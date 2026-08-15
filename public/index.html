@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MiniScape 2D - V40 (Multiplayer & Câmera Precisa)</title>
+    <title>MiniScape 2D - V41 (Correção Crítica de Login)</title>
     <style>
         /* === BASE & RESPONSIVIDADE (TELA CHEIA) === */
         body { margin: 0; padding: 10px; background-color: #121212; color: #e0e0e0; font-family: 'Segoe UI', Tahoma, sans-serif; display: flex; gap: 15px; justify-content: center; height: 100vh; box-sizing: border-box; overflow: hidden; flex-direction: row; align-items: stretch; }
         @media (max-width: 850px) { body { flex-direction: column; align-items: center; padding: 5px; overflow-y: auto; height: auto;} #ui-panel { width: 100% !important; max-width: 100%; min-height: 500px; } .mobile-btn { display: block !important; } #game-container { height: 50vh; min-height: 400px; } }
         
-        /* NOVO SISTEMA DE CÂMERA: OCUPA 100% DO CONTAINER. SEM MOLDURA, SEM SCROLL CSS */
+        /* SISTEMA DE CÂMERA: OCUPA 100% DO CONTAINER. SEM MOLDURA, SEM SCROLL CSS */
         #game-container { position: relative; flex: 1; border: 2px solid #3d2e24; background-color: #000; box-shadow: 0 0 20px rgba(0,0,0,0.8); overflow: hidden; border-radius: 4px; display: block;}
         #gameCanvas { cursor: crosshair; display: block; width: 100%; height: 100%; touch-action: none; }
         
@@ -60,6 +60,7 @@
         .spell-card { background: #231c15; border: 1px solid #3d2e24; padding: 8px; margin-bottom: 5px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s; border-radius: 4px;} .spell-card:hover { background: #3d2e24; } .spell-active { border: 1px solid #3498db; background: rgba(52, 152, 219, 0.1); } .spell-runes { font-size: 0.65rem; color: #95a5a6; }
         .npc-dialog { background: #111; border-left: 4px solid #f1c40f; padding: 10px; font-style: italic; margin-bottom: 10px; color: #ecf0f1; font-size: 0.85rem;} .shop-item { display: flex; justify-content: space-between; align-items: center; background: #231c15; padding: 6px; border: 1px solid #3d2e24; margin-bottom: 4px; border-radius: 3px; font-size: 0.8rem;} .shop-btn { background: #5d4037; color: #fff; border: 1px solid #8b5a2b; padding: 4px 8px; font-weight: bold; cursor: pointer; font-size: 0.7rem; border-radius: 2px;} .shop-btn:hover { background: #8b5a2b; color: #f1c40f; } .shop-btn:disabled { background: #333; border-color: #222; color: #666; cursor: not-allowed; }
         
+        /* DEV MODE CSS */
         .dev-sub-tabs { display: flex; margin-bottom: 10px; border-bottom: 2px solid #5d4037; flex-wrap: wrap;} .dev-sub-btn { background: #231c15; color: #888; border: none; padding: 6px 10px; cursor: pointer; font-size: 0.7rem; flex: 1; } .dev-sub-btn.active { background: #5d4037; color: #f1c40f; font-weight: bold; } .dev-sub-content { display: none; } .dev-sub-content.active { display: block; } .dev-form-group { margin-bottom: 8px; } .dev-form-group label { display: block; font-size: 0.65rem; color: #bdc3c7; margin-bottom: 2px; text-transform: uppercase;} .dev-input, .dev-select { width: 100%; padding: 6px; background: #111; color: #fff; border: 1px solid #3d2e24; box-sizing: border-box; font-size: 0.8rem; border-radius: 2px;} .dev-row { display: flex; gap: 5px; } .dev-save-btn { width: 100%; padding: 8px; background: #27ae60; color: white; border: none; font-weight: bold; cursor: pointer; margin-top: 5px; border-radius: 2px;} .dev-save-btn:hover { background: #2ecc71; } 
         
         #dev-entity-list { max-height: 180px; overflow-y: auto; background: #111; border: 1px solid #3d2e24; padding: 5px; border-radius: 4px;} .dev-ent-cat { color: #f39c12; font-size: 0.7rem; border-bottom: 1px solid #333; margin-top: 5px; padding-bottom: 2px; text-transform: uppercase; font-weight: bold;} .dev-ent-item { padding: 6px; font-size: 0.8rem; cursor: pointer; color: #ecf0f1; border-radius: 3px; display: flex; align-items: center; gap: 8px;} .dev-ent-item:hover { background: #2c241b; color: #f1c40f;} .dev-ent-item.selected { background: #5d4037; font-weight: bold; color: white;} .entity-selector-item:hover { filter: brightness(1.5); }
@@ -81,7 +82,7 @@
     <div id="login-overlay">
         <div class="login-box">
             <h1>MiniScape</h1>
-            <p style="font-size: 0.8rem; color: #bdc3c7;">Servidor Online Oficial</p>
+            <p style="font-size: 0.8rem; color: #bdc3c7;">Servidor Online V41</p>
             <input type="text" id="auth-user" class="login-input" placeholder="Usuário">
             <input type="password" id="auth-pass" class="login-input" placeholder="Senha">
             <div id="login-msg"></div>
@@ -91,7 +92,7 @@
     </div>
 
     <!-- O JOGO FICA OCULTO ATÉ O LOGIN SER APROVADO -->
-    <div id="game-wrapper" style="display: none; width: 100%; height: 100%; max-width: 1400px; gap: 15px;">
+    <div id="game-wrapper" style="display: none; width: 100%; height: 100%; gap: 15px;">
         <div id="custom-modal-overlay"><div id="custom-modal-box"></div></div>
         <div id="tooltip"></div>
         <div id="osrs-menu"></div>
@@ -172,12 +173,12 @@
                     <h3 style="color:#2ecc71; margin-top:0;">📡 Injetor de Expansão</h3>
                     <p style="font-size:0.75rem; color:#bdc3c7; line-height: 1.4;">Cole os <b>Códigos Especiais</b> gerados pela IA para adicionar Novos Bosses, Itens e Recursos.</p>
                     <textarea id="dev-import-code" class="dev-input" style="height:120px; font-family:monospace; resize: none; margin-bottom: 10px;" placeholder="Cole o código Base64 aqui..."></textarea>
-                    <button class="dev-save-btn" onclick="importDevCode()" style="background:#8e44ad; font-size: 1rem;">⚡ Injetar Pacote</button>
+                    <button class="dev-save-btn" onclick="importDevCode()" style="background:#8e44ad; font-size: 1rem;">⚡ Injetar Pacote de Dados</button>
                 </div>
 
                 <div id="dev-map" class="dev-sub-content active">
                     <div class="dev-row" style="margin-bottom: 5px;">
-                        <input type="text" id="dev-search" class="dev-input" placeholder="🔍 Buscar entidade (Ex: arvore)..." oninput="filterDevEntities(this.value)" style="flex: 1; border-color: #5d4037;">
+                        <input type="text" id="dev-search" class="dev-input" placeholder="🔍 Buscar entidade..." oninput="filterDevEntities(this.value)" style="flex: 1; border-color: #5d4037;">
                         <button class="dev-save-btn" style="width: auto; margin:0; background:#3d2e24;" onclick="toggleDevView()" title="Alternar Vista">🔲/📄</button>
                     </div>
                     
@@ -193,23 +194,17 @@
                     <button onclick="toggleDevBuild()" id="btn-build-mode" style="width: 100%; padding: 10px; background: #e67e22; color: white; border: none; font-weight: bold; cursor: pointer; margin-top:5px; border-radius:4px;">
                         Modo Construção: OFF
                     </button>
-                    <p style="font-size: 0.7rem; color: #f1c40f; margin-top:10px;">Clique ESQUERDO no mapa para <b>Colocar</b>.<br>Clique DIREITO para <b>Apagar (Borracha)</b></p>
+                    <p style="font-size: 0.7rem; color: #f1c40f; margin-top:10px;">Clique ESQUERDO: Colocar<br>Clique DIREITO: <b>Apagar (Borracha)</b></p>
                 </div>
 
                 <div id="dev-map-manager" class="dev-sub-content">
                     <div class="dev-form-group" style="background:#1a1511; padding:10px; border:1px solid #3d2e24; margin-bottom:10px; border-radius:4px;">
                         <label style="color:#2ecc71; margin-bottom:5px;">🗺️ Editar Mapa Atual: <span id="cur-map-id-disp"></span></label>
-                        <div class="dev-row">
-                            <input type="text" id="cur-map-name" class="dev-input" placeholder="Nome">
-                            <input type="color" id="cur-map-color" class="dev-input" style="padding:0; height:28px;">
-                        </div>
-                        <div class="dev-row" style="margin-top:5px;">
-                            <input type="number" id="cur-map-w" class="dev-input" placeholder="Larg (W)">
-                            <input type="number" id="cur-map-h" class="dev-input" placeholder="Alt (H)">
-                        </div>
+                        <div class="dev-row"><input type="text" id="cur-map-name" class="dev-input" placeholder="Nome"><input type="color" id="cur-map-color" class="dev-input" style="padding:0; height:28px;"></div>
+                        <div class="dev-row" style="margin-top:5px;"><input type="number" id="cur-map-w" class="dev-input" placeholder="Larg (W)"><input type="number" id="cur-map-h" class="dev-input" placeholder="Alt (H)"></div>
                         <button class="dev-save-btn" onclick="saveCurrentMapSettings()">Salvar Alterações</button>
                     </div>
-                    <p style="font-size:0.7rem; color:#bdc3c7;">Conecte seus mapas clicando na grade. Eles transicionam sozinhos ao andar até a borda.</p>
+                    <p style="font-size:0.7rem; color:#bdc3c7;">Conecte seus mapas clicando na grade.</p>
                     <div id="map-grid-ui" class="map-tile-grid"></div>
                     <div class="dev-form-group" style="margin-top:10px; padding-top: 10px; border-top: 1px solid #444;">
                         <label style="color:#f39c12;">Criar Novo Mapa Solto:</label>
@@ -252,40 +247,52 @@
 
             <div id="tab-cfg" class="tab-content">
                 <h3 style="color:#ecf0f1; margin-top: 0; border-bottom: 1px solid #3d2e24; padding-bottom: 5px;">Sistema Servidor</h3>
-                <p style="font-size: 0.75rem; color: #bdc3c7;">Seus dados são salvos online (ou offline) automaticamente a cada 60 segundos.</p>
-                <button class="dev-save-btn" style="background: #27ae60;" onclick="saveDataLogic(true)">💾 Forçar Save Global</button>
+                <p style="font-size: 0.75rem; color: #bdc3c7;">Seus dados são salvos online automaticamente a cada 60 segundos.</p>
+                <button class="dev-save-btn" style="background: #27ae60;" onclick="saveDataLogic(true)">💾 Forçar Save Online</button>
                 <button class="dev-save-btn" style="background: #c0392b; margin-top: 20px;" onclick="logOut()">🚪 Sair da Conta</button>
             </div>
         </div>
     </div>
 
+    <!-- SCRIPT GIGANTE E UNIFICADO DO JOGO -->
     <script>
-        // === VARIÁVEIS GLOBAIS ===
+        // === VARIÁVEIS GLOBAIS ÚNICAS ===
         const canvas = document.getElementById('gameCanvas'); 
         const ctx = canvas.getContext('2d');
+        const osrsMenu = document.getElementById('osrs-menu'); 
+        const tooltip = document.getElementById('tooltip');
+        
         let gameLoopStarted = false;
         let currentUser = null;
         let userRole = 'player';
         let isOfflineMode = false;
         let chatMessages = [];
-        let otherPlayers = {}; // Multiplayer em tempo real
+        let otherPlayers = {}; 
         
         let floatingTexts = []; let projectiles = []; let isBankOpen = false; let isNPCOpen = false; let isDevBuildMode = false; let activeNPCShop = null;
         let selectedDevEntity = 'tree'; let devViewMode = 'list'; const imgCache = {};
         let keys = { w: false, a: false, s: false, d: false, arrowup: false, arrowdown: false, arrowleft: false, arrowright: false };
 
-        const osrsMenu = document.getElementById('osrs-menu'); 
-        const tooltip = document.getElementById('tooltip');
+        // --- FUNÇÕES UTILITÁRIAS ---
+        function removeAccents(str) { return str.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); }
+        
+        // --- FUNÇÃO CRÍTICA QUE FALTAVA (CORREÇÃO DA TELA PRETA) ---
+        function giveStarterItems() { 
+            addInvItem('Bronze Sword', 1); addInvItem('Shortbow', 1); addInvItem('Staff', 1); 
+            addInvItem('Bronze Pickaxe', 1); addInvItem('Bronze Axe', 1); addInvItem('Tinderbox', 1); 
+            addInvItem('Net', 1); addInvItem('Coins', 100); addInvItem('Air Rune', 50); 
+            addInvItem('Mind Rune', 50); addInvItem('Bronze Arrow', 50); 
+        }
 
-        // --- BANCOS DE DADOS DE FÁBRICA ---
+        // --- BANCOS DE DADOS DE FÁBRICA (FALLBACK) ---
         let itemDB = {
             'Bronze Pickaxe': { name: 'Bronze Pickaxe', icon: '⛏️', type: 'equipment', slot: 'weapon', tool: 'pickaxe', stackable: false, weight: 2.0, desc: 'Ferramenta de mineração.', recipe: 'Bronze Bar,2|Logs,1', craftQty: 1 },
             'Iron Pickaxe': { name: 'Iron Pickaxe', icon: '⛏️', type: 'equipment', slot: 'weapon', tool: 'pickaxe', stackable: false, weight: 2.0, desc: 'Minera rápido.', recipe: 'Iron Bar,2|Logs,1', craftQty: 1 },
             'Bronze Axe': { name: 'Bronze Axe', icon: '🪓', type: 'equipment', slot: 'weapon', tool: 'axe', stackable: false, weight: 2.0, desc: 'Corta lenha.', recipe: 'Bronze Bar,1|Logs,1', craftQty: 1 },
-            'Bronze Sword': { name: 'Bronze Sword', icon: '🗡️', type: 'equipment', slot: 'weapon', bonusDmg: 4, stackable: false, weight: 1.8, desc: 'Espada de combate.', recipe: 'Bronze Bar,1', craftQty: 1 },
+            'Bronze Sword': { name: 'Bronze Sword', icon: '🗡️', type: 'equipment', slot: 'weapon', bonusDmg: 4, stackable: false, weight: 1.8, desc: 'Espada.', recipe: 'Bronze Bar,1', craftQty: 1 },
             'Shortbow': { name: 'Shortbow', icon: '🏹', type: 'equipment', slot: 'weapon', tool: 'ranged', bonusDmg: 2, stackable: false, weight: 1.0, desc: 'Arco longo alcance.', recipe: 'Logs,2', craftQty: 1 },
-            'Staff': { name: 'Staff', icon: '🦯', type: 'equipment', slot: 'weapon', tool: 'magic', bonusDmg: 1, stackable: false, weight: 1.5, desc: 'Lança magias.', recipe: 'Logs,3', craftQty: 1 },
-            'Bronze Shield': { name: 'Bronze Shield', icon: '🛡️', type: 'equipment', slot: 'shield', defBonus: 2, stackable: false, weight: 3.0, desc: 'Aumenta defesa.', recipe: 'Bronze Bar,2', craftQty: 1 }, 
+            'Staff': { name: 'Staff', icon: '🦯', type: 'equipment', slot: 'weapon', tool: 'magic', bonusDmg: 1, stackable: false, weight: 1.5, desc: 'Magias.', recipe: 'Logs,3', craftQty: 1 },
+            'Bronze Shield': { name: 'Bronze Shield', icon: '🛡️', type: 'equipment', slot: 'shield', defBonus: 2, stackable: false, weight: 3.0, desc: 'Defesa.', recipe: 'Bronze Bar,2', craftQty: 1 }, 
             'Bronze Body': { name: 'Bronze Body', icon: '🦺', type: 'equipment', slot: 'body', defBonus: 3, stackable: false, weight: 5.0, desc: 'Armadura pesada.', recipe: 'Bronze Bar,3', craftQty: 1 }, 
             'Bronze Arrow': { name: 'Bronze Arrow', icon: '↗️', type: 'equipment', slot: 'ammo', bonusDmg: 1, stackable: true, weight: 0.01, desc: 'Munição arco.', recipe: 'Logs,1|Copper Ore,1', craftQty: 10 },
             'Iron Arrow': { name: 'Iron Arrow', icon: '➵', type: 'equipment', slot: 'ammo', bonusDmg: 3, stackable: true, weight: 0.01, desc: 'Munição forte.', recipe: 'Logs,1|Iron Ore,1', craftQty: 10 },
@@ -298,9 +305,9 @@
             'Iron Bar': { name: 'Iron Bar', icon: '🧱', type: 'resource', stackable: true, weight: 1.8, desc: 'Barra de ferro.' },
             'Logs': { name: 'Logs', icon: '🪵', type: 'resource', stackable: true, weight: 1.5, desc: 'Lenha extraída.' },
             'Bones': { name: 'Bones', icon: '🦴', type: 'consumable', heal: 0, stackable: true, weight: 0.5, desc: 'Enterre para XP Prayer.' }, 
-            'Air Rune': { name: 'Air Rune', icon: '💨', type: 'resource', stackable: true, weight: 0.01, desc: 'Runa do ar.' },
+            'Air Rune': { name: 'Air Rune', icon: '💨', type: 'resource', stackable: true, weight: 0.01, desc: 'Runa elemental.' },
             'Mind Rune': { name: 'Mind Rune', icon: '👁️', type: 'resource', stackable: true, weight: 0.01, desc: 'Runa mental.' },
-            'Water Rune': { name: 'Water Rune', icon: '💧', type: 'resource', stackable: true, weight: 0.01, desc: 'Runa da água.' },
+            'Water Rune': { name: 'Water Rune', icon: '💧', type: 'resource', stackable: true, weight: 0.01, desc: 'Runa de água.' },
             'Raw Meat': { name: 'Raw Meat', icon: '🥩', type: 'resource', stackable: true, weight: 0.8, desc: 'Carne crua.' },
             'Cooked Meat': { name: 'Cooked Meat', icon: '🍖', type: 'consumable', heal: 4, stackable: true, weight: 0.8, desc: 'Cura HP.' },
             'Raw Fish': { name: 'Raw Fish', icon: '🐟', type: 'resource', stackable: true, weight: 0.5, desc: 'Peixe cru.' },
@@ -335,8 +342,9 @@
         // --- SISTEMA DE SESSÃO E INICIALIZAÇÃO ---
         document.addEventListener('DOMContentLoaded', async () => {
             const isLocalFile = window.location.protocol === 'file:';
+            
             if (isLocalFile) {
-                console.log("Arquivo Local detectado. Forçando Offline Dev Mode.");
+                console.log("Arquivo Local detectado. Forçando Offline.");
                 forceOfflineMode();
             } else {
                 let savedSession = localStorage.getItem('miniscape_session');
@@ -351,11 +359,12 @@
 
         async function attemptSessionLogin(username) {
             try {
-                // Auto preenche a tela pra facilitar, num jogo real usaria JWT Token.
                 document.getElementById('auth-user').value = username;
                 document.getElementById('login-overlay').style.display = 'flex';
                 document.getElementById('login-msg').innerText = "Sessão encontrada. Digite sua senha.";
-            } catch(e) { document.getElementById('login-overlay').style.display = 'flex'; }
+            } catch(e) {
+                document.getElementById('login-overlay').style.display = 'flex';
+            }
         }
 
         async function register() {
@@ -386,18 +395,18 @@
             if(!user || !pass) { msg.innerText = "Preencha usuário e senha!"; return; }
             msg.innerText = "Autenticando...";
             
-            // ADMIN MESTRE
             if (user === 'Admin' && pass === 'Adleradm') {
-                currentUser = user; userRole = 'admin'; isOfflineMode = false; // Tenta online primeiro
+                currentUser = user; userRole = 'admin'; isOfflineMode = true;
                 localStorage.setItem('miniscape_session', user);
+                finishLoginSetup(JSON.parse(localStorage.getItem('miniscape_save_v41') || '{}'));
+                return;
             }
 
             try {
                 let res = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: user, password: pass }) });
                 
-                // Se o servidor for zerado, o Admin força a criação da conta via API.
                 if (res.status === 401 && user === 'Admin' && pass === 'Adleradm') {
-                     await fetch('/api/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: user, password: pass }) });
+                     let regRes = await fetch('/api/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: user, password: pass }) });
                      res = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: user, password: pass }) });
                 }
 
@@ -414,14 +423,14 @@
                 if ((user === 'Admin' && pass === 'Adleradm') || (users[user] && users[user] === pass)) {
                     currentUser = user; userRole = (user === 'Admin') ? 'admin' : 'player'; isOfflineMode = true;
                     localStorage.setItem('miniscape_session', user);
-                    finishLoginSetup(JSON.parse(localStorage.getItem('miniscape_save_v39') || '{}'));
+                    finishLoginSetup(JSON.parse(localStorage.getItem('miniscape_save_v41') || '{}'));
                 } else { msg.innerText = "Servidor offline. Conta local não encontrada."; }
             }
         }
 
         function forceOfflineMode() {
             currentUser = 'LocalAdmin'; userRole = 'admin'; isOfflineMode = true;
-            finishLoginSetup(JSON.parse(localStorage.getItem('miniscape_save_v39') || '{}'));
+            finishLoginSetup(JSON.parse(localStorage.getItem('miniscape_save_v41') || '{}'));
         }
 
         function logOut() {
@@ -430,7 +439,6 @@
         }
 
         function finishLoginSetup(data) {
-            // INJETA O BOTÃO DEV SE FOR ADMIN
             if(userRole === 'admin') {
                 let tabContainer = document.getElementById('tab-buttons-container');
                 let devBtn = document.createElement('button');
@@ -460,23 +468,31 @@
             document.getElementById('login-overlay').style.display = 'none';
             document.getElementById('game-wrapper').style.display = 'flex';
             
-            // LIGA O MOTOR!
             setTimeout(() => {
-                resizeCanvas(); window.addEventListener('resize', resizeCanvas);
+                resizeCanvas();
+                window.addEventListener('resize', resizeCanvas);
+                
                 openTab('inv'); updateUI(); 
                 if(userRole === 'admin') { buildDevEntityList(); loadDevMapManager(); }
-                updateChatUI();
                 
-                if(!gameLoopStarted) { gameLoopStarted = true; gameLoop(); }
-            }, 50);
+                updateChatUI();
+                if(!isOfflineMode) setInterval(pollChat, 3000);
+
+                if(!gameLoopStarted) {
+                    gameLoopStarted = true;
+                    gameLoop(); 
+                }
+            }, 100);
         }
 
         function resizeCanvas() {
             const container = document.getElementById('game-container');
-            if(container) { canvas.width = container.clientWidth; canvas.height = container.clientHeight; }
+            if(container) {
+                canvas.width = container.clientWidth;
+                canvas.height = container.clientHeight;
+            }
         }
 
-        // --- SISTEMA MULTIPLAYER E SINCRONIZAÇÃO (A CADA 500MS) ---
         setInterval(async () => {
             if(!currentUser || isOfflineMode) return;
             try {
@@ -489,7 +505,7 @@
                 const data = await res.json();
                 if(data.players) otherPlayers = data.players;
                 if(data.chat) { chatMessages = data.chat; updateChatUI(); }
-                if(data.worldData && userRole !== 'admin') { gameMaps = data.worldData; } // Admins mandam o mapa, players recebem.
+                if(data.worldData && userRole !== 'admin') { gameMaps = data.worldData; }
             } catch(e) {}
         }, 500);
 
@@ -500,35 +516,66 @@
 
             if (isOfflineMode || window.location.protocol === 'file:') {
                 const saveData = { playerData: player, worldData: gameMaps, itemDB: itemDB, npcDB: npcDB }; 
-                localStorage.setItem('miniscape_save_v39', JSON.stringify(saveData));
+                localStorage.setItem('miniscape_save_v41', JSON.stringify(saveData));
                 if(manual) setActionText("Salvo Localmente!", "#f1c40f"); return;
             }
             try {
                 await fetch('/api/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: currentUser, playerData: player, worldData: gameMaps, itemDB: itemDB, npcDB: npcDB }) });
                 if(manual) setActionText("Progresso salvo online!", "#3498db");
-            } catch (e) { if(manual) setActionText("Erro ao salvar no servidor.", "#e74c3c"); }
+            } catch (e) {
+                if(manual) setActionText("Erro ao salvar no servidor.", "#e74c3c");
+            }
         }
         setInterval(() => { if(currentUser) saveDataLogic(); }, 60000);
 
         // --- CHAT SYSTEM ---
         async function sendChat() {
-            if (isOfflineMode) { setActionText("Chat indisponível offline.", "#e74c3c"); return; }
-            const input = document.getElementById('chat-input'); const msg = input.value.trim(); if(!msg) return; input.value = '';
+            if (isOfflineMode) {
+                setActionText("Chat indisponível offline.", "#e74c3c"); return;
+            }
+            const input = document.getElementById('chat-input');
+            const msg = input.value.trim();
+            if(!msg) return;
+            input.value = '';
+            
             let color = userRole === 'admin' ? '#e74c3c' : '#ecf0f1';
+            
             try {
                 const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sender: currentUser, msg: msg, color: color }) });
                 const data = await res.json();
-                if(data.chat) { chatMessages = data.chat; updateChatUI(); }
+                if(data.chat) {
+                    chatMessages = data.chat;
+                    updateChatUI();
+                }
+            } catch(e) { console.error(e); }
+        }
+
+        async function pollChat() {
+            try {
+                const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sender: '', msg: '' }) });
+                const data = await res.json();
+                if(data.chat) {
+                    chatMessages = data.chat;
+                    updateChatUI();
+                }
             } catch(e) {}
         }
+
         function updateChatUI() {
-            const box = document.getElementById('chat-box'); if(!box) return; box.innerHTML = '';
-            chatMessages.forEach(c => { box.innerHTML += `<div class="chat-msg"><span style="color:${c.color}; font-weight:bold;">[${c.sender}]</span>: ${c.msg}</div>`; });
+            const box = document.getElementById('chat-box');
+            if(!box) return;
+            box.innerHTML = '';
+            chatMessages.forEach(c => {
+                box.innerHTML += `<div class="chat-msg"><span style="color:${c.color}; font-weight:bold;">[${c.sender}]</span>: ${c.msg}</div>`;
+            });
             box.scrollTop = box.scrollHeight;
         }
-        document.getElementById('chat-input').addEventListener('keypress', function (e) { if (e.key === 'Enter') sendChat(); });
 
-        // --- SISTEMAS DE CONTROLE ---
+        document.getElementById('chat-input').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') sendChat();
+        });
+
+        // --- SISTEMAS DE CONTROLE (TECLADO) ---
         window.addEventListener("keydown", function(e) {
             if(document.getElementById('login-overlay').style.display !== 'none') return; 
             if(["Space","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].indexOf(e.code) > -1) {
@@ -547,7 +594,10 @@
             let k = e.key.toLowerCase(); if(['w','a','s','d','arrowup','arrowleft','arrowdown','arrowright'].includes(k)) keys[k] = false;
         });
 
-        // --- CÁLCULO DE CÂMERA ---
+        document.addEventListener('mousemove', (e) => { if (tooltip.style.display === 'block') { tooltip.style.left = (e.pageX + 15) + 'px'; tooltip.style.top = (e.pageY + 15) + 'px'; } });
+        function showTooltip(item) { if(!item) return; let html = `<div class="tt-title">${item.name}</div><div class="tt-desc">${item.desc||''}</div>`; if (item.bonusDmg) html += `<div class="tt-stat">⚔️ Dano: +${item.bonusDmg}</div>`; if (item.defBonus) html += `<div class="tt-stat">🛡️ Defesa: +${item.defBonus}</div>`; if (item.heal) html += `<div class="tt-stat">❤️ Cura: +${item.heal}</div>`; html += `<div class="tt-weight">⚖️ Peso: ${item.weight||0} kg</div>`; tooltip.innerHTML = html; tooltip.style.display = 'block'; }
+        function hideTooltip() { tooltip.style.display = 'none'; }
+        
         function getCameraOffset() {
             let mapObj = gameMaps[currentMap];
             if (!mapObj) return { x: 0, y: 0 };
@@ -575,7 +625,7 @@
             return { x: ((cX - rect.left) * scaleX) - offset.x, y: ((cY - rect.top) * scaleY) - offset.y, pageX: pX, pageY: pY };
         }
 
-        // --- INVENTÁRIO & UI ---
+        // --- INVENTÁRIO E UI ---
         function getInvCount(iName) { return player.inventory.reduce((acc, i) => acc + (i.name === iName ? (i.qty||1) : 0), 0); }
         function calcTotalWeight() { return player.inventory.reduce((acc, i) => acc + ((i&&i.weight?i.weight:0) * (i&&i.qty?i.qty:1)), 0).toFixed(1); }
         function removeInvItem(iName, amount) { let tr = amount; for(let i = player.inventory.length - 1; i >= 0; i--) { if(player.inventory[i].name === iName) { if(player.inventory[i].stackable) { if(player.inventory[i].qty > tr) { player.inventory[i].qty -= tr; return true; } else { tr -= player.inventory[i].qty; player.inventory.splice(i, 1); } } else { player.inventory.splice(i, 1); tr--; if(tr === 0) return true; } } } return false; }
@@ -594,31 +644,15 @@
 
         function unequip(slot) { const item = player.equipment[slot]; if(item) { if(item.stackable && slot === 'ammo') { if(addInvItem(item.name, item.qty)) { player.equipment[slot] = null; updateUI(); } else { setActionText("Inv. Cheio!", "#e74c3c"); } } else { if(player.inventory.length >= 28) { setActionText("Inv. Cheio!", "#e74c3c"); return; } player.equipment[slot] = null; player.inventory.push(item); hideTooltip(); updateUI(); } } }
 
-        function craftItem(iName) {
-            let it = itemDB[iName]; if(!it || !it.recipe) return; let reqs = it.recipe.split('|'); let hasAll = true;
-            reqs.forEach(r => { let p = r.split(','); if(getInvCount(p[0].trim()) < parseInt(p[1])) hasAll = false; });
-            if(hasAll) { reqs.forEach(r => { let p = r.split(','); removeInvItem(p[0].trim(), parseInt(p[1])); }); if(addInvItem(iName, it.craftQty || 1)) { addXP('crafting', 15); setActionText(`Criou ${iName}!`); } updateUI(); } else { setActionText(`Faltam materiais!`, '#e74c3c'); }
-        }
+        function craftItem(iName) { let it = itemDB[iName]; if(!it || !it.recipe) return; let reqs = it.recipe.split('|'); let hasAll = true; reqs.forEach(r => { let p = r.split(','); if(getInvCount(p[0].trim()) < parseInt(p[1])) hasAll = false; }); if(hasAll) { reqs.forEach(r => { let p = r.split(','); removeInvItem(p[0].trim(), parseInt(p[1])); }); if(addInvItem(iName, it.craftQty || 1)) { addXP('crafting', 15); setActionText(`Criou ${iName}!`); } updateUI(); } else { setActionText(`Faltam materiais!`, '#e74c3c'); } }
 
         function closeMenus() { isBankOpen = false; isNPCOpen = false; activeNPCShop = null; document.getElementById('btn-bank').style.display='none'; document.getElementById('btn-npc').style.display='none'; }
         function openTab(tP) { document.querySelectorAll('.tab-content').forEach(e=>e.classList.remove('active-tab')); document.querySelectorAll('.tab-btn').forEach(e=>e.classList.remove('active-btn')); const tb = document.getElementById(`tab-${tP}`); if(tb) tb.classList.add('active-tab'); const bt = document.getElementById(`btn-${tP}`); if(bt) bt.classList.add('active-btn'); isBankOpen = (tP === 'bank'); isNPCOpen = (tP === 'npc'); if (['craft', 'mag', 'inv', 'eq', 'sk', 'bank'].includes(tP)) { updateUI(); } }
         function setActionText(t, c="#2ecc71") { const el = document.getElementById('action-text'); el.innerText = t; el.style.color = c; setTimeout(() => { if(el.innerText === t) el.innerText = ""; }, 3000); }
         function addFloatingText(x, y, t, c) { floatingTexts.push({ x: x, y: y, text: t, color: c, life: 50 }); }
         
-        function addXP(sK, a) { 
-            const sk = player.stats.skills[sK]; if(!sk) return;
-            sk.xp += a; addFloatingText(player.x, player.y - 20, `+${a} XP`, '#f1c40f'); 
-            let leveledUp = false;
-            while (sk.xp >= sk.next) { 
-                sk.level++; sk.xp -= sk.next; sk.next = Math.floor(sk.next * 1.5); leveledUp = true;
-                if (sK === 'hp') { player.stats.maxHp += 2; player.stats.hp = player.stats.maxHp; } 
-            } 
-            if(leveledUp) { setActionText(`${sk.name} Nível ${sk.level}!`, "#f1c40f"); addFloatingText(player.x, player.y - 40, `Level Up!`, '#2ecc71'); }
-            updateUI(); 
-        }
-
+        function addXP(sK, a) { const sk = player.stats.skills[sK]; if(!sk) return; sk.xp += a; addFloatingText(player.x, player.y - 20, `+${a} XP`, '#f1c40f'); let leveledUp = false; while (sk.xp >= sk.next) { sk.level++; sk.xp -= sk.next; sk.next = Math.floor(sk.next * 1.5); leveledUp = true; if (sK === 'hp') { player.stats.maxHp += 2; player.stats.hp = player.stats.maxHp; } } if(leveledUp) { setActionText(`${sk.name} Nível ${sk.level}!`, "#f1c40f"); addFloatingText(player.x, player.y - 40, `Level Up!`, '#2ecc71'); } updateUI(); }
         function getTotalDef() { let d = player.stats.skills.combat.level; if(player.equipment.shield) d += player.equipment.shield.defBonus; if(player.equipment.body) d += player.equipment.body.defBonus; return d; }
-
         function openShop(nData) { document.getElementById('btn-npc').style.display = 'block'; openTab('npc'); document.getElementById('npc-title').innerText = nData.name; document.getElementById('npc-dialog').innerText = `"${nData.dialog || '...'}"`; let sL = document.getElementById('npc-shop-list'); sL.innerHTML = ''; if(nData.shopStr) { nData.shopStr.split('|').forEach(p => { let pt = p.split(','); if(pt.length >= 2) { let iN = pt[0].trim(); let ct = parseInt(pt[1]); let iD = itemDB[iN]; if(iD) { sL.innerHTML += `<div class="shop-item"><span>${iD.icon} ${iD.name}</span><button class="shop-btn" onclick="buyItem('${iN}', ${ct})">Comprar (${ct} 🪙)</button></div>`; } } }); } }
         function buyItem(iN, ct) { if(getInvCount('Coins') >= ct) { if(addInvItem(iN, 1)) { removeInvItem('Coins', ct); setActionText(`Comprou ${iN}!`); updateUI(); } else { setActionText("Inv Cheio!", "#e74c3c"); } } else { setActionText("Coins insuficientes!", "#e74c3c"); } }
         function setActiveSpell(sId) { player.activeSpell = sId; updateUI(); }
@@ -642,7 +676,7 @@
 
         function importDevCode() {
             const codeInput = document.getElementById('dev-import-code').value.trim(); if (!codeInput) { setActionText("Cole o código!", "#e74c3c"); return; }
-            try { let decoded = atob(codeInput); let parsed = JSON.parse(decoded); if(parsed.items) Object.assign(itemDB, parsed.items); if(parsed.npcs) Object.assign(npcDB, parsed.npcs); saveDataLogic(); updateUI(); buildDevEntityList(); document.getElementById('dev-import-code').value = ''; setActionText("Importado com sucesso!", "#2ecc71"); } catch(e) { setActionText("Código inválido.", "#e74c3c"); }
+            try { let decoded = atob(codeInput); let parsed = JSON.parse(decoded); if(parsed.items) Object.assign(itemDB, parsed.items); if(parsed.npcs) Object.assign(npcDB, parsed.npcs); saveDataLogic(); updateUI(); buildDevEntityList(); document.getElementById('dev-import-code').value = ''; setActionText("Importado com sucesso!", "#2ecc71"); alert("Pacote injetado com sucesso!"); } catch(e) { setActionText("Código inválido.", "#e74c3c"); }
         }
 
         function filterDevEntities(term) { let val = removeAccents(term).toLowerCase(); document.querySelectorAll('.dev-ent-item').forEach(el => { let txt = removeAccents(el.getAttribute('data-name')).toLowerCase(); if(txt.includes(val)) el.style.display = devViewMode === 'list' ? 'flex' : 'flex'; else el.style.display = 'none'; }); if(devViewMode === 'list') { document.querySelectorAll('.dev-ent-cat').forEach(cat => { let hasVisible = false; let next = cat.nextElementSibling; while(next && next.classList.contains('dev-ent-item')) { if(next.style.display !== 'none') hasVisible = true; next = next.nextElementSibling; } cat.style.display = hasVisible ? 'block' : 'none'; }); } }
@@ -668,20 +702,22 @@
         function populateDevNPCs(){ let s=document.getElementById('dev-npc-select'); s.innerHTML='<option value="NEW">-- CRIAR NOVO --</option>'; Object.keys(npcDB).forEach(k=>{s.innerHTML+=`<option value="${k}">${k} (${npcDB[k].name})</option>`;}); }
         function loadDevNPCForm(){ let k=document.getElementById('dev-npc-select').value; if(k==='NEW'){ document.getElementById('dn-id').value=''; document.getElementById('dn-name').value='Monstro'; document.getElementById('dn-hp').value=10; document.getElementById('dn-hit').value=1; document.getElementById('dn-xp').value=20; document.getElementById('dn-loot').value=''; document.getElementById('dn-dialog').value=''; document.getElementById('dn-shop').value=''; }else{ let n=npcDB[k]; document.getElementById('dn-id').value=k; document.getElementById('dn-name').value=n.name; document.getElementById('dn-hp').value=n.hp; document.getElementById('dn-hit').value=n.maxHit; document.getElementById('dn-xp').value=n.xp; document.getElementById('dn-c1').value=n.c1; document.getElementById('dn-c2').value=n.c2; document.getElementById('dn-loot').value=n.lootStr||''; document.getElementById('dn-dialog').value=n.dialog||''; document.getElementById('dn-shop').value=n.shopStr||''; } }
         function saveDevNPC(){ let k=document.getElementById('dn-id').value; if(!k)return; npcDB[k]={name:document.getElementById('dn-name').value,hp:parseInt(document.getElementById('dn-hp').value),maxHit:parseInt(document.getElementById('dn-hit').value),xp:parseInt(document.getElementById('dn-xp').value),c1:document.getElementById('dn-c1').value,c2:document.getElementById('dn-c2').value,lootStr:document.getElementById('dn-loot').value,dialog:document.getElementById('dn-dialog').value,shopStr:document.getElementById('dn-shop').value}; populateDevNPCs(); document.getElementById('dev-npc-select').value=k; setActionText(`NPC salvo!`); saveDataLogic(); buildDevEntityList();}
-        function toggleDevBuild() { isDevBuildMode = !isDevBuildMode; document.getElementById('btn-build-mode').innerText=`Modo Construção: ${isDevBuildMode?'ON':'OFF'}`; document.getElementById('btn-build-mode').style.background=isDevBuildMode?'#2ecc71':'#e67e22'; setActionText(isDevBuildMode?"Build ON.":"Build OFF.", "#f1c40f"); }
+        function toggleDevBuild() { isDevBuildMode = !isDevBuildMode; document.getElementById('btn-build-mode').innerText=`Modo Construção: ${isDevBuildMode?'ON':'OFF'}`; document.getElementById('btn-build-mode').style.background=isDevBuildMode?'#2ecc71':'#e67e22'; setActionText(isDevBuildMode?"Build ON. Clique para colocar.":"Build OFF.", "#f1c40f"); }
 
         function loadDevMapManager() { let grid = document.getElementById('map-grid-ui'); if(!grid) return; grid.innerHTML = ''; for(let y = -2; y <= 2; y++) { for(let x = -2; x <= 2; x++) { let m = Object.keys(gameMaps).find(k => gameMaps[k].gridX === x && gameMaps[k].gridY === y); let div = document.createElement('div'); div.className = 'map-tile'; if(m) { div.innerText = m; div.style.background = gameMaps[m].color; } else { div.innerText = "+"; } if(m === currentMap) div.classList.add('active-tile'); div.onclick = () => handleGridClick(x, y, m); grid.appendChild(div); } } let cm = gameMaps[currentMap]; if(cm) { document.getElementById('cur-map-id-disp').innerText = cm.name; document.getElementById('cur-map-name').value = cm.name; document.getElementById('cur-map-w').value = cm.width; document.getElementById('cur-map-h').value = cm.height; document.getElementById('cur-map-color').value = cm.color || '#4a6b2d'; } }
+
         function handleGridClick(x, y, existingMapId) {
             if (existingMapId) { openModal(`<h3 style="margin-top:0; color:#f1c40f;">Mapa: ${existingMapId}</h3><div style="display:flex; flex-direction:column; gap:8px; margin-top:10px;"><button class="dev-save-btn" style="background:#3498db;" onclick="closeModal(); switchMap('${existingMapId}', ${gameMaps[existingMapId].width/2}, ${gameMaps[existingMapId].height/2})">Viajar para cá</button><button class="dev-save-btn" style="background:#c0392b;" onclick="unlinkMap('${existingMapId}')">Desvincular</button><button class="dev-save-btn" style="background:#555;" onclick="closeModal()">Cancelar</button></div>`); } 
             else { let unlinked = Object.keys(gameMaps).filter(k => gameMaps[k].gridX === null || gameMaps[k].gridX === undefined); let opts = unlinked.map(k => `<option value="${k}">${k} (${gameMaps[k].name})</option>`).join(''); openModal(`<h3 style="margin-top:0; color:#2ecc71;">Vincular Mapa</h3><select id="mod-map-sel" class="dev-select" style="margin-top:5px; margin-bottom:10px;"><option value="">-- Selecione --</option>${opts}</select><div style="display:flex; flex-direction:column; gap:8px;"><button class="dev-save-btn" onclick="linkMap(${x}, ${y})">Vincular</button><button class="dev-save-btn" style="background:#e67e22;" onclick="quickCreateMap(${x}, ${y})">Criar Novo Aqui</button><button class="dev-save-btn" style="background:#555;" onclick="closeModal()">Cancelar</button></div>`); }
         }
-        function linkMap(x, y) { let sel = document.getElementById('mod-map-sel'); if(sel && sel.value && gameMaps[sel.value]) { gameMaps[sel.value].gridX = x; gameMaps[sel.value].gridY = y; saveDataLogic(); loadDevMapManager(); closeModal(); } }
+
+        function linkMap(x, y) { let sel = document.getElementById('mod-map-sel'); if(sel && sel.value && gameMaps[sel.value]) { gameMaps[sel.value].gridX = x; gameMaps[sel.value].gridY = y; saveDataLogic(); loadDevMapManager(); closeModal(); } else { alert("Selecione um mapa válido."); } }
         function unlinkMap(mapId) { if(gameMaps[mapId]) { gameMaps[mapId].gridX = null; gameMaps[mapId].gridY = null; saveDataLogic(); loadDevMapManager(); closeModal(); } }
         function quickCreateMap(x, y) { let nId = 'mapa_' + Date.now().toString().slice(-4); gameMaps[nId] = { id: nId, name: 'Novo Mapa', width: 800, height: 600, color: '#4a6b2d', gridX: x, gridY: y, entities: [] }; saveDataLogic(); loadDevMapManager(); closeModal(); }
         function saveCurrentMapSettings() { let cm = gameMaps[currentMap]; if(cm) { cm.name = document.getElementById('cur-map-name').value || cm.id; cm.width = parseInt(document.getElementById('cur-map-w').value) || 800; cm.height = parseInt(document.getElementById('cur-map-h').value) || 600; cm.color = document.getElementById('cur-map-color').value || '#4a6b2d'; canvas.width = cm.width; canvas.height = cm.height; saveDataLogic(); loadDevMapManager(); setActionText("Mapa Atualizado!"); } }
         function createNewMap() { let id = document.getElementById('dm-id').value; let n = document.getElementById('dm-name').value; let w = parseInt(document.getElementById('dm-w').value) || 800; let h = parseInt(document.getElementById('dm-h').value) || 600; let c = document.getElementById('dm-color').value; if(!id || gameMaps[id]) { alert("ID inválido!"); return; } gameMaps[id] = { id: id, name: n||id, width: w, height: h, color: c, gridX: null, gridY: null, entities: [] }; setActionText("Mapa Criado!"); saveDataLogic(); loadDevMapManager(); }
 
-        // --- MANIPULADORES DE MOUSE E DEV SPAWN/DELETE ---
+        // --- SISTEMA DE AÇÃO DE CLIQUE E MOUSE ---
         function handleInputDown(e) {
             if(document.getElementById('login-overlay').style.display !== 'none') return;
             if(e.type === 'touchstart') e.preventDefault(); 
@@ -736,7 +772,6 @@
             e.preventDefault(); const pos = getCoords(e);
             let cObj = null; let cur = gameMaps[currentMap] ? gameMaps[currentMap].entities || [] : [];
             
-            // BORRACHA DEV SEGURO DE BACKUP
             if (isDevBuildMode) { 
                 for (let i = cur.length - 1; i >= 0; i--) { 
                     let o = cur[i]; 
@@ -769,7 +804,7 @@
         function addMenuOption(text, callback) { const div = document.createElement('div'); div.className = 'osrs-menu-item'; div.innerText = text; div.onclick = () => { osrsMenu.style.display = 'none'; callback(); }; osrsMenu.appendChild(div); }
         function setPendingAction(obj) { player.pendingAutoAction = obj; player.destX = obj.x + (obj.w||30)/2; player.destY = obj.y + (obj.h||30)/2; if(isNPCOpen && obj.type !== 'npc') { closeMenus(); openTab('inv'); } osrsMenu.style.display = 'none'; }
 
-        // --- SISTEMA DE AÇÃO INTELIGENTE ---
+        // --- SISTEMA DE AÇÃO INTELIGENTE (ESPAÇO E CTRL) ---
         function tryPickupOrInteract() {
             if(player.isPerformingAction) { player.isPerformingAction = false; return; }
             let cur = gameMaps[currentMap].entities || [];
@@ -896,7 +931,7 @@
             }
         }
 
-        // --- UPDATE LOOP FÍSICO ---
+        // --- UPDATE LOOP FÍSICO COM CÂMERA E TECLADO ---
         function update() {
             try {
                 let curM = gameMaps[currentMap]; if(!curM) return; let cur = curM.entities || [];
@@ -1011,45 +1046,21 @@
                     }
                 });
 
-            } catch(e) {}
+            } catch(e) { console.error("Silenced Update Error", e); }
         }
 
-        // --- RENDERIZADOR (NOVA CÂMERA MATEMÁTICA E MULTIPLAYER) ---
-        function getCameraOffset() {
-            let mapObj = gameMaps[currentMap];
-            if (!mapObj) return { x: 0, y: 0 };
-            
-            let camX = (canvas.width / 2) - player.x;
-            let camY = (canvas.height / 2) - player.y;
-
-            if (mapObj.width > canvas.width) {
-                if (camX > 0) camX = 0;
-                if (camX < canvas.width - mapObj.width) camX = canvas.width - mapObj.width;
-            } else {
-                camX = (canvas.width - mapObj.width) / 2;
-            }
-
-            if (mapObj.height > canvas.height) {
-                if (camY > 0) camY = 0;
-                if (camY < canvas.height - mapObj.height) camY = canvas.height - mapObj.height;
-            } else {
-                camY = (canvas.height - mapObj.height) / 2;
-            }
-            return { x: camX, y: camY };
-        }
-
+        // --- RENDERIZADOR (COM CÂMERA) ---
         function draw() {
             try {
                 let container = document.getElementById('game-container');
                 if(!container) return;
                 
-                // O Canvas se ajusta exato à tela
+                // Força o Canvas a preencher a div visualmente
                 if(canvas.width !== container.clientWidth) canvas.width = container.clientWidth;
                 if(canvas.height !== container.clientHeight) canvas.height = container.clientHeight;
 
                 ctx.clearRect(0, 0, canvas.width, canvas.height); 
                 let mapObj = gameMaps[currentMap]; 
-                
                 if(!mapObj) {
                     currentMap = 'lumbridge'; mapObj = gameMaps['lumbridge'];
                     if (!mapObj) return; 
@@ -1058,7 +1069,7 @@
                 let offset = getCameraOffset();
                 
                 ctx.save();
-                ctx.translate(offset.x, offset.y); // Aplica a câmera real
+                ctx.translate(offset.x, offset.y); 
                 
                 ctx.fillStyle = mapObj.color || '#4a6b2d'; 
                 ctx.fillRect(0,0,mapObj.width, mapObj.height);
@@ -1068,11 +1079,13 @@
 
                 let cur = mapObj.entities || [];
                 
+                // 1. PINTURAS DE CHÃO
                 cur.forEach(o => {
                     if(!o || !o.type) return; let ow = o.w || 40; let oh = o.h || 40;
                     if(o.type === 'paint') { ctx.fillStyle = o.color; ctx.fillRect(o.x, o.y, ow, oh); }
                 });
 
+                // 2. ITENS DE CHÃO
                 cur.forEach(o => {
                     if(!o || !o.type) return; let ow = o.w || 30; let oh = o.h || 30;
                     if (o.type === 'ground_item' && o.active) {
@@ -1081,6 +1094,7 @@
                     }
                 });
 
+                // 3. ENTIDADES ACIMA
                 cur.forEach(o => {
                     if (!o || !o.type || !o.active || o.type === 'ground_item' || o.type === 'paint') return;
                     let ow = o.w || 30; let oh = o.h || 30;
@@ -1169,12 +1183,11 @@
                 projectiles.forEach(p => { if (p.type === 'ranged') { ctx.fillStyle = '#795548'; ctx.fillRect(p.x-2, p.y-2, 4, 4); } else { ctx.fillStyle = p.color || '#1abc9c'; ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#ecf0f1'; ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI*2); ctx.fill(); } });
                 floatingTexts.forEach((ft, i) => { ctx.fillStyle = ft.color; ctx.font = 'bold 16px Arial'; ctx.fillText(ft.text, ft.x, ft.y); ft.y -= 0.5; ft.life--; if(ft.life <= 0) floatingTexts.splice(i, 1); });
 
-                ctx.restore(); // Restaura a câmera matemática
+                ctx.restore(); // Restaura a translação da câmera
 
             } catch (e) { console.error("Ignorado Draw Error", e); }
         }
 
-        // --- SISTEMA DE MINIMAPA DESACOPLADO ---
         function drawMinimap() {
             try {
                 const mCanvas = document.getElementById('minimapCanvas'); if(!mCanvas) return;
@@ -1197,7 +1210,6 @@
                 mCtx.fillStyle = 'white'; mCtx.fillRect(player.x * scaleX, player.y * scaleY, 4, 4);
             } catch(e) {}
         }
-
     </script>
 </body>
 </html>
