@@ -10,7 +10,6 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const DB_FILE = path.join(__dirname, 'database.json');
 
-// Inicialização segura
 function initDB() {
     if (!fs.existsSync(DB_FILE)) {
         const initialDB = {
@@ -31,8 +30,7 @@ function readDB() { return JSON.parse(fs.readFileSync(DB_FILE, 'utf8')); }
 function writeDB(data) { fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf8'); }
 
 let activePlayers = {}; 
-let mapHosts = {}; // Mestre de cálculo de AI por Mapa
-let mapEntitiesRAM = {}; // Posição global dos monstros
+let mapEntitiesRAM = {}; 
 
 app.post('/api/register', (req, res) => {
     const { username, password } = req.body;
@@ -64,7 +62,7 @@ app.post('/api/save', (req, res) => {
     if (db.users[username]) {
         db.users[username].playerData = playerData; 
         
-        // MUDANÇA GLOBAL: Alterações no mapa esmagam a versão velha. O mundo é um só.
+        // Qualquer player salvando combate ou alteração atualiza o mundo global
         if (worldData) { db.worldData = worldData; db.mapVersion = Date.now(); }
         
         if (db.users[username].role === 'admin') { 
@@ -75,7 +73,6 @@ app.post('/api/save', (req, res) => {
     } else { res.status(401).json({ error: 'Sessão inválida.' }); }
 });
 
-// A MÁGICA DA SINCRONIZAÇÃO EM TEMPO REAL SEM LAG
 app.post('/api/sync', (req, res) => {
     const { username, x, y, map, facing, actionAnim, equipment, entities } = req.body;
     let db = readDB();
@@ -84,12 +81,16 @@ app.post('/api/sync', (req, res) => {
         activePlayers[username] = { x, y, map, facing, actionAnim, equipment, lastSeen: Date.now() }; 
     }
 
+    // Atualiza entidades do mapa quando enviadas
+    if (entities && map) {
+        mapEntitiesRAM[map] = entities;
+    }
+
     let now = Date.now();
     let visiblePlayers = {};
     
     for(let u in activePlayers) {
         if (now - activePlayers[u].lastSeen > 4000) { 
-            if(mapHosts[activePlayers[u].map] === u) delete mapHosts[activePlayers[u].map];
             delete activePlayers[u]; 
         } 
         else if (u !== username && activePlayers[u].map === map) { 
@@ -97,26 +98,11 @@ app.post('/api/sync', (req, res) => {
         }
     }
 
-    // Eleição de Host: Quem está há mais tempo (ou o Admin) roda a IA para todos.
-    let currentHost = mapHosts[map];
-    if (!currentHost || !activePlayers[currentHost] || activePlayers[currentHost].map !== map) {
-        mapHosts[map] = username;
-    } else if (username.toLowerCase() === 'admin') {
-        mapHosts[map] = username; // Admin é Host Soberano
-    }
-
-    let isHost = (mapHosts[map] === username);
-
-    if (isHost && entities) {
-        mapEntitiesRAM[map] = entities;
-    }
-
     res.json({ 
         players: visiblePlayers, 
         chat: db.chat, 
         mapVersion: db.mapVersion,
-        syncEntities: (!isHost && mapEntitiesRAM[map]) ? mapEntitiesRAM[map] : null,
-        isHost: isHost
+        syncEntities: mapEntitiesRAM[map] || null
     });
 });
 
