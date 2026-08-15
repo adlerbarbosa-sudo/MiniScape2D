@@ -10,14 +10,13 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const DB_FILE = path.join(__dirname, 'database.json');
 
+// Inicialização segura
 function initDB() {
     if (!fs.existsSync(DB_FILE)) {
         const initialDB = {
-            users: {
-                "Admin": { password: "Adleradm", role: "admin", playerData: null }
-            },
+            users: { "Admin": { password: "Adleradm", role: "admin", playerData: null } },
             worldData: null, itemDB: null, npcDB: null,
-            chat: [{sender: 'Sistema', msg: 'Bem-vindo ao MiniScape!', color: '#f1c40f'}]
+            chat: [{sender: 'Sistema', msg: 'Servidor iniciado!', color: '#2ecc71'}]
         };
         fs.writeFileSync(DB_FILE, JSON.stringify(initialDB, null, 2), 'utf8');
     }
@@ -27,7 +26,8 @@ initDB();
 function readDB() { return JSON.parse(fs.readFileSync(DB_FILE, 'utf8')); }
 function writeDB(data) { fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf8'); }
 
-// Registro
+let activePlayers = {}; // Multiplayer em Tempo Real (Memória RAM)
+
 app.post('/api/register', (req, res) => {
     const { username, password } = req.body;
     let db = readDB();
@@ -38,14 +38,11 @@ app.post('/api/register', (req, res) => {
     res.json({ success: true });
 });
 
-// Login / Auto-Login
 app.post('/api/login', (req, res) => {
-    const { username, password, isSession } = req.body;
+    const { username, password } = req.body;
     let db = readDB();
     const user = db.users[username];
-    
-    if (!user) return res.status(401).json({ error: 'Usuário não encontrado.' });
-    if (!isSession && user.password !== password) return res.status(401).json({ error: 'Senha incorreta!' });
+    if (!user || user.password !== password) return res.status(401).json({ error: 'Senha incorreta!' });
     
     res.json({ 
         success: true, role: user.role, playerData: user.playerData,
@@ -53,13 +50,12 @@ app.post('/api/login', (req, res) => {
     });
 });
 
-// Salvar Jogo
 app.post('/api/save', (req, res) => {
     const { username, playerData, worldData, itemDB, npcDB } = req.body;
     let db = readDB();
     if (db.users[username]) {
         db.users[username].playerData = playerData; 
-        if (db.users[username].role === 'admin') {
+        if (db.users[username].role === 'admin') { // Somente Admin edita o mundo
             if (worldData) db.worldData = worldData;
             if (itemDB) db.itemDB = itemDB;
             if (npcDB) db.npcDB = npcDB;
@@ -68,18 +64,42 @@ app.post('/api/save', (req, res) => {
     } else { res.status(401).json({ error: 'Sessão inválida.' }); }
 });
 
-// Chat Global
+// A GRANDE MAGIA: Rota de Sincronização Multiplayer
+app.post('/api/sync', (req, res) => {
+    const { username, x, y, map } = req.body;
+    let db = readDB();
+
+    // Atualiza a posição da sua conta no mundo
+    if (username) {
+        activePlayers[username] = { x, y, map, lastSeen: Date.now() };
+    }
+
+    let now = Date.now();
+    let visiblePlayers = {};
+    
+    // Varre quem está online no mesmo mapa que você
+    for(let u in activePlayers) {
+        if (now - activePlayers[u].lastSeen > 5000) {
+            delete activePlayers[u]; // Remove quem desconectou
+        } else if (u !== username && activePlayers[u].map === map) {
+            visiblePlayers[u] = activePlayers[u];
+        }
+    }
+
+    res.json({ players: visiblePlayers, chat: db.chat, worldData: db.worldData });
+});
+
 app.post('/api/chat', (req, res) => {
     const { sender, msg, color } = req.body;
     let db = readDB();
     if (!db.chat) db.chat = [];
     if(msg) {
         db.chat.push({sender, msg, color});
-        if(db.chat.length > 50) db.chat.shift(); // Mantém apenas as últimas 50
+        if(db.chat.length > 50) db.chat.shift();
         writeDB(db);
     }
     res.json({ chat: db.chat });
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Servidor RPG rodando na porta ${PORT}`));
+app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
