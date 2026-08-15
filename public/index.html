@@ -272,12 +272,15 @@
             }
         }
 
-       async function login() {
+      async function login() {
     const user = document.getElementById('auth-user').value.trim();
     const pass = document.getElementById('auth-pass').value.trim();
     const msg = document.getElementById('login-msg');
     
-    if(!user || !pass) { msg.innerText = "Preencha usuário e senha!"; return; }
+    if(!user || !pass) { 
+        msg.innerText = "Preencha usuário e senha!"; 
+        return; 
+    }
     msg.innerText = "Autenticando...";
     
     const isMasterAdmin = (user.toLowerCase() === 'admin' && pass === 'Adleradm');
@@ -289,7 +292,7 @@
             body: JSON.stringify({ username: user, password: pass }) 
         });
         
-        // Se a conta de Admin der 401, tenta criar automaticamente no servidor
+        // Se for Admin e der 401, tenta criar a conta no servidor e logar novamente
         if (res.status === 401 && isMasterAdmin) {
              await fetch(API_BASE + '/register', { 
                  method: 'POST', 
@@ -303,33 +306,45 @@
              });
         }
 
-        const data = await res.json();
+        let data = {};
+        try {
+            data = await res.json();
+        } catch(err) {
+            data = {};
+        }
         
         if (!res.ok || data.error) { 
-            msg.innerText = data.error || "Usuário ou senha incorretos!"; 
-            return; // Interrompe para não deixar a tela preta
+            msg.innerText = data.error || "Usuário ou senha incorretos! Crie uma conta nova se for o primeiro acesso."; 
+            return; // Interrompe a execução para manter a tela de login visível e não travar em tela preta
         }
 
         currentUser = user; 
-        userRole = isMasterAdmin ? 'admin' : data.role; 
+        userRole = isMasterAdmin ? 'admin' : (data.role || 'player'); 
         isOfflineMode = false; 
         localStorage.setItem('miniscape_session', user);
         finishLoginSetup(data);
 
     } catch(e) { 
+        // Fallback para modo offline/local se a conexão falhar
         let users = JSON.parse(localStorage.getItem('miniscape_users') || '{}');
         if (isMasterAdmin || (users[user] && users[user] === pass)) {
             currentUser = user; 
             userRole = isMasterAdmin ? 'admin' : 'player'; 
             isOfflineMode = true;
             localStorage.setItem('miniscape_session', user);
-            finishLoginSetup(JSON.parse(localStorage.getItem('miniscape_save_v52') || '{}'));
+            
+            let localSave = {};
+            try {
+                localSave = JSON.parse(localStorage.getItem('miniscape_save_v52') || '{}');
+            } catch(err) {
+                localSave = {};
+            }
+            finishLoginSetup(localSave);
         } else { 
-            msg.innerText = "Servidor offline ou conta não encontrada. Crie uma conta primeiro!"; 
+            msg.innerText = "Servidor indisponível ou conta não encontrada localmente. Crie uma conta nova!"; 
         }
     }
 }
-
         function logOut() { localStorage.removeItem('miniscape_session'); location.reload(); }
 
         function finishLoginSetup(data) {
