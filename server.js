@@ -4,13 +4,15 @@ const path = require('path');
 
 const app = express();
 app.use(express.json({ limit: '50mb' }));
-app.use(express.static(path.join(__dirname, 'public'))); // Hospeda a pasta public
+
+// Hospeda os arquivos da pasta 'public'
+app.use(express.static(path.join(__dirname, 'public')));
 
 const DB_FILE = './database.json';
 
-// Inicia o banco de dados se não existir
+// Cria o banco de dados inicial se não existir
 if (!fs.existsSync(DB_FILE)) {
-    fs.writeFileSync(DB_FILE, JSON.stringify({ users: {}, worldData: null }));
+    fs.writeFileSync(DB_FILE, JSON.stringify({ users: {}, worldData: null, itemDB: null, npcDB: null }));
 }
 
 function readDB() { return JSON.parse(fs.readFileSync(DB_FILE)); }
@@ -20,18 +22,19 @@ function writeDB(data) { fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2)
 app.post('/api/register', (req, res) => {
     const { username, password } = req.body;
     let db = readDB();
+    
     if (db.users[username]) return res.status(400).json({ error: 'Usuário já existe!' });
     
-    // O primeiro usuário a criar conta vira Admin automaticamente
+    // O PRIMEIRO usuário a criar conta vira Admin. Os próximos viram 'player'.
     const isFirstUser = Object.keys(db.users).length === 0;
     
     db.users[username] = {
-        password: password, // Em um jogo real, usaríamos bcrypt para criptografar
+        password: password, 
         role: isFirstUser ? 'admin' : 'player',
-        playerData: null // Inicia com personagem zerado
+        playerData: null // Inicia sem personagem
     };
     writeDB(db);
-    res.json({ success: true, message: 'Conta criada com sucesso!' });
+    res.json({ success: true, message: 'Conta criada! Faça login.' });
 });
 
 // Rota de Login
@@ -46,26 +49,33 @@ app.post('/api/login', (req, res) => {
         success: true, 
         role: user.role, 
         playerData: user.playerData,
-        worldData: db.worldData 
+        worldData: db.worldData,
+        itemDB: db.itemDB,
+        npcDB: db.npcDB
     });
 });
 
-// Rota para Salvar Jogo
+// Rota para Salvar Jogo (Segurança Ativa)
 app.post('/api/save', (req, res) => {
-    const { username, playerData, worldData } = req.body;
+    const { username, playerData, worldData, itemDB, npcDB } = req.body;
     let db = readDB();
     
     if (db.users[username]) {
-        db.users[username].playerData = playerData; // Salva o personagem
-        if (db.users[username].role === 'admin' && worldData) {
-            db.worldData = worldData; // Apenas Admins salvam as alterações do mundo
+        // Salva o personagem do usuário logado
+        db.users[username].playerData = playerData; 
+        
+        // APENAS ADMINS podem salvar alterações no mundo e no banco de itens
+        if (db.users[username].role === 'admin') {
+            if (worldData) db.worldData = worldData;
+            if (itemDB) db.itemDB = itemDB;
+            if (npcDB) db.npcDB = npcDB;
         }
         writeDB(db);
         res.json({ success: true });
     } else {
-        res.status(401).json({ error: 'Não autorizado.' });
+        res.status(401).json({ error: 'Sessão inválida.' });
     }
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
+app.listen(PORT, () => console.log(`Servidor RPG rodando na porta ${PORT}`));
