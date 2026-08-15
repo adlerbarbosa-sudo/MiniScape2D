@@ -3,18 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MiniScape 2D - V46 (Injetor de Mundos)</title>
+    <title>MiniScape 2D - V47 (Engine Definitiva MMORPG)</title>
     <style>
-        /* === BASE & RESPONSIVIDADE (TELA CHEIA) === */
+        /* === BASE & RESPONSIVIDADE (TELA CHEIA 1900px) === */
         body { margin: 0; padding: 10px; background-color: #121212; color: #e0e0e0; font-family: 'Segoe UI', Tahoma, sans-serif; display: flex; gap: 15px; justify-content: center; height: 100vh; box-sizing: border-box; overflow: hidden; flex-direction: row; align-items: stretch; }
         @media (max-width: 850px) { body { flex-direction: column; align-items: center; padding: 5px; overflow-y: auto; height: auto;} #ui-panel { width: 100% !important; max-width: 100%; min-height: 500px; } .mobile-btn { display: block !important; } #game-container { height: 50vh; min-height: 400px; } }
         
-        /* CÂMERA DINÂMICA */
+        /* CÂMERA DINÂMICA (SEM SCROLL, 100% MATEMÁTICO) */
         #game-container { position: relative; flex: 1; border: 2px solid #3d2e24; background-color: #000; box-shadow: 0 0 20px rgba(0,0,0,0.8); overflow: hidden; border-radius: 4px; display: block;}
-        #gameCanvas { cursor: crosshair; display: block; width: 100%; height: 100%; touch-action: none; }
+        #gameCanvas { cursor: crosshair; display: block; padding: 0; margin: 0; width: 100%; height: 100%; touch-action: none; border: none; }
         
         /* SISTEMA DE CHAT */
-        #chat-container { position: absolute; bottom: 10px; left: 10px; width: 350px; background: rgba(0, 0, 0, 0.6); border: 1px solid #3d2e24; border-radius: 4px; display: flex; flex-direction: column; z-index: 100; }
+        #chat-container { position: absolute; bottom: 10px; left: 10px; width: 350px; background: rgba(0, 0, 0, 0.7); border: 1px solid #3d2e24; border-radius: 4px; display: flex; flex-direction: column; z-index: 100; pointer-events: auto; }
         #chat-box { height: 150px; overflow-y: auto; padding: 8px; font-size: 0.8rem; font-family: monospace; display: flex; flex-direction: column; gap: 4px;}
         .chat-msg { color: white; text-shadow: 1px 1px 0 #000; word-wrap: break-word;}
         #chat-input-area { display: flex; border-top: 1px solid #3d2e24; }
@@ -68,7 +68,7 @@
         .map-tile-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; background: #222; padding: 2px; border: 2px solid #111; border-radius: 4px;} .map-tile { aspect-ratio: 1; background: #111; color: #888; font-size: 0.6rem; display: flex; align-items: center; justify-content: center; cursor: pointer; text-align: center; word-break: break-all; border-radius: 2px;} .map-tile:hover { background: #333; color: white;} .map-tile.active-tile { border: 2px solid #f1c40f; background: #5d4037; color: white;}
 
         /* TELA DE LOGIN ONLINE */
-        #login-overlay { display: flex; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #121212; z-index: 20000; align-items: center; justify-content: center; flex-direction: column; }
+        #login-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #121212; z-index: 20000; align-items: center; justify-content: center; flex-direction: column; }
         .login-box { background: #1e1e1e; border: 4px solid #3d2e24; padding: 30px; border-radius: 8px; width: 300px; box-shadow: 0 0 30px black; text-align: center;}
         .login-box h1 { color: #f1c40f; margin-top: 0; text-transform: uppercase; letter-spacing: 2px;}
         .login-input { width: 100%; padding: 10px; margin-bottom: 15px; background: #111; border: 1px solid #5d4037; color: white; box-sizing: border-box; border-radius: 4px;}
@@ -79,10 +79,11 @@
 </head>
 <body>
 
+    <!-- TELA DE LOGIN -->
     <div id="login-overlay">
         <div class="login-box">
             <h1>MiniScape</h1>
-            <p style="font-size: 0.8rem; color: #bdc3c7;">Servidor Online V46</p>
+            <p style="font-size: 0.8rem; color: #bdc3c7;">Servidor Online e Local</p>
             <input type="text" id="auth-user" class="login-input" placeholder="Usuário">
             <input type="password" id="auth-pass" class="login-input" placeholder="Senha">
             <div id="login-msg"></div>
@@ -91,7 +92,7 @@
         </div>
     </div>
 
-    <!-- O JOGO FICA OCULTO ATÉ O LOGIN SER APROVADO -->
+    <!-- O JOGO FICA OCULTO ATÉ O LOGIN SER APROVADO COM O MAX-WIDTH 1900px MANTIDO -->
     <div id="game-wrapper" style="display: none; width: 100%; height: 100%; max-width: 1900px; gap: 15px;">
         <div id="custom-modal-overlay"><div id="custom-modal-box"></div></div>
         <div id="tooltip"></div>
@@ -159,7 +160,7 @@
             <div id="tab-mag" class="tab-content"><div style="font-size: 0.7rem; color: #bdc3c7; margin-bottom: 10px;">Equipe um Cajado e clique na magia.</div><div id="spellbook-list"></div></div>
             <div id="tab-npc" class="tab-content"><h3 id="npc-title" style="margin-top:0; color:#f39c12;">NPC</h3><div id="npc-dialog" class="npc-dialog">...</div><div id="npc-shop-list"></div></div>
 
-            <!-- MODO DEV ENGINE (VÍSIVEL APENAS PARA ADMINS) -->
+            <!-- MODO DEV ENGINE -->
             <div id="tab-dev" class="tab-content">
                 <div class="dev-sub-tabs">
                     <button id="btn-dev-map" class="dev-sub-btn active" onclick="openDevSub('dev-map', this)">Colocar</button>
@@ -171,19 +172,17 @@
 
                 <div id="dev-import" class="dev-sub-content">
                     <h3 style="color:#2ecc71; margin-top:0;">📡 Injetor de Expansão</h3>
-                    <p style="font-size:0.75rem; color:#bdc3c7; line-height: 1.4;">Cole os <b>Códigos Especiais</b> gerados pela IA para adicionar Novos Mapas, Bosses, Itens e Recursos.</p>
+                    <p style="font-size:0.75rem; color:#bdc3c7; line-height: 1.4;">Cole os <b>Códigos Especiais</b> gerados pela IA para adicionar Novos Bosses, Itens e Mapas.</p>
                     <textarea id="dev-import-code" class="dev-input" style="height:120px; font-family:monospace; resize: none; margin-bottom: 10px;" placeholder="Cole o código Base64 aqui..."></textarea>
-                    <button class="dev-save-btn" onclick="importDevCode()" style="background:#8e44ad; font-size: 1rem;">⚡ Injetar Pacote de Dados</button>
+                    <button class="dev-save-btn" onclick="importDevCode()" style="background:#8e44ad; font-size: 1rem;">⚡ Injetar Pacote</button>
                 </div>
 
                 <div id="dev-map" class="dev-sub-content active">
                     <div class="dev-row" style="margin-bottom: 5px;">
-                        <input type="text" id="dev-search" class="dev-input" placeholder="🔍 Buscar entidade (Ex: arvore)..." oninput="filterDevEntities(this.value)" style="flex: 1; border-color: #5d4037;">
+                        <input type="text" id="dev-search" class="dev-input" placeholder="🔍 Buscar entidade..." oninput="filterDevEntities(this.value)" style="flex: 1; border-color: #5d4037;">
                         <button class="dev-save-btn" style="width: auto; margin:0; background:#3d2e24;" onclick="toggleDevView()" title="Alternar Vista">🔲/📄</button>
                     </div>
-                    
                     <div id="dev-entity-list"></div>
-                    
                     <div class="dev-row" style="margin-top: 8px;">
                         <input type="number" id="spawn-w" class="dev-input" placeholder="Largura (W)">
                         <input type="number" id="spawn-h" class="dev-input" placeholder="Altura (H)">
@@ -194,7 +193,7 @@
                     <button onclick="toggleDevBuild()" id="btn-build-mode" style="width: 100%; padding: 10px; background: #e67e22; color: white; border: none; font-weight: bold; cursor: pointer; margin-top:5px; border-radius:4px;">
                         Modo Construção: OFF
                     </button>
-                    <p style="font-size: 0.7rem; color: #f1c40f; margin-top:10px;">Clique ESQUERDO no mapa para <b>Colocar</b>.<br>Clique DIREITO para <b>Apagar (Borracha)</b></p>
+                    <p style="font-size: 0.7rem; color: #f1c40f; margin-top:10px;">ESQUERDO: Colocar | DIREITO: <b>Apagar</b></p>
                 </div>
 
                 <div id="dev-map-manager" class="dev-sub-content">
@@ -204,7 +203,7 @@
                         <div class="dev-row" style="margin-top:5px;"><input type="number" id="cur-map-w" class="dev-input" placeholder="Larg (W)"><input type="number" id="cur-map-h" class="dev-input" placeholder="Alt (H)"></div>
                         <button class="dev-save-btn" onclick="saveCurrentMapSettings()">Salvar Alterações</button>
                     </div>
-                    <p style="font-size:0.7rem; color:#bdc3c7;">Conecte seus mapas clicando na grade. Eles transicionam sozinhos ao andar até a borda.</p>
+                    <p style="font-size:0.7rem; color:#bdc3c7;">Conecte seus mapas clicando na grade.</p>
                     <div id="map-grid-ui" class="map-tile-grid"></div>
                     <div class="dev-form-group" style="margin-top:10px; padding-top: 10px; border-top: 1px solid #444;">
                         <label style="color:#f39c12;">Criar Novo Mapa Solto:</label>
@@ -224,7 +223,7 @@
                         <div class="dev-row"><div class="dev-form-group"><label>Dano:</label><input type="number" id="di-dmg" class="dev-input" value="0"></div><div class="dev-form-group"><label>Defesa:</label><input type="number" id="di-def" class="dev-input" value="0"></div></div>
                     </div>
                     <div id="di-cons-fields" style="display:none; padding:5px; border:1px solid #3d2e24; background:#111; margin-bottom:5px;"><div class="dev-form-group"><label>Cura HP:</label><input type="number" id="di-heal" class="dev-input" value="0"></div></div>
-                    <div class="dev-form-group"><label>Receita Crafting (Item,Qtd|Item2,Qtd):</label><input type="text" id="di-recipe" class="dev-input" placeholder="Logs,1|Copper Ore,1"></div>
+                    <div class="dev-form-group"><label>Receita Crafting:</label><input type="text" id="di-recipe" class="dev-input" placeholder="Logs,1|Copper Ore,1"></div>
                     <div class="dev-form-group"><label>Quantidade Criada na Receita:</label><input type="number" id="di-craftqty" class="dev-input" value="1"></div>
                     <div class="dev-form-group"><label>Descrição Tooltip:</label><input type="text" id="di-desc" class="dev-input"></div>
                     <button class="dev-save-btn" onclick="saveDevItem()">Salvar/Atualizar Item</button>
@@ -238,7 +237,7 @@
                     <div class="dev-row"><div class="dev-form-group" style="flex:1"><label>Cor Corpo:</label><input type="color" id="dn-c1" class="dev-input" value="#e74c3c" style="padding:0; height:30px;"></div><div class="dev-form-group" style="flex:1"><label>Cor Cabeça:</label><input type="color" id="dn-c2" class="dev-input" value="#c0392b" style="padding:0; height:30px;"></div></div>
                     <div class="dev-form-group"><label>Diálogo (Se for NPC):</label><input type="text" id="dn-dialog" class="dev-input"></div>
                     <div class="dev-form-group"><label>Loja (Item,Preço|...):</label><input type="text" id="dn-shop" class="dev-input"></div>
-                    <div class="dev-form-group"><label>Loot Drop (Item,ChanceDec,MaxQty|...):</label><input type="text" id="dn-loot" class="dev-input" placeholder="Bones,1,1"></div>
+                    <div class="dev-form-group"><label>Loot Drop (Item,Chance,MaxQty|...):</label><input type="text" id="dn-loot" class="dev-input" placeholder="Bones,1,1"></div>
                     <button class="dev-save-btn" onclick="saveDevNPC()">Salvar NPC/Monstro</button>
                 </div>
             </div>
@@ -246,8 +245,8 @@
             <div id="tab-bank" class="tab-content"><div id="bank-grid" class="grid-container"></div></div>
 
             <div id="tab-cfg" class="tab-content">
-                <h3 style="color:#ecf0f1; margin-top: 0; border-bottom: 1px solid #3d2e24; padding-bottom: 5px;">Sistema</h3>
-                <p style="font-size: 0.75rem; color: #bdc3c7;">Seus dados são salvos online (ou offline) automaticamente a cada 60 segundos.</p>
+                <h3 style="color:#ecf0f1; margin-top: 0; border-bottom: 1px solid #3d2e24; padding-bottom: 5px;">Sistema Servidor</h3>
+                <p style="font-size: 0.75rem; color: #bdc3c7;">Seus dados são salvos online (ou offline) automaticamente.</p>
                 <button class="dev-save-btn" style="background: #27ae60;" onclick="saveDataLogic(true)">💾 Forçar Save Global</button>
                 <button class="dev-save-btn" style="background: #c0392b; margin-top: 20px;" onclick="logOut()">🚪 Sair da Conta / Reiniciar</button>
             </div>
@@ -256,7 +255,7 @@
 
     <!-- SCRIPT GIGANTE E UNIFICADO DO JOGO -->
     <script>
-        // === VARIÁVEIS GLOBAIS ÚNICAS ===
+        // === 1. DECLARAÇÕES GLOBAIS ÚNICAS ===
         const canvas = document.getElementById('gameCanvas'); 
         const ctx = canvas.getContext('2d');
         const osrsMenu = document.getElementById('osrs-menu'); 
@@ -271,8 +270,11 @@
         
         let floatingTexts = []; let projectiles = []; let isBankOpen = false; let isNPCOpen = false; let isDevBuildMode = false; let activeNPCShop = null;
         let selectedDevEntity = 'tree'; let devViewMode = 'list'; const imgCache = {};
+        
+        // VARIÁVEL TECLADO BLINDADA
         let keys = { w: false, a: false, s: false, d: false, arrowup: false, arrowdown: false, arrowleft: false, arrowright: false };
 
+        // AUTO BYPASS DE MODO LOCAL: Identifica o arquivo HTML direto
         const API_BASE = (window.location.protocol === 'file:') ? 'http://localhost:3000/api' : '/api';
 
         function removeAccents(str) { return str.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); }
@@ -284,7 +286,7 @@
             addInvItem('Mind Rune', 50); addInvItem('Bronze Arrow', 50); 
         }
 
-        // --- BANCOS DE DADOS DE FÁBRICA (FALLBACK) ---
+        // --- 2. BANCOS DE DADOS DE FÁBRICA ---
         let itemDB = {
             'Bronze Pickaxe': { name: 'Bronze Pickaxe', icon: '⛏️', type: 'equipment', slot: 'weapon', tool: 'pickaxe', stackable: false, weight: 2.0, desc: 'Ferramenta de mineração.', recipe: 'Bronze Bar,2|Logs,1', craftQty: 1 },
             'Iron Pickaxe': { name: 'Iron Pickaxe', icon: '⛏️', type: 'equipment', slot: 'weapon', tool: 'pickaxe', stackable: false, weight: 2.0, desc: 'Minera rápido.', recipe: 'Iron Bar,2|Logs,1', craftQty: 1 },
@@ -322,8 +324,7 @@
         };
 
         let spellbookDB = [
-            { id: 'wind_strike', name: 'Wind Strike', lvl: 1, req: {'Air Rune': 1, 'Mind Rune': 1}, dmg: 2, color: '#ecf0f1' },
-            { id: 'water_strike', name: 'Water Strike', lvl: 5, req: {'Water Rune': 1, 'Air Rune': 1, 'Mind Rune': 1}, dmg: 4, color: '#3498db' }
+            { id: 'wind_strike', name: 'Wind Strike', lvl: 1, req: {'Air Rune': 1, 'Mind Rune': 1}, dmg: 2, color: '#ecf0f1' }
         ];
 
         let playerDefault = {
@@ -336,38 +337,22 @@
         let player = JSON.parse(JSON.stringify(playerDefault));
 
         let defaultGameMaps = {
-            'lumbridge': { id: 'lumbridge', name: 'Cidade Principal', width: 800, height: 600, color: '#4a6b2d', gridX: 0, gridY: 0, entities: [ { id: 1, type: 'tree', name: 'Oak Tree', x: 150, y: 150, w: 40, h: 50, active: true, hp: 3, maxHp: 3 }, { id: 3, type: 'enemy', dbKey: 'goblin_base', name: 'Goblin', x: 300, y: 400, w: 25, h: 25, active: true, hp: 15, maxHp: 15, attackCooldown: 0 }, { id: 4, type: 'bank', name: 'Bank Booth', x: 400, y: 50, w: 50, h: 30, active: true }, { id: 6, type: 'npc', dbKey: 'merchant_base', name: 'Merchant', x: 100, y: 100, w: 25, h: 25, active: true }, { id: 7, type: 'fishing_spot', name: 'Fishing Spot', x: 600, y: 450, w: 100, h: 80, active: true } ] },
-            'mine': { id: 'mine', name: 'Mina Subterrânea', width: 1200, height: 800, color: '#3e3933', gridX: 1, gridY: 0, entities: [ { id: 8, type: 'rock_copper', name: 'Copper Rock', x: 150, y: 200, w: 35, h: 30, active: true, hp: 2, maxHp: 2, color: '#d35400' }, { id: 9, type: 'rock_iron', name: 'Iron Rock', x: 220, y: 200, w: 35, h: 30, active: true, hp: 3, maxHp: 3, color: '#7f8c8d' }, { id: 10, type: 'furnace', name: 'Furnace', x: 400, y: 100, w: 45, h: 45, active: true }, { id: 11, type: 'anvil', name: 'Anvil', x: 500, y: 120, w: 35, h: 25, active: true }, { id: 12, type: 'enemy', dbKey: 'orc_base', name: 'Orc', x: 400, y: 400, w: 35, h: 35, active: true, hp: 30, maxHp: 30, attackCooldown: 0 } ] }
+            'lumbridge': { id: 'lumbridge', name: 'Cidade Principal', width: 800, height: 600, color: '#4a6b2d', gridX: 0, gridY: 0, entities: [ { id: 1, type: 'tree', name: 'Oak Tree', x: 150, y: 150, w: 40, h: 50, active: true, hp: 3, maxHp: 3 }, { id: 3, type: 'enemy', dbKey: 'goblin_base', name: 'Goblin', x: 300, y: 400, w: 25, h: 25, active: true, hp: 15, maxHp: 15, attackCooldown: 0 }, { id: 4, type: 'bank', name: 'Bank Booth', x: 400, y: 50, w: 50, h: 30, active: true } ] }
         };
         let gameMaps = JSON.parse(JSON.stringify(defaultGameMaps));
         let currentMap = 'lumbridge';
 
-        // --- SISTEMA DE SESSÃO E INICIALIZAÇÃO ---
+        // --- 3. INICIALIZAÇÃO DE SESSÃO COM BYPASS SEGURO ---
         document.addEventListener('DOMContentLoaded', async () => {
-            const isLocalFile = window.location.protocol === 'file:';
-            if (isLocalFile) {
-                console.log("Arquivo Local detectado. Forçando Offline.");
-                forceOfflineMode();
-            } else {
-                let savedSession = localStorage.getItem('miniscape_session');
-                if (savedSession) {
-                    document.getElementById('login-msg').innerText = "Restaurando sessão...";
-                    await attemptSessionLogin(savedSession);
-                } else {
-                    document.getElementById('login-overlay').style.display = 'flex';
-                }
+            document.getElementById('login-overlay').style.display = 'flex';
+            document.getElementById('game-wrapper').style.display = 'none';
+            
+            let savedSession = localStorage.getItem('miniscape_session');
+            if (savedSession) {
+                document.getElementById('login-msg').innerText = "Sessão Encontrada. Digite a senha para logar.";
+                document.getElementById('auth-user').value = savedSession;
             }
         });
-
-        async function attemptSessionLogin(username) {
-            try {
-                document.getElementById('auth-user').value = username;
-                document.getElementById('login-overlay').style.display = 'flex';
-                document.getElementById('login-msg').innerText = "Sessão encontrada. Digite sua senha.";
-            } catch(e) {
-                document.getElementById('login-overlay').style.display = 'flex';
-            }
-        }
 
         async function register() {
             const user = document.getElementById('auth-user').value.trim();
@@ -375,7 +360,7 @@
             const msg = document.getElementById('login-msg');
             
             if(!user || !pass) { msg.innerText = "Preencha usuário e senha!"; return; }
-            msg.innerText = "Conectando ao servidor...";
+            msg.innerText = "Conectando...";
             
             try {
                 const res = await fetch(API_BASE + '/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: user, password: pass }) });
@@ -420,14 +405,14 @@
                 if (isMasterAdmin || (users[user] && users[user] === pass)) {
                     currentUser = user; userRole = isMasterAdmin ? 'admin' : 'player'; isOfflineMode = true;
                     localStorage.setItem('miniscape_session', user);
-                    finishLoginSetup(JSON.parse(localStorage.getItem('miniscape_save_v45') || '{}'));
+                    finishLoginSetup(JSON.parse(localStorage.getItem('miniscape_save_v47') || '{}'));
                 } else { msg.innerText = "Servidor offline. Conta local não encontrada."; }
             }
         }
 
         function forceOfflineMode() {
             currentUser = 'LocalAdmin'; userRole = 'admin'; isOfflineMode = true;
-            finishLoginSetup(JSON.parse(localStorage.getItem('miniscape_save_v45') || '{}'));
+            finishLoginSetup(JSON.parse(localStorage.getItem('miniscape_save_v47') || '{}'));
         }
 
         function logOut() {
@@ -436,6 +421,7 @@
         }
 
         function finishLoginSetup(data) {
+            // MOSTRA O BOTÃO DEV SE FOR ADMIN
             if(userRole === 'admin') {
                 let tabContainer = document.getElementById('tab-buttons-container');
                 let devBtn = document.createElement('button');
@@ -445,23 +431,9 @@
                 tabContainer.insertBefore(devBtn, document.getElementById('btn-cfg'));
             }
             
+            // CARREGA DADOS DO SERVIDOR OU OFFLINE (Sem resetar monstro local toda hora)
             if(data.worldData && Object.keys(data.worldData).length > 0 && data.worldData['lumbridge']) { 
-                if (userRole === 'admin' || isOfflineMode) {
-                    gameMaps = data.worldData; 
-                } else {
-                    let localMaps = gameMaps;
-                    gameMaps = data.worldData;
-                    Object.keys(gameMaps).forEach(mId => {
-                        if (gameMaps[mId] && gameMaps[mId].entities && localMaps[mId] && localMaps[mId].entities) {
-                            gameMaps[mId].entities.forEach(serverEnt => {
-                                if (serverEnt.type === 'enemy' || serverEnt.type === 'npc') {
-                                    let localEnt = localMaps[mId].entities.find(e => e.id === serverEnt.id);
-                                    if(localEnt) { serverEnt.x = localEnt.x; serverEnt.y = localEnt.y; serverEnt.destX = localEnt.destX; serverEnt.destY = localEnt.destY; serverEnt.hp = localEnt.hp; }
-                                }
-                            });
-                        }
-                    });
-                }
+                gameMaps = data.worldData;
             } else { gameMaps = JSON.parse(JSON.stringify(defaultGameMaps)); }
             
             if(data.itemDB) itemDB = data.itemDB;
@@ -472,28 +444,34 @@
                 player = { ...playerDefault, ...data.playerData };
                 if(data.playerData.stats) player.stats = { ...playerDefault.stats, ...data.playerData.stats };
                 if(data.playerData.stats && data.playerData.stats.skills) player.stats.skills = { ...playerDefault.stats.skills, ...data.playerData.stats.skills };
-                if(isNaN(player.x) || isNaN(player.y)) { player.x = 400; player.y = 300; player.destX = 400; player.destY = 300; }
-                if(player.inventory.length === 0 && player.stats.skills.combat.xp === 0) giveStarterItems();
             } else {
                 player = JSON.parse(JSON.stringify(playerDefault));
                 giveStarterItems();
             }
             
+            // ANTI-TELA PRETA: Sanitização matemática 
+            if (typeof player.x !== 'number' || isNaN(player.x)) player.x = 400;
+            if (typeof player.y !== 'number' || isNaN(player.y)) player.y = 300;
+            if (typeof player.destX !== 'number' || isNaN(player.destX)) player.destX = player.x;
+            if (typeof player.destY !== 'number' || isNaN(player.destY)) player.destY = player.y;
+            if (typeof player.speed !== 'number' || isNaN(player.speed)) player.speed = 4.0;
+
             currentMap = player.currentMap || 'lumbridge'; if(!gameMaps[currentMap]) currentMap = 'lumbridge';
             
+            // LIGA A TELA DO JOGO
             document.getElementById('login-overlay').style.display = 'none';
             document.getElementById('game-wrapper').style.display = 'flex';
             
             setTimeout(() => {
-                resizeCanvas();
-                window.addEventListener('resize', resizeCanvas);
-                
+                resizeCanvas(); window.addEventListener('resize', resizeCanvas);
                 openTab('inv'); updateUI(); 
                 if(userRole === 'admin') { buildDevEntityList(); loadDevMapManager(); }
-                
                 updateChatUI();
+                
+                // MULTIPLAYER SYNC
                 if(!isOfflineMode) setInterval(syncMultiplayer, 500);
 
+                // INICIA LAÇO GRÁFICO
                 if(!gameLoopStarted) {
                     gameLoopStarted = true;
                     requestAnimationFrame(gameLoop);
@@ -504,12 +482,12 @@
         function resizeCanvas() {
             const container = document.getElementById('game-container');
             if(container) {
-                if(canvas.width !== container.clientWidth && container.clientWidth > 0) canvas.width = container.clientWidth;
-                if(canvas.height !== container.clientHeight && container.clientHeight > 0) canvas.height = container.clientHeight;
+                const w = container.clientWidth; const h = container.clientHeight;
+                if(canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
             }
         }
 
-        // --- SISTEMA MULTIPLAYER ---
+        // --- SISTEMA MULTIPLAYER (SÓ SINCRONIZA JOGADOR E CHAT AGORA!) ---
         async function syncMultiplayer() {
             if(!currentUser || isOfflineMode) return;
             try {
@@ -520,21 +498,6 @@
                 const data = await res.json();
                 if(data.players) otherPlayers = data.players;
                 if(data.chat) { chatMessages = data.chat; updateChatUI(); }
-                
-                if(data.worldData && userRole !== 'admin') { 
-                    let localMaps = gameMaps;
-                    gameMaps = data.worldData;
-                    Object.keys(gameMaps).forEach(mId => {
-                        if (gameMaps[mId] && gameMaps[mId].entities && localMaps[mId] && localMaps[mId].entities) {
-                            gameMaps[mId].entities.forEach(serverEnt => {
-                                if (serverEnt.type === 'enemy' || serverEnt.type === 'npc') {
-                                    let localEnt = localMaps[mId].entities.find(e => e.id === serverEnt.id);
-                                    if(localEnt) { serverEnt.x = localEnt.x; serverEnt.y = localEnt.y; serverEnt.destX = localEnt.destX; serverEnt.destY = localEnt.destY; serverEnt.hp = localEnt.hp; }
-                                }
-                            });
-                        }
-                    });
-                }
             } catch(e) {}
         }
 
@@ -543,9 +506,9 @@
             for (let map in gameMaps) { if (gameMaps[map] && gameMaps[map].entities) { gameMaps[map].entities.forEach(obj => { if(obj && obj.aggroTarget) obj.aggroTarget = null; }); } }
             player.currentMap = currentMap; player.actionTarget = null; player.actionToolItem = null; player.pendingAutoAction = null;
 
-            if (isOfflineMode || window.location.protocol === 'file:') {
+            if (isOfflineMode) {
                 const saveData = { playerData: player, worldData: gameMaps, itemDB: itemDB, npcDB: npcDB }; 
-                localStorage.setItem('miniscape_save_v45', JSON.stringify(saveData));
+                localStorage.setItem('miniscape_save_v47', JSON.stringify(saveData));
                 if(manual) setActionText("Salvo Localmente!", "#f1c40f"); return;
             }
             try {
@@ -569,13 +532,6 @@
                 if(data.chat) { chatMessages = data.chat; updateChatUI(); }
             } catch(e) {}
         }
-        async function pollChat() {
-            try {
-                const res = await fetch(API_BASE + '/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sender: '', msg: '' }) });
-                const data = await res.json();
-                if(data.chat) { chatMessages = data.chat; updateChatUI(); }
-            } catch(e) {}
-        }
         function updateChatUI() {
             const box = document.getElementById('chat-box'); if(!box) return; box.innerHTML = '';
             chatMessages.forEach(c => { box.innerHTML += `<div class="chat-msg"><span style="color:${c.color}; font-weight:bold;">[${c.sender}]</span>: ${c.msg}</div>`; });
@@ -583,7 +539,7 @@
         }
         document.getElementById('chat-input').addEventListener('keypress', function (e) { if (e.key === 'Enter') sendChat(); });
 
-        // --- CÁLCULO PRECISO DE CÂMERA E MOUSE ---
+        // --- CÁLCULO PRECISO DO MOUSE (LIVRE DE ESCALAS FALSAS) ---
         function getCameraOffset() {
             let mapObj = gameMaps[currentMap];
             if (!mapObj) return { x: 0, y: 0 };
@@ -609,52 +565,55 @@
 
         function getCoords(e) {
             const rect = canvas.getBoundingClientRect(); 
-            const scaleX = rect.width > 0 ? canvas.width / rect.width : 1; 
-            const scaleY = rect.height > 0 ? canvas.height / rect.height : 1;
-            
             let cX = e.clientX, cY = e.clientY, pX = e.pageX, pY = e.pageY;
             if(e.type && e.type.includes('touch')) { cX = e.touches[0].clientX; cY = e.touches[0].clientY; pX = e.touches[0].pageX; pY = e.touches[0].pageY; }
             
+            let rawX = cX - rect.left;
+            let rawY = cY - rect.top;
+
             let offset = getCameraOffset();
-            return { x: ((cX - rect.left) * scaleX) - offset.x, y: ((cY - rect.top) * scaleY) - offset.y, pageX: pX, pageY: pY };
+            return { x: rawX - offset.x, y: rawY - offset.y, pageX: pX, pageY: pY };
         }
 
-        // --- DEV ENGINE & IMPORTAÇÃO ATUALIZADA (AGORA LÊ MAPAS!) ---
-        function importDevCode() {
-            const codeInput = document.getElementById('dev-import-code').value.trim(); if (!codeInput) { setActionText("Cole o código!", "#e74c3c"); return; }
-            try { 
-                let decoded = atob(codeInput); let parsed = JSON.parse(decoded); 
-                if(parsed.items) Object.assign(itemDB, parsed.items); 
-                if(parsed.npcs) Object.assign(npcDB, parsed.npcs); 
-                
-                // NOVIDADE: O Injetor agora engole novos mapas!
-                if(parsed.maps) {
-                    Object.keys(parsed.maps).forEach(mId => {
-                        if(gameMaps[mId]) {
-                            // Se o mapa já existe, só adiciona as coisas novas nele.
-                            if(parsed.maps[mId].entities) {
-                                gameMaps[mId].entities = gameMaps[mId].entities.concat(parsed.maps[mId].entities);
-                            }
-                        } else {
-                            // Se não existe, cria ele inteiro
-                            gameMaps[mId] = parsed.maps[mId];
-                        }
-                    });
-                }
+        // --- SISTEMAS DE CONTROLE (TECLADO SEGURO) ---
+        window.addEventListener("keydown", function(e) {
+            if(document.getElementById('login-overlay').style.display !== 'none') return; 
+            if(["Space","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].indexOf(e.code) > -1) {
+                if(e.target.tagName !== "INPUT" && e.target.tagName !== "TEXTAREA") e.preventDefault();
+            }
+        }, false);
+        document.addEventListener('keydown', (e) => { 
+            if(document.getElementById('login-overlay').style.display !== 'none') return;
+            if(e.target.tagName === "INPUT" || e.target.tagName === "SELECT" || e.target.tagName === "TEXTAREA") return;
+            let k = e.key.toLowerCase(); if(['w','a','s','d','arrowup','arrowleft','arrowdown','arrowright'].includes(k)) keys[k] = true;
+            if (e.code === 'Space') { tryPickupOrInteract(); } if (e.key === 'Control') { tryAttack(); } 
+        });
+        document.addEventListener('keyup', (e) => { 
+            if(document.getElementById('login-overlay').style.display !== 'none') return;
+            if(e.target.tagName === "INPUT" || e.target.tagName === "SELECT" || e.target.tagName === "TEXTAREA") return;
+            let k = e.key.toLowerCase(); if(['w','a','s','d','arrowup','arrowleft','arrowdown','arrowright'].includes(k)) keys[k] = false;
+        });
 
-                saveDataLogic(true); updateUI(); buildDevEntityList(); loadDevMapManager();
-                document.getElementById('dev-import-code').value = ''; setActionText("Importado com sucesso!", "#2ecc71"); alert("Pacote injetado com sucesso!"); 
-            } catch(e) { setActionText("Código inválido.", "#e74c3c"); console.error(e); }
-        }
+        document.addEventListener('mousemove', (e) => { if (tooltip.style.display === 'block') { tooltip.style.left = (e.pageX + 15) + 'px'; tooltip.style.top = (e.pageY + 15) + 'px'; } });
+        function showTooltip(item) { if(!item) return; let html = `<div class="tt-title">${item.name}</div><div class="tt-desc">${item.desc||''}</div>`; if (item.bonusDmg) html += `<div class="tt-stat">⚔️ Dano: +${item.bonusDmg}</div>`; if (item.defBonus) html += `<div class="tt-stat">🛡️ Defesa: +${item.defBonus}</div>`; if (item.heal) html += `<div class="tt-stat">❤️ Cura: +${item.heal}</div>`; html += `<div class="tt-weight">⚖️ Peso: ${item.weight||0} kg</div>`; tooltip.innerHTML = html; tooltip.style.display = 'block'; }
+        function hideTooltip() { tooltip.style.display = 'none'; }
 
-        // --- SISTEMAS INTERNOS (MANTIDOS E BLINDADOS) ---
+        // --- SISTEMAS DE INVENTÁRIO, UI, CRAFT E BANK ---
         function getInvCount(iName) { return player.inventory.reduce((acc, i) => acc + (i.name === iName ? (i.qty||1) : 0), 0); }
         function calcTotalWeight() { return player.inventory.reduce((acc, i) => acc + ((i&&i.weight?i.weight:0) * (i&&i.qty?i.qty:1)), 0).toFixed(1); }
         function removeInvItem(iName, amount) { let tr = amount; for(let i = player.inventory.length - 1; i >= 0; i--) { if(player.inventory[i].name === iName) { if(player.inventory[i].stackable) { if(player.inventory[i].qty > tr) { player.inventory[i].qty -= tr; return true; } else { tr -= player.inventory[i].qty; player.inventory.splice(i, 1); } } else { player.inventory.splice(i, 1); tr--; if(tr === 0) return true; } } } return false; }
         function addInvItem(iName, qty = 1) { const b = itemDB[iName]; if(!b) return false; if (b.stackable) { let r = qty; for(let i of player.inventory) { if(i.name === iName && i.qty < 254) { let sp = 254 - i.qty; if(r <= sp) { i.qty += r; return true; } else { i.qty = 254; r -= sp; } } } while(r > 0 && player.inventory.length < 28) { let t = Math.min(r, 254); player.inventory.push({...b, qty: t}); r -= t; } return r <= 0; } else { if(player.inventory.length < 28) { player.inventory.push({...b}); return true; } return false; } }
         function transferToBank(invIndex) { const item = player.inventory[invIndex]; if(!item) return; let bankItem = player.bank.find(i => i.name === item.name); if(bankItem && item.stackable) { bankItem.qty += item.qty; } else if (item.stackable) { player.bank.push({...item, qty: item.qty}); } else { player.bank.push({...item, qty: 1}); } player.inventory.splice(invIndex, 1); hideTooltip(); updateUI(); }
         function withdrawFromBank(bankIndex) { const item = player.bank[bankIndex]; if(!item) return; let wQ = item.stackable ? Math.min(item.qty, 254) : 1; if(addInvItem(item.name, wQ)) { item.qty -= wQ; if(item.qty <= 0) player.bank.splice(bankIndex, 1); hideTooltip(); updateUI(); } else { setActionText("Inventário Cheio!", "#e74c3c"); } }
-        function useItem(index) { if(isBankOpen) { transferToBank(index); return; } const item = player.inventory[index]; if(!item) return; if(item.type === 'equipment') { if(item.stackable && item.slot === 'ammo') { let curAm = player.equipment.ammo; player.equipment.ammo = player.inventory.splice(index, 1)[0]; if(curAm) addInvItem(curAm.name, curAm.qty); } else { player.inventory.splice(index, 1); if(player.equipment[item.slot]) player.inventory.push(player.equipment[item.slot]); player.equipment[item.slot] = item; } } else if(item.type === 'consumable') { if(item.heal > 0) { player.stats.hp = Math.min(player.stats.maxHp, player.stats.hp + item.heal); setActionText(`Curou ${item.heal} HP.`); } if(item.name === 'Bones') { addXP('prayer', 5); addFloatingText(player.x, player.y - 15, "Enterrou", "#bdc3c7"); } removeInvItem(item.name, 1); } else if(item.name === 'Tinderbox') { if(getInvCount('Logs') >= 1) { removeInvItem('Logs', 1); if(!gameMaps[currentMap].entities) gameMaps[currentMap].entities = []; gameMaps[currentMap].entities.push({ id: Date.now(), type: 'fire', name: 'Fire', x: player.x - 15, y: player.y - 15, w: 30, h: 30, active: true, life: 1000 }); addXP('firemaking', 15); setActionText("Acendeu fogo!"); } else { setActionText("Precisa de Logs.", "#e74c3c"); } } else if(item.name === 'Knife') { setActionText("Use a aba Craft para criar itens.", "#e74c3c"); } player.isPerformingAction = false; player.pendingAutoAction = null; player.actionToolItem = null; hideTooltip(); updateUI(); }
+
+        function useItem(index) {
+            if(isBankOpen) { transferToBank(index); return; } const item = player.inventory[index]; if(!item) return;
+            if(item.type === 'equipment') { if(item.stackable && item.slot === 'ammo') { let curAm = player.equipment.ammo; player.equipment.ammo = player.inventory.splice(index, 1)[0]; if(curAm) addInvItem(curAm.name, curAm.qty); } else { player.inventory.splice(index, 1); if(player.equipment[item.slot]) player.inventory.push(player.equipment[item.slot]); player.equipment[item.slot] = item; } } 
+            else if(item.type === 'consumable') { if(item.heal > 0) { player.stats.hp = Math.min(player.stats.maxHp, player.stats.hp + item.heal); setActionText(`Curou ${item.heal} HP.`); } if(item.name === 'Bones') { addXP('prayer', 5); addFloatingText(player.x, player.y - 15, "Enterrou", "#bdc3c7"); } removeInvItem(item.name, 1); } 
+            else if(item.name === 'Tinderbox') { if(getInvCount('Logs') >= 1) { removeInvItem('Logs', 1); if(!gameMaps[currentMap].entities) gameMaps[currentMap].entities = []; gameMaps[currentMap].entities.push({ id: Date.now(), type: 'fire', name: 'Fire', x: player.x - 15, y: player.y - 15, w: 30, h: 30, active: true, life: 1000 }); addXP('firemaking', 15); setActionText("Acendeu fogo!"); } else { setActionText("Precisa de Logs.", "#e74c3c"); } } 
+            else if(item.name === 'Knife') { setActionText("Use a aba Craft para criar itens.", "#e74c3c"); }
+            player.isPerformingAction = false; player.pendingAutoAction = null; player.actionToolItem = null; hideTooltip(); updateUI();
+        }
         function unequip(slot) { const item = player.equipment[slot]; if(item) { if(item.stackable && slot === 'ammo') { if(addInvItem(item.name, item.qty)) { player.equipment[slot] = null; updateUI(); } else { setActionText("Inv. Cheio!", "#e74c3c"); } } else { if(player.inventory.length >= 28) { setActionText("Inv. Cheio!", "#e74c3c"); return; } player.equipment[slot] = null; player.inventory.push(item); hideTooltip(); updateUI(); } } }
         function craftItem(iName) { let it = itemDB[iName]; if(!it || !it.recipe) return; let reqs = it.recipe.split('|'); let hasAll = true; reqs.forEach(r => { let p = r.split(','); if(getInvCount(p[0].trim()) < parseInt(p[1])) hasAll = false; }); if(hasAll) { reqs.forEach(r => { let p = r.split(','); removeInvItem(p[0].trim(), parseInt(p[1])); }); if(addInvItem(iName, it.craftQty || 1)) { addXP('crafting', 15); setActionText(`Criou ${iName}!`); } updateUI(); } else { setActionText(`Faltam materiais!`, '#e74c3c'); } }
         function closeMenus() { isBankOpen = false; isNPCOpen = false; activeNPCShop = null; document.getElementById('btn-bank').style.display='none'; document.getElementById('btn-npc').style.display='none'; }
@@ -679,10 +638,44 @@
             } catch(e) { }
         }
 
-        // --- DEV ENGINE GERAL ---
+        // --- SISTEMA DEV ENGINE (INJETOR E CONSTRUTOR) ---
         function openModal(htmlContent) { const overlay = document.getElementById('custom-modal-overlay'); const box = document.getElementById('custom-modal-box'); box.innerHTML = htmlContent; overlay.style.display = 'flex'; }
         function closeModal() { document.getElementById('custom-modal-overlay').style.display = 'none'; }
         function openDevSub(tabId, btn) { document.querySelectorAll('.dev-sub-content').forEach(e=>e.classList.remove('active')); document.querySelectorAll('.dev-sub-btn').forEach(e=>e.classList.remove('active')); const t = document.getElementById(tabId); if(t) t.classList.add('active'); if(btn) btn.classList.add('active'); if(tabId==='dev-map') buildDevEntityList(); if(tabId==='dev-items') populateDevItems(); if(tabId==='dev-npcs') populateDevNPCs(); if(tabId==='dev-map-manager') loadDevMapManager(); if(tabId==='dev-import') document.getElementById('dev-import-code').value = ''; }
+
+        function importDevCode() {
+            const codeInput = document.getElementById('dev-import-code').value.trim(); if (!codeInput) { setActionText("Cole o código!", "#e74c3c"); return; }
+            try { 
+                let decoded = atob(codeInput); let parsed = JSON.parse(decoded); 
+                if(parsed.items) Object.assign(itemDB, parsed.items); 
+                if(parsed.npcs) Object.assign(npcDB, parsed.npcs); 
+                if(parsed.maps) {
+                    Object.keys(parsed.maps).forEach(mId => {
+                        if(gameMaps[mId]) {
+                            if(parsed.maps[mId].entities) { gameMaps[mId].entities = gameMaps[mId].entities.concat(parsed.maps[mId].entities); }
+                        } else { gameMaps[mId] = parsed.maps[mId]; }
+                    });
+                }
+                saveDataLogic(true); updateUI(); buildDevEntityList(); loadDevMapManager();
+                document.getElementById('dev-import-code').value = ''; setActionText("Importado com sucesso!", "#2ecc71"); alert("Pacote injetado com sucesso!"); 
+            } catch(e) { setActionText("Código inválido.", "#e74c3c"); }
+        }
+
+        function filterDevEntities(term) { let val = removeAccents(term).toLowerCase(); document.querySelectorAll('.dev-ent-item').forEach(el => { let txt = removeAccents(el.getAttribute('data-name')).toLowerCase(); if(txt.includes(val)) el.style.display = devViewMode === 'list' ? 'flex' : 'flex'; else el.style.display = 'none'; }); if(devViewMode === 'list') { document.querySelectorAll('.dev-ent-cat').forEach(cat => { let hasVisible = false; let next = cat.nextElementSibling; while(next && next.classList.contains('dev-ent-item')) { if(next.style.display !== 'none') hasVisible = true; next = next.nextElementSibling; } cat.style.display = hasVisible ? 'block' : 'none'; }); } }
+        function setDevObj(val, el) { selectedDevEntity = val; document.querySelectorAll('.dev-ent-item').forEach(e => e.classList.remove('selected')); el.classList.add('selected'); }
+        function toggleDevView() { devViewMode = devViewMode === 'list' ? 'grid' : 'list'; buildDevEntityList(); let search = document.getElementById('dev-search'); if(search) filterDevEntities(search.value); }
+        
+        function buildDevEntityList() { 
+            let cont = document.getElementById('dev-entity-list'); if(!cont) return; let html = ''; 
+            let list = [ 
+                { cat: '🌲 Ambiente', items: [ { v: 'tree', n: 'Árvore', ic: '🌲' }, { v: 'fishing_spot', n: 'Lagos', ic: '🐟' }, { v: 'rock_copper', n: 'Minério (Copper)', ic: '🪨' }, { v: 'rock_tin', n: 'Minério (Tin)', ic: '🪨' }, { v: 'rock_iron', n: 'Minério (Iron)', ic: '🪨' } ]}, 
+                { cat: '🏠 Construções', items: [ { v: 'furnace', n: 'Fornalha', ic: '♨️' }, { v: 'anvil', n: 'Bigorna', ic: '🔨' }, { v: 'bank', n: 'Bank', ic: '🏦' }, { v: 'portal', n: 'Portal', ic: '🚪' }, { v: 'house', n: 'Casa', ic: '🏠' } ]}, 
+                { cat: '🎨 Chão e Pintura', items: [ { v: 'paint_dirt', n: 'Estrada de Terra', ic: '🟫' }, { v: 'paint_stone', n: 'Piso de Pedra', ic: '⬜' }, { v: 'paint_grass', n: 'Grama Escura', ic: '🟩' }, { v: 'paint_water', n: 'Água', ic: '🟦' } ]}, 
+                { cat: '👹 Monstros e NPCs', items: Object.keys(npcDB).map(k => ({ v: 'e_'+k, n: npcDB[k].name, ic: '👹' })) }, 
+                { cat: '📦 Itens', items: Object.keys(itemDB).map(k => ({ v: 'i_'+k, n: itemDB[k].name, ic: itemDB[k].icon })) } 
+            ]; 
+            if(devViewMode === 'list') { cont.style.display = 'block'; list.forEach(g => { html += `<div class="dev-ent-cat">${g.cat}</div>`; g.items.forEach(i => { let sel = selectedDevEntity === i.v ? 'selected' : ''; html += `<div class="dev-ent-item ${sel}" data-name="${i.n}" onclick="setDevObj('${i.v}', this)">${i.ic} <span style="margin-left:8px;">${i.n}</span></div>`; }); }); } else { cont.style.display = 'flex'; cont.style.flexWrap = 'wrap'; cont.style.gap = '5px'; list.forEach(g => { g.items.forEach(i => { let sel = selectedDevEntity === i.v ? 'selected' : ''; let border = selectedDevEntity === i.v ? 'border: 2px solid #e74c3c;' : 'border: 1px solid #3d2e24;'; html += `<div class="dev-ent-item ${sel}" style="width:40px; height:40px; display:flex; align-items:center; justify-content:center; background:#111; ${border} font-size:1.5rem; cursor:pointer;" data-name="${i.n}" title="${i.n}" onclick="setDevObj('${i.v}', this)">${i.ic}</div>`; }); }); } cont.innerHTML = html; 
+        }
 
         function toggleItemFields(){ let t = document.getElementById('di-type').value; document.getElementById('di-eq-fields').style.display = t==='equipment'?'block':'none'; document.getElementById('di-cons-fields').style.display = t==='consumable'?'block':'none'; }
         function populateDevItems(){ let s = document.getElementById('dev-item-select'); s.innerHTML='<option value="NEW">-- CRIAR NOVO ITEM --</option>'; Object.keys(itemDB).forEach(k=>{s.innerHTML+=`<option value="${k}">${k} (${itemDB[k].icon})</option>`;}); }
@@ -704,6 +697,30 @@
         function quickCreateMap(x, y) { let nId = 'mapa_' + Date.now().toString().slice(-4); gameMaps[nId] = { id: nId, name: 'Novo Mapa', width: 800, height: 600, color: '#4a6b2d', gridX: x, gridY: y, entities: [] }; saveDataLogic(); loadDevMapManager(); closeModal(); }
         function saveCurrentMapSettings() { let cm = gameMaps[currentMap]; if(cm) { cm.name = document.getElementById('cur-map-name').value || cm.id; cm.width = parseInt(document.getElementById('cur-map-w').value) || 800; cm.height = parseInt(document.getElementById('cur-map-h').value) || 600; cm.color = document.getElementById('cur-map-color').value || '#4a6b2d'; resizeCanvas(); saveDataLogic(); loadDevMapManager(); setActionText("Mapa Atualizado!"); } }
         function createNewMap() { let id = document.getElementById('dm-id').value; let n = document.getElementById('dm-name').value; let w = parseInt(document.getElementById('dm-w').value) || 800; let h = parseInt(document.getElementById('dm-h').value) || 600; let c = document.getElementById('dm-color').value; if(!id || gameMaps[id]) { alert("ID inválido!"); return; } gameMaps[id] = { id: id, name: n||id, width: w, height: h, color: c, gridX: null, gridY: null, entities: [] }; setActionText("Mapa Criado!"); saveDataLogic(); loadDevMapManager(); }
+
+        // --- SISTEMA DE MAPAS E TRANSIÇÕES ---
+        function switchMap(targetMap, nx, ny) { if(!gameMaps[targetMap]) return; currentMap = targetMap; player.x = nx; player.y = ny; player.destX = nx; player.destY = ny; player.isPerformingAction = false; player.pendingAutoAction = null; player.actionTarget = null; player.actionToolItem = null; projectiles = []; canvas.width = gameMaps[currentMap].width || 800; canvas.height = gameMaps[currentMap].height || 600; setActionText(`Viajou: ${gameMaps[currentMap].name}`); saveDataLogic(); loadDevMapManager(); }
+        
+        function switchMapByGrid(dx, dy) {
+            let cm = gameMaps[currentMap]; 
+            let tgX = cm.gridX !== null ? cm.gridX + dx : null;
+            let tgY = cm.gridY !== null ? cm.gridY + dy : null;
+            
+            let targetMapId = null;
+            if (tgX !== null && tgY !== null) {
+                targetMapId = Object.keys(gameMaps).find(k => gameMaps[k].gridX === tgX && gameMaps[k].gridY === tgY);
+            }
+            
+            if(targetMapId) { 
+                let tm = gameMaps[targetMapId]; let tmW = tm.width || 800; let tmH = tm.height || 600;
+                let nx = player.x; let ny = player.y;
+                if (dx !== 0) { let ratio = player.y / (cm.height||600); ny = tmH * ratio; if (dx > 0) nx = 40; if (dx < 0) nx = tmW - 40; }
+                if (dy !== 0) { let ratio = player.x / (cm.width||800); nx = tmW * ratio; if (dy > 0) ny = 40; if (dy < 0) ny = tmH - 40; }
+                switchMap(targetMapId, nx, ny);
+                return true;
+            }
+            return false;
+        }
 
         // --- SISTEMA DE CLIQUE / MOUSE / SPAWN / BORRACHA ---
         function handleInputDown(e) {
@@ -760,7 +777,7 @@
             e.preventDefault(); const pos = getCoords(e);
             let cObj = null; let cur = gameMaps[currentMap] ? gameMaps[currentMap].entities || [] : [];
             
-            // BORRACHA DEV SEGURO DE BACKUP
+            // BORRACHA DEV SEGURO
             if (isDevBuildMode) { 
                 for (let i = cur.length - 1; i >= 0; i--) { 
                     let o = cur[i]; 
@@ -793,7 +810,7 @@
         function addMenuOption(text, callback) { const div = document.createElement('div'); div.className = 'osrs-menu-item'; div.innerText = text; div.onclick = () => { osrsMenu.style.display = 'none'; callback(); }; osrsMenu.appendChild(div); }
         function setPendingAction(obj) { player.pendingAutoAction = obj; player.destX = obj.x + (obj.w||30)/2; player.destY = obj.y + (obj.h||30)/2; if(isNPCOpen && obj.type !== 'npc') { closeMenus(); openTab('inv'); } osrsMenu.style.display = 'none'; }
 
-        // --- SISTEMA DE AÇÃO INTELIGENTE ---
+        // --- SISTEMA DE AÇÃO E LUTA ---
         function tryPickupOrInteract() {
             if(player.isPerformingAction) { player.isPerformingAction = false; return; }
             let cur = gameMaps[currentMap].entities || [];
@@ -920,7 +937,7 @@
             }
         }
 
-        // --- UPDATE LOOP FÍSICO COM BARREIRAS SÓLIDAS DE MAPA ---
+        // --- UPDATE LOOP FÍSICO COM COLISÃO REVISADA ---
         function update() {
             try {
                 let curM = gameMaps[currentMap]; if(!curM) return; let cur = curM.entities || [];
@@ -952,7 +969,9 @@
                     player.destX = player.x; player.destY = player.y; player.pendingAutoAction = null; player.isPerformingAction = false; player.actionToolItem = null;
                     let dK = Math.hypot(dxK, dyK); let mx = (dxK / dK) * player.speed; let my = (dyK / dK) * player.speed; 
                     let nX = player.x + mx; let nY = player.y + my; let colX = false, colY = false; let pw = 10, ph = 10;
+                    
                     for(let o of cur) {
+                        // IGNORA INIMIGOS E NPCS (O jogador não trava mais neles)
                         if(!o || !o.type || !o.active || ['ground_item','fishing_spot','portal','fire','paint','enemy','npc'].includes(o.type)) continue;
                         let ow = o.w || 30; let oh = o.h || 30;
                         if(nX-pw < o.x+ow && nX+pw > o.x && player.y-ph < o.y+oh && player.y+ph > o.y) colX = true;
@@ -982,36 +1001,32 @@
                     }
                 }
 
-                // COLISÃO COM OS LIMITES DO MAPA
+                // LIMITES DO MAPA E TRANSIÇÃO (As Paredes Invisíveis)
                 let mapW = curM.width || 800;
                 let mapH = curM.height || 600;
 
-                function attemptGridTransition(dx, dy) {
-                    let cm = gameMaps[currentMap];
-                    if (cm.gridX == null || cm.gridY == null) return false;
-                    let tgX = cm.gridX + dx; let tgY = cm.gridY + dy;
-                    let targetMapId = Object.keys(gameMaps).find(k => gameMaps[k].gridX === tgX && gameMaps[k].gridY === tgY);
-                    if (targetMapId) {
-                        let tm = gameMaps[targetMapId]; let tmW = tm.width || 800; let tmH = tm.height || 600;
-                        let nx = player.x; let ny = player.y;
-                        if (dx !== 0) { let ratio = player.y / mapH; ny = tmH * ratio; if (dx > 0) nx = 40; if (dx < 0) nx = tmW - 40; }
-                        if (dy !== 0) { let ratio = player.x / mapW; nx = tmW * ratio; if (dy > 0) ny = 40; if (dy < 0) ny = tmH - 40; }
-                        switchMap(targetMapId, nx, ny);
-                        return true;
-                    }
-                    return false;
+                if (player.x <= 15) {
+                    let tgX = curM.gridX !== null ? curM.gridX - 1 : null;
+                    let tgY = curM.gridY !== null ? curM.gridY : null;
+                    let tMapId = Object.keys(gameMaps).find(k => gameMaps[k].gridX === tgX && gameMaps[k].gridY === tgY);
+                    if (tMapId) { switchMapByGrid(-1, 0); } else { player.x = 15; player.destX = 15; }
+                } else if (player.x >= mapW - 15) {
+                    let tgX = curM.gridX !== null ? curM.gridX + 1 : null;
+                    let tgY = curM.gridY !== null ? curM.gridY : null;
+                    let tMapId = Object.keys(gameMaps).find(k => gameMaps[k].gridX === tgX && gameMaps[k].gridY === tgY);
+                    if (tMapId) { switchMapByGrid(1, 0); } else { player.x = mapW - 15; player.destX = mapW - 15; }
                 }
 
-                if (player.x <= 5) {
-                    if (!attemptGridTransition(-1, 0)) { player.x = 5; player.destX = 5; }
-                } else if (player.x >= mapW - 5) {
-                    if (!attemptGridTransition(1, 0)) { player.x = mapW - 5; player.destX = mapW - 5; }
-                }
-
-                if (player.y <= 5) {
-                    if (!attemptGridTransition(0, -1)) { player.y = 5; player.destY = 5; }
-                } else if (player.y >= mapH - 5) {
-                    if (!attemptGridTransition(0, 1)) { player.y = mapH - 5; player.destY = mapH - 5; }
+                if (player.y <= 15) {
+                    let tgX = curM.gridX !== null ? curM.gridX : null;
+                    let tgY = curM.gridY !== null ? curM.gridY - 1 : null;
+                    let tMapId = Object.keys(gameMaps).find(k => gameMaps[k].gridX === tgX && gameMaps[k].gridY === tgY);
+                    if (tMapId) { switchMapByGrid(0, -1); } else { player.y = 15; player.destY = 15; }
+                } else if (player.y >= mapH - 15) {
+                    let tgX = curM.gridX !== null ? curM.gridX : null;
+                    let tgY = curM.gridY !== null ? curM.gridY + 1 : null;
+                    let tMapId = Object.keys(gameMaps).find(k => gameMaps[k].gridX === tgX && gameMaps[k].gridY === tgY);
+                    if (tMapId) { switchMapByGrid(0, 1); } else { player.y = mapH - 15; player.destY = mapH - 15; }
                 }
 
                 if(player.isPerformingAction && player.actionTarget && player.actionTarget.active) {
@@ -1099,13 +1114,11 @@
 
                 let cur = mapObj.entities || [];
                 
-                // 1. PINTURAS DE CHÃO
                 cur.forEach(o => {
                     if(!o || !o.type) return; let ow = o.w || 40; let oh = o.h || 40;
                     if(o.type === 'paint') { ctx.fillStyle = o.color; ctx.fillRect(o.x, o.y, ow, oh); }
                 });
 
-                // 2. ITENS DE CHÃO
                 cur.forEach(o => {
                     if(!o || !o.type) return; let ow = o.w || 30; let oh = o.h || 30;
                     if (o.type === 'ground_item' && o.active) {
@@ -1114,7 +1127,6 @@
                     }
                 });
 
-                // 3. ENTIDADES ACIMA
                 cur.forEach(o => {
                     if (!o || !o.type || !o.active || o.type === 'ground_item' || o.type === 'paint') return;
                     let ow = o.w || 30; let oh = o.h || 30;
@@ -1183,7 +1195,7 @@
                 ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.arc(px, py+6, 8, 0, Math.PI*2); ctx.fill();
                 ctx.fillStyle = tC; ctx.fillRect(px - 8, py - 6, 16, 12); ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(px, py - 10, 8, 0, Math.PI*2); ctx.fill();
                 
-                if(player.facing.y > 0) { ctx.fillStyle = 'white'; ctx.fillRect(px - 4, py - 12, 3, 3); ctx.fillRect(px + 1, py - 12, 3, 3); ctx.fillStyle = 'black'; ctx.fillRect(px - 3, py - 11, 1, 1); ctx.fillStyle = '#333'; ctx.fillRect(px-8, py+2, 16, 2);
+                if(player.facing.y > 0) { ctx.fillStyle = 'white'; ctx.fillRect(px - 4, py - 12, 3, 3); ctx.fillRect(px + 1, py - 12, 3, 3); ctx.fillStyle = 'black'; ctx.fillRect(px - 3, py - 11, 1, 1); ctx.fillRect(px + 2, py - 11, 1, 1); ctx.fillStyle = '#333'; ctx.fillRect(px-8, py+2, 16, 2);
                 } else if (player.facing.y < 0) { ctx.fillStyle = '#6b4c3a'; ctx.beginPath(); ctx.arc(px, py - 10, 8, Math.PI, 0); ctx.fill(); ctx.fillStyle = '#8b4513'; ctx.fillRect(px - 6, py - 4, 12, 8);
                 } else if (player.facing.x < 0) { ctx.fillStyle = '#6b4c3a'; ctx.fillRect(px, py - 18, 8, 16); ctx.fillStyle = 'white'; ctx.fillRect(px - 4, py - 12, 3, 3); ctx.fillStyle = 'black'; ctx.fillRect(px - 3, py - 11, 1, 1); ctx.fillStyle = '#8b4513'; ctx.fillRect(px + 2, py - 4, 6, 8);
                 } else if (player.facing.x > 0) { ctx.fillStyle = '#6b4c3a'; ctx.fillRect(px - 8, py - 18, 8, 16); ctx.fillStyle = 'white'; ctx.fillRect(px + 1, py - 12, 3, 3); ctx.fillStyle = 'black'; ctx.fillRect(px + 2, py - 11, 1, 1); ctx.fillStyle = '#8b4513'; ctx.fillRect(px - 8, py - 4, 6, 8); }
@@ -1214,10 +1226,8 @@
                 const mCtx = mCanvas.getContext('2d'); mCtx.clearRect(0, 0, mCanvas.width, mCanvas.height);
                 let curM = gameMaps[currentMap]; if(!curM) return;
                 mCtx.fillStyle = curM.color || '#4a6b2d'; mCtx.fillRect(0, 0, mCanvas.width, mCanvas.height);
-                
                 let mapW = curM.width || 800; let mapH = curM.height || 600;
                 let scaleX = mCanvas.width / mapW; let scaleY = mCanvas.height / mapH;
-                
                 if(curM.entities) {
                     curM.entities.forEach(o => {
                         if(!o || !o.active || !o.type || o.type === 'paint') return;
@@ -1225,11 +1235,9 @@
                         mCtx.fillRect(o.x * scaleX, o.y * scaleY, (o.w||30) * scaleX, (o.h||30) * scaleY);
                     });
                 }
-                
                 if (typeof otherPlayers !== 'undefined') {
                     Object.keys(otherPlayers).forEach(u => { mCtx.fillStyle = '#2980b9'; mCtx.fillRect(otherPlayers[u].x * scaleX, otherPlayers[u].y * scaleY, 4, 4); });
                 }
-                
                 mCtx.fillStyle = 'white'; mCtx.fillRect(player.x * scaleX, player.y * scaleY, 4, 4);
             } catch(e) {}
         }
@@ -1241,6 +1249,7 @@
             try { drawMinimap(); } catch(e){ console.error(e); } 
             requestAnimationFrame(gameLoop); 
         }
+
     </script>
 </body>
 </html>
