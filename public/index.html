@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MiniScape 2D - Servidor Online V30</title>
+    <title>MiniScape 2D - Servidor Online V31</title>
     <style>
         /* === BASE & RESPONSIVIDADE === */
         body { 
@@ -16,7 +16,7 @@
         @media (max-width: 850px) { 
             body { flex-direction: column; align-items: center; padding: 5px; overflow-y: auto; height: auto;} 
             #ui-panel { width: 100% !important; max-width: 100%; min-height: 500px; } 
-            #mobile-action-btn, #mobile-atk-btn { display: block !important; } 
+            .mobile-btn { display: block !important; } 
             #game-container { height: 50vh; } 
         }
         
@@ -55,8 +55,9 @@
         .tab-btn { flex: 1 1 20%; padding: 6px 2px; background: #3d2e24; color: #bdc3c7; border: 1px solid #231912; cursor: pointer; font-weight: bold; font-size: 0.70rem; text-align: center; border-radius: 2px 2px 0 0;} 
         .tab-btn:hover { background: #5d4037; color: white;} .active-btn { background: #5d4037 !important; border-bottom: none !important; color: #f1c40f !important;} 
         
-        /* Botão DEV Blindado via CSS */
-        #btn-dev { display: none; background-color: #c0392b; color: white; }
+        /* BLINDAGEM CSS DO BOTÃO DEV */
+        #btn-dev { display: none !important; background-color: #c0392b; color: white; border-color: #900 !important; }
+        #btn-dev.is-admin { display: block !important; }
         
         .tab-content { display: none; background: #1a1511; padding: 10px; border: 1px solid #3d2e24; flex: 1; overflow-y: auto; border-radius: 0 4px 4px 4px;} .active-tab { display: block; }
         
@@ -71,7 +72,7 @@
         #dev-entity-list { max-height: 180px; overflow-y: auto; background: #111; border: 1px solid #3d2e24; padding: 5px; border-radius: 4px;} .dev-ent-cat { color: #f39c12; font-size: 0.7rem; border-bottom: 1px solid #333; margin-top: 5px; padding-bottom: 2px; text-transform: uppercase; font-weight: bold;} .dev-ent-item { padding: 6px; font-size: 0.8rem; cursor: pointer; color: #ecf0f1; border-radius: 3px; display: flex; align-items: center; gap: 8px;} .dev-ent-item:hover { background: #2c241b; color: #f1c40f;} .dev-ent-item.selected { background: #5d4037; font-weight: bold; color: white;} .entity-selector-item:hover { filter: brightness(1.5); }
         .map-tile-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; background: #222; padding: 2px; border: 2px solid #111; border-radius: 4px;} .map-tile { aspect-ratio: 1; background: #111; color: #888; font-size: 0.6rem; display: flex; align-items: center; justify-content: center; cursor: pointer; text-align: center; word-break: break-all; border-radius: 2px;} .map-tile:hover { background: #333; color: white;} .map-tile.active-tile { border: 2px solid #f1c40f; background: #5d4037; color: white;}
 
-        /* NOVA TELA DE LOGIN ONLINE */
+        /* TELA DE LOGIN ONLINE */
         #login-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #121212; z-index: 20000; display: flex; align-items: center; justify-content: center; flex-direction: column; }
         .login-box { background: #1e1e1e; border: 4px solid #3d2e24; padding: 30px; border-radius: 8px; width: 300px; box-shadow: 0 0 30px black; text-align: center;}
         .login-box h1 { color: #f1c40f; margin-top: 0; text-transform: uppercase; letter-spacing: 2px;}
@@ -83,11 +84,10 @@
 </head>
 <body>
 
-    <!-- OVERLAY DE LOGIN / REGISTRO -->
     <div id="login-overlay">
         <div class="login-box">
             <h1>MiniScape</h1>
-            <p style="font-size: 0.8rem; color: #bdc3c7;">Servidor Online V30</p>
+            <p style="font-size: 0.8rem; color: #bdc3c7;">Servidor Node.js Ativo</p>
             <input type="text" id="auth-user" class="login-input" placeholder="Usuário">
             <input type="password" id="auth-pass" class="login-input" placeholder="Senha">
             <div id="login-msg"></div>
@@ -96,7 +96,7 @@
         </div>
     </div>
 
-    <!-- O JOGO FICA OCULTO ATÉ O LOGIN SER APROVADO PELO SERVIDOR -->
+    <!-- O JOGO FICA OCULTO ATÉ O LOGIN -->
     <div id="game-wrapper" style="display: none; width: 100%; height: 100%; max-width: 1200px; gap: 15px;">
         <div id="custom-modal-overlay"><div id="custom-modal-box"></div></div>
         <div id="tooltip"></div>
@@ -107,7 +107,6 @@
         </div>
 
         <div id="ui-panel">
-            
             <div class="hud-header">
                 <canvas id="minimapCanvas" width="110" height="80"></canvas>
                 <div class="hud-bars-wrapper">
@@ -129,8 +128,10 @@
                 <button id="btn-craft" class="tab-btn" onclick="openTab('craft'); updateUI();" style="background-color: #d35400;">Craft</button>
                 <button id="btn-mag" class="tab-btn" onclick="openTab('mag')" style="background-color: #3498db;">✨</button>
                 <button id="btn-npc" class="tab-btn" onclick="openTab('npc')" style="display:none;">Falar</button>
-                <!-- BOTÃO DEV (SÓ APARECE PARA O ADMIN) -->
+                
+                <!-- BOTÃO DEV (BLINDADO, SÓ APARECE COM CLASSE is-admin) -->
                 <button id="btn-dev" class="tab-btn" onclick="openTab('dev'); openDevSub('dev-map', document.getElementById('btn-dev-map'));">DEV</button>
+                
                 <button id="btn-cfg" class="tab-btn" onclick="openTab('cfg')">⚙️</button>
             </div>
 
@@ -154,7 +155,7 @@
 
             <div id="tab-sk" class="tab-content"><div id="skills-list"></div></div>
             <div id="tab-craft" class="tab-content"><div style="font-size: 0.7rem; color: #bdc3c7; margin-bottom: 10px;">Crie itens e armas.</div><div id="craft-list"></div></div>
-            <div id="tab-mag" class="tab-content"><div style="font-size: 0.7rem; color: #bdc3c7; margin-bottom: 10px;">Equipe um Cajado e ative.</div><div id="spellbook-list"></div></div>
+            <div id="tab-mag" class="tab-content"><div style="font-size: 0.7rem; color: #bdc3c7; margin-bottom: 10px;">Equipe um Cajado e clique na magia.</div><div id="spellbook-list"></div></div>
             <div id="tab-npc" class="tab-content"><h3 id="npc-title" style="margin-top:0; color:#f39c12;">NPC</h3><div id="npc-dialog" class="npc-dialog">...</div><div id="npc-shop-list"></div></div>
 
             <!-- MODO DEV ENGINE (VÍSIVEL APENAS PARA ADMINS) -->
@@ -170,7 +171,7 @@
                 <div id="dev-import" class="dev-sub-content">
                     <h3 style="color:#2ecc71; margin-top:0;">📡 Injetor de Expansão</h3>
                     <p style="font-size:0.75rem; color:#bdc3c7; line-height: 1.4;">
-                        Cole os <b>Códigos Especiais</b> para injetar Bosses e Itens online.
+                        Cole os <b>Códigos Especiais</b> gerados pela IA para adicionar Novos Bosses, Itens e Recursos.
                     </p>
                     <textarea id="dev-import-code" class="dev-input" style="height:120px; font-family:monospace; resize: none; margin-bottom: 10px;" placeholder="Cole o código Base64 aqui..."></textarea>
                     <button class="dev-save-btn" onclick="importDevCode()" style="background:#8e44ad; font-size: 1rem;">⚡ Injetar Pacote de Dados</button>
@@ -194,6 +195,7 @@
                     <button onclick="toggleDevBuild()" id="btn-build-mode" style="width: 100%; padding: 10px; background: #e67e22; color: white; border: none; font-weight: bold; cursor: pointer; margin-top:5px; border-radius:4px;">
                         Modo Construção: OFF
                     </button>
+                    <p style="font-size: 0.7rem; color: #bdc3c7; margin-top:10px;">Clique ESQUERDO: Coloca. Clique DIREITO: Apaga (Remove do mapa e do Servidor).</p>
                 </div>
 
                 <div id="dev-map-manager" class="dev-sub-content">
@@ -248,27 +250,28 @@
                 </div>
             </div>
 
-            <div id="tab-bank" class="tab-content"><div id="bank-grid" class="grid-container"></div></div>
-
             <div id="tab-cfg" class="tab-content">
                 <h3 style="color:#ecf0f1; margin-top: 0; border-bottom: 1px solid #3d2e24; padding-bottom: 5px;">Sistema Servidor</h3>
-                <p style="font-size: 0.75rem; color: #bdc3c7;">Seus dados são salvos online automaticamente.</p>
-                <button class="dev-save-btn" style="background: #27ae60;" onclick="saveOnline()">💾 Forçar Save Online</button>
-                <button class="dev-save-btn" style="background: #c0392b; margin-top: 20px;" onclick="location.reload()">Sair da Conta</button>
+                <p style="font-size: 0.75rem; color: #bdc3c7;">O seu progresso é salvo no Node.js automaticamente.</p>
+                <button class="dev-save-btn" style="background: #27ae60;" onclick="saveOnline(true)">💾 Forçar Save Online</button>
+                <button class="dev-save-btn" style="background: #c0392b; margin-top: 20px;" onclick="location.reload()">🚪 Sair da Conta</button>
             </div>
         </div>
     </div>
 
     <script>
-        // === NODE.JS CLIENT LOGIC ===
+        // === NODE.JS CLIENT LOGIC & SERVER AUTH ===
         let currentUser = null;
         let userRole = 'player';
+        let gameLoopStarted = false;
         
         async function register() {
             const user = document.getElementById('auth-user').value;
             const pass = document.getElementById('auth-pass').value;
             const msg = document.getElementById('login-msg');
+            
             if(!user || !pass) { msg.innerText = "Preencha usuário e senha!"; return; }
+            
             try {
                 const res = await fetch('/api/register', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -277,13 +280,14 @@
                 const data = await res.json();
                 if(data.error) msg.innerText = data.error;
                 else msg.innerText = "Conta criada! Faça login.";
-            } catch(e) { msg.innerText = "Erro ao conectar com o servidor."; }
+            } catch(e) { msg.innerText = "Erro ao conectar com o servidor Node."; }
         }
 
         async function login() {
             const user = document.getElementById('auth-user').value;
             const pass = document.getElementById('auth-pass').value;
             const msg = document.getElementById('login-msg');
+            
             if(!user || !pass) { msg.innerText = "Preencha usuário e senha!"; return; }
             
             try {
@@ -299,51 +303,79 @@
                     currentUser = user;
                     userRole = data.role;
                     
-                    // Mostra botão DEV apenas para admins
-                    if(userRole === 'admin') document.getElementById('btn-dev').style.display = 'block';
+                    // CONTROLE RESTRITO DO BOTÃO DEV
+                    if(userRole === 'admin') {
+                        document.getElementById('btn-dev').classList.add('is-admin');
+                    } else {
+                        document.getElementById('btn-dev').classList.remove('is-admin');
+                        // Se por algum bug visual ele tiver na aba, joga pro Inventário
+                        openTab('inv');
+                    }
                     
-                    if(data.worldData) gameMaps = data.worldData;
-                    if(data.itemDB) Object.assign(itemDB, data.itemDB);
-                    if(data.npcDB) Object.assign(npcDB, data.npcDB);
+                    // CARREGA DADOS DO SERVIDOR OU INICIA PADRÕES
+                    if(data.worldData && Object.keys(data.worldData).length > 0) {
+                        gameMaps = data.worldData;
+                    } else {
+                        gameMaps = JSON.parse(JSON.stringify(defaultGameMaps));
+                    }
+                    
+                    if(data.itemDB) itemDB = data.itemDB;
+                    if(data.npcDB) npcDB = data.npcDB;
                     
                     if(data.playerData) {
-                        player = { ...playerDefault, ...data.playerData };
+                        player = data.playerData;
                     } else {
                         player = JSON.parse(JSON.stringify(playerDefault));
                         giveStarterItems();
                     }
                     
+                    currentMap = player.currentMap || 'lumbridge';
                     if(!gameMaps[currentMap]) currentMap = 'lumbridge';
-                    canvas.width = gameMaps[currentMap].width || 800; canvas.height = gameMaps[currentMap].height || 600;
+                    
+                    canvas.width = gameMaps[currentMap].width || 800; 
+                    canvas.height = gameMaps[currentMap].height || 600;
                     
                     document.getElementById('login-overlay').style.display = 'none';
                     document.getElementById('game-wrapper').style.display = 'flex';
                     
-                    openTab('inv'); updateUI(); 
+                    openTab('inv'); 
+                    updateUI(); 
                     if(userRole === 'admin') buildDevEntityList(); 
-                    startGameLoop();
+                    loadDevMapManager();
+                    
+                    // LIGA O MOTOR APENAS APÓS O SUCESSO DO LOGIN
+                    if(!gameLoopStarted) {
+                        startGameLoop();
+                        gameLoopStarted = true;
+                    }
                 }
-            } catch(e) { msg.innerText = "Servidor offline ou inacessível."; }
+            } catch(e) { msg.innerText = "Servidor offline ou erro de API."; }
         }
 
-        async function saveOnline() {
+        async function saveOnline(manual = false) {
             if (!currentUser) return;
             for (let map in gameMaps) { if (gameMaps[map] && gameMaps[map].entities) { gameMaps[map].entities.forEach(obj => { if(obj && obj.aggroTarget) obj.aggroTarget = null; }); } }
+            
+            // Grava mapa atual no player para voltar na mesma posição
+            player.currentMap = currentMap;
+
             try {
                 await fetch('/api/save', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username: currentUser, playerData: player, worldData: gameMaps, itemDB: itemDB, npcDB: npcDB })
                 });
-                setActionText("Progresso salvo online!", "#3498db");
+                if(manual) setActionText("Progresso salvo online!", "#3498db");
             } catch (e) {
-                console.error("Erro ao salvar no servidor.");
+                if(manual) setActionText("Erro ao salvar no servidor.", "#e74c3c");
             }
         }
         
-        setInterval(() => saveOnline(), 60000);
+        // Auto-save a cada minuto
+        setInterval(() => { if(currentUser) saveOnline(); }, 60000);
 
-        // --- SISTEMAS DO JOGO MANTIDOS ---
+        // --- SISTEMAS DE CONTROLE (TECLADO MANTIDO) ---
         let keys = { w: false, a: false, s: false, d: false, arrowup: false, arrowdown: false, arrowleft: false, arrowright: false };
+        
         window.addEventListener("keydown", function(e) {
             if(document.getElementById('login-overlay').style.display !== 'none') return; 
             if(["Space","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].indexOf(e.code) > -1) {
@@ -378,13 +410,13 @@
         function showTooltip(item) { if(!item) return; let html = `<div class="tt-title">${item.name}</div><div class="tt-desc">${item.desc||''}</div>`; if (item.bonusDmg) html += `<div class="tt-stat">⚔️ Dano: +${item.bonusDmg}</div>`; if (item.defBonus) html += `<div class="tt-stat">🛡️ Defesa: +${item.defBonus}</div>`; if (item.heal) html += `<div class="tt-stat">❤️ Cura: +${item.heal}</div>`; html += `<div class="tt-weight">⚖️ Peso: ${item.weight||0} kg</div>`; tooltip.innerHTML = html; tooltip.style.display = 'block'; }
         function hideTooltip() { tooltip.style.display = 'none'; }
 
-        // Bancos de Dados base e Player Default 
+        // Bancos de Dados base (Carregados apenas como Fallback inicial se servidor não tiver nada)
         let itemDB = {
             'Bronze Pickaxe': { name: 'Bronze Pickaxe', icon: '⛏️', type: 'equipment', slot: 'weapon', tool: 'pickaxe', stackable: false, weight: 2.0, desc: 'Ferramenta de mineração.', recipe: 'Bronze Bar,2|Logs,1', craftQty: 1 },
             'Iron Pickaxe': { name: 'Iron Pickaxe', icon: '⛏️', type: 'equipment', slot: 'weapon', tool: 'pickaxe', stackable: false, weight: 2.0, desc: 'Minera rápido.', recipe: 'Iron Bar,2|Logs,1', craftQty: 1 },
             'Bronze Axe': { name: 'Bronze Axe', icon: '🪓', type: 'equipment', slot: 'weapon', tool: 'axe', stackable: false, weight: 2.0, desc: 'Corta lenha de árvores.', recipe: 'Bronze Bar,1|Logs,1', craftQty: 1 },
             'Bronze Sword': { name: 'Bronze Sword', icon: '🗡️', type: 'equipment', slot: 'weapon', bonusDmg: 4, stackable: false, weight: 1.8, desc: 'Espada básica de combate.', recipe: 'Bronze Bar,1', craftQty: 1 },
-            'Shortbow': { name: 'Shortbow', icon: '🏹', type: 'equipment', slot: 'weapon', tool: 'ranged', bonusDmg: 2, stackable: false, weight: 1.0, desc: 'Arco para combate à distância.', recipe: 'Logs,2', craftQty: 1 },
+            'Shortbow': { name: 'Shortbow', icon: '🏹', type: 'equipment', slot: 'weapon', tool: 'ranged', bonusDmg: 2, stackable: false, weight: 1.0, desc: 'Arco longo alcance.', recipe: 'Logs,2', craftQty: 1 },
             'Staff': { name: 'Staff', icon: '🦯', type: 'equipment', slot: 'weapon', tool: 'magic', bonusDmg: 1, stackable: false, weight: 1.5, desc: 'Permite lançar magias.', recipe: 'Logs,3', craftQty: 1 },
             'Bronze Shield': { name: 'Bronze Shield', icon: '🛡️', type: 'equipment', slot: 'shield', defBonus: 2, stackable: false, weight: 3.0, desc: 'Aumenta defesa.', recipe: 'Bronze Bar,2', craftQty: 1 }, 
             'Bronze Body': { name: 'Bronze Body', icon: '🦺', type: 'equipment', slot: 'body', defBonus: 3, stackable: false, weight: 5.0, desc: 'Armadura pesada de bronze.', recipe: 'Bronze Bar,3', craftQty: 1 }, 
@@ -429,11 +461,12 @@
         };
         let player = JSON.parse(JSON.stringify(playerDefault));
 
-        let currentMap = 'lumbridge';
-        let gameMaps = {
+        let defaultGameMaps = {
             'lumbridge': { id: 'lumbridge', name: 'Cidade Principal', width: 800, height: 600, color: '#4a6b2d', gridX: 0, gridY: 0, entities: [ { id: 1, type: 'tree', name: 'Oak Tree', x: 150, y: 150, w: 40, h: 50, active: true, hp: 3, maxHp: 3 }, { id: 3, type: 'enemy', dbKey: 'goblin_base', name: 'Goblin', x: 300, y: 400, w: 25, h: 25, active: true, hp: 15, maxHp: 15, attackCooldown: 0 }, { id: 4, type: 'bank', name: 'Bank Booth', x: 400, y: 50, w: 50, h: 30, active: true }, { id: 6, type: 'npc', dbKey: 'merchant_base', name: 'Merchant', x: 100, y: 100, w: 25, h: 25, active: true }, { id: 7, type: 'fishing_spot', name: 'Fishing Spot', x: 600, y: 450, w: 100, h: 80, active: true } ] },
             'mine': { id: 'mine', name: 'Mina Subterrânea', width: 1200, height: 800, color: '#3e3933', gridX: 1, gridY: 0, entities: [ { id: 8, type: 'rock_copper', name: 'Copper Rock', x: 150, y: 200, w: 35, h: 30, active: true, hp: 2, maxHp: 2, color: '#d35400' }, { id: 9, type: 'rock_iron', name: 'Iron Rock', x: 220, y: 200, w: 35, h: 30, active: true, hp: 3, maxHp: 3, color: '#7f8c8d' }, { id: 10, type: 'furnace', name: 'Furnace', x: 400, y: 100, w: 45, h: 45, active: true }, { id: 11, type: 'anvil', name: 'Anvil', x: 500, y: 120, w: 35, h: 25, active: true }, { id: 12, type: 'enemy', dbKey: 'orc_base', name: 'Orc', x: 400, y: 400, w: 35, h: 35, active: true, hp: 30, maxHp: 30, attackCooldown: 0 } ] }
         };
+        let gameMaps = JSON.parse(JSON.stringify(defaultGameMaps));
+        let currentMap = 'lumbridge';
 
         function getCoords(e) {
             const rect = canvas.getBoundingClientRect(); const scaleX = canvas.width / rect.width; const scaleY = canvas.height / rect.height;
@@ -443,7 +476,7 @@
         }
 
         function giveStarterItems() {
-            addInvItem('Bronze Sword', 1); addInvItem('Shortbow', 1); addInvItem('Staff', 1); addInvItem('Bronze Pickaxe', 1); addInvItem('Bronze Axe', 1); addInvItem('Tinderbox', 1); addInvItem('Net', 1); addInvItem('Coins', 100); addInvItem('Air Rune', 50); addInvItem('Mind Rune', 50); addInvItem('Bronze Arrow', 50); addInvItem('Iron Arrow', 25); canvas.width = 800; canvas.height = 600;
+            addInvItem('Bronze Sword', 1); addInvItem('Shortbow', 1); addInvItem('Staff', 1); addInvItem('Bronze Pickaxe', 1); addInvItem('Bronze Axe', 1); addInvItem('Tinderbox', 1); addInvItem('Net', 1); addInvItem('Coins', 100); addInvItem('Air Rune', 50); addInvItem('Mind Rune', 50); addInvItem('Bronze Arrow', 50);
         }
 
         // --- SISTEMA DE TRANSIÇÃO (GRID) ---
@@ -517,10 +550,10 @@
                 const bG = document.getElementById('bank-grid'); bG.innerHTML = ''; for(let i = 0; i < Math.max(30, player.bank.length + 4); i++) { const item = player.bank[i]; const div = document.createElement('div'); div.className = 'item-slot'; if(item) { div.innerText = item.icon || '?'; if(item.qty > 1) div.innerHTML += `<span class="item-qty">${item.qty}</span>`; div.onclick = () => withdrawFromBank(i); div.onmouseenter = () => showTooltip(item); div.onmouseleave = () => hideTooltip(); } bG.appendChild(div); }
                 const mL = document.getElementById('spellbook-list'); if (mL) { mL.innerHTML = ''; spellbookDB.forEach(sp => { let rT = Object.keys(sp.req).map(k => `${sp.req[k]}x ${itemDB[k]?itemDB[k].icon:'?'}`).join(' '); let iA = player.stats.skills.magic.level >= sp.lvl; let sC = player.activeSpell === sp.id ? 'spell-card spell-active' : 'spell-card'; mL.innerHTML += `<div class="${sC}" onclick="setActiveSpell('${sp.id}')" style="opacity:${iA?1:0.5}"><div><strong>${sp.name}</strong> <span style="font-size:0.7rem; color:${sp.color}">Dano: +${sp.dmg}</span><br><span class="spell-runes">Req: Lvl ${sp.lvl} | ${rT}</span></div>${player.activeSpell === sp.id ? '⭐' : ''}</div>`; }); }
                 const cG = document.getElementById('craft-list'); if(cG) { cG.innerHTML = ''; Object.values(itemDB).forEach(it => { if(it.recipe) { let reqs = it.recipe.split('|'); let hasAll = true; reqs.forEach(r => { let p = r.split(','); if(getInvCount(p[0].trim()) < parseInt(p[1])) hasAll = false; }); let rT = reqs.map(r => { let p=r.split(','); let ic = itemDB[p[0].trim()] ? itemDB[p[0].trim()].icon : '?'; return `${p[1]}x ${ic}`; }).join(' + '); let opacity = hasAll ? "1" : "0.4"; let btnDisabled = hasAll ? "" : "disabled"; let filter = hasAll ? "" : "filter: grayscale(100%);"; cG.innerHTML += `<div class="spell-card" style="opacity: ${opacity}; ${filter}" onclick="${hasAll ? `craftItem('${it.name}')` : ''}"> <div><strong>${it.icon} ${it.name}</strong> <span style="font-size:0.7rem; color:#bdc3c7;">(Cria ${it.craftQty||1})</span><br><span class="spell-runes">Req: ${rT}</span></div> <button class="shop-btn" ${btnDisabled}>Criar</button> </div>`; } }); }
-            } catch(e) {}
+            } catch(e) { console.error("UI Error", e); }
         }
 
-        // --- CUSTOM MODAL & DEV ENGINE ---
+        // --- CUSTOM MODAL E DEV ENGINE ---
         function openModal(htmlContent) { const overlay = document.getElementById('custom-modal-overlay'); const box = document.getElementById('custom-modal-box'); box.innerHTML = htmlContent; overlay.style.display = 'flex'; }
         function closeModal() { document.getElementById('custom-modal-overlay').style.display = 'none'; }
         function openDevSub(tabId, btn) { document.querySelectorAll('.dev-sub-content').forEach(e=>e.classList.remove('active')); document.querySelectorAll('.dev-sub-btn').forEach(e=>e.classList.remove('active')); const t = document.getElementById(tabId); if(t) t.classList.add('active'); if(btn) btn.classList.add('active'); if(tabId==='dev-map') buildDevEntityList(); if(tabId==='dev-items') populateDevItems(); if(tabId==='dev-npcs') populateDevNPCs(); if(tabId==='dev-map-manager') loadDevMapManager(); if(tabId==='dev-import') document.getElementById('dev-import-code').value = ''; }
@@ -546,7 +579,7 @@
             let list = [ 
                 { cat: '🌲 Ambiente', items: [ { v: 'tree', n: 'Árvore', ic: '🌲' }, { v: 'fishing_spot', n: 'Lagos', ic: '🐟' }, { v: 'rock_copper', n: 'Minério (Copper)', ic: '🪨' }, { v: 'rock_tin', n: 'Minério (Tin)', ic: '🪨' }, { v: 'rock_iron', n: 'Minério (Iron)', ic: '🪨' } ]}, 
                 { cat: '🏠 Construções', items: [ { v: 'furnace', n: 'Fornalha', ic: '♨️' }, { v: 'anvil', n: 'Bigorna', ic: '🔨' }, { v: 'bank', n: 'Bank', ic: '🏦' }, { v: 'portal', n: 'Portal', ic: '🚪' }, { v: 'house', n: 'Casa', ic: '🏠' } ]}, 
-                { cat: '🎨 Chão e Pintura', items: [ { v: 'paint_dirt', n: 'Estrada de Terra', ic: '🟫' }, { v: 'paint_stone', n: 'Piso de Pedra', ic: '⬜' }, { v: 'paint_sand', n: 'Areia', ic: '🟨' } ]}, 
+                { cat: '🎨 Chão e Pintura', items: [ { v: 'paint_dirt', n: 'Estrada de Terra', ic: '🟫' }, { v: 'paint_stone', n: 'Piso de Pedra', ic: '⬜' }, { v: 'paint_sand', n: 'Areia', ic: '🟨' }, { v: 'paint_water', n: 'Água', ic: '🟦' } ]}, 
                 { cat: '👹 Monstros e NPCs', items: Object.keys(npcDB).map(k => ({ v: 'e_'+k, n: npcDB[k].name, ic: '👹' })) }, 
                 { cat: '📦 Itens', items: Object.keys(itemDB).map(k => ({ v: 'i_'+k, n: itemDB[k].name, ic: itemDB[k].icon })) } 
             ]; 
@@ -560,7 +593,7 @@
         function populateDevNPCs(){ let s=document.getElementById('dev-npc-select'); s.innerHTML='<option value="NEW">-- CRIAR NOVO --</option>'; Object.keys(npcDB).forEach(k=>{s.innerHTML+=`<option value="${k}">${k} (${npcDB[k].name})</option>`;}); }
         function loadDevNPCForm(){ let k=document.getElementById('dev-npc-select').value; if(k==='NEW'){ document.getElementById('dn-id').value=''; document.getElementById('dn-name').value='Monstro'; document.getElementById('dn-hp').value=10; document.getElementById('dn-hit').value=1; document.getElementById('dn-xp').value=20; document.getElementById('dn-loot').value=''; document.getElementById('dn-dialog').value=''; document.getElementById('dn-shop').value=''; }else{ let n=npcDB[k]; document.getElementById('dn-id').value=k; document.getElementById('dn-name').value=n.name; document.getElementById('dn-hp').value=n.hp; document.getElementById('dn-hit').value=n.maxHit; document.getElementById('dn-xp').value=n.xp; document.getElementById('dn-c1').value=n.c1; document.getElementById('dn-c2').value=n.c2; document.getElementById('dn-loot').value=n.lootStr||''; document.getElementById('dn-dialog').value=n.dialog||''; document.getElementById('dn-shop').value=n.shopStr||''; } }
         function saveDevNPC(){ let k=document.getElementById('dn-id').value; if(!k)return; npcDB[k]={name:document.getElementById('dn-name').value,hp:parseInt(document.getElementById('dn-hp').value),maxHit:parseInt(document.getElementById('dn-hit').value),xp:parseInt(document.getElementById('dn-xp').value),c1:document.getElementById('dn-c1').value,c2:document.getElementById('dn-c2').value,lootStr:document.getElementById('dn-loot').value,dialog:document.getElementById('dn-dialog').value,shopStr:document.getElementById('dn-shop').value}; populateDevNPCs(); document.getElementById('dev-npc-select').value=k; setActionText(`NPC salvo!`); saveOnline(); buildDevEntityList();}
-        function toggleDevBuild() { isDevBuildMode = !isDevBuildMode; document.getElementById('btn-build-mode').innerText=`Modo Construção: ${isDevBuildMode?'ON':'OFF'}`; document.getElementById('btn-build-mode').style.background=isDevBuildMode?'#2ecc71':'#e67e22'; setActionText(isDevBuildMode?"Build ON. Clique esquerdo cria.":"Build OFF.", "#f1c40f"); }
+        function toggleDevBuild() { isDevBuildMode = !isDevBuildMode; document.getElementById('btn-build-mode').innerText=`Modo Construção: ${isDevBuildMode?'ON':'OFF'}`; document.getElementById('btn-build-mode').style.background=isDevBuildMode?'#2ecc71':'#e67e22'; setActionText(isDevBuildMode?"Build ON.":"Build OFF.", "#f1c40f"); }
 
         function loadDevMapManager() { let grid = document.getElementById('map-grid-ui'); if(!grid) return; grid.innerHTML = ''; for(let y = -2; y <= 2; y++) { for(let x = -2; x <= 2; x++) { let m = Object.keys(gameMaps).find(k => gameMaps[k].gridX === x && gameMaps[k].gridY === y); let div = document.createElement('div'); div.className = 'map-tile'; if(m) { div.innerText = m; div.style.background = gameMaps[m].color; } else { div.innerText = "+"; } if(m === currentMap) div.classList.add('active-tile'); div.onclick = () => handleGridClick(x, y, m); grid.appendChild(div); } } let cm = gameMaps[currentMap]; if(cm) { document.getElementById('cur-map-id-disp').innerText = cm.name; document.getElementById('cur-map-name').value = cm.name; document.getElementById('cur-map-w').value = cm.width; document.getElementById('cur-map-h').value = cm.height; document.getElementById('cur-map-color').value = cm.color || '#4a6b2d'; } }
 
@@ -575,13 +608,25 @@
         function saveCurrentMapSettings() { let cm = gameMaps[currentMap]; if(cm) { cm.name = document.getElementById('cur-map-name').value || cm.id; cm.width = parseInt(document.getElementById('cur-map-w').value) || 800; cm.height = parseInt(document.getElementById('cur-map-h').value) || 600; cm.color = document.getElementById('cur-map-color').value || '#4a6b2d'; canvas.width = cm.width; canvas.height = cm.height; saveOnline(); loadDevMapManager(); setActionText("Mapa Atualizado!"); } }
         function createNewMap() { let id = document.getElementById('dm-id').value; let n = document.getElementById('dm-name').value; let w = parseInt(document.getElementById('dm-w').value) || 800; let h = parseInt(document.getElementById('dm-h').value) || 600; let c = document.getElementById('dm-color').value; if(!id || gameMaps[id]) { alert("ID inválido/já existe!"); return; } gameMaps[id] = { id: id, name: n||id, width: w, height: h, color: c, gridX: null, gridY: null, entities: [] }; setActionText("Mapa Criado! Vincule na grade."); saveOnline(); loadDevMapManager(); }
 
-        // --- MANIPULADORES DE MOUSE E DEV SPAWN ---
+        // --- MANIPULADORES DE EVENTOS DE MOUSE/TOUCH ---
         function handleInputDown(e) {
             if(document.getElementById('login-overlay').style.display !== 'none') return;
             if(e.type === 'touchstart') e.preventDefault(); if(e.type === 'mousedown' && e.button !== 0) return; 
             const pos = getCoords(e); let curM = gameMaps[currentMap]; if(!curM) return;
 
-            if (isDevBuildMode) { 
+            // BORRACHA (Deletar Entidade)
+            if (isDevBuildMode && e.button === 2) { 
+                let cur = curM.entities || [];
+                for (let i = cur.length - 1; i >= 0; i--) { 
+                    let o = cur[i]; 
+                    if (pos.x >= o.x && pos.x <= o.x + (o.w||30) && pos.y >= o.y && pos.y <= o.y + (o.h||30)) { 
+                        cur.splice(i, 1); addFloatingText(pos.x, pos.y, "Deletado", "#e74c3c"); return; 
+                    } 
+                } return; 
+            }
+
+            // SPAWN DEV
+            if (isDevBuildMode && e.button === 0) { 
                 const val = selectedDevEntity; if(!val) return;
                 let cW = parseInt(document.getElementById('spawn-w') ? document.getElementById('spawn-w').value : 0);
                 let cH = parseInt(document.getElementById('spawn-h') ? document.getElementById('spawn-h').value : 0);
@@ -596,16 +641,9 @@
                 else if (val === 'tree') { n.type = 'tree'; n.name = 'Tree'; n.hp = 3; n.maxHp = 3; n.h = cH||50; }
                 else if (val === 'fishing_spot') { n.type = 'fishing_spot'; n.name = 'Fishing Spot'; }
                 else if (val === 'house') { n.type = 'house'; n.name = 'House'; n.w=cW||100; n.h=cH||100; }
-                // PINTURA DE CHÃO
-                else if (val.startsWith('paint_')) { 
-                    n.type = 'paint'; n.name = 'Chão'; 
-                    n.color = val==='paint_dirt'?'#5c4033':val==='paint_stone'?'#7f8c8d':'#f39c12'; 
-                    n.w=cW||40; n.h=cH||40; 
-                }
+                else if (val.startsWith('paint_')) { n.type = 'paint'; n.name = 'Chão'; n.color = val==='paint_dirt'?'#5c4033':val==='paint_stone'?'#7f8c8d':val==='paint_water'?'#3498db':'#f39c12'; n.w=cW||40; n.h=cH||40; }
                 else if (typeof val === 'string' && val.startsWith('rock_')) { n.type = val; n.name = val; n.hp = val==='rock_iron'?3:2; n.maxHp = n.hp; n.color = val==='rock_copper'?'#d35400':val==='rock_iron'?'#7f8c8d':'#bdc3c7'; n.h = cH||30; }
-                else if (val === 'furnace') { n.type = 'furnace'; n.name = 'Furnace'; n.h = cH||45; } 
-                else if (val === 'anvil') { n.type = 'anvil'; n.name = 'Anvil'; n.h = cH||25; } 
-                else if (val === 'bank') { n.type = 'bank'; n.name = 'Bank Booth'; n.w=cW||50; n.h=cH||30; }
+                else if (val === 'furnace') { n.type = 'furnace'; n.name = 'Furnace'; n.h = cH||45; } else if (val === 'anvil') { n.type = 'anvil'; n.name = 'Anvil'; n.h = cH||25; } else if (val === 'bank') { n.type = 'bank'; n.name = 'Bank Booth'; n.w=cW||50; n.h=cH||30; }
                 else { n.type = 'unknown'; } 
                 
                 if(!curM.entities) curM.entities = []; curM.entities.push(n); addFloatingText(pos.x, pos.y, "Spawn", "#2ecc71"); return;
@@ -621,15 +659,14 @@
             e.preventDefault(); const pos = getCoords(e);
             let cObj = null; let cur = gameMaps[currentMap] ? gameMaps[currentMap].entities || [] : [];
             
-            // BORRACHA DEV (DELETAR MESMO)
+            // BORRACHA DEV
             if (isDevBuildMode) { 
                 for (let i = cur.length - 1; i >= 0; i--) { 
                     let o = cur[i]; 
                     if (pos.x >= o.x && pos.x <= o.x + (o.w||30) && pos.y >= o.y && pos.y <= o.y + (o.h||30)) { 
-                        cur.splice(i, 1); addFloatingText(pos.x, pos.y, "Deletado", "#e74c3c"); saveOnline(); return; 
+                        cur.splice(i, 1); addFloatingText(pos.x, pos.y, "Deletado", "#e74c3c"); return; 
                     } 
-                } 
-                return; 
+                } return; 
             }
 
             for (let i = cur.length - 1; i >= 0; i--) { let o = cur[i]; if (o && o.active && o.type !== 'paint' && pos.x >= o.x && pos.x <= o.x + (o.w||30) && pos.y >= o.y && pos.y <= o.y + (o.h||30)) { cObj = o; break; } }
@@ -654,7 +691,7 @@
         function addMenuOption(text, callback) { const div = document.createElement('div'); div.className = 'osrs-menu-item'; div.innerText = text; div.onclick = () => { osrsMenu.style.display = 'none'; callback(); }; osrsMenu.appendChild(div); }
         function setPendingAction(obj) { player.pendingAutoAction = obj; player.destX = obj.x + (obj.w||30)/2; player.destY = obj.y + (obj.h||30)/2; if(isNPCOpen && obj.type !== 'npc') { closeMenus(); openTab('inv'); } osrsMenu.style.display = 'none'; }
 
-        // --- SISTEMA DE AÇÃO INTELIGENTE ---
+        // --- SISTEMA DE AÇÃO INTELIGENTE (ESPAÇO E CTRL) ---
         function tryPickupOrInteract() {
             if(player.isPerformingAction) { player.isPerformingAction = false; return; }
             let cur = gameMaps[currentMap].entities || [];
@@ -874,11 +911,12 @@
                     }
                 });
 
+                // CÂMERA SEGUIDORA
                 const gc = document.getElementById('game-container');
                 if(gc && canvas.width > gc.clientWidth) gc.scrollLeft = player.x - gc.clientWidth / 2;
                 if(gc && canvas.height > gc.clientHeight) gc.scrollTop = player.y - gc.clientHeight / 2;
 
-            } catch(e) {}
+            } catch(e) { console.error("Silenced Update Error", e); }
         }
 
         // --- RENDERIZADOR ---
@@ -890,13 +928,12 @@
 
                 let cur = mapObj.entities || [];
                 
-                // 1. PRIMEIRO DESENHA PINTURAS DE CHÃO
+                // PINTURA DE CHÃO FICA EMBAIXO
                 cur.forEach(o => {
-                    if(!o || !o.type) return; let ow = o.w || 40; let oh = o.h || 40;
-                    if(o.type === 'paint') { ctx.fillStyle = o.color; ctx.fillRect(o.x, o.y, ow, oh); }
+                    if(!o || !o.type) return; let ow = o.w || 30; let oh = o.h || 30;
+                    if (o.type === 'paint') { ctx.fillStyle = o.color; ctx.fillRect(o.x, o.y, ow, oh); }
                 });
 
-                // 2. DEPOIS DESENHA ITENS DE CHÃO
                 cur.forEach(o => {
                     if(!o || !o.type) return; let ow = o.w || 30; let oh = o.h || 30;
                     if (o.type === 'ground_item' && o.active) {
@@ -905,7 +942,6 @@
                     }
                 });
 
-                // 3. POR FIM AS ENTIDADES ACIMA
                 cur.forEach(o => {
                     if (!o || !o.type || !o.active || o.type === 'ground_item' || o.type === 'paint') return;
                     let ow = o.w || 30; let oh = o.h || 30;
@@ -981,10 +1017,9 @@
                 projectiles.forEach(p => { if (p.type === 'ranged') { ctx.fillStyle = '#795548'; ctx.fillRect(p.x-2, p.y-2, 4, 4); } else { ctx.fillStyle = p.color || '#1abc9c'; ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#ecf0f1'; ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI*2); ctx.fill(); } });
                 floatingTexts.forEach((ft, i) => { ctx.fillStyle = ft.color; ctx.font = 'bold 16px Arial'; ctx.fillText(ft.text, ft.x, ft.y); ft.y -= 0.5; ft.life--; if(ft.life <= 0) floatingTexts.splice(i, 1); });
 
-            } catch (e) { console.error("Ignorado", e); }
+            } catch (e) { console.error("Ignorado Draw Error", e); }
         }
 
-        // --- SISTEMA DE MINIMAPA DESACOPLADO ---
         function drawMinimap() {
             try {
                 const mCanvas = document.getElementById('minimapCanvas'); if(!mCanvas) return;
