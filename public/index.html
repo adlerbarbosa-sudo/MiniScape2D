@@ -3,30 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MiniScape 2D - V33 (Tela Expandida & Admin Seguro)</title>
+    <title>MiniScape 2D - V37 (Motor Limpo e Estável)</title>
     <style>
         /* === BASE & RESPONSIVIDADE MAXIMIZADA === */
-        body { 
-            margin: 0; padding: 10px; background-color: #0a0a0a; color: #e0e0e0; 
-            font-family: 'Segoe UI', Tahoma, sans-serif; display: flex; gap: 15px; 
-            height: 100vh; box-sizing: border-box; overflow: hidden; 
-            flex-direction: row; align-items: stretch; justify-content: space-between;
-        }
+        body { margin: 0; padding: 10px; background-color: #121212; color: #e0e0e0; font-family: 'Segoe UI', Tahoma, sans-serif; display: flex; gap: 15px; justify-content: center; height: 100vh; box-sizing: border-box; overflow: hidden; flex-direction: row; align-items: stretch; }
+        @media (max-width: 850px) { body { flex-direction: column; align-items: center; padding: 5px; overflow-y: auto; height: auto;} #ui-panel { width: 100% !important; max-width: 100%; min-height: 500px; } .mobile-btn { display: block !important; } #game-container { height: 50vh; min-height: 400px; } }
         
-        @media (max-width: 850px) { 
-            body { flex-direction: column; padding: 5px; overflow-y: auto; height: auto;} 
-            #ui-panel { width: 100% !important; min-width: 100%; min-height: 500px; } 
-            .mobile-btn { display: block !important; } 
-            #game-container { height: 60vh; min-height: 400px; } 
-        }
-        
-        /* CÂMERA DINÂMICA: AGORA OCUPA TODO O ESPAÇO LIVRE DA TELA */
-        #game-container { 
-            position: relative; flex: 1; border: 4px solid #3d2e24; background-color: #050505; 
-            box-shadow: inset 0 0 20px rgba(0,0,0,1); overflow: hidden; border-radius: 4px; 
-            display: block;
-        }
-        #gameCanvas { cursor: crosshair; display: block; touch-action: none; transform-origin: top left; }
+        /* CÂMERA DINÂMICA E CONTAINER DO JOGO */
+        #game-container { position: relative; flex: 1; border: 4px solid #3d2e24; background-color: #000; box-shadow: 0 0 20px rgba(0,0,0,0.8); overflow: hidden; border-radius: 4px; display: flex; align-items: center; justify-content: center;}
+        #gameCanvas { cursor: crosshair; display: block; touch-action: none; }
         
         .mobile-btn { display: none; width: 100%; padding: 15px; margin-bottom: 5px; background: #e74c3c; color: white; border: 2px solid #c0392b; border-radius: 4px; font-size: 1.1rem; font-weight: bold; cursor: pointer; text-shadow: 1px 1px 0 #000; }
         
@@ -36,11 +21,11 @@
         #osrs-menu { display: none; position: absolute; background-color: #3d2e24; border: 2px solid #231912; box-shadow: 2px 2px 5px rgba(0,0,0,0.8); z-index: 9999; min-width: 150px; font-family: 'Courier New', Courier, monospace; font-weight: bold; color: #f1c40f; border-radius: 2px; }
         .osrs-menu-item { padding: 8px 12px; cursor: pointer; font-size: 0.85rem; text-shadow: 1px 1px 0 #000; border-bottom: 1px solid #231912; } .osrs-menu-item:hover { background-color: #5d4037; color: #fff; }
         
-        #custom-modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 10000; align-items: center; justify-content: center; }
+        #custom-modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); z-index: 10000; align-items: center; justify-content: center; }
         #custom-modal-box { background: #2c241b; border: 3px solid #5d4037; border-radius: 4px; padding: 20px; width: 320px; box-shadow: 0 0 25px black; color: white; display: flex; flex-direction: column; gap: 10px; }
         
         /* UI PAINEL RPG ELEGANTE */
-        #ui-panel { width: 360px; min-width: 360px; max-width: 360px; background-color: #231c15; border: 4px solid #3d2e24; padding: 10px; display: flex; flex-direction: column; gap: 8px; box-sizing: border-box; overflow-y: hidden; border-radius: 4px; height: 100%; box-shadow: inset 0 0 15px rgba(0,0,0,0.8); }
+        #ui-panel { width: 360px; min-width: 360px; background-color: #231c15; border: 4px solid #3d2e24; padding: 10px; display: flex; flex-direction: column; gap: 8px; box-sizing: border-box; overflow-y: hidden; border-radius: 4px; height: 100%; box-shadow: inset 0 0 15px rgba(0,0,0,0.8); }
         .hud-header { display: flex; gap: 10px; align-items: stretch; background: #1a1511; padding: 8px; border: 1px solid #3d2e24; border-radius: 4px; }
         #minimapCanvas { border: 2px solid #5d4037; background: #000; border-radius: 4px; width: 110px; height: 80px; flex-shrink: 0;}
         .hud-bars-wrapper { flex-grow: 1; display: flex; flex-direction: column; justify-content: space-between; }
@@ -58,6 +43,7 @@
         
         .grid-container { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; } .item-slot { aspect-ratio: 1; background: #231c15; border: 1px solid #3d2e24; position: relative; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; cursor: pointer; box-shadow: inset 0 0 8px rgba(0,0,0,0.6); border-radius: 3px; } .item-slot:hover { background: #3d2e24; border-color: #f1c40f;} .item-qty { position: absolute; top: 1px; left: 3px; color: #f1c40f; font-weight: bold; font-size: 0.65rem; text-shadow: 1px 1px 0 #000; font-family: Tahoma;}
         #equip-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; text-align: center; font-size: 0.8rem; } .equip-slot-box { position: relative; background: #231c15; border: 1px solid #3d2e24; padding: 10px 5px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 4px;} .slot-name { color: #888; font-size: 0.65rem; margin-bottom: 2px; text-transform: uppercase;} .equip-icon { font-size: 1.5rem; } .skill-line { display: flex; justify-content: space-between; border-bottom: 1px solid #231c15; padding: 6px 4px; font-size: 0.75rem; color: #bdc3c7;}
+        
         .spell-card { background: #231c15; border: 1px solid #3d2e24; padding: 8px; margin-bottom: 5px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s; border-radius: 4px;} .spell-card:hover { background: #3d2e24; } .spell-active { border: 1px solid #3498db; background: rgba(52, 152, 219, 0.1); } .spell-runes { font-size: 0.65rem; color: #95a5a6; }
         .npc-dialog { background: #111; border-left: 4px solid #f1c40f; padding: 10px; font-style: italic; margin-bottom: 10px; color: #ecf0f1; font-size: 0.85rem;} .shop-item { display: flex; justify-content: space-between; align-items: center; background: #231c15; padding: 6px; border: 1px solid #3d2e24; margin-bottom: 4px; border-radius: 3px; font-size: 0.8rem;} .shop-btn { background: #5d4037; color: #fff; border: 1px solid #8b5a2b; padding: 4px 8px; font-weight: bold; cursor: pointer; font-size: 0.7rem; border-radius: 2px;} .shop-btn:hover { background: #8b5a2b; color: #f1c40f; } .shop-btn:disabled { background: #333; border-color: #222; color: #666; cursor: not-allowed; }
         
@@ -67,35 +53,33 @@
         #dev-entity-list { max-height: 180px; overflow-y: auto; background: #111; border: 1px solid #3d2e24; padding: 5px; border-radius: 4px;} .dev-ent-cat { color: #f39c12; font-size: 0.7rem; border-bottom: 1px solid #333; margin-top: 5px; padding-bottom: 2px; text-transform: uppercase; font-weight: bold;} .dev-ent-item { padding: 6px; font-size: 0.8rem; cursor: pointer; color: #ecf0f1; border-radius: 3px; display: flex; align-items: center; gap: 8px;} .dev-ent-item:hover { background: #2c241b; color: #f1c40f;} .dev-ent-item.selected { background: #5d4037; font-weight: bold; color: white;} .entity-selector-item:hover { filter: brightness(1.5); }
         .map-tile-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; background: #222; padding: 2px; border: 2px solid #111; border-radius: 4px;} .map-tile { aspect-ratio: 1; background: #111; color: #888; font-size: 0.6rem; display: flex; align-items: center; justify-content: center; cursor: pointer; text-align: center; word-break: break-all; border-radius: 2px;} .map-tile:hover { background: #333; color: white;} .map-tile.active-tile { border: 2px solid #f1c40f; background: #5d4037; color: white;}
 
-        /* TELA DE LOGIN ONLINE */
-        #login-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #121212; z-index: 20000; display: flex; align-items: center; justify-content: center; flex-direction: column; }
+        /* TELA DE LOGIN ONLINE - FLEX POR PADRÃO */
+        #login-overlay { display: flex; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #121212; z-index: 20000; align-items: center; justify-content: center; flex-direction: column; }
         .login-box { background: #1e1e1e; border: 4px solid #3d2e24; padding: 30px; border-radius: 8px; width: 300px; box-shadow: 0 0 30px black; text-align: center;}
         .login-box h1 { color: #f1c40f; margin-top: 0; text-transform: uppercase; letter-spacing: 2px;}
         .login-input { width: 100%; padding: 10px; margin-bottom: 15px; background: #111; border: 1px solid #5d4037; color: white; box-sizing: border-box; border-radius: 4px;}
         .login-btn { width: 100%; padding: 12px; background: #27ae60; color: white; border: none; font-weight: bold; cursor: pointer; border-radius: 4px; margin-bottom: 10px;}
         .login-btn.reg { background: #2980b9; }
-        .login-btn.off { background: #c0392b; margin-top: 15px; }
         #login-msg { color: #e74c3c; font-size: 0.85rem; font-weight: bold; min-height: 20px; margin-bottom: 10px;}
     </style>
 </head>
 <body>
 
-    <!-- OVERLAY DE LOGIN / REGISTRO (BLOQUEIA TELA PRETA ATÉ CARREGAR TUDO) -->
+    <!-- OVERLAY DE LOGIN -->
     <div id="login-overlay">
         <div class="login-box">
             <h1>MiniScape</h1>
-            <p style="font-size: 0.8rem; color: #bdc3c7;">Servidor Oficial</p>
+            <p style="font-size: 0.8rem; color: #bdc3c7;">Servidor Online V37</p>
             <input type="text" id="auth-user" class="login-input" placeholder="Usuário">
             <input type="password" id="auth-pass" class="login-input" placeholder="Senha">
             <div id="login-msg"></div>
             <button class="login-btn" onclick="login()">Entrar no Jogo Online</button>
             <button class="login-btn reg" onclick="register()">Criar Conta Nova</button>
-            <button class="login-btn off" onclick="forceOfflineMode()">Jogar Offline (Admin Local)</button>
         </div>
     </div>
 
     <!-- O JOGO FICA OCULTO ATÉ O LOGIN SER APROVADO -->
-    <div id="game-wrapper" style="display: none; width: 100%; height: 100%; gap: 15px;">
+    <div id="game-wrapper" style="display: none; width: 100%; height: 100%; max-width: 1200px; gap: 15px;">
         <div id="custom-modal-overlay"><div id="custom-modal-box"></div></div>
         <div id="tooltip"></div>
         <div id="osrs-menu"></div>
@@ -115,12 +99,12 @@
                 </div>
             </div>
             
-            <div id="action-text">Conectado com Sucesso!</div>
+            <div id="action-text">Conectado ao Servidor!</div>
             
             <button id="mobile-action-btn" class="mobile-btn" onclick="tryPickupOrInteract()">🎯 AÇÃO (ESPAÇO)</button>
             <button id="mobile-atk-btn" class="mobile-btn" style="background:#8e44ad; border-color:#9b59b6; margin-top:-5px;" onclick="tryAttack()">⚔️ ATACAR (CTRL)</button>
 
-            <!-- AQUI É ONDE O BOTÃO DEV SERÁ INJETADO PELO JAVASCRIPT SE FOR ADMIN -->
+            <!-- AQUI É ONDE O BOTÃO DEV SERÁ INJETADO SE FOR ADMIN -->
             <div class="tab-buttons" id="tab-buttons-container">
                 <button id="btn-inv" class="tab-btn active-btn" onclick="openTab('inv')">Inv</button>
                 <button id="btn-eq" class="tab-btn" onclick="openTab('eq')">Equip</button>
@@ -154,7 +138,7 @@
             <div id="tab-mag" class="tab-content"><div style="font-size: 0.7rem; color: #bdc3c7; margin-bottom: 10px;">Equipe um Cajado e clique na magia.</div><div id="spellbook-list"></div></div>
             <div id="tab-npc" class="tab-content"><h3 id="npc-title" style="margin-top:0; color:#f39c12;">NPC</h3><div id="npc-dialog" class="npc-dialog">...</div><div id="npc-shop-list"></div></div>
 
-            <!-- MODO DEV ENGINE (ESCONDIDO ATÉ O ADMIN LOGAR) -->
+            <!-- MODO DEV ENGINE (VÍSIVEL APENAS PARA ADMINS) -->
             <div id="tab-dev" class="tab-content">
                 <div class="dev-sub-tabs">
                     <button id="btn-dev-map" class="dev-sub-btn active" onclick="openDevSub('dev-map', this)">Colocar</button>
@@ -173,7 +157,7 @@
 
                 <div id="dev-map" class="dev-sub-content active">
                     <div class="dev-row" style="margin-bottom: 5px;">
-                        <input type="text" id="dev-search" class="dev-input" placeholder="🔍 Buscar entidade (Ex: arvore)..." oninput="filterDevEntities(this.value)" style="flex: 1; border-color: #5d4037;">
+                        <input type="text" id="dev-search" class="dev-input" placeholder="🔍 Buscar entidade..." oninput="filterDevEntities(this.value)" style="flex: 1; border-color: #5d4037;">
                         <button class="dev-save-btn" style="width: auto; margin:0; background:#3d2e24;" onclick="toggleDevView()" title="Alternar Vista">🔲/📄</button>
                     </div>
                     
@@ -189,7 +173,7 @@
                     <button onclick="toggleDevBuild()" id="btn-build-mode" style="width: 100%; padding: 10px; background: #e67e22; color: white; border: none; font-weight: bold; cursor: pointer; margin-top:5px; border-radius:4px;">
                         Modo Construção: OFF
                     </button>
-                    <p style="font-size: 0.7rem; color: #bdc3c7; margin-top:10px;">Clique ESQUERDO no mapa para <b>Colocar</b>.<br>Clique DIREITO para <b>Apagar</b>.</p>
+                    <p style="font-size: 0.7rem; color: #f1c40f; margin-top:10px;">Clique ESQUERDO: Colocar no mapa.<br>Clique DIREITO: <b>Apagar (Borracha)</b></p>
                 </div>
 
                 <div id="dev-map-manager" class="dev-sub-content">
@@ -244,30 +228,111 @@
                 </div>
             </div>
 
+            <div id="tab-bank" class="tab-content"><div id="bank-grid" class="grid-container"></div></div>
+
             <div id="tab-cfg" class="tab-content">
-                <h3 style="color:#ecf0f1; margin-top: 0; border-bottom: 1px solid #3d2e24; padding-bottom: 5px;">Sistema Servidor</h3>
-                <p style="font-size: 0.75rem; color: #bdc3c7;">Seus dados são salvos online (ou offline) a cada 60s.</p>
-                <button class="dev-save-btn" style="background: #27ae60;" onclick="saveDataLogic(true)">💾 Forçar Save Global</button>
-                <button class="dev-save-btn" style="background: #c0392b; margin-top: 20px;" onclick="location.reload()">🚪 Sair do Jogo</button>
+                <h3 style="color:#ecf0f1; margin-top: 0; border-bottom: 1px solid #3d2e24; padding-bottom: 5px;">Sistema</h3>
+                <p style="font-size: 0.75rem; color: #bdc3c7;">Seus dados são salvos online (ou offline) automaticamente.</p>
+                <button class="dev-save-btn" style="background: #27ae60;" onclick="saveDataLogic(true)">💾 Forçar Save</button>
+                <button class="dev-save-btn" style="background: #c0392b; margin-top: 20px;" onclick="location.reload()">🚪 Sair da Conta / Reiniciar</button>
             </div>
         </div>
     </div>
 
-    <!-- JAVASCRIPT GIGANTE TOTALMENTE BLINDADO -->
+    <!-- SCRIPT GIGANTE E UNIFICADO DO JOGO -->
     <script>
-        // === VARIÁVEIS GLOBAIS ===
+        // === 1. DECLARAÇÕES GLOBAIS ÚNICAS (NUNCA DUPLICADAS) ===
         const canvas = document.getElementById('gameCanvas'); 
         const ctx = canvas.getContext('2d');
+        const osrsMenu = document.getElementById('osrs-menu'); 
+        const tooltip = document.getElementById('tooltip');
+        
         let gameLoopStarted = false;
         let currentUser = null;
         let userRole = 'player';
         let isOfflineMode = false;
         
-        let floatingTexts = []; let projectiles = []; let isBankOpen = false; let isNPCOpen = false; let isDevBuildMode = false; let activeNPCShop = null;
-        let selectedDevEntity = 'tree'; let devViewMode = 'list'; const imgCache = {};
+        let floatingTexts = []; 
+        let projectiles = []; 
+        let isBankOpen = false; 
+        let isNPCOpen = false; 
+        let isDevBuildMode = false; 
+        let activeNPCShop = null;
+        let selectedDevEntity = 'tree'; 
+        let devViewMode = 'list'; 
+        const imgCache = {};
         let keys = { w: false, a: false, s: false, d: false, arrowup: false, arrowdown: false, arrowleft: false, arrowright: false };
 
-        // --- SISTEMA DE LOGIN, AUTENTICAÇÃO E OFFLINE BYPASS ---
+        // --- 2. BANCOS DE DADOS DE FÁBRICA (FALLBACK) ---
+        let itemDB = {
+            'Bronze Pickaxe': { name: 'Bronze Pickaxe', icon: '⛏️', type: 'equipment', slot: 'weapon', tool: 'pickaxe', stackable: false, weight: 2.0, desc: 'Ferramenta de mineração.', recipe: 'Bronze Bar,2|Logs,1', craftQty: 1 },
+            'Iron Pickaxe': { name: 'Iron Pickaxe', icon: '⛏️', type: 'equipment', slot: 'weapon', tool: 'pickaxe', stackable: false, weight: 2.0, desc: 'Minera rápido.', recipe: 'Iron Bar,2|Logs,1', craftQty: 1 },
+            'Bronze Axe': { name: 'Bronze Axe', icon: '🪓', type: 'equipment', slot: 'weapon', tool: 'axe', stackable: false, weight: 2.0, desc: 'Corta lenha de árvores.', recipe: 'Bronze Bar,1|Logs,1', craftQty: 1 },
+            'Bronze Sword': { name: 'Bronze Sword', icon: '🗡️', type: 'equipment', slot: 'weapon', bonusDmg: 4, stackable: false, weight: 1.8, desc: 'Espada de combate.', recipe: 'Bronze Bar,1', craftQty: 1 },
+            'Shortbow': { name: 'Shortbow', icon: '🏹', type: 'equipment', slot: 'weapon', tool: 'ranged', bonusDmg: 2, stackable: false, weight: 1.0, desc: 'Arco.', recipe: 'Logs,2', craftQty: 1 },
+            'Staff': { name: 'Staff', icon: '🦯', type: 'equipment', slot: 'weapon', tool: 'magic', bonusDmg: 1, stackable: false, weight: 1.5, desc: 'Lança magias.', recipe: 'Logs,3', craftQty: 1 },
+            'Bronze Shield': { name: 'Bronze Shield', icon: '🛡️', type: 'equipment', slot: 'shield', defBonus: 2, stackable: false, weight: 3.0, desc: 'Aumenta defesa.', recipe: 'Bronze Bar,2', craftQty: 1 }, 
+            'Bronze Body': { name: 'Bronze Body', icon: '🦺', type: 'equipment', slot: 'body', defBonus: 3, stackable: false, weight: 5.0, desc: 'Armadura pesada.', recipe: 'Bronze Bar,3', craftQty: 1 }, 
+            'Bronze Arrow': { name: 'Bronze Arrow', icon: '↗️', type: 'equipment', slot: 'ammo', bonusDmg: 1, stackable: true, weight: 0.01, desc: 'Munição arco.', recipe: 'Logs,1|Copper Ore,1', craftQty: 10 },
+            'Iron Arrow': { name: 'Iron Arrow', icon: '➵', type: 'equipment', slot: 'ammo', bonusDmg: 3, stackable: true, weight: 0.01, desc: 'Munição forte.', recipe: 'Logs,1|Iron Ore,1', craftQty: 10 },
+            'Tinderbox': { name: 'Tinderbox', icon: '🧯', type: 'tool', stackable: false, weight: 0.5, desc: 'Cria fogo usando Logs.' },
+            'Net': { name: 'Fishing Net', icon: '🕸️', type: 'tool', tool: 'net', stackable: false, weight: 0.5, desc: 'Usada em lagos.' },
+            'Copper Ore': { name: 'Copper Ore', icon: '🪨', type: 'resource', stackable: true, weight: 2.2, desc: 'Cobre.' },
+            'Tin Ore': { name: 'Tin Ore', icon: '🪨', type: 'resource', stackable: true, weight: 2.2, desc: 'Estanho.' },
+            'Iron Ore': { name: 'Iron Ore', icon: '🪨', type: 'resource', stackable: true, weight: 2.2, desc: 'Ferro.' },
+            'Bronze Bar': { name: 'Bronze Bar', icon: '🧱', type: 'resource', stackable: true, weight: 1.8, desc: 'Barra de bronze.' },
+            'Iron Bar': { name: 'Iron Bar', icon: '🧱', type: 'resource', stackable: true, weight: 1.8, desc: 'Barra de ferro.' },
+            'Logs': { name: 'Logs', icon: '🪵', type: 'resource', stackable: true, weight: 1.5, desc: 'Lenha.' },
+            'Bones': { name: 'Bones', icon: '🦴', type: 'consumable', heal: 0, stackable: true, weight: 0.5, desc: 'Enterre para XP Prayer.' }, 
+            'Air Rune': { name: 'Air Rune', icon: '💨', type: 'resource', stackable: true, weight: 0.01, desc: 'Runa do ar.' },
+            'Mind Rune': { name: 'Mind Rune', icon: '👁️', type: 'resource', stackable: true, weight: 0.01, desc: 'Runa mental.' },
+            'Water Rune': { name: 'Water Rune', icon: '💧', type: 'resource', stackable: true, weight: 0.01, desc: 'Runa da água.' },
+            'Raw Meat': { name: 'Raw Meat', icon: '🥩', type: 'resource', stackable: true, weight: 0.8, desc: 'Carne crua.' },
+            'Cooked Meat': { name: 'Cooked Meat', icon: '🍖', type: 'consumable', heal: 4, stackable: true, weight: 0.8, desc: 'Cura HP.' },
+            'Raw Fish': { name: 'Raw Fish', icon: '🐟', type: 'resource', stackable: true, weight: 0.5, desc: 'Peixe cru.' },
+            'Cooked Fish': { name: 'Cooked Fish', icon: '🍣', type: 'consumable', heal: 8, stackable: true, weight: 0.5, desc: 'Cura muito HP.' },
+            'Coins': { name: 'Coins', icon: '🪙', type: 'resource', stackable: true, weight: 0.0, desc: 'Moedas.' }
+        };
+
+        let npcDB = {
+            'goblin_base': { name: 'Goblin', hp: 15, maxHit: 2, xp: 15, c1: '#16a085', c2: '#1abc9c', lootStr: 'Bones,1,1|Raw Meat,0.5,1|Coins,0.3,15', dialog: '', shopStr: '' },
+            'orc_base': { name: 'Orc', hp: 30, maxHit: 5, xp: 40, c1: '#2c3e50', c2: '#34495e', lootStr: 'Bones,1,1|Iron Ore,0.2,1|Coins,1,30', dialog: '', shopStr: '' },
+            'merchant_base': { name: 'Merchant', hp: 0, maxHit: 0, xp: 0, c1: '#8e44ad', c2: '#f1c27d', lootStr: '', dialog: 'Bem-vindo à minha loja!', shopStr: 'Net,20|Water Rune,10|Tinderbox,50' }
+        };
+
+        let spellbookDB = [
+            { id: 'wind_strike', name: 'Wind Strike', lvl: 1, req: {'Air Rune': 1, 'Mind Rune': 1}, dmg: 2, color: '#ecf0f1' },
+            { id: 'water_strike', name: 'Water Strike', lvl: 5, req: {'Water Rune': 1, 'Air Rune': 1, 'Mind Rune': 1}, dmg: 4, color: '#3498db' }
+        ];
+
+        let playerDefault = {
+            x: 400, y: 300, width: 24, height: 24, destX: 400, destY: 300, speed: 4.0, facing: { x: 0, y: 1 }, 
+            isPerformingAction: false, actionTarget: null, actionType: null, actionTimer: 0, actionDelay: 100, attackCooldown: 0, pendingAutoAction: null, actionAnim: 0, actionToolItem: null,
+            activeSpell: 'wind_strike', regenTimer: 300, currentMap: 'lumbridge',
+            equipment: { head: null, body: null, weapon: null, shield: null, ammo: null }, inventory: [], bank: [],
+            stats: { hp: 15, maxHp: 15, mp: 10, maxMp: 10, skills: { hp: { level: 10, xp: 0, next: 100, name: 'Health' }, combat: { level: 1, xp: 0, next: 100, name: 'Combat' }, ranged: { level: 1, xp: 0, next: 100, name: 'Ranged' }, magic: { level: 1, xp: 0, next: 100, name: 'Magic' }, prayer: { level: 1, xp: 0, next: 50, name: 'Prayer' }, woodcutting: { level: 1, xp: 0, next: 50, name: 'Woodcut' }, mining: { level: 1, xp: 0, next: 50, name: 'Mining' }, smithing: { level: 1, xp: 0, next: 50, name: 'Smithing' }, firemaking: { level: 1, xp: 0, next: 50, name: 'Firemk' }, cooking: { level: 1, xp: 0, next: 50, name: 'Cooking' }, crafting: { level: 1, xp: 0, next: 50, name: 'Crafting' }, fishing: { level: 1, xp: 0, next: 50, name: 'Fishing' } } }
+        };
+        let player = JSON.parse(JSON.stringify(playerDefault));
+
+        let defaultGameMaps = {
+            'lumbridge': { id: 'lumbridge', name: 'Cidade Principal', width: 800, height: 600, color: '#4a6b2d', gridX: 0, gridY: 0, entities: [ { id: 1, type: 'tree', name: 'Oak Tree', x: 150, y: 150, w: 40, h: 50, active: true, hp: 3, maxHp: 3 }, { id: 3, type: 'enemy', dbKey: 'goblin_base', name: 'Goblin', x: 300, y: 400, w: 25, h: 25, active: true, hp: 15, maxHp: 15, attackCooldown: 0 }, { id: 4, type: 'bank', name: 'Bank Booth', x: 400, y: 50, w: 50, h: 30, active: true }, { id: 6, type: 'npc', dbKey: 'merchant_base', name: 'Merchant', x: 100, y: 100, w: 25, h: 25, active: true }, { id: 7, type: 'fishing_spot', name: 'Fishing Spot', x: 600, y: 450, w: 100, h: 80, active: true } ] },
+            'mine': { id: 'mine', name: 'Mina Subterrânea', width: 1200, height: 800, color: '#3e3933', gridX: 1, gridY: 0, entities: [ { id: 8, type: 'rock_copper', name: 'Copper Rock', x: 150, y: 200, w: 35, h: 30, active: true, hp: 2, maxHp: 2, color: '#d35400' }, { id: 9, type: 'rock_iron', name: 'Iron Rock', x: 220, y: 200, w: 35, h: 30, active: true, hp: 3, maxHp: 3, color: '#7f8c8d' }, { id: 10, type: 'furnace', name: 'Furnace', x: 400, y: 100, w: 45, h: 45, active: true }, { id: 11, type: 'anvil', name: 'Anvil', x: 500, y: 120, w: 35, h: 25, active: true }, { id: 12, type: 'enemy', dbKey: 'orc_base', name: 'Orc', x: 400, y: 400, w: 35, h: 35, active: true, hp: 30, maxHp: 30, attackCooldown: 0 } ] }
+        };
+        let gameMaps = JSON.parse(JSON.stringify(defaultGameMaps));
+        let currentMap = 'lumbridge';
+
+        // --- 3. INICIALIZAÇÃO ÚNICA (O SEGREDO CONTRA A TELA PRETA) ---
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.location.protocol === 'file:') {
+                console.log("Modo Local detectado (file://). Bypass de login automático.");
+                forceOfflineMode();
+            } else {
+                document.getElementById('login-overlay').style.display = 'flex';
+                document.getElementById('game-wrapper').style.display = 'none';
+            }
+        });
+
+        // --- 4. SISTEMA DE LOGIN E AUTENTICAÇÃO ---
         async function register() {
             const user = document.getElementById('auth-user').value.trim();
             const pass = document.getElementById('auth-pass').value.trim();
@@ -277,15 +342,15 @@
             msg.innerText = "Conectando ao servidor Node.js...";
             
             try {
-                const res = await fetch('/api/register', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: user, password: pass })
-                });
+                const res = await fetch('/api/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: user, password: pass }) });
                 const data = await res.json();
-                if(data.error) msg.innerText = data.error;
-                else msg.innerText = "Conta criada com sucesso! Faça login.";
+                if(data.error) msg.innerText = data.error; else msg.innerText = "Conta criada com sucesso! Faça login.";
             } catch(e) { 
-                msg.innerText = "Erro: Servidor Node não detectado."; 
+                // Fallback de teste local
+                let users = JSON.parse(localStorage.getItem('miniscape_users') || '{}');
+                if(users[user]) { msg.innerText = "Usuário já existe localmente."; return; }
+                users[user] = pass; localStorage.setItem('miniscape_users', JSON.stringify(users));
+                msg.innerText = "Conta offline criada. Faça login.";
             }
         }
 
@@ -295,48 +360,43 @@
             const msg = document.getElementById('login-msg');
             
             if(!user || !pass) { msg.innerText = "Preencha usuário e senha!"; return; }
-            msg.innerText = "Autenticando no Node.js...";
+            msg.innerText = "Autenticando...";
             
+            // A CONTA MESTRA
+            if (user === 'Admin' && pass === 'Adleradm') {
+                currentUser = user; userRole = 'admin'; isOfflineMode = true;
+                finishLoginSetup(JSON.parse(localStorage.getItem('miniscape_save_v37') || '{}'));
+                return;
+            }
+
             try {
-                const res = await fetch('/api/login', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: user, password: pass })
-                });
+                const res = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: user, password: pass }) });
                 const data = await res.json();
                 
-                if(data.error) {
-                    msg.innerText = data.error;
-                } else {
-                    currentUser = user;
-                    userRole = data.role;
-                    isOfflineMode = false;
-                    finishLoginSetup(data);
+                if(data.error) { msg.innerText = data.error; } else {
+                    currentUser = user; userRole = data.role; isOfflineMode = false; finishLoginSetup(data);
                 }
             } catch(e) { 
-                msg.innerText = "Servidor offline. Clique em 'Jogar Offline'."; 
+                // Fallback Local
+                let users = JSON.parse(localStorage.getItem('miniscape_users') || '{}');
+                if (users[user] && users[user] === pass) {
+                    currentUser = user; userRole = 'player'; isOfflineMode = true;
+                    finishLoginSetup(JSON.parse(localStorage.getItem('miniscape_save_v37') || '{}'));
+                } else { msg.innerText = "Servidor offline e usuário não encontrado localmente."; }
             }
         }
 
-        // BOTAO SALVADOR DE VIDAS: JOGAR OFFLINE (Bypassa o Node)
         function forceOfflineMode() {
-            currentUser = 'LocalAdmin';
-            userRole = 'admin';
-            isOfflineMode = true;
-            
-            // Tenta carregar do LocalStorage já que não tem Node
-            let savedLocal = localStorage.getItem('miniscape_save_offline');
-            let data = savedLocal ? JSON.parse(savedLocal) : {};
-            
-            finishLoginSetup(data);
+            currentUser = 'LocalAdmin'; userRole = 'admin'; isOfflineMode = true;
+            finishLoginSetup(JSON.parse(localStorage.getItem('miniscape_save_v37') || '{}'));
         }
 
         function finishLoginSetup(data) {
-            // INJETA O BOTÃO DEV SE FOR ADMIN
-            const tabContainer = document.getElementById('tab-buttons-container');
+            // SE FOR ADMIN, CRIA E INJETA O BOTÃO DEV
             if(userRole === 'admin') {
+                let tabContainer = document.getElementById('tab-buttons-container');
                 let devBtn = document.createElement('button');
-                devBtn.id = 'btn-dev';
-                devBtn.className = 'tab-btn';
+                devBtn.id = 'btn-dev'; devBtn.className = 'tab-btn';
                 devBtn.style.backgroundColor = '#c0392b';
                 devBtn.innerHTML = 'DEV';
                 devBtn.onclick = function() { openTab('dev'); openDevSub('dev-map', document.getElementById('btn-dev-map')); };
@@ -344,16 +404,11 @@
             }
             
             // CARREGA DADOS DO SERVIDOR OU OFFLINE
-            if(data.worldData && Object.keys(data.worldData).length > 0 && data.worldData['lumbridge']) {
-                gameMaps = data.worldData;
-            } else {
-                gameMaps = JSON.parse(JSON.stringify(defaultGameMaps));
-            }
-            
+            if(data.worldData && Object.keys(data.worldData).length > 0 && data.worldData['lumbridge']) { gameMaps = data.worldData; } else { gameMaps = JSON.parse(JSON.stringify(defaultGameMaps)); }
             if(data.itemDB) itemDB = data.itemDB;
             if(data.npcDB) npcDB = data.npcDB;
             
-            if(data.playerData) {
+            if(data.playerData && Object.keys(data.playerData).length > 0) {
                 player = { ...playerDefault, ...data.playerData };
                 if(data.playerData.stats) player.stats = { ...playerDefault.stats, ...data.playerData.stats };
                 if(data.playerData.stats && data.playerData.stats.skills) player.stats.skills = { ...playerDefault.stats.skills, ...data.playerData.stats.skills };
@@ -362,69 +417,49 @@
                 giveStarterItems();
             }
             
-            currentMap = player.currentMap || 'lumbridge';
-            if(!gameMaps[currentMap]) currentMap = 'lumbridge';
+            currentMap = player.currentMap || 'lumbridge'; if(!gameMaps[currentMap]) currentMap = 'lumbridge';
             
-            // Esconde Tela de Login, Mostra Jogo
+            // Tira a tela de login e mostra o jogo
             document.getElementById('login-overlay').style.display = 'none';
             document.getElementById('game-wrapper').style.display = 'flex';
             
-            // Ajusta o Canvas após a tela aparecer
+            // ESPERA A TELA APARECER PRA PEGAR MEDIDAS E INICIAR MOTOR
             setTimeout(() => {
                 canvas.width = gameMaps[currentMap].width || 800; 
                 canvas.height = gameMaps[currentMap].height || 600;
                 
-                openTab('inv'); 
-                updateUI(); 
+                openTab('inv'); updateUI(); 
                 
-                if(userRole === 'admin') {
-                    buildDevEntityList(); 
-                    loadDevMapManager();
-                }
+                if(userRole === 'admin') { buildDevEntityList(); loadDevMapManager(); }
                 
                 // LIGA O MOTOR GRÁFICO SÓ AGORA (Impossível dar tela preta)
                 if(!gameLoopStarted) {
                     gameLoopStarted = true;
                     requestAnimationFrame(gameLoop);
                 }
-            }, 100);
+            }, 50);
         }
 
         async function saveDataLogic(manual = false) {
             if (!currentUser) return;
-            
-            // Limpa ponteiros cíclicos
-            for (let map in gameMaps) { 
-                if (gameMaps[map] && gameMaps[map].entities) { 
-                    gameMaps[map].entities.forEach(obj => { if(obj && obj.aggroTarget) obj.aggroTarget = null; }); 
-                } 
-            }
-            player.currentMap = currentMap;
-            player.actionTarget = null;
-            player.actionToolItem = null;
-            player.pendingAutoAction = null;
+            for (let map in gameMaps) { if (gameMaps[map] && gameMaps[map].entities) { gameMaps[map].entities.forEach(obj => { if(obj && obj.aggroTarget) obj.aggroTarget = null; }); } }
+            player.currentMap = currentMap; player.actionTarget = null; player.actionToolItem = null; player.pendingAutoAction = null;
 
-            if (isOfflineMode) {
+            if (isOfflineMode || window.location.protocol === 'file:') {
                 const saveData = { playerData: player, worldData: gameMaps, itemDB: itemDB, npcDB: npcDB }; 
-                localStorage.setItem('miniscape_save_offline', JSON.stringify(saveData));
-                if(manual) setActionText("Salvo Localmente (Offline)!", "#f1c40f");
-                return;
+                localStorage.setItem('miniscape_save_v37', JSON.stringify(saveData));
+                if(manual) setActionText("Salvo Localmente (Offline)!", "#f1c40f"); return;
             }
-
             try {
-                await fetch('/api/save', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: currentUser, playerData: player, worldData: gameMaps, itemDB: itemDB, npcDB: npcDB })
-                });
-                if(manual) setActionText("Progresso salvo no Node.js!", "#3498db");
+                await fetch('/api/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: currentUser, playerData: player, worldData: gameMaps, itemDB: itemDB, npcDB: npcDB }) });
+                if(manual) setActionText("Progresso salvo online!", "#3498db");
             } catch (e) {
                 if(manual) setActionText("Erro ao salvar no servidor.", "#e74c3c");
             }
         }
-        
         setInterval(() => { if(currentUser) saveDataLogic(); }, 60000);
 
-        // --- SISTEMAS DE CONTROLE ---
+        // --- 5. EVENT LISTENERS E CONTROLES ---
         window.addEventListener("keydown", function(e) {
             if(document.getElementById('login-overlay').style.display !== 'none') return; 
             if(["Space","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].indexOf(e.code) > -1) {
@@ -452,62 +487,7 @@
         document.addEventListener('mousemove', (e) => { if (tooltip.style.display === 'block') { tooltip.style.left = (e.pageX + 15) + 'px'; tooltip.style.top = (e.pageY + 15) + 'px'; } });
         function showTooltip(item) { if(!item) return; let html = `<div class="tt-title">${item.name}</div><div class="tt-desc">${item.desc||''}</div>`; if (item.bonusDmg) html += `<div class="tt-stat">⚔️ Dano: +${item.bonusDmg}</div>`; if (item.defBonus) html += `<div class="tt-stat">🛡️ Defesa: +${item.defBonus}</div>`; if (item.heal) html += `<div class="tt-stat">❤️ Cura: +${item.heal}</div>`; html += `<div class="tt-weight">⚖️ Peso: ${item.weight||0} kg</div>`; tooltip.innerHTML = html; tooltip.style.display = 'block'; }
         function hideTooltip() { tooltip.style.display = 'none'; }
-
-        // --- BANCOS DE DADOS DE FÁBRICA ---
-        let itemDB = {
-            'Bronze Pickaxe': { name: 'Bronze Pickaxe', icon: '⛏️', type: 'equipment', slot: 'weapon', tool: 'pickaxe', stackable: false, weight: 2.0, desc: 'Ferramenta de mineração.', recipe: 'Bronze Bar,2|Logs,1', craftQty: 1 },
-            'Iron Pickaxe': { name: 'Iron Pickaxe', icon: '⛏️', type: 'equipment', slot: 'weapon', tool: 'pickaxe', stackable: false, weight: 2.0, desc: 'Minera rápido.', recipe: 'Iron Bar,2|Logs,1', craftQty: 1 },
-            'Bronze Axe': { name: 'Bronze Axe', icon: '🪓', type: 'equipment', slot: 'weapon', tool: 'axe', stackable: false, weight: 2.0, desc: 'Corta lenha.', recipe: 'Bronze Bar,1|Logs,1', craftQty: 1 },
-            'Bronze Sword': { name: 'Bronze Sword', icon: '🗡️', type: 'equipment', slot: 'weapon', bonusDmg: 4, stackable: false, weight: 1.8, desc: 'Espada.', recipe: 'Bronze Bar,1', craftQty: 1 },
-            'Shortbow': { name: 'Shortbow', icon: '🏹', type: 'equipment', slot: 'weapon', tool: 'ranged', bonusDmg: 2, stackable: false, weight: 1.0, desc: 'Arco longo alcance.', recipe: 'Logs,2', craftQty: 1 },
-            'Staff': { name: 'Staff', icon: '🦯', type: 'equipment', slot: 'weapon', tool: 'magic', bonusDmg: 1, stackable: false, weight: 1.5, desc: 'Magias.', recipe: 'Logs,3', craftQty: 1 },
-            'Bronze Shield': { name: 'Bronze Shield', icon: '🛡️', type: 'equipment', slot: 'shield', defBonus: 2, stackable: false, weight: 3.0, desc: 'Defesa.', recipe: 'Bronze Bar,2', craftQty: 1 }, 
-            'Bronze Body': { name: 'Bronze Body', icon: '🦺', type: 'equipment', slot: 'body', defBonus: 3, stackable: false, weight: 5.0, desc: 'Armadura pesada.', recipe: 'Bronze Bar,3', craftQty: 1 }, 
-            'Bronze Arrow': { name: 'Bronze Arrow', icon: '↗️', type: 'equipment', slot: 'ammo', bonusDmg: 1, stackable: true, weight: 0.01, desc: 'Munição arco.', recipe: 'Logs,1|Copper Ore,1', craftQty: 10 },
-            'Iron Arrow': { name: 'Iron Arrow', icon: '➵', type: 'equipment', slot: 'ammo', bonusDmg: 3, stackable: true, weight: 0.01, desc: 'Munição forte.', recipe: 'Logs,1|Iron Ore,1', craftQty: 10 },
-            'Tinderbox': { name: 'Tinderbox', icon: '🧯', type: 'tool', stackable: false, weight: 0.5, desc: 'Cria fogo usando Logs.' },
-            'Net': { name: 'Fishing Net', icon: '🕸️', type: 'tool', tool: 'net', stackable: false, weight: 0.5, desc: 'Usada em lagos.' },
-            'Copper Ore': { name: 'Copper Ore', icon: '🪨', type: 'resource', stackable: true, weight: 2.2, desc: 'Cobre bruto.' },
-            'Tin Ore': { name: 'Tin Ore', icon: '🪨', type: 'resource', stackable: true, weight: 2.2, desc: 'Estanho bruto.' },
-            'Iron Ore': { name: 'Iron Ore', icon: '🪨', type: 'resource', stackable: true, weight: 2.2, desc: 'Ferro bruto.' },
-            'Bronze Bar': { name: 'Bronze Bar', icon: '🧱', type: 'resource', stackable: true, weight: 1.8, desc: 'Barra fundida bronze.' },
-            'Iron Bar': { name: 'Iron Bar', icon: '🧱', type: 'resource', stackable: true, weight: 1.8, desc: 'Barra fundida ferro.' },
-            'Logs': { name: 'Logs', icon: '🪵', type: 'resource', stackable: true, weight: 1.5, desc: 'Lenha extraída.' },
-            'Bones': { name: 'Bones', icon: '🦴', type: 'consumable', heal: 0, stackable: true, weight: 0.5, desc: 'Enterre para XP.' }, 
-            'Air Rune': { name: 'Air Rune', icon: '💨', type: 'resource', stackable: true, weight: 0.01, desc: 'Runa elemental.' },
-            'Mind Rune': { name: 'Mind Rune', icon: '👁️', type: 'resource', stackable: true, weight: 0.01, desc: 'Runa mental.' },
-            'Water Rune': { name: 'Water Rune', icon: '💧', type: 'resource', stackable: true, weight: 0.01, desc: 'Runa de água.' },
-            'Raw Meat': { name: 'Raw Meat', icon: '🥩', type: 'resource', stackable: true, weight: 0.8, desc: 'Carne crua.' },
-            'Cooked Meat': { name: 'Cooked Meat', icon: '🍖', type: 'consumable', heal: 4, stackable: true, weight: 0.8, desc: 'Carne cozida. Cura HP.' },
-            'Raw Fish': { name: 'Raw Fish', icon: '🐟', type: 'resource', stackable: true, weight: 0.5, desc: 'Peixe cru.' },
-            'Cooked Fish': { name: 'Cooked Fish', icon: '🍣', type: 'consumable', heal: 8, stackable: true, weight: 0.5, desc: 'Peixe assado. Cura HP muito bem.' },
-            'Coins': { name: 'Coins', icon: '🪙', type: 'resource', stackable: true, weight: 0.0, desc: 'Moedas de comércio.' }
-        };
-
-        let npcDB = {
-            'goblin_base': { name: 'Goblin', hp: 15, maxHit: 2, xp: 15, c1: '#16a085', c2: '#1abc9c', lootStr: 'Bones,1,1|Raw Meat,0.5,1|Coins,0.3,15', dialog: '', shopStr: '' },
-            'orc_base': { name: 'Orc', hp: 30, maxHit: 5, xp: 40, c1: '#2c3e50', c2: '#34495e', lootStr: 'Bones,1,1|Iron Ore,0.2,1|Coins,1,30', dialog: '', shopStr: '' },
-            'merchant_base': { name: 'Merchant', hp: 0, maxHit: 0, xp: 0, c1: '#8e44ad', c2: '#f1c27d', lootStr: '', dialog: 'Bem-vindo à minha loja!', shopStr: 'Net,20|Water Rune,10|Tinderbox,50' }
-        };
-
-        let spellbookDB = [
-            { id: 'wind_strike', name: 'Wind Strike', lvl: 1, req: {'Air Rune': 1, 'Mind Rune': 1}, dmg: 2, color: '#ecf0f1' },
-            { id: 'water_strike', name: 'Water Strike', lvl: 5, req: {'Water Rune': 1, 'Air Rune': 1, 'Mind Rune': 1}, dmg: 4, color: '#3498db' }
-        ];
-
-        let playerDefault = {
-            x: 400, y: 300, width: 24, height: 24, destX: 400, destY: 300, speed: 4.0, facing: { x: 0, y: 1 }, 
-            isPerformingAction: false, actionTarget: null, actionType: null, actionTimer: 0, actionDelay: 100, attackCooldown: 0, pendingAutoAction: null, actionAnim: 0, actionToolItem: null,
-            activeSpell: 'wind_strike', regenTimer: 300,
-            equipment: { head: null, body: null, weapon: null, shield: null, ammo: null }, inventory: [], bank: [],
-            stats: { hp: 15, maxHp: 15, mp: 10, maxMp: 10, skills: { hp: { level: 10, xp: 0, next: 100, name: 'Health' }, combat: { level: 1, xp: 0, next: 100, name: 'Combat' }, ranged: { level: 1, xp: 0, next: 100, name: 'Ranged' }, magic: { level: 1, xp: 0, next: 100, name: 'Magic' }, prayer: { level: 1, xp: 0, next: 50, name: 'Prayer' }, woodcutting: { level: 1, xp: 0, next: 50, name: 'Woodcut' }, mining: { level: 1, xp: 0, next: 50, name: 'Mining' }, smithing: { level: 1, xp: 0, next: 50, name: 'Smithing' }, firemaking: { level: 1, xp: 0, next: 50, name: 'Firemk' }, cooking: { level: 1, xp: 0, next: 50, name: 'Cooking' }, crafting: { level: 1, xp: 0, next: 50, name: 'Crafting' }, fishing: { level: 1, xp: 0, next: 50, name: 'Fishing' } } }
-        };
-
-        let defaultGameMaps = {
-            'lumbridge': { id: 'lumbridge', name: 'Cidade Principal', width: 800, height: 600, color: '#4a6b2d', gridX: 0, gridY: 0, entities: [ { id: 1, type: 'tree', name: 'Oak Tree', x: 150, y: 150, w: 40, h: 50, active: true, hp: 3, maxHp: 3 }, { id: 3, type: 'enemy', dbKey: 'goblin_base', name: 'Goblin', x: 300, y: 400, w: 25, h: 25, active: true, hp: 15, maxHp: 15, attackCooldown: 0 }, { id: 4, type: 'bank', name: 'Bank Booth', x: 400, y: 50, w: 50, h: 30, active: true }, { id: 6, type: 'npc', dbKey: 'merchant_base', name: 'Merchant', x: 100, y: 100, w: 25, h: 25, active: true }, { id: 7, type: 'fishing_spot', name: 'Fishing Spot', x: 600, y: 450, w: 100, h: 80, active: true } ] },
-            'mine': { id: 'mine', name: 'Mina Subterrânea', width: 1200, height: 800, color: '#3e3933', gridX: 1, gridY: 0, entities: [ { id: 8, type: 'rock_copper', name: 'Copper Rock', x: 150, y: 200, w: 35, h: 30, active: true, hp: 2, maxHp: 2, color: '#d35400' }, { id: 9, type: 'rock_iron', name: 'Iron Rock', x: 220, y: 200, w: 35, h: 30, active: true, hp: 3, maxHp: 3, color: '#7f8c8d' }, { id: 10, type: 'furnace', name: 'Furnace', x: 400, y: 100, w: 45, h: 45, active: true }, { id: 11, type: 'anvil', name: 'Anvil', x: 500, y: 120, w: 35, h: 25, active: true }, { id: 12, type: 'enemy', dbKey: 'orc_base', name: 'Orc', x: 400, y: 400, w: 35, h: 35, active: true, hp: 30, maxHp: 30, attackCooldown: 0 } ] }
-        };
-
+        
         function getCoords(e) {
             const rect = canvas.getBoundingClientRect(); const scaleX = canvas.width / rect.width; const scaleY = canvas.height / rect.height;
             let cX = e.clientX, cY = e.clientY, pX = e.pageX, pY = e.pageY;
@@ -515,7 +495,7 @@
             return { x: (cX - rect.left) * scaleX, y: (cY - rect.top) * scaleY, pageX: pX, pageY: pY };
         }
 
-        // --- SISTEMA DE TRANSIÇÃO (GRID) ---
+        // --- 6. FUNÇÕES DO JOGO (MOVIMENTO, MAPAS, INVENTÁRIO, UI) ---
         function switchMap(targetMap, nx, ny) { if(!gameMaps[targetMap]) return; currentMap = targetMap; player.x = nx; player.y = ny; player.destX = nx; player.destY = ny; player.isPerformingAction = false; player.pendingAutoAction = null; player.actionTarget = null; player.actionToolItem = null; projectiles = []; canvas.width = gameMaps[currentMap].width || 800; canvas.height = gameMaps[currentMap].height || 600; setActionText(`Viajou: ${gameMaps[currentMap].name}`); saveDataLogic(); loadDevMapManager(); }
         function switchMapByGrid(dx, dy) {
             let cm = gameMaps[currentMap]; let tgX = (cm.gridX||0) + dx; let tgY = (cm.gridY||0) + dy; let targetMapId = Object.keys(gameMaps).find(k => gameMaps[k].gridX === tgX && gameMaps[k].gridY === tgY);
@@ -529,7 +509,6 @@
             }
         }
 
-        // --- INVENTÁRIO ---
         function getInvCount(iName) { return player.inventory.reduce((acc, i) => acc + (i.name === iName ? (i.qty||1) : 0), 0); }
         function calcTotalWeight() { return player.inventory.reduce((acc, i) => acc + ((i&&i.weight?i.weight:0) * (i&&i.qty?i.qty:1)), 0).toFixed(1); }
         function removeInvItem(iName, amount) { let tr = amount; for(let i = player.inventory.length - 1; i >= 0; i--) { if(player.inventory[i].name === iName) { if(player.inventory[i].stackable) { if(player.inventory[i].qty > tr) { player.inventory[i].qty -= tr; return true; } else { tr -= player.inventory[i].qty; player.inventory.splice(i, 1); } } else { player.inventory.splice(i, 1); tr--; if(tr === 0) return true; } } } return false; }
@@ -543,42 +522,25 @@
             else if(item.type === 'consumable') { if(item.heal > 0) { player.stats.hp = Math.min(player.stats.maxHp, player.stats.hp + item.heal); setActionText(`Curou ${item.heal} HP.`); } if(item.name === 'Bones') { addXP('prayer', 5); addFloatingText(player.x, player.y - 15, "Enterrou", "#bdc3c7"); } removeInvItem(item.name, 1); } 
             else if(item.name === 'Tinderbox') { if(getInvCount('Logs') >= 1) { removeInvItem('Logs', 1); if(!gameMaps[currentMap].entities) gameMaps[currentMap].entities = []; gameMaps[currentMap].entities.push({ id: Date.now(), type: 'fire', name: 'Fire', x: player.x - 15, y: player.y - 15, w: 30, h: 30, active: true, life: 1000 }); addXP('firemaking', 15); setActionText("Acendeu fogo!"); } else { setActionText("Precisa de Logs.", "#e74c3c"); } } 
             else if(item.name === 'Knife') { setActionText("Use a aba Craft para criar itens.", "#e74c3c"); }
-            player.isPerformingAction = false; player.pendingAutoAction = null; hideTooltip(); updateUI();
+            player.isPerformingAction = false; player.pendingAutoAction = null; player.actionToolItem = null; hideTooltip(); updateUI();
         }
 
         function unequip(slot) { const item = player.equipment[slot]; if(item) { if(item.stackable && slot === 'ammo') { if(addInvItem(item.name, item.qty)) { player.equipment[slot] = null; updateUI(); } else { setActionText("Inv. Cheio!", "#e74c3c"); } } else { if(player.inventory.length >= 28) { setActionText("Inv. Cheio!", "#e74c3c"); return; } player.equipment[slot] = null; player.inventory.push(item); hideTooltip(); updateUI(); } } }
 
-        function craftItem(iName) {
-            let it = itemDB[iName]; if(!it || !it.recipe) return; let reqs = it.recipe.split('|'); let hasAll = true;
-            reqs.forEach(r => { let p = r.split(','); if(getInvCount(p[0].trim()) < parseInt(p[1])) hasAll = false; });
-            if(hasAll) { reqs.forEach(r => { let p = r.split(','); removeInvItem(p[0].trim(), parseInt(p[1])); }); if(addInvItem(iName, it.craftQty || 1)) { addXP('crafting', 15); setActionText(`Criou ${iName}!`); } updateUI(); } else { setActionText(`Faltam materiais!`, '#e74c3c'); }
-        }
+        function craftItem(iName) { let it = itemDB[iName]; if(!it || !it.recipe) return; let reqs = it.recipe.split('|'); let hasAll = true; reqs.forEach(r => { let p = r.split(','); if(getInvCount(p[0].trim()) < parseInt(p[1])) hasAll = false; }); if(hasAll) { reqs.forEach(r => { let p = r.split(','); removeInvItem(p[0].trim(), parseInt(p[1])); }); if(addInvItem(iName, it.craftQty || 1)) { addXP('crafting', 15); setActionText(`Criou ${iName}!`); } updateUI(); } else { setActionText(`Faltam materiais!`, '#e74c3c'); } }
 
-        // --- UI & XP ---
         function closeMenus() { isBankOpen = false; isNPCOpen = false; activeNPCShop = null; document.getElementById('btn-bank').style.display='none'; document.getElementById('btn-npc').style.display='none'; }
         function openTab(tP) { document.querySelectorAll('.tab-content').forEach(e=>e.classList.remove('active-tab')); document.querySelectorAll('.tab-btn').forEach(e=>e.classList.remove('active-btn')); const tb = document.getElementById(`tab-${tP}`); if(tb) tb.classList.add('active-tab'); const bt = document.getElementById(`btn-${tP}`); if(bt) bt.classList.add('active-btn'); isBankOpen = (tP === 'bank'); isNPCOpen = (tP === 'npc'); if (['craft', 'mag', 'inv', 'eq', 'sk', 'bank'].includes(tP)) { updateUI(); } }
         function setActionText(t, c="#2ecc71") { const el = document.getElementById('action-text'); el.innerText = t; el.style.color = c; setTimeout(() => { if(el.innerText === t) el.innerText = ""; }, 3000); }
         function addFloatingText(x, y, t, c) { floatingTexts.push({ x: x, y: y, text: t, color: c, life: 50 }); }
         
-        function addXP(sK, a) { 
-            const sk = player.stats.skills[sK]; if(!sk) return;
-            sk.xp += a; addFloatingText(player.x, player.y - 20, `+${a} XP`, '#f1c40f'); 
-            let leveledUp = false;
-            while (sk.xp >= sk.next) { 
-                sk.level++; sk.xp -= sk.next; sk.next = Math.floor(sk.next * 1.5); leveledUp = true;
-                if (sK === 'hp') { player.stats.maxHp += 2; player.stats.hp = player.stats.maxHp; } 
-            } 
-            if(leveledUp) { setActionText(`${sk.name} Nível ${sk.level}!`, "#f1c40f"); addFloatingText(player.x, player.y - 40, `Level Up!`, '#2ecc71'); }
-            updateUI(); 
-        }
-
+        function addXP(sK, a) { const sk = player.stats.skills[sK]; if(!sk) return; sk.xp += a; addFloatingText(player.x, player.y - 20, `+${a} XP`, '#f1c40f'); let leveledUp = false; while (sk.xp >= sk.next) { sk.level++; sk.xp -= sk.next; sk.next = Math.floor(sk.next * 1.5); leveledUp = true; if (sK === 'hp') { player.stats.maxHp += 2; player.stats.hp = player.stats.maxHp; } } if(leveledUp) { setActionText(`${sk.name} Nível ${sk.level}!`, "#f1c40f"); addFloatingText(player.x, player.y - 40, `Level Up!`, '#2ecc71'); } updateUI(); }
         function getTotalDef() { let d = player.stats.skills.combat.level; if(player.equipment.shield) d += player.equipment.shield.defBonus; if(player.equipment.body) d += player.equipment.body.defBonus; return d; }
 
         function openShop(nData) { document.getElementById('btn-npc').style.display = 'block'; openTab('npc'); document.getElementById('npc-title').innerText = nData.name; document.getElementById('npc-dialog').innerText = `"${nData.dialog || '...'}"`; let sL = document.getElementById('npc-shop-list'); sL.innerHTML = ''; if(nData.shopStr) { nData.shopStr.split('|').forEach(p => { let pt = p.split(','); if(pt.length >= 2) { let iN = pt[0].trim(); let ct = parseInt(pt[1]); let iD = itemDB[iN]; if(iD) { sL.innerHTML += `<div class="shop-item"><span>${iD.icon} ${iD.name}</span><button class="shop-btn" onclick="buyItem('${iN}', ${ct})">Comprar (${ct} 🪙)</button></div>`; } } }); } }
         function buyItem(iN, ct) { if(getInvCount('Coins') >= ct) { if(addInvItem(iN, 1)) { removeInvItem('Coins', ct); setActionText(`Comprou ${iN}!`); updateUI(); } else { setActionText("Inv Cheio!", "#e74c3c"); } } else { setActionText("Coins insuficientes!", "#e74c3c"); } }
         function setActiveSpell(sId) { player.activeSpell = sId; updateUI(); }
 
-        // --- SISTEMA BLINDADO DE ATUALIZAÇÃO DE UI ---
         function updateUI() {
             try {
                 document.getElementById('bar-hp').style.width = `${(player.stats.hp / player.stats.maxHp)*100}%`; document.getElementById('text-hp').innerText = `HP ${player.stats.hp}/${player.stats.maxHp}`; document.getElementById('bar-mp').style.width = `${(player.stats.mp / player.stats.maxMp)*100}%`; document.getElementById('text-mp').innerText = `MP ${player.stats.mp}/${player.stats.maxMp}`;
@@ -588,14 +550,12 @@
                 const bG = document.getElementById('bank-grid'); bG.innerHTML = ''; for(let i = 0; i < Math.max(30, player.bank.length + 4); i++) { const item = player.bank[i]; const div = document.createElement('div'); div.className = 'item-slot'; if(item) { div.innerText = item.icon || '?'; if(item.qty > 1) div.innerHTML += `<span class="item-qty">${item.qty}</span>`; div.onclick = () => withdrawFromBank(i); div.onmouseenter = () => showTooltip(item); div.onmouseleave = () => hideTooltip(); } bG.appendChild(div); }
                 const mL = document.getElementById('spellbook-list'); if (mL) { mL.innerHTML = ''; spellbookDB.forEach(sp => { let rT = Object.keys(sp.req).map(k => `${sp.req[k]}x ${itemDB[k]?itemDB[k].icon:'?'}`).join(' '); let iA = player.stats.skills.magic.level >= sp.lvl; let sC = player.activeSpell === sp.id ? 'spell-card spell-active' : 'spell-card'; mL.innerHTML += `<div class="${sC}" onclick="setActiveSpell('${sp.id}')" style="opacity:${iA?1:0.5}"><div><strong>${sp.name}</strong> <span style="font-size:0.7rem; color:${sp.color}">Dano: +${sp.dmg}</span><br><span class="spell-runes">Req: Lvl ${sp.lvl} | ${rT}</span></div>${player.activeSpell === sp.id ? '⭐' : ''}</div>`; }); }
                 const cG = document.getElementById('craft-list'); if(cG) { cG.innerHTML = ''; Object.values(itemDB).forEach(it => { if(it.recipe) { let reqs = it.recipe.split('|'); let hasAll = true; reqs.forEach(r => { let p = r.split(','); if(getInvCount(p[0].trim()) < parseInt(p[1])) hasAll = false; }); let rT = reqs.map(r => { let p=r.split(','); let ic = itemDB[p[0].trim()] ? itemDB[p[0].trim()].icon : '?'; return `${p[1]}x ${ic}`; }).join(' + '); let opacity = hasAll ? "1" : "0.4"; let btnDisabled = hasAll ? "" : "disabled"; let filter = hasAll ? "" : "filter: grayscale(100%);"; cG.innerHTML += `<div class="spell-card" style="opacity: ${opacity}; ${filter}" onclick="${hasAll ? `craftItem('${it.name}')` : ''}"> <div><strong>${it.icon} ${it.name}</strong> <span style="font-size:0.7rem; color:#bdc3c7;">(Cria ${it.craftQty||1})</span><br><span class="spell-runes">Req: ${rT}</span></div> <button class="shop-btn" ${btnDisabled}>Criar</button> </div>`; } }); }
-            } catch(e) { console.error("UI Update falhou", e); }
+            } catch(e) {}
         }
 
-        // --- SISTEMA DE MODAL ---
+        // --- DEV ENGINE & INJEÇÃO DE CÓDIGOS ---
         function openModal(htmlContent) { const overlay = document.getElementById('custom-modal-overlay'); const box = document.getElementById('custom-modal-box'); box.innerHTML = htmlContent; overlay.style.display = 'flex'; }
         function closeModal() { document.getElementById('custom-modal-overlay').style.display = 'none'; }
-
-        // --- DEV ENGINE ---
         function openDevSub(tabId, btn) { document.querySelectorAll('.dev-sub-content').forEach(e=>e.classList.remove('active')); document.querySelectorAll('.dev-sub-btn').forEach(e=>e.classList.remove('active')); const t = document.getElementById(tabId); if(t) t.classList.add('active'); if(btn) btn.classList.add('active'); if(tabId==='dev-map') buildDevEntityList(); if(tabId==='dev-items') populateDevItems(); if(tabId==='dev-npcs') populateDevNPCs(); if(tabId==='dev-map-manager') loadDevMapManager(); if(tabId==='dev-import') document.getElementById('dev-import-code').value = ''; }
 
         function importDevCode() {
@@ -607,7 +567,8 @@
                 if(parsed.npcs) Object.assign(npcDB, parsed.npcs);
                 saveDataLogic(); updateUI(); buildDevEntityList(); 
                 document.getElementById('dev-import-code').value = ''; setActionText("Conteúdo importado!", "#2ecc71");
-            } catch(e) { console.error(e); setActionText("Código inválido.", "#e74c3c"); }
+                alert("Pacote injetado com sucesso!");
+            } catch(e) { setActionText("Código inválido.", "#e74c3c"); }
         }
 
         function filterDevEntities(term) { let val = removeAccents(term).toLowerCase(); document.querySelectorAll('.dev-ent-item').forEach(el => { let txt = removeAccents(el.getAttribute('data-name')).toLowerCase(); if(txt.includes(val)) el.style.display = devViewMode === 'list' ? 'flex' : 'flex'; else el.style.display = 'none'; }); if(devViewMode === 'list') { document.querySelectorAll('.dev-ent-cat').forEach(cat => { let hasVisible = false; let next = cat.nextElementSibling; while(next && next.classList.contains('dev-ent-item')) { if(next.style.display !== 'none') hasVisible = true; next = next.nextElementSibling; } cat.style.display = hasVisible ? 'block' : 'none'; }); } }
@@ -619,7 +580,7 @@
             let list = [ 
                 { cat: '🌲 Ambiente', items: [ { v: 'tree', n: 'Árvore', ic: '🌲' }, { v: 'fishing_spot', n: 'Lagos', ic: '🐟' }, { v: 'rock_copper', n: 'Minério (Copper)', ic: '🪨' }, { v: 'rock_tin', n: 'Minério (Tin)', ic: '🪨' }, { v: 'rock_iron', n: 'Minério (Iron)', ic: '🪨' } ]}, 
                 { cat: '🏠 Construções', items: [ { v: 'furnace', n: 'Fornalha', ic: '♨️' }, { v: 'anvil', n: 'Bigorna', ic: '🔨' }, { v: 'bank', n: 'Bank', ic: '🏦' }, { v: 'portal', n: 'Portal', ic: '🚪' }, { v: 'house', n: 'Casa', ic: '🏠' } ]}, 
-                { cat: '🎨 Chão e Pintura', items: [ { v: 'paint_dirt', n: 'Estrada de Terra', ic: '🟫' }, { v: 'paint_stone', n: 'Piso de Pedra', ic: '⬜' }, { v: 'paint_sand', n: 'Areia', ic: '🟨' }, { v: 'paint_water', n: 'Água', ic: '🟦' } ]}, 
+                { cat: '🎨 Chão e Pintura', items: [ { v: 'paint_dirt', n: 'Estrada de Terra', ic: '🟫' }, { v: 'paint_stone', n: 'Piso de Pedra', ic: '⬜' }, { v: 'paint_grass', n: 'Grama Escura', ic: '🟩' }, { v: 'paint_water', n: 'Água', ic: '🟦' } ]}, 
                 { cat: '👹 Monstros e NPCs', items: Object.keys(npcDB).map(k => ({ v: 'e_'+k, n: npcDB[k].name, ic: '👹' })) }, 
                 { cat: '📦 Itens', items: Object.keys(itemDB).map(k => ({ v: 'i_'+k, n: itemDB[k].name, ic: itemDB[k].icon })) } 
             ]; 
@@ -633,10 +594,9 @@
         function populateDevNPCs(){ let s=document.getElementById('dev-npc-select'); s.innerHTML='<option value="NEW">-- CRIAR NOVO --</option>'; Object.keys(npcDB).forEach(k=>{s.innerHTML+=`<option value="${k}">${k} (${npcDB[k].name})</option>`;}); }
         function loadDevNPCForm(){ let k=document.getElementById('dev-npc-select').value; if(k==='NEW'){ document.getElementById('dn-id').value=''; document.getElementById('dn-name').value='Monstro'; document.getElementById('dn-hp').value=10; document.getElementById('dn-hit').value=1; document.getElementById('dn-xp').value=20; document.getElementById('dn-loot').value=''; document.getElementById('dn-dialog').value=''; document.getElementById('dn-shop').value=''; }else{ let n=npcDB[k]; document.getElementById('dn-id').value=k; document.getElementById('dn-name').value=n.name; document.getElementById('dn-hp').value=n.hp; document.getElementById('dn-hit').value=n.maxHit; document.getElementById('dn-xp').value=n.xp; document.getElementById('dn-c1').value=n.c1; document.getElementById('dn-c2').value=n.c2; document.getElementById('dn-loot').value=n.lootStr||''; document.getElementById('dn-dialog').value=n.dialog||''; document.getElementById('dn-shop').value=n.shopStr||''; } }
         function saveDevNPC(){ let k=document.getElementById('dn-id').value; if(!k)return; npcDB[k]={name:document.getElementById('dn-name').value,hp:parseInt(document.getElementById('dn-hp').value),maxHit:parseInt(document.getElementById('dn-hit').value),xp:parseInt(document.getElementById('dn-xp').value),c1:document.getElementById('dn-c1').value,c2:document.getElementById('dn-c2').value,lootStr:document.getElementById('dn-loot').value,dialog:document.getElementById('dn-dialog').value,shopStr:document.getElementById('dn-shop').value}; populateDevNPCs(); document.getElementById('dev-npc-select').value=k; setActionText(`NPC salvo!`); saveDataLogic(); buildDevEntityList();}
-        function toggleDevBuild() { isDevBuildMode = !isDevBuildMode; document.getElementById('btn-build-mode').innerText=`Modo Construção: ${isDevBuildMode?'ON':'OFF'}`; document.getElementById('btn-build-mode').style.background=isDevBuildMode?'#2ecc71':'#e67e22'; setActionText(isDevBuildMode?"Build ON. Clique esquerdo cria.":"Build OFF.", "#f1c40f"); }
+        function toggleDevBuild() { isDevBuildMode = !isDevBuildMode; document.getElementById('btn-build-mode').innerText=`Modo Construção: ${isDevBuildMode?'ON':'OFF'}`; document.getElementById('btn-build-mode').style.background=isDevBuildMode?'#2ecc71':'#e67e22'; setActionText(isDevBuildMode?"Build ON.":"Build OFF.", "#f1c40f"); }
 
         function loadDevMapManager() { let grid = document.getElementById('map-grid-ui'); if(!grid) return; grid.innerHTML = ''; for(let y = -2; y <= 2; y++) { for(let x = -2; x <= 2; x++) { let m = Object.keys(gameMaps).find(k => gameMaps[k].gridX === x && gameMaps[k].gridY === y); let div = document.createElement('div'); div.className = 'map-tile'; if(m) { div.innerText = m; div.style.background = gameMaps[m].color; } else { div.innerText = "+"; } if(m === currentMap) div.classList.add('active-tile'); div.onclick = () => handleGridClick(x, y, m); grid.appendChild(div); } } let cm = gameMaps[currentMap]; if(cm) { document.getElementById('cur-map-id-disp').innerText = cm.name; document.getElementById('cur-map-name').value = cm.name; document.getElementById('cur-map-w').value = cm.width; document.getElementById('cur-map-h').value = cm.height; document.getElementById('cur-map-color').value = cm.color || '#4a6b2d'; } }
-
         function handleGridClick(x, y, existingMapId) {
             if (existingMapId) { openModal(`<h3 style="margin-top:0; color:#f1c40f;">Mapa: ${existingMapId}</h3><div style="display:flex; flex-direction:column; gap:8px; margin-top:10px;"><button class="dev-save-btn" style="background:#3498db;" onclick="closeModal(); switchMap('${existingMapId}', ${gameMaps[existingMapId].width/2}, ${gameMaps[existingMapId].height/2})">Viajar para cá</button><button class="dev-save-btn" style="background:#c0392b;" onclick="unlinkMap('${existingMapId}')">Desvincular</button><button class="dev-save-btn" style="background:#555;" onclick="closeModal()">Cancelar</button></div>`); } 
             else { let unlinked = Object.keys(gameMaps).filter(k => gameMaps[k].gridX === null || gameMaps[k].gridX === undefined); let opts = unlinked.map(k => `<option value="${k}">${k} (${gameMaps[k].name})</option>`).join(''); openModal(`<h3 style="margin-top:0; color:#2ecc71;">Vincular Mapa</h3><select id="mod-map-sel" class="dev-select" style="margin-top:5px; margin-bottom:10px;"><option value="">-- Selecione --</option>${opts}</select><div style="display:flex; flex-direction:column; gap:8px;"><button class="dev-save-btn" onclick="linkMap(${x}, ${y})">Vincular</button><button class="dev-save-btn" style="background:#e67e22;" onclick="quickCreateMap(${x}, ${y})">Criar Novo Aqui</button><button class="dev-save-btn" style="background:#555;" onclick="closeModal()">Cancelar</button></div>`); }
@@ -646,25 +606,21 @@
         function unlinkMap(mapId) { if(gameMaps[mapId]) { gameMaps[mapId].gridX = null; gameMaps[mapId].gridY = null; saveDataLogic(); loadDevMapManager(); closeModal(); } }
         function quickCreateMap(x, y) { let nId = 'mapa_' + Date.now().toString().slice(-4); gameMaps[nId] = { id: nId, name: 'Novo Mapa', width: 800, height: 600, color: '#4a6b2d', gridX: x, gridY: y, entities: [] }; saveDataLogic(); loadDevMapManager(); closeModal(); }
         function saveCurrentMapSettings() { let cm = gameMaps[currentMap]; if(cm) { cm.name = document.getElementById('cur-map-name').value || cm.id; cm.width = parseInt(document.getElementById('cur-map-w').value) || 800; cm.height = parseInt(document.getElementById('cur-map-h').value) || 600; cm.color = document.getElementById('cur-map-color').value || '#4a6b2d'; canvas.width = cm.width; canvas.height = cm.height; saveDataLogic(); loadDevMapManager(); setActionText("Mapa Atualizado!"); } }
-        function createNewMap() { let id = document.getElementById('dm-id').value; let n = document.getElementById('dm-name').value; let w = parseInt(document.getElementById('dm-w').value) || 800; let h = parseInt(document.getElementById('dm-h').value) || 600; let c = document.getElementById('dm-color').value; if(!id || gameMaps[id]) { alert("ID inválido/já existe!"); return; } gameMaps[id] = { id: id, name: n||id, width: w, height: h, color: c, gridX: null, gridY: null, entities: [] }; setActionText("Mapa Criado!"); saveDataLogic(); loadDevMapManager(); }
+        function createNewMap() { let id = document.getElementById('dm-id').value; let n = document.getElementById('dm-name').value; let w = parseInt(document.getElementById('dm-w').value) || 800; let h = parseInt(document.getElementById('dm-h').value) || 600; let c = document.getElementById('dm-color').value; if(!id || gameMaps[id]) { alert("ID inválido!"); return; } gameMaps[id] = { id: id, name: n||id, width: w, height: h, color: c, gridX: null, gridY: null, entities: [] }; setActionText("Mapa Criado!"); saveDataLogic(); loadDevMapManager(); }
 
-        // --- MOUSE & SPAWN / DELETE ---
+        // --- SISTEMA DE CLIQUE / MOUSE / SPAWN / BORRACHA ---
         function handleInputDown(e) {
             if(document.getElementById('login-overlay').style.display !== 'none') return;
             if(e.type === 'touchstart') e.preventDefault(); 
-            
-            const pos = getCoords(e); 
-            let curM = gameMaps[currentMap]; if(!curM) return;
+            const pos = getCoords(e); let curM = gameMaps[currentMap]; if(!curM) return;
 
-            // MODO BORRACHA (CLIQUE DIREITO APAGA)
+            // BORRACHA (CLIQUE DIREITO)
             if (isDevBuildMode && (e.button === 2 || e.which === 3)) {
                 let cur = curM.entities || [];
                 for (let i = cur.length - 1; i >= 0; i--) { 
                     let o = cur[i]; 
                     if (pos.x >= o.x && pos.x <= o.x + (o.w||30) && pos.y >= o.y && pos.y <= o.y + (o.h||30)) { 
-                        cur.splice(i, 1); 
-                        addFloatingText(pos.x, pos.y, "Deletado", "#e74c3c"); 
-                        return; 
+                        cur.splice(i, 1); addFloatingText(pos.x, pos.y, "Deletado", "#e74c3c"); saveDataLogic(); return; 
                     } 
                 } 
                 return;
@@ -672,13 +628,12 @@
 
             if (e.button !== 0 && e.type === 'mousedown') return;
 
-            // MODO SPAWN
+            // SPAWN DEV (CLIQUE ESQUERDO)
             if (isDevBuildMode) { 
                 const val = selectedDevEntity; if(!val) return;
                 let cW = parseInt(document.getElementById('spawn-w') ? document.getElementById('spawn-w').value : 0);
                 let cH = parseInt(document.getElementById('spawn-h') ? document.getElementById('spawn-h').value : 0);
                 let cI = document.getElementById('spawn-img') ? document.getElementById('spawn-img').value : '';
-                
                 let n = { id: Date.now(), x: pos.x - (cW||40)/2, y: pos.y - (cH||40)/2, w: cW||40, h: cH||40, active: true };
                 if (cI) n.imgUrl = cI;
 
@@ -688,12 +643,11 @@
                 else if (val === 'tree') { n.type = 'tree'; n.name = 'Tree'; n.hp = 3; n.maxHp = 3; n.h = cH||50; }
                 else if (val === 'fishing_spot') { n.type = 'fishing_spot'; n.name = 'Fishing Spot'; }
                 else if (val === 'house') { n.type = 'house'; n.name = 'House'; n.w=cW||100; n.h=cH||100; }
-                else if (val.startsWith('paint_')) { n.type = 'paint'; n.name = 'Chão'; n.color = val==='paint_dirt'?'#5c4033':val==='paint_stone'?'#7f8c8d':val==='paint_water'?'#3498db':'#f39c12'; n.w=cW||40; n.h=cH||40; }
+                else if (val.startsWith('paint_')) { n.type = 'paint'; n.name = 'Chão'; n.color = val==='paint_dirt'?'#5c4033':val==='paint_stone'?'#7f8c8d':val==='paint_grass'?'#27ae60':'#3498db'; n.w=cW||40; n.h=cH||40; }
                 else if (typeof val === 'string' && val.startsWith('rock_')) { n.type = val; n.name = val; n.hp = val==='rock_iron'?3:2; n.maxHp = n.hp; n.color = val==='rock_copper'?'#d35400':val==='rock_iron'?'#7f8c8d':'#bdc3c7'; n.h = cH||30; }
                 else if (val === 'furnace') { n.type = 'furnace'; n.name = 'Furnace'; n.h = cH||45; } else if (val === 'anvil') { n.type = 'anvil'; n.name = 'Anvil'; n.h = cH||25; } else if (val === 'bank') { n.type = 'bank'; n.name = 'Bank Booth'; n.w=cW||50; n.h=cH||30; }
                 else { n.type = 'unknown'; } 
-                
-                if(!curM.entities) curM.entities = []; curM.entities.push(n); addFloatingText(pos.x, pos.y, "Spawn", "#2ecc71"); return;
+                if(!curM.entities) curM.entities = []; curM.entities.push(n); addFloatingText(pos.x, pos.y, "Spawn", "#2ecc71"); saveDataLogic(); return;
             }
             if(!osrsMenu.contains(e.target) && !document.getElementById('custom-modal-overlay').contains(e.target)) { player.destX = pos.x; player.destY = pos.y; player.isPerformingAction = false; player.pendingAutoAction = null; player.actionToolItem = null; if(isNPCOpen){closeMenus(); openTab('inv');} osrsMenu.style.display = 'none'; }
         }
@@ -706,12 +660,12 @@
             e.preventDefault(); const pos = getCoords(e);
             let cObj = null; let cur = gameMaps[currentMap] ? gameMaps[currentMap].entities || [] : [];
             
-            // Borracha de Backup para garantir
+            // BORRACHA DEV SEGURO DE BACKUP
             if (isDevBuildMode) { 
                 for (let i = cur.length - 1; i >= 0; i--) { 
                     let o = cur[i]; 
                     if (pos.x >= o.x && pos.x <= o.x + (o.w||30) && pos.y >= o.y && pos.y <= o.y + (o.h||30)) { 
-                        cur.splice(i, 1); addFloatingText(pos.x, pos.y, "Deletado", "#e74c3c"); return; 
+                        cur.splice(i, 1); addFloatingText(pos.x, pos.y, "Deletado", "#e74c3c"); saveDataLogic(); return; 
                     } 
                 } 
                 return; 
@@ -991,19 +945,28 @@
         // --- RENDERIZADOR ---
         function draw() {
             try {
-                ctx.clearRect(0, 0, canvas.width, canvas.height); let mapObj = gameMaps[currentMap]; if(!mapObj) return;
-                ctx.fillStyle = mapObj.color || '#4a6b2d'; ctx.fillRect(0,0,canvas.width, canvas.height);
-                ctx.strokeStyle = "rgba(0,0,0,0.1)"; for(let i=0; i<canvas.width; i+=40) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,canvas.height); ctx.stroke(); } for(let i=0; i<canvas.height; i+=40) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(canvas.width,i); ctx.stroke(); }
+                ctx.clearRect(0, 0, canvas.width, canvas.height); 
+                let mapObj = gameMaps[currentMap]; 
+                
+                if(!mapObj) {
+                    currentMap = 'lumbridge';
+                    mapObj = gameMaps['lumbridge'];
+                    if (!mapObj) return; 
+                }
+                
+                ctx.fillStyle = mapObj.color || '#4a6b2d'; 
+                ctx.fillRect(0,0,canvas.width, canvas.height);
+                ctx.strokeStyle = "rgba(0,0,0,0.1)"; 
+                for(let i=0; i<canvas.width; i+=40) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,canvas.height); ctx.stroke(); } 
+                for(let i=0; i<canvas.height; i+=40) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(canvas.width,i); ctx.stroke(); }
 
                 let cur = mapObj.entities || [];
                 
-                // 1. CHÃO E PINTURAS
                 cur.forEach(o => {
                     if(!o || !o.type) return; let ow = o.w || 40; let oh = o.h || 40;
                     if(o.type === 'paint') { ctx.fillStyle = o.color; ctx.fillRect(o.x, o.y, ow, oh); }
                 });
 
-                // 2. ITENS DE CHÃO
                 cur.forEach(o => {
                     if(!o || !o.type) return; let ow = o.w || 30; let oh = o.h || 30;
                     if (o.type === 'ground_item' && o.active) {
@@ -1012,7 +975,6 @@
                     }
                 });
 
-                // 3. ENTIDADES ACIMA
                 cur.forEach(o => {
                     if (!o || !o.type || !o.active || o.type === 'ground_item' || o.type === 'paint') return;
                     let ow = o.w || 30; let oh = o.h || 30;
@@ -1108,6 +1070,15 @@
                 mCtx.fillStyle = 'white'; mCtx.fillRect(player.x * scaleX, player.y * scaleY, 4, 4);
             } catch(e) {}
         }
+
+        // --- 7. A DECLARAÇÃO CORRETA E GLOBAL DO LOOP ---
+        function gameLoop() { 
+            try { update(); } catch(e){} 
+            try { draw(); } catch(e){} 
+            try { drawMinimap(); } catch(e){} 
+            requestAnimationFrame(gameLoop); 
+        }
+
     </script>
 </body>
 </html>
