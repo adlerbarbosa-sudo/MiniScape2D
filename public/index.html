@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MiniScape 2D - V29 (Node.js Server Login)</title>
+    <style>
+        /* ESTILOS MANTIDOS DO JOGO... */
+        body { margin: 0; padding: 10px; background-color: #121212; color: #e0e0e0; font-family: 'Segoe UI', Tahoma, sans-serif; display: flex; gap: 15px; justify-content: center; height: 100vh; box-sizing: border-box; overflow: hidden; flex-direction: row; align-items: stretch; }
+        @media (max-width: 850px) { body { flex-direction: column; align-items: center; padding: 5px; overflow-y: auto; height: auto;} #ui-panel { width: 100% !important; max-width: 100%; min-height: 500px; } #mobile-action-btn, #mobile-atk-btn { display: block !important; } #game-container { height: 50vh; } }
+        #game-container { position: relative; flex: 1; border: 4px solid #3d2e24; background-color: #000; box-shadow: 0 0 20px rgba(0,0,0,0.8); overflow: hidden; border-radius: 4px; }
+        #gameCanvas { cursor: crosshair; display: block; touch-action: none; }
+        .mobile-btn { display: none; width: 100%; padding: 15px; margin-bottom: 5px; background: #e74c3c; color: white; border: 2px solid #c0392b; border-radius: 4px; font-size: 1.1rem; font-weight: bold; cursor: pointer; text-shadow: 1px 1px 0 #000; }
+        #tooltip { display: none; position: absolute; background: rgba(26, 21, 17, 0.95); border: 2px solid #5d4037; border-radius: 4px; padding: 8px; color: #fff; pointer-events: none; z-index: 3000; min-width: 120px; font-size: 0.8rem; box-shadow: 2px 2px 10px rgba(0,0,0,0.8); text-shadow: 1px 1px 0 #000; }
+        .tt-title { color: #f1c40f; font-weight: bold; font-size: 0.9rem; border-bottom: 1px solid #4a3321; margin-bottom: 4px; padding-bottom: 2px;} .tt-desc { color: #bdc3c7; margin-bottom: 4px; font-style: italic; font-size: 0.75rem;} .tt-stat { color: #2ecc71; } .tt-weight { color: #95a5a6; font-size: 0.7rem; margin-top: 4px; text-align: right; }
+        #osrs-menu { display: none; position: absolute; background-color: #3d2e24; border: 2px solid #231912; box-shadow: 2px 2px 5px rgba(0,0,0,0.8); z-index: 9999; min-width: 150px; font-family: 'Courier New', Courier, monospace; font-weight: bold; color: #f1c40f; border-radius: 2px; }
+        .osrs-menu-item { padding: 8px 12px; cursor: pointer; font-size: 0.85rem; text-shadow: 1px 1px 0 #000; border-bottom: 1px solid #231912; } .osrs-menu-item:hover { background-color: #5d4037; color: #fff; }
+        #custom-modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); z-index: 10000; align-items: center; justify-content: center; }
+        #custom-modal-box { background: #2c241b; border: 3px solid #5d4037; border-radius: 4px; padding: 20px; width: 320px; box-shadow: 0 0 25px black; color: white; display: flex; flex-direction: column; gap: 10px; }
+        #ui-panel { width: 360px; min-width: 360px; background-color: #231c15; border: 4px solid #3d2e24; padding: 10px; display: flex; flex-direction: column; gap: 8px; box-sizing: border-box; overflow-y: hidden; border-radius: 4px; height: 100%; box-shadow: inset 0 0 15px rgba(0,0,0,0.8); }
+        .hud-header { display: flex; gap: 10px; align-items: stretch; background: #1a1511; padding: 8px; border: 1px solid #3d2e24; border-radius: 4px; }
+        #minimapCanvas { border: 2px solid #5d4037; background: #000; border-radius: 4px; width: 110px; height: 80px; flex-shrink: 0;}
+        .hud-bars-wrapper { flex-grow: 1; display: flex; flex-direction: column; justify-content: space-between; }
+        .hud-bar-container { width: 100%; height: 18px; background: #111; border: 1px solid #000; position: relative; border-radius: 2px; overflow: hidden; box-shadow: inset 0 0 5px black;} 
+        .hud-bar-fill { height: 100%; transition: width 0.2s; } 
+        #bar-hp { background: linear-gradient(to bottom, #c0392b, #8e44ad); } #bar-mp { background: linear-gradient(to bottom, #2980b9, #2c3e50); } #bar-xp { background: linear-gradient(to bottom, #f39c12, #d35400); } 
+        .hud-text { position: absolute; width: 100%; text-align: center; top: -1px; left: 0; font-size: 0.75rem; font-weight: bold; color: white; text-shadow: 1px 1px 1px #000; line-height: 20px; } 
+        #action-text { color: #f1c40f; text-align: center; font-weight: bold; height: 16px; font-size: 0.8rem; text-shadow: 1px 1px 0 #000;}
+        .tab-buttons { display: flex; gap: 2px; flex-wrap: wrap;} 
+        .tab-btn { flex: 1 1 20%; padding: 6px 2px; background: #3d2e24; color: #bdc3c7; border: 1px solid #231912; cursor: pointer; font-weight: bold; font-size: 0.70rem; text-align: center; border-radius: 2px 2px 0 0;} 
+        .tab-btn:hover { background: #5d4037; color: white;} 
+        .active-btn { background: #5d4037 !important; border-bottom: none !important; color: #f1c40f !important;} 
+        .tab-content { display: none; background: #1a1511; padding: 10px; border: 1px solid #3d2e24; flex: 1; overflow-y: auto; border-radius: 0 4px 4px 4px;} 
+        .active-tab { display: block; }
+        .grid-container { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; } 
+        .item-slot { aspect-ratio: 1; background: #231c15; border: 1px solid #3d2e24; position: relative; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; cursor: pointer; box-shadow: inset 0 0 8px rgba(0,0,0,0.6); border-radius: 3px; } 
+        .item-slot:hover { background: #3d2e24; border-color: #f1c40f;} 
+        .item-qty { position: absolute; top: 1px; left: 3px; color: #f1c40f; font-weight: bold; font-size: 0.65rem; text-shadow: 1px 1px 0 #000; font-family: Tahoma;}
+        #equip-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; text-align: center; font-size: 0.8rem; } 
+        .equip-slot-box { position: relative; background: #231c15; border: 1px solid #3d2e24; padding: 10px 5px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 4px;} 
+        .slot-name { color: #888; font-size: 0.65rem; margin-bottom: 2px; text-transform: uppercase;} 
+        .equip-icon { font-size: 1.5rem; } 
+        .skill-line { display: flex; justify-content: space-between; border-bottom: 1px solid #231c15; padding: 6px 4px; font-size: 0.75rem; color: #bdc3c7;}
+        .spell-card { background: #231c15; border: 1px solid #3d2e24; padding: 8px; margin-bottom: 5px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s; border-radius: 4px;} 
+        .spell-card:hover { background: #3d2e24; } .spell-active { border: 1px solid #3498db; background: rgba(52, 152, 219, 0.1); } .spell-runes { font-size: 0.65rem; color: #95a5a6; }
+        .npc-dialog { background: #111; border-left: 4px solid #f1c40f; padding: 10px; font-style: italic; margin-bottom: 10px; color: #ecf0f1; font-size: 0.85rem;} 
+        .shop-item { display: flex; justify-content: space-between; align-items: center; background: #231c15; padding: 6px; border: 1px solid #3d2e24; margin-bottom: 4px; border-radius: 3px; font-size: 0.8rem;} 
+        .shop-btn { background: #5d4037; color: #fff; border: 1px solid #8b5a2b; padding: 4px 8px; font-weight: bold; cursor: pointer; font-size: 0.7rem; border-radius: 2px;} 
+        .shop-btn:hover { background: #8b5a2b; color: #f1c40f; } .shop-btn:disabled { background: #333; border-color: #222; color: #666; cursor: not-allowed; }
+        .dev-sub-tabs { display: flex; margin-bottom: 10px; border-bottom: 2px solid #5d4037; flex-wrap: wrap;} .dev-sub-btn { background: #231c15; color: #888; border: none; padding: 6px 10px; cursor: pointer; font-size: 0.7rem; flex: 1; } .dev-sub-btn.active { background: #5d4037; color: #f1c40f; font-weight: bold; } .dev-sub-content { display: none; } .dev-sub-content.active { display: block; } .dev-form-group { margin-bottom: 8px; } .dev-form-group label { display: block; font-size: 0.65rem; color: #bdc3c7; margin-bottom: 2px; text-transform: uppercase;} .dev-input, .dev-select { width: 100%; padding: 6px; background: #111; color: #fff; border: 1px solid #3d2e24; box-sizing: border-box; font-size: 0.8rem; border-radius: 2px;} .dev-row { display: flex; gap: 5px; } .dev-save-btn { width: 100%; padding: 8px; background: #27ae60; color: white; border: none; font-weight: bold; cursor: pointer; margin-top: 5px; border-radius: 2px;} .dev-save-btn:hover { background: #2ecc71; } 
+        #dev-entity-list { max-height: 180px; overflow-y: auto; background: #111; border: 1px solid #3d2e24; padding: 5px; border-radius: 4px;} .dev-ent-cat { color: #f39c12; font-size: 0.7rem; border-bottom: 1px solid #333; margin-top: 5px; padding-bottom: 2px; text-transform: uppercase; font-weight: bold;} .dev-ent-item { padding: 6px; font-size: 0.8rem; cursor: pointer; color: #ecf0f1; border-radius: 3px; display: flex; align-items: center; gap: 8px;} .dev-ent-item:hover { background: #2c241b; color: #f1c40f;} .dev-ent-item.selected { background: #5d4037; font-weight: bold; color: white;} .entity-selector-item:hover { filter: brightness(1.5); }
+        .map-tile-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; background: #222; padding: 2px; border: 2px solid #111; border-radius: 4px;} .map-tile { aspect-ratio: 1; background: #111; color: #888; font-size: 0.6rem; display: flex; align-items: center; justify-content: center; cursor: pointer; text-align: center; word-break: break-all; border-radius: 2px;} .map-tile:hover { background: #333; color: white;} .map-tile.active-tile { border: 2px solid #f1c40f; background: #5d4037; color: white;}
+
+        /* NOVA TELA DE LOGIN */
+        #login-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #121212; z-index: 20000; display: flex; align-items: center; justify-content: center; flex-direction: column; }
+        .login-box { background: #1e1e1e; border: 4px solid #3d2e24; padding: 30px; border-radius: 8px; width: 300px; box-shadow: 0 0 30px black; text-align: center;}
+        .login-box h1 { color: #f1c40f; margin-top: 0; text-transform: uppercase; letter-spacing: 2px;}
+        .login-input { width: 100%; padding: 10px; margin-bottom: 15px; background: #111; border: 1px solid #5d4037; color: white; box-sizing: border-box; border-radius: 4px;}
+        .login-btn { width: 100%; padding: 12px; background: #27ae60; color: white; border: none; font-weight: bold; cursor: pointer; border-radius: 4px; margin-bottom: 10px;}
+        .login-btn.reg { background: #2980b9; }
+        #login-msg { color: #e74c3c; font-size: 0.85rem; font-weight: bold; height: 20px;}
+    </style>
+</head>
+<body>
+
+    <!-- OVERLAY DE LOGIN / REGISTRO -->
+    <div id="login-overlay">
+        <div class="login-box">
+            <h1>MiniScape 2D</h1>
+            <p style="font-size: 0.8rem; color: #bdc3c7;">Servidor Online Oficial</p>
+            <input type="text" id="auth-user" class="login-input" placeholder="Usuário">
+            <input type="password" id="auth-pass" class="login-input" placeholder="Senha">
+            <div id="login-msg"></div>
+            <button class="login-btn" onclick="login()">Entrar no Jogo</button>
+            <button class="login-btn reg" onclick="register()">Criar Nova Conta</button>
+        </div>
+    </div>
+
+    <!-- O JOGO FICA OCULTO ATÉ LOGAR -->
+    <div id="game-wrapper" style="display: none; width: 100%; height: 100%; max-width: 1200px; gap: 15px;">
+        <div id="custom-modal-overlay"><div id="custom-modal-box"></div></div>
+        <div id="tooltip"></div>
+        <div id="osrs-menu"></div>
+        
+        <div id="game-container">
+            <canvas id="gameCanvas" width="800" height="600"></canvas>
+        </div>
+
+        <div id="ui-panel">
+            
+            <div class="hud-header">
+                <canvas id="minimapCanvas" width="110" height="80"></canvas>
+                <div class="hud-bars-wrapper">
+                    <div class="hud-bar-container"><div id="bar-hp" class="hud-bar-fill"></div><div id="text-hp" class="hud-text">HP 15/15</div></div>
+                    <div class="hud-bar-container"><div id="bar-mp" class="hud-bar-fill"></div><div id="text-mp" class="hud-text">MP 10/10</div></div>
+                    <div class="hud-bar-container"><div id="bar-xp" class="hud-bar-fill" style="width: 0%;"></div><div id="text-xp" class="hud-text">Nível Geral: 1</div></div>
+                </div>
+            </div>
+            
+            <div id="action-text">Conectado ao Servidor!</div>
+            
+            <button id="mobile-action-btn" class="mobile-btn" onclick="tryPickupOrInteract()">🎯 AÇÃO (ESPAÇO)</button>
+            <button id="mobile-atk-btn" class="mobile-btn" style="background:#8e44ad; border-color:#9b59b6; margin-top:-5px;" onclick="tryAttack()">⚔️ ATACAR (CTRL)</button>
+
+            <div class="tab-buttons">
+                <button id="btn-inv" class="tab-btn active-btn" onclick="openTab('inv')">Inv</button>
+                <button id="btn-eq" class="tab-btn" onclick="openTab('eq')">Equip</button>
+                <button id="btn-sk" class="tab-btn" onclick="openTab('sk')">Skills</button>
+                <button id="btn-craft" class="tab-btn" onclick="openTab('craft'); updateUI();">Craft</button>
+                <button id="btn-mag" class="tab-btn" onclick="openTab('mag')">✨</button>
+                <button id="btn-npc" class="tab-btn" onclick="openTab('npc')" style="display:none;">Falar</button>
+                <!-- BOTÃO DEV OCULTO POR PADRÃO -->
+                <button id="btn-dev" class="tab-btn" onclick="openTab('dev'); openDevSub('dev-map', document.getElementById('btn-dev-map'));" style="display:none; background-color: #c0392b;">DEV</button>
+                <button id="btn-cfg" class="tab-btn" onclick="openTab('cfg')">⚙️</button>
+            </div>
+
+            <!-- ABAS (MANTIDAS COMO NA V27) -->
+            <div id="tab-inv" class="tab-content active-tab">
+                <div id="inv-grid" class="grid-container"></div>
+                <div style="font-size: 0.65rem; color: #888; margin-top: 10px; text-align: right;">Peso: <span id="weight-txt" style="color:#bdc3c7;">0</span> / 50 kg</div>
+            </div>
+
+            <div id="tab-eq" class="tab-content">
+                <div id="equip-grid">
+                    <div class="equip-slot-box" onclick="unequip('head')"><span class="slot-name">Cabeça</span><span id="eq-head" class="equip-icon"></span></div>
+                    <div class="equip-slot-box" onclick="unequip('body')"><span class="slot-name">Tronco</span><span id="eq-body" class="equip-icon"></span></div>
+                    <div class="equip-slot-box" onclick="unequip('ammo')"><span class="slot-name">Munição</span><span id="eq-ammo" class="equip-icon"></span><span id="ammo-qty" class="item-qty" style="top:auto; bottom:2px;"></span></div>
+                    <div class="equip-slot-box" onclick="unequip('weapon')"><span class="slot-name">Arma</span><span id="eq-weapon" class="equip-icon"></span></div>
+                    <div class="equip-slot-box" onclick="unequip('shield')"><span class="slot-name">Escudo</span><span id="eq-shield" class="equip-icon"></span></div>
+                    <div class="equip-slot-box"></div> 
+                </div>
+                <div style="margin-top:10px; font-size:0.75rem; color:#f1c40f; text-align: center;" id="def-stats">Bônus de Defesa: 0</div>
+            </div>
+
+            <div id="tab-sk" class="tab-content"><div id="skills-list"></div></div>
+            <div id="tab-craft" class="tab-content"><div style="font-size: 0.7rem; color: #bdc3c7; margin-bottom: 10px;">Crie itens e equipamentos.</div><div id="craft-list"></div></div>
+            <div id="tab-mag" class="tab-content"><div style="font-size: 0.7rem; color: #bdc3c7; margin-bottom: 10px;">Magias ativas.</div><div id="spellbook-list"></div></div>
+            <div id="tab-npc" class="tab-content"><h3 id="npc-title" style="margin-top:0; color:#f39c12;">NPC</h3><div id="npc-dialog" class="npc-dialog">...</div><div id="npc-shop-list"></div></div>
+
+            <!-- MODO DEV ENGINE (VÍSIVEL APENAS PARA ADMINS) -->
+            <div id="tab-dev" class="tab-content">
+                <div class="dev-sub-tabs">
+                    <button id="btn-dev-map" class="dev-sub-btn active" onclick="openDevSub('dev-map', this)">Colocar</button>
+                    <button class="dev-sub-btn" onclick="openDevSub('dev-map-manager', this)">Grade</button>
+                    <button class="dev-sub-btn" onclick="openDevSub('dev-items', this)">Itens/Craft</button>
+                    <button class="dev-sub-btn" onclick="openDevSub('dev-npcs', this)">NPCs</button>
+                </div>
+
+                <div id="dev-map" class="dev-sub-content active">
+                    <div class="dev-row" style="margin-bottom: 5px;">
+                        <input type="text" id="dev-search" class="dev-input" placeholder="🔍 Buscar entidade..." oninput="filterDevEntities(this.value)" style="flex: 1; border-color: #5d4037;">
+                        <button class="dev-save-btn" style="width: auto; margin:0; background:#3d2e24;" onclick="toggleDevView()" title="Alternar Vista">🔲/📄</button>
+                    </div>
+                    <div id="dev-entity-list"></div>
+                    <div class="dev-row" style="margin-top: 8px;">
+                        <input type="number" id="spawn-w" class="dev-input" placeholder="Largura (W)">
+                        <input type="number" id="spawn-h" class="dev-input" placeholder="Altura (H)">
+                    </div>
+                    <div class="dev-form-group" style="margin-top: 5px;">
+                        <input type="text" id="spawn-img" class="dev-input" placeholder="URL Imagem PNG (Opcional)">
+                    </div>
+                    <button onclick="toggleDevBuild()" id="btn-build-mode" style="width: 100%; padding: 10px; background: #e67e22; color: white; border: none; font-weight: bold; cursor: pointer; margin-top:5px; border-radius:4px;">
+                        Modo Construção: OFF
+                    </button>
+                </div>
+
+                <div id="dev-map-manager" class="dev-sub-content">
+                    <div class="dev-form-group" style="background:#111; padding:10px; border:1px solid #3d2e24; margin-bottom:10px; border-radius:4px;">
+                        <label style="color:#2ecc71; margin-bottom:5px;">🗺️ Editar Mapa Atual: <span id="cur-map-id-disp"></span></label>
+                        <div class="dev-row"><input type="text" id="cur-map-name" class="dev-input" placeholder="Nome"><input type="color" id="cur-map-color" class="dev-input" style="padding:0; height:28px;"></div>
+                        <div class="dev-row" style="margin-top:5px;"><input type="number" id="cur-map-w" class="dev-input" placeholder="Larg (W)"><input type="number" id="cur-map-h" class="dev-input" placeholder="Alt (H)"></div>
+                        <button class="dev-save-btn" onclick="saveCurrentMapSettings()">Salvar Alterações</button>
+                    </div>
+                    <p style="font-size:0.7rem; color:#bdc3c7;">Conecte seus mapas clicando na grade.</p>
+                    <div id="map-grid-ui" class="map-tile-grid"></div>
+                    <div class="dev-form-group" style="margin-top:10px; padding-top: 10px; border-top: 1px solid #444;">
+                        <label style="color:#f39c12;">Criar Novo Mapa Solto:</label>
+                        <div class="dev-row"><input type="text" id="dm-id" class="dev-input" placeholder="ID (floresta)"><input type="text" id="dm-name" class="dev-input" placeholder="Nome Exibição"></div>
+                        <button class="dev-save-btn" onclick="createNewMap()">Criar Mapa Base</button>
+                    </div>
+                </div>
+
+                <div id="dev-items" class="dev-sub-content">
+                    <div class="dev-form-group"><label>Editar/Criar:</label><select id="dev-item-select" class="dev-select" onchange="loadDevItemForm()"><option value="NEW">-- CRIAR NOVO ITEM --</option></select></div>
+                    <div class="dev-form-group"><label>Nome (ID Único):</label><input type="text" id="di-name" class="dev-input"></div>
+                    <div class="dev-row"><div class="dev-form-group" style="flex:1"><label>Ícone:</label><input type="text" id="di-icon" class="dev-input"></div><div class="dev-form-group" style="flex:1"><label>Peso (kg):</label><input type="number" step="0.1" id="di-weight" class="dev-input"></div></div>
+                    <div class="dev-form-group"><label>Tipo:</label><select id="di-type" class="dev-select" onchange="toggleItemFields()"><option value="resource">Recurso/Material</option><option value="equipment">Equipamento</option><option value="consumable">Consumível</option><option value="tool">Ferramenta</option></select></div>
+                    <div class="dev-form-group"><label>Stackable:</label><select id="di-stack" class="dev-select"><option value="true">Sim</option><option value="false">Não</option></select></div>
+                    <div id="di-eq-fields" style="display:none; padding:5px; border:1px solid #3d2e24; background:#111; margin-bottom:5px;">
+                        <div class="dev-row"><select id="di-slot" class="dev-select" style="flex:1"><option value="weapon">Arma</option><option value="shield">Escudo</option><option value="head">Cabeça</option><option value="body">Tronco</option><option value="ammo">Munição</option></select><select id="di-tool" class="dev-select" style="flex:1"><option value="">Melee</option><option value="magic">Magia</option><option value="ranged">Arco</option><option value="pickaxe">Picareta</option><option value="axe">Machado</option><option value="net">Rede</option></select></div>
+                        <div class="dev-row"><div class="dev-form-group"><label>Dano:</label><input type="number" id="di-dmg" class="dev-input" value="0"></div><div class="dev-form-group"><label>Defesa:</label><input type="number" id="di-def" class="dev-input" value="0"></div></div>
+                    </div>
+                    <div id="di-cons-fields" style="display:none; padding:5px; border:1px solid #3d2e24; background:#111; margin-bottom:5px;"><div class="dev-form-group"><label>Cura HP:</label><input type="number" id="di-heal" class="dev-input" value="0"></div></div>
+                    <div class="dev-form-group"><label>Receita Crafting (Item,Qtd|Item2,Qtd):</label><input type="text" id="di-recipe" class="dev-input" placeholder="Logs,1|Copper Ore,1"></div>
+                    <div class="dev-form-group"><label>Quantidade Criada na Receita:</label><input type="number" id="di-craftqty" class="dev-input" value="1"></div>
+                    <div class="dev-form-group"><label>Descrição Tooltip:</label><input type="text" id="di-desc" class="dev-input"></div>
+                    <button class="dev-save-btn" onclick="saveDevItem()">Salvar/Atualizar Item</button>
+                </div>
+
+                <div id="dev-npcs" class="dev-sub-content">
+                    <div class="dev-form-group"><label>Editar/Criar NPC/Monstro:</label><select id="dev-npc-select" class="dev-select" onchange="loadDevNPCForm()"><option value="NEW">-- CRIAR NOVO --</option></select></div>
+                    <div class="dev-form-group"><label>ID Único:</label><input type="text" id="dn-id" class="dev-input"></div>
+                    <div class="dev-form-group"><label>Nome:</label><input type="text" id="dn-name" class="dev-input"></div>
+                    <div class="dev-row"><div class="dev-form-group" style="flex:1"><label>HP Máx (0=NPC):</label><input type="number" id="dn-hp" class="dev-input" value="10"></div><div class="dev-form-group" style="flex:1"><label>Dano Máx:</label><input type="number" id="dn-hit" class="dev-input" value="1"></div><div class="dev-form-group" style="flex:1"><label>XP Base:</label><input type="number" id="dn-xp" class="dev-input" value="10"></div></div>
+                    <div class="dev-row"><div class="dev-form-group" style="flex:1"><label>Cor Corpo:</label><input type="color" id="dn-c1" class="dev-input" value="#e74c3c" style="padding:0; height:30px;"></div><div class="dev-form-group" style="flex:1"><label>Cor Cabeça:</label><input type="color" id="dn-c2" class="dev-input" value="#c0392b" style="padding:0; height:30px;"></div></div>
+                    <div class="dev-form-group"><label>Diálogo (Se for NPC):</label><input type="text" id="dn-dialog" class="dev-input"></div>
+                    <div class="dev-form-group"><label>Loja (Item,Preço|...):</label><input type="text" id="dn-shop" class="dev-input"></div>
+                    <div class="dev-form-group"><label>Loot Drop (Item,ChanceDec,MaxQty|...):</label><input type="text" id="dn-loot" class="dev-input" placeholder="Bones,1,1"></div>
+                    <button class="dev-save-btn" onclick="saveDevNPC()">Salvar NPC/Monstro</button>
+                </div>
+            </div>
+
+            <div id="tab-bank" class="tab-content"><div id="bank-grid" class="grid-container"></div></div>
+
+            <div id="tab-cfg" class="tab-content">
+                <h3 style="color:#ecf0f1; margin-top: 0; border-bottom: 1px solid #3d2e24; padding-bottom: 5px;">Sistema Servidor</h3>
+                <p style="font-size: 0.75rem; color: #bdc3c7;">Seus dados são salvos online automaticamente.</p>
+                <button class="config-btn" style="background: #27ae60;" onclick="saveToNode()">💾 Salvar Jogo Manualmente</button>
+                <button class="config-btn" style="background: #c0392b; margin-top: 20px;" onclick="location.reload()">Sair da Conta</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // === NODE.JS CLIENT LOGIC ===
+        let currentUser = null;
+        let userRole = 'player';
+        
+        async function register() {
+            const user = document.getElementById('auth-user').value;
+            const pass = document.getElementById('auth-pass').value;
+            const msg = document.getElementById('login-msg');
+            
+            if(!user || !pass) { msg.innerText = "Preencha usuário e senha!"; return; }
+            
+            try {
+                const res = await fetch('/api/register', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: user, password: pass })
+                });
+                const data = await res.json();
+                if(data.error) msg.innerText = data.error;
+                else msg.innerText = "Conta criada! Faça login.";
+            } catch(e) { msg.innerText = "Erro ao conectar com o servidor."; }
+        }
+
+        async function login() {
+            const user = document.getElementById('auth-user').value;
+            const pass = document.getElementById('auth-pass').value;
+            const msg = document.getElementById('login-msg');
+            
+            if(!user || !pass) { msg.innerText = "Preencha usuário e senha!"; return; }
+            
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: user, password: pass })
+                });
+                const data = await res.json();
+                
+                if(data.error) {
+                    msg.innerText = data.error;
+                } else {
+                    currentUser = user;
+                    userRole = data.role;
+                    
+                    // Mostra botão DEV apenas para admins
+                    if(userRole === 'admin') document.getElementById('btn-dev').style.display = 'block';
+                    
+                    // Carrega dados se existirem, senão dá os itens iniciais
+                    if(data.playerData) player = data.playerData;
+                    else giveStarterItems();
+                    
+                    if(data.worldData) gameMaps = data.worldData;
+                    
+                    document.getElementById('login-overlay').style.display = 'none';
+                    document.getElementById('game-wrapper').style.display = 'flex';
+                    
+                    openTab('inv'); updateUI(); 
+                    if(userRole === 'admin') buildDevEntityList(); 
+                    startGameLoop();
+                }
+            } catch(e) { msg.innerText = "Servidor offline ou inacessível."; }
+        }
+
+        async function saveToNode() {
+            if (!currentUser) return;
+            for (let map in gameMaps) { if (gameMaps[map] && gameMaps[map].entities) { gameMaps[map].entities.forEach(obj => { if(obj && obj.aggroTarget) obj.aggroTarget = null; }); } }
+            try {
+                await fetch('/api/save', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: currentUser, playerData: player, worldData: gameMaps })
+                });
+                setActionText("Progresso salvo online!", "#3498db");
+            } catch (e) {
+                console.error("Erro ao salvar no servidor.");
+            }
+        }
+        
+        // Auto-save a cada minuto
+        setInterval(() => saveToNode(), 60000);
+
+        // --- SISTEMAS DO JOGO MANTIDOS (IGUAL V27) ---
+        let keys = { w: false, a: false, s: false, d: false, arrowup: false, arrowdown: false, arrowleft: false, arrowright: false };
+        window.addEventListener("keydown", function(e) {
+            if(document.getElementById('login-overlay').style.display !== 'none') return; // Ignora se não estiver logado
+            if(["Space","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].indexOf(e.code) > -1) {
+                if(e.target.tagName !== "INPUT") e.preventDefault();
+            }
+        }, false);
+
+        document.addEventListener('keydown', (e) => { 
+            if(document.getElementById('login-overlay').style.display !== 'none') return;
+            if(e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+            let k = e.key.toLowerCase();
+            if(['w','a','s','d','arrowup','arrowleft','arrowdown','arrowright'].includes(k)) keys[k] = true;
+            if (e.code === 'Space') { tryPickupOrInteract(); } 
+            if (e.key === 'Control') { tryAttack(); } 
+        });
+
+        document.addEventListener('keyup', (e) => { 
+            if(document.getElementById('login-overlay').style.display !== 'none') return;
+            if(e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+            let k = e.key.toLowerCase();
+            if(['w','a','s','d','arrowup','arrowleft','arrowdown','arrowright'].includes(k)) keys[k] = false;
+        });
+
+        const canvas = document.getElementById('gameCanvas'); const ctx = canvas.getContext('2d');
+        const osrsMenu = document.getElementById('osrs-menu'); const tooltip = document.getElementById('tooltip');
+
+        let floatingTexts = []; let projectiles = []; let isBankOpen = false; let isNPCOpen = false; let isDevBuildMode = false; let activeNPCShop = null;
+        let selectedDevEntity = 'tree'; let devViewMode = 'list'; const imgCache = {};
+
+        function removeAccents(str) { return str.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); }
+        document.addEventListener('mousemove', (e) => { if (tooltip.style.display === 'block') { tooltip.style.left = (e.pageX + 15) + 'px'; tooltip.style.top = (e.pageY + 15) + 'px'; } });
+        function showTooltip(item) { if(!item) return; let html = `<div class="tt-title">${item.name}</div><div class="tt-desc">${item.desc||''}</div>`; if (item.bonusDmg) html += `<div class="tt-stat">⚔️ Dano: +${item.bonusDmg}</div>`; if (item.defBonus) html += `<div class="tt-stat">🛡️ Defesa: +${item.defBonus}</div>`; if (item.heal) html += `<div class="tt-stat">❤️ Cura: +${item.heal}</div>`; html += `<div class="tt-weight">⚖️ Peso: ${item.weight||0} kg</div>`; tooltip.innerHTML = html; tooltip.style.display = 'block'; }
+        function hideTooltip() { tooltip.style.display = 'none'; }
+
+        // Bancos de Dados base (Usados caso o Node.js não tenha carregado nada ainda)
+        let itemDB = {
+            'Bronze Pickaxe': { name: 'Bronze Pickaxe', icon: '⛏️', type: 'equipment', slot: 'weapon', tool: 'pickaxe', stackable: false, weight: 2.0, desc: 'Ferramenta de mineração.', recipe: 'Bronze Bar,2|Logs,1', craftQty: 1 },
+            'Iron Pickaxe': { name: 'Iron Pickaxe', icon: '⛏️', type: 'equipment', slot: 'weapon', tool: 'pickaxe', stackable: false, weight: 2.0, desc: 'Minera rápido.', recipe: 'Iron Bar,2|Logs,1', craftQty: 1 },
+            'Bronze Axe': { name: 'Bronze Axe', icon: '🪓', type: 'equipment', slot: 'weapon', tool: 'axe', stackable: false, weight: 2.0, desc: 'Corta lenha de árvores.', recipe: 'Bronze Bar,1|Logs,1', craftQty: 1 },
+            'Bronze Sword': { name: 'Bronze Sword', icon: '🗡️', type: 'equipment', slot: 'weapon', bonusDmg: 4, stackable: false, weight: 1.8, desc: 'Espada básica de combate.', recipe: 'Bronze Bar,1', craftQty: 1 },
+            'Shortbow': { name: 'Shortbow', icon: '🏹', type: 'equipment', slot: 'weapon', tool: 'ranged', bonusDmg: 2, stackable: false, weight: 1.0, desc: 'Arco para combate à distância.', recipe: 'Logs,2', craftQty: 1 },
+            'Staff': { name: 'Staff', icon: '🦯', type: 'equipment', slot: 'weapon', tool: 'magic', bonusDmg: 1, stackable: false, weight: 1.5, desc: 'Permite lançar magias.', recipe: 'Logs,3', craftQty: 1 },
+            'Bronze Shield': { name: 'Bronze Shield', icon: '🛡️', type: 'equipment', slot: 'shield', defBonus: 2, stackable: false, weight: 3.0, desc: 'Aumenta defesa.', recipe: 'Bronze Bar,2', craftQty: 1 }, 
+            'Bronze Body': { name: 'Bronze Body', icon: '🦺', type: 'equipment', slot: 'body', defBonus: 3, stackable: false, weight: 5.0, desc: 'Armadura pesada de bronze.', recipe: 'Bronze Bar,3', craftQty: 1 }, 
+            'Bronze Arrow': { name: 'Bronze Arrow', icon: '↗️', type: 'equipment', slot: 'ammo', bonusDmg: 1, stackable: true, weight: 0.01, desc: 'Munição para o arco.', recipe: 'Logs,1|Copper Ore,1', craftQty: 10 },
+            'Iron Arrow': { name: 'Iron Arrow', icon: '➵', type: 'equipment', slot: 'ammo', bonusDmg: 3, stackable: true, weight: 0.01, desc: 'Munição forte.', recipe: 'Logs,1|Iron Ore,1', craftQty: 10 },
+            'Tinderbox': { name: 'Tinderbox', icon: '🧯', type: 'tool', stackable: false, weight: 0.5, desc: 'Cria fogo usando Logs.' },
+            'Net': { name: 'Fishing Net', icon: '🕸️', type: 'tool', tool: 'net', stackable: false, weight: 0.5, desc: 'Usada em lagos para pescar.' },
+            'Copper Ore': { name: 'Copper Ore', icon: '🪨', type: 'resource', stackable: true, weight: 2.2, desc: 'Cobre bruto.' },
+            'Tin Ore': { name: 'Tin Ore', icon: '🪨', type: 'resource', stackable: true, weight: 2.2, desc: 'Estanho bruto.' },
+            'Iron Ore': { name: 'Iron Ore', icon: '🪨', type: 'resource', stackable: true, weight: 2.2, desc: 'Ferro bruto.' },
+            'Bronze Bar': { name: 'Bronze Bar', icon: '🧱', type: 'resource', stackable: true, weight: 1.8, desc: 'Barra fundida de bronze.' },
+            'Iron Bar': { name: 'Iron Bar', icon: '🧱', type: 'resource', stackable: true, weight: 1.8, desc: 'Barra fundida de ferro.' },
+            'Logs': { name: 'Logs', icon: '🪵', type: 'resource', stackable: true, weight: 1.5, desc: 'Lenha extraída.' },
+            'Bones': { name: 'Bones', icon: '🦴', type: 'consumable', heal: 0, stackable: true, weight: 0.5, desc: 'Enterre para ganhar XP em Prayer.' }, 
+            'Air Rune': { name: 'Air Rune', icon: '💨', type: 'resource', stackable: true, weight: 0.01, desc: 'Runa mágica elemental.' },
+            'Mind Rune': { name: 'Mind Rune', icon: '👁️', type: 'resource', stackable: true, weight: 0.01, desc: 'Runa mágica mental.' },
+            'Water Rune': { name: 'Water Rune', icon: '💧', type: 'resource', stackable: true, weight: 0.01, desc: 'Runa mágica da água.' },
+            'Raw Meat': { name: 'Raw Meat', icon: '🥩', type: 'resource', stackable: true, weight: 0.8, desc: 'Carne crua. Cozinhe antes de comer.' },
+            'Cooked Meat': { name: 'Cooked Meat', icon: '🍖', type: 'consumable', heal: 4, stackable: true, weight: 0.8, desc: 'Carne cozida. Cura HP.' },
+            'Raw Fish': { name: 'Raw Fish', icon: '🐟', type: 'resource', stackable: true, weight: 0.5, desc: 'Peixe cru.' },
+            'Cooked Fish': { name: 'Cooked Fish', icon: '🍣', type: 'consumable', heal: 8, stackable: true, weight: 0.5, desc: 'Peixe assado. Cura HP muito bem.' },
+            'Coins': { name: 'Coins', icon: '🪙', type: 'resource', stackable: true, weight: 0.0, desc: 'Moedas de comércio.' }
+        };
+        let npcDB = {
+            'goblin_base': { name: 'Goblin', hp: 15, maxHit: 2, xp: 15, c1: '#16a085', c2: '#1abc9c', lootStr: 'Bones,1,1|Raw Meat,0.5,1|Coins,0.3,15', dialog: '', shopStr: '' },
+            'orc_base': { name: 'Orc', hp: 30, maxHit: 5, xp: 40, c1: '#2c3e50', c2: '#34495e', lootStr: 'Bones,1,1|Iron Ore,0.2,1|Coins,1,30', dialog: '', shopStr: '' },
+            'merchant_base': { name: 'Merchant', hp: 0, maxHit: 0, xp: 0, c1: '#8e44ad', c2: '#f1c27d', lootStr: '', dialog: 'Bem-vindo à minha loja!', shopStr: 'Net,20|Water Rune,10|Tinderbox,50' }
+        };
+        let spellbookDB = [
+            { id: 'wind_strike', name: 'Wind Strike', lvl: 1, req: {'Air Rune': 1, 'Mind Rune': 1}, dmg: 2, color: '#ecf0f1' },
+            { id: 'water_strike', name: 'Water Strike', lvl: 5, req: {'Water Rune': 1, 'Air Rune': 1, 'Mind Rune': 1}, dmg: 4, color: '#3498db' }
+        ];
+
+        let playerDefault = {
+            x: 400, y: 300, width: 24, height: 24, destX: 400, destY: 300, speed: 4.0, facing: { x: 0, y: 1 }, 
+            isPerformingAction: false, actionTarget: null, actionType: null, actionTimer: 0, actionDelay: 100, attackCooldown: 0, pendingAutoAction: null, actionAnim: 0, actionToolItem: null,
+            activeSpell: 'wind_strike', regenTimer: 300,
+            equipment: { head: null, body: null, weapon: null, shield: null, ammo: null }, inventory: [], bank: [],
+            stats: { hp: 15, maxHp: 15, mp: 10, maxMp: 10, skills: { hp: { level: 10, xp: 0, next: 100, name: 'Health' }, combat: { level: 1, xp: 0, next: 100, name: 'Combat' }, ranged: { level: 1, xp: 0, next: 100, name: 'Ranged' }, magic: { level: 1, xp: 0, next: 100, name: 'Magic' }, prayer: { level: 1, xp: 0, next: 50, name: 'Prayer' }, woodcutting: { level: 1, xp: 0, next: 50, name: 'Woodcut' }, mining: { level: 1, xp: 0, next: 50, name: 'Mining' }, smithing: { level: 1, xp: 0, next: 50, name: 'Smithing' }, firemaking: { level: 1, xp: 0, next: 50, name: 'Firemk' }, cooking: { level: 1, xp: 0, next: 50, name: 'Cooking' }, crafting: { level: 1, xp: 0, next: 50, name: 'Crafting' }, fishing: { level: 1, xp: 0, next: 50, name: 'Fishing' } } }
+        };
+        // Atribui o default pra garantir. O Login sobreescreve
+        player = JSON.parse(JSON.stringify(playerDefault));
+
+        let currentMap = 'lumbridge';
+        let gameMaps = {
+            'lumbridge': { id: 'lumbridge', name: 'Cidade Principal', width: 800, height: 600, color: '#4a6b2d', gridX: 0, gridY: 0, entities: [ { id: 1, type: 'tree', name: 'Oak Tree', x: 150, y: 150, w: 40, h: 50, active: true, hp: 3, maxHp: 3 }, { id: 3, type: 'enemy', dbKey: 'goblin_base', name: 'Goblin', x: 300, y: 400, w: 25, h: 25, active: true, hp: 15, maxHp: 15, attackCooldown: 0 }, { id: 4, type: 'bank', name: 'Bank Booth', x: 400, y: 50, w: 50, h: 30, active: true }, { id: 6, type: 'npc', dbKey: 'merchant_base', name: 'Merchant', x: 100, y: 100, w: 25, h: 25, active: true }, { id: 7, type: 'fishing_spot', name: 'Fishing Spot', x: 600, y: 450, w: 100, h: 80, active: true } ] },
+            'mine': { id: 'mine', name: 'Mina Subterrânea', width: 1200, height: 800, color: '#3e3933', gridX: 1, gridY: 0, entities: [ { id: 8, type: 'rock_copper', name: 'Copper Rock', x: 150, y: 200, w: 35, h: 30, active: true, hp: 2, maxHp: 2, color: '#d35400' }, { id: 9, type: 'rock_iron', name: 'Iron Rock', x: 220, y: 200, w: 35, h: 30, active: true, hp: 3, maxHp: 3, color: '#7f8c8d' }, { id: 10, type: 'furnace', name: 'Furnace', x: 400, y: 100, w: 45, h: 45, active: true }, { id: 11, type: 'anvil', name: 'Anvil', x: 500, y: 120, w: 35, h: 25, active: true }, { id: 12, type: 'enemy', dbKey: 'orc_base', name: 'Orc', x: 400, y: 400, w: 35, h: 35, active: true, hp: 30, maxHp: 30, attackCooldown: 0 } ] }
+        };
+
+        function getCoords(e) {
+            const rect = canvas.getBoundingClientRect(); const scaleX = canvas.width / rect.width; const scaleY = canvas.height / rect.height;
+            let cX = e.clientX, cY = e.clientY, pX = e.pageX, pY = e.pageY;
+            if(e.type && e.type.includes('touch')) { cX = e.touches[0].clientX; cY = e.touches[0].clientY; pX = e.touches[0].pageX; pY = e.touches[0].pageY; }
+            return { x: (cX - rect.left) * scaleX, y: (cY - rect.top) * scaleY, pageX: pX, pageY: pY };
+        }
+
+        function giveStarterItems() {
+            addInvItem('Bronze Sword', 1); addInvItem('Shortbow', 1); addInvItem('Staff', 1); addInvItem('Bronze Pickaxe', 1); addInvItem('Bronze Axe', 1); addInvItem('Tinderbox', 1); addInvItem('Net', 1); addInvItem('Coins', 100); addInvItem('Air Rune', 50); addInvItem('Mind Rune', 50); addInvItem('Bronze Arrow', 50);
+            canvas.width = 800; canvas.height = 600;
+        }
+
+        // --- SISTEMA DE TRANSIÇÃO (GRID) ---
+        function switchMap(targetMap, x, y) { if(!gameMaps[targetMap]) return; currentMap = targetMap; player.x = x; player.y = y; player.destX = x; player.destY = y; player.isPerformingAction = false; player.pendingAutoAction = null; player.actionTarget = null; player.actionToolItem = null; projectiles = []; canvas.width = gameMaps[currentMap].width || 800; canvas.height = gameMaps[currentMap].height || 600; setActionText(`Viajou: ${gameMaps[currentMap].name}`); saveToNode(); loadDevMapManager(); }
+        function switchMapByGrid(dx, dy, nx, ny) { let cm = gameMaps[currentMap]; let tgX = (cm.gridX||0) + dx; let tgY = (cm.gridY||0) + dy; let targetMap = Object.keys(gameMaps).find(k => gameMaps[k].gridX === tgX && gameMaps[k].gridY === tgY); if(targetMap) { switchMap(targetMap, nx, ny); } else { if(dx < 0) player.x = 40; if(dx > 0) player.x = cm.width - 40; if(dy < 0) player.y = 40; if(dy > 0) player.y = cm.height - 40; player.destX = player.x; player.destY = player.y; } }
+
+        // --- INVENTÁRIO ---
+        function getInvCount(iName) { return player.inventory.reduce((acc, i) => acc + (i.name === iName ? (i.qty||1) : 0), 0); }
+        function calcTotalWeight() { return player.inventory.reduce((acc, i) => acc + ((i&&i.weight?i.weight:0) * (i&&i.qty?i.qty:1)), 0).toFixed(1); }
+        function removeInvItem(iName, amount) { let tr = amount; for(let i = player.inventory.length - 1; i >= 0; i--) { if(player.inventory[i].name === iName) { if(player.inventory[i].stackable) { if(player.inventory[i].qty > tr) { player.inventory[i].qty -= tr; return true; } else { tr -= player.inventory[i].qty; player.inventory.splice(i, 1); } } else { player.inventory.splice(i, 1); tr--; if(tr === 0) return true; } } } return false; }
+        function addInvItem(iName, qty = 1) { const b = itemDB[iName]; if(!b) return false; if (b.stackable) { let r = qty; for(let i of player.inventory) { if(i.name === iName && i.qty < 254) { let sp = 254 - i.qty; if(r <= sp) { i.qty += r; return true; } else { i.qty = 254; r -= sp; } } } while(r > 0 && player.inventory.length < 28) { let t = Math.min(r, 254); player.inventory.push({...b, qty: t}); r -= t; } return r <= 0; } else { if(player.inventory.length < 28) { player.inventory.push({...b}); return true; } return false; } }
+        function transferToBank(invIndex) { const item = player.inventory[invIndex]; if(!item) return; let bankItem = player.bank.find(i => i.name === item.name); if(bankItem && item.stackable) { bankItem.qty += item.qty; } else if (item.stackable) { player.bank.push({...item, qty: item.qty}); } else { player.bank.push({...item, qty: 1}); } player.inventory.splice(invIndex, 1); hideTooltip(); updateUI(); }
+        function withdrawFromBank(bankIndex) { const item = player.bank[bankIndex]; if(!item) return; let wQ = item.stackable ? Math.min(item.qty, 254) : 1; if(addInvItem(item.name, wQ)) { item.qty -= wQ; if(item.qty <= 0) player.bank.splice(bankIndex, 1); hideTooltip(); updateUI(); } else { setActionText("Inventário Cheio!", "#e74c3c"); } }
+
+        function useItem(index) {
+            if(isBankOpen) { transferToBank(index); return; } const item = player.inventory[index]; if(!item) return;
+            if(item.type === 'equipment') { if(item.stackable && item.slot === 'ammo') { let curAm = player.equipment.ammo; player.equipment.ammo = player.inventory.splice(index, 1)[0]; if(curAm) addInvItem(curAm.name, curAm.qty); } else { player.inventory.splice(index, 1); if(player.equipment[item.slot]) player.inventory.push(player.equipment[item.slot]); player.equipment[item.slot] = item; } } 
+            else if(item.type === 'consumable') { if(item.heal > 0) { player.stats.hp = Math.min(player.stats.maxHp, player.stats.hp + item.heal); setActionText(`Curou ${item.heal} HP.`); } if(item.name === 'Bones') { addXP('prayer', 5); addFloatingText(player.x, player.y - 15, "Enterrou", "#bdc3c7"); } removeInvItem(item.name, 1); } 
+            else if(item.name === 'Tinderbox') { if(getInvCount('Logs') >= 1) { removeInvItem('Logs', 1); if(!gameMaps[currentMap].entities) gameMaps[currentMap].entities = []; gameMaps[currentMap].entities.push({ id: Date.now(), type: 'fire', name: 'Fire', x: player.x - 15, y: player.y - 15, w: 30, h: 30, active: true, life: 1000 }); addXP('firemaking', 15); setActionText("Acendeu fogo!"); } else { setActionText("Precisa de Logs.", "#e74c3c"); } } 
+            player.isPerformingAction = false; player.pendingAutoAction = null; player.actionToolItem = null; hideTooltip(); updateUI();
+        }
+
+        function unequip(slot) { const item = player.equipment[slot]; if(item) { if(item.stackable && slot === 'ammo') { if(addInvItem(item.name, item.qty)) { player.equipment[slot] = null; updateUI(); } else { setActionText("Inv. Cheio!", "#e74c3c"); } } else { if(player.inventory.length >= 28) { setActionText("Inv. Cheio!", "#e74c3c"); return; } player.equipment[slot] = null; player.inventory.push(item); hideTooltip(); updateUI(); } } }
+
+        function craftItem(iName) {
+            let it = itemDB[iName]; if(!it || !it.recipe) return; let reqs = it.recipe.split('|'); let hasAll = true;
+            reqs.forEach(r => { let p = r.split(','); if(getInvCount(p[0].trim()) < parseInt(p[1])) hasAll = false; });
+            if(hasAll) { reqs.forEach(r => { let p = r.split(','); removeInvItem(p[0].trim(), parseInt(p[1])); }); if(addInvItem(iName, it.craftQty || 1)) { addXP('crafting', 15); setActionText(`Criou ${iName}!`); } updateUI(); } else { setActionText(`Faltam materiais!`, '#e74c3c'); }
+        }
+
+        // --- UI & XP MULTIPLO COM LAÇO ---
+        function closeMenus() { isBankOpen = false; isNPCOpen = false; activeNPCShop = null; document.getElementById('btn-bank').style.display='none'; document.getElementById('btn-npc').style.display='none'; }
+        function openTab(tP) { document.querySelectorAll('.tab-content').forEach(e=>e.classList.remove('active-tab')); document.querySelectorAll('.tab-btn').forEach(e=>e.classList.remove('active-btn')); const tb = document.getElementById(`tab-${tP}`); if(tb) tb.classList.add('active-tab'); const bt = document.getElementById(`btn-${tP}`); if(bt) bt.classList.add('active-btn'); isBankOpen = (tP === 'bank'); isNPCOpen = (tP === 'npc'); if (['craft', 'mag', 'inv', 'eq', 'sk', 'bank'].includes(tP)) { updateUI(); } }
+        function setActionText(t, c="#2ecc71") { const el = document.getElementById('action-text'); el.innerText = t; el.style.color = c; setTimeout(() => { if(el.innerText === t) el.innerText = ""; }, 3000); }
+        function addFloatingText(x, y, t, c) { floatingTexts.push({ x: x, y: y, text: t, color: c, life: 50 }); }
+        
+        function addXP(sK, a) { 
+            const sk = player.stats.skills[sK]; if(!sk) return;
+            sk.xp += a; addFloatingText(player.x, player.y - 20, `+${a} XP`, '#f1c40f'); 
+            let leveledUp = false;
+            while (sk.xp >= sk.next) { 
+                sk.level++; sk.xp -= sk.next; sk.next = Math.floor(sk.next * 1.5); leveledUp = true;
+                if (sK === 'hp') { player.stats.maxHp += 2; player.stats.hp = player.stats.maxHp; } 
+            } 
+            if(leveledUp) { setActionText(`${sk.name} Nível ${sk.level}!`, "#f1c40f"); addFloatingText(player.x, player.y - 40, `Level Up!`, '#2ecc71'); }
+            updateUI(); 
+        }
+
+        function getTotalDef() { let d = player.stats.skills.combat.level; if(player.equipment.shield) d += player.equipment.shield.defBonus; if(player.equipment.body) d += player.equipment.body.defBonus; return d; }
+
+        function openShop(nData) { document.getElementById('btn-npc').style.display = 'block'; openTab('npc'); document.getElementById('npc-title').innerText = nData.name; document.getElementById('npc-dialog').innerText = `"${nData.dialog || '...'}"`; let sL = document.getElementById('npc-shop-list'); sL.innerHTML = ''; if(nData.shopStr) { nData.shopStr.split('|').forEach(p => { let pt = p.split(','); if(pt.length >= 2) { let iN = pt[0].trim(); let ct = parseInt(pt[1]); let iD = itemDB[iN]; if(iD) { sL.innerHTML += `<div class="shop-item"><span>${iD.icon} ${iD.name}</span><button class="shop-btn" onclick="buyItem('${iN}', ${ct})">Comprar (${ct} 🪙)</button></div>`; } } }); } }
+        function buyItem(iN, ct) { if(getInvCount('Coins') >= ct) { if(addInvItem(iN, 1)) { removeInvItem('Coins', ct); setActionText(`Comprou ${iN}!`); updateUI(); } else { setActionText("Inv Cheio!", "#e74c3c"); } } else { setActionText("Coins insuficientes!", "#e74c3c"); } }
+        function setActiveSpell(sId) { player.activeSpell = sId; updateUI(); }
+
+        function updateUI() {
+            try {
+                document.getElementById('bar-hp').style.width = `${(player.stats.hp / player.stats.maxHp)*100}%`; document.getElementById('text-hp').innerText = `HP ${player.stats.hp}/${player.stats.maxHp}`; document.getElementById('bar-mp').style.width = `${(player.stats.mp / player.stats.maxMp)*100}%`; document.getElementById('text-mp').innerText = `MP ${player.stats.mp}/${player.stats.maxMp}`;
+                const iG = document.getElementById('inv-grid'); iG.innerHTML = ''; for(let i = 0; i < 30; i++) { const item = player.inventory[i]; const div = document.createElement('div'); div.className = 'item-slot'; if(item) { div.innerText = item.icon || '?'; if(item.stackable && item.qty > 1) div.innerHTML += `<span class="item-qty">${item.qty}</span>`; div.onclick = () => useItem(i); div.onmouseenter = () => showTooltip(item); div.onmouseleave = () => hideTooltip(); } iG.appendChild(div); } document.getElementById('weight-txt').innerText = calcTotalWeight();
+                Object.keys(player.equipment || {}).forEach(sl => { const el = document.getElementById(`eq-${sl}`); if(el && player.equipment[sl]) { el.innerText = player.equipment[sl].icon || '?'; if (sl === 'ammo' && player.equipment.ammo) document.getElementById('ammo-qty').innerText = player.equipment.ammo.qty || ''; el.parentElement.onmouseenter = () => showTooltip(player.equipment[sl]); el.parentElement.onmouseleave = () => hideTooltip(); } else if(el) { el.innerText = ''; if (sl === 'ammo') document.getElementById('ammo-qty').innerText = ''; el.parentElement.onmouseenter = null; } }); document.getElementById('def-stats').innerText = `Bônus de Defesa: ${getTotalDef()}`;
+                const sL = document.getElementById('skills-list'); sL.innerHTML = ''; let tL = 0; Object.values(player.stats.skills || {}).forEach(s => { tL += s.level; sL.innerHTML += `<div class="skill-line"><span>${s.name}: Lvl ${s.level}</span> <span style="color:#888;">${s.xp}/${s.next} XP</span></div>`; }); document.getElementById('text-xp').innerText = `Nível: ${tL}`;
+                const bG = document.getElementById('bank-grid'); bG.innerHTML = ''; for(let i = 0; i < Math.max(30, player.bank.length + 4); i++) { const item = player.bank[i]; const div = document.createElement('div'); div.className = 'item-slot'; if(item) { div.innerText = item.icon || '?'; if(item.qty > 1) div.innerHTML += `<span class="item-qty">${item.qty}</span>`; div.onclick = () => withdrawFromBank(i); div.onmouseenter = () => showTooltip(item); div.onmouseleave = () => hideTooltip(); } bG.appendChild(div); }
+                const mL = document.getElementById('spellbook-list'); if (mL) { mL.innerHTML = ''; spellbookDB.forEach(sp => { let rT = Object.keys(sp.req).map(k => `${sp.req[k]}x ${itemDB[k]?itemDB[k].icon:'?'}`).join(' '); let iA = player.stats.skills.magic.level >= sp.lvl; let sC = player.activeSpell === sp.id ? 'spell-card spell-active' : 'spell-card'; mL.innerHTML += `<div class="${sC}" onclick="setActiveSpell('${sp.id}')" style="opacity:${iA?1:0.5}"><div><strong>${sp.name}</strong> <span style="font-size:0.7rem; color:${sp.color}">Dano: +${sp.dmg}</span><br><span class="spell-runes">Req: Lvl ${sp.lvl} | ${rT}</span></div>${player.activeSpell === sp.id ? '⭐' : ''}</div>`; }); }
+                const cG = document.getElementById('craft-list'); if(cG) { cG.innerHTML = ''; Object.values(itemDB).forEach(it => { if(it.recipe) { let reqs = it.recipe.split('|'); let hasAll = true; reqs.forEach(r => { let p = r.split(','); if(getInvCount(p[0].trim()) < parseInt(p[1])) hasAll = false; }); let rT = reqs.map(r => { let p=r.split(','); let ic = itemDB[p[0].trim()] ? itemDB[p[0].trim()].icon : '?'; return `${p[1]}x ${ic}`; }).join(' + '); let opacity = hasAll ? "1" : "0.4"; let btnDisabled = hasAll ? "" : "disabled"; let filter = hasAll ? "" : "filter: grayscale(100%);"; cG.innerHTML += `<div class="spell-card" style="opacity: ${opacity}; ${filter}" onclick="${hasAll ? `craftItem('${it.name}')` : ''}"> <div><strong>${it.icon} ${it.name}</strong> <span style="font-size:0.7rem; color:#bdc3c7;">(Cria ${it.craftQty||1})</span><br><span class="spell-runes">Req: ${rT}</span></div> <button class="shop-btn" ${btnDisabled}>Criar</button> </div>`; } }); }
+            } catch(e) {}
+        }
+
+        // --- SISTEMA DE MINIMAPA ---
+        function drawMinimap() {
+            const mCanvas = document.getElementById('minimapCanvas'); if(!mCanvas) return;
+            const mCtx = mCanvas.getContext('2d'); mCtx.clearRect(0, 0, mCanvas.width, mCanvas.height);
+            let curM = gameMaps[currentMap]; if(!curM) return;
+            mCtx.fillStyle = curM.color || '#4a6b2d'; mCtx.fillRect(0, 0, mCanvas.width, mCanvas.height);
+            let scaleX = mCanvas.width / (curM.width || 800); let scaleY = mCanvas.height / (curM.height || 600);
+            if(curM.entities) {
+                curM.entities.forEach(o => {
+                    if(!o || !o.active || !o.type) return;
+                    mCtx.fillStyle = o.type === 'enemy' ? '#e74c3c' : o.type === 'npc' ? '#f1c40f' : o.type === 'tree' ? '#27ae60' : (typeof o.type==='string' && o.type.startsWith('rock')) ? '#7f8c8d' : o.type === 'portal' ? '#8e44ad' : o.type === 'fishing_spot' ? '#3498db' : '#95a5a6';
+                    mCtx.fillRect(o.x * scaleX, o.y * scaleY, (o.w||30) * scaleX, (o.h||30) * scaleY);
+                });
+            }
+            mCtx.fillStyle = 'white'; mCtx.fillRect(player.x * scaleX, player.y * scaleY, 4, 4);
+        }
+
+        // --- CUSTOM MODAL & DEV ENGINE ---
+        function openModal(htmlContent) { const overlay = document.getElementById('custom-modal-overlay'); const box = document.getElementById('custom-modal-box'); box.innerHTML = htmlContent; overlay.style.display = 'flex'; }
+        function closeModal() { document.getElementById('custom-modal-overlay').style.display = 'none'; }
+        function openDevSub(tabId, btn) { document.querySelectorAll('.dev-sub-content').forEach(e=>e.classList.remove('active')); document.querySelectorAll('.dev-sub-btn').forEach(e=>e.classList.remove('active')); const t = document.getElementById(tabId); if(t) t.classList.add('active'); if(btn) btn.classList.add('active'); if(tabId==='dev-map') buildDevEntityList(); if(tabId==='dev-items') populateDevItems(); if(tabId==='dev-npcs') populateDevNPCs(); if(tabId==='dev-map-manager') loadDevMapManager(); }
+
+        function filterDevEntities(term) { let val = removeAccents(term).toLowerCase(); document.querySelectorAll('.dev-ent-item').forEach(el => { let txt = removeAccents(el.getAttribute('data-name')).toLowerCase(); if(txt.includes(val)) el.style.display = devViewMode === 'list' ? 'flex' : 'flex'; else el.style.display = 'none'; }); if(devViewMode === 'list') { document.querySelectorAll('.dev-ent-cat').forEach(cat => { let hasVisible = false; let next = cat.nextElementSibling; while(next && next.classList.contains('dev-ent-item')) { if(next.style.display !== 'none') hasVisible = true; next = next.nextElementSibling; } cat.style.display = hasVisible ? 'block' : 'none'; }); } }
+        function setDevObj(val, el) { selectedDevEntity = val; document.querySelectorAll('.dev-ent-item').forEach(e => e.classList.remove('selected')); el.classList.add('selected'); }
+        function toggleDevView() { devViewMode = devViewMode === 'list' ? 'grid' : 'list'; buildDevEntityList(); let search = document.getElementById('dev-search'); if(search) filterDevEntities(search.value); }
+        function buildDevEntityList() { let cont = document.getElementById('dev-entity-list'); if(!cont) return; let html = ''; let list = [ { cat: '🌲 Ambiente', items: [ { v: 'tree', n: 'Árvore', ic: '🌲' }, { v: 'fishing_spot', n: 'Lagos', ic: '🐟' }, { v: 'rock_copper', n: 'Minério (Copper)', ic: '🪨' }, { v: 'rock_tin', n: 'Minério (Tin)', ic: '🪨' }, { v: 'rock_iron', n: 'Minério (Iron)', ic: '🪨' } ]}, { cat: '🏠 Construções', items: [ { v: 'furnace', n: 'Fornalha', ic: '♨️' }, { v: 'anvil', n: 'Bigorna', ic: '🔨' }, { v: 'bank', n: 'Bank', ic: '🏦' }, { v: 'portal', n: 'Portal', ic: '🚪' }, { v: 'house', n: 'Casa', ic: '🏠' } ]}, { cat: '👹 Monstros e NPCs', items: Object.keys(npcDB).map(k => ({ v: 'e_'+k, n: npcDB[k].name, ic: '👹' })) }, { cat: '📦 Itens', items: Object.keys(itemDB).map(k => ({ v: 'i_'+k, n: itemDB[k].name, ic: itemDB[k].icon })) } ]; if(devViewMode === 'list') { cont.style.display = 'block'; list.forEach(g => { html += `<div class="dev-ent-cat">${g.cat}</div>`; g.items.forEach(i => { let sel = selectedDevEntity === i.v ? 'selected' : ''; html += `<div class="dev-ent-item ${sel}" data-name="${i.n}" onclick="setDevObj('${i.v}', this)">${i.ic} <span style="margin-left:8px;">${i.n}</span></div>`; }); }); } else { cont.style.display = 'flex'; cont.style.flexWrap = 'wrap'; cont.style.gap = '5px'; list.forEach(g => { g.items.forEach(i => { let sel = selectedDevEntity === i.v ? 'selected' : ''; let border = selectedDevEntity === i.v ? 'border: 2px solid #e74c3c;' : 'border: 1px solid #3d2e24;'; html += `<div class="dev-ent-item ${sel}" style="width:40px; height:40px; display:flex; align-items:center; justify-content:center; background:#111; ${border} font-size:1.5rem; cursor:pointer;" data-name="${i.n}" title="${i.n}" onclick="setDevObj('${i.v}', this)">${i.ic}</div>`; }); }); } cont.innerHTML = html; }
+
+        function toggleItemFields(){ let t = document.getElementById('di-type').value; document.getElementById('di-eq-fields').style.display = t==='equipment'?'block':'none'; document.getElementById('di-cons-fields').style.display = t==='consumable'?'block':'none'; }
+        function populateDevItems(){ let s = document.getElementById('dev-item-select'); s.innerHTML='<option value="NEW">-- CRIAR NOVO ITEM --</option>'; Object.keys(itemDB).forEach(k=>{s.innerHTML+=`<option value="${k}">${k} (${itemDB[k].icon})</option>`;}); }
+        function loadDevItemForm(){ let k = document.getElementById('dev-item-select').value; if(k==='NEW'){ document.getElementById('di-name').value=''; document.getElementById('di-icon').value='📦'; document.getElementById('di-weight').value='1.0'; document.getElementById('di-desc').value=''; document.getElementById('di-type').value='resource'; document.getElementById('di-stack').value='true'; document.getElementById('di-recipe').value=''; document.getElementById('di-craftqty').value='1';}else{ let i=itemDB[k]; document.getElementById('di-name').value=k; document.getElementById('di-icon').value=i.icon; document.getElementById('di-weight').value=i.weight||0; document.getElementById('di-desc').value=i.desc||''; document.getElementById('di-type').value=i.type; document.getElementById('di-stack').value=i.stackable?'true':'false'; document.getElementById('di-recipe').value=i.recipe||''; document.getElementById('di-craftqty').value=i.craftQty||1; if(i.type==='equipment'){ document.getElementById('di-slot').value=i.slot; document.getElementById('di-tool').value=i.tool||''; document.getElementById('di-dmg').value=i.bonusDmg||0; document.getElementById('di-def').value=i.defBonus||0; } if(i.type==='consumable')document.getElementById('di-heal').value=i.heal||0; } toggleItemFields(); }
+        function saveDevItem(){ let k=document.getElementById('di-name').value; if(!k)return; let t=document.getElementById('di-type').value; itemDB[k]={name:k,icon:document.getElementById('di-icon').value,type:t,stackable:document.getElementById('di-stack').value==='true',weight:parseFloat(document.getElementById('di-weight').value)||0,desc:document.getElementById('di-desc').value}; let rec=document.getElementById('di-recipe').value; if(rec) {itemDB[k].recipe=rec; itemDB[k].craftQty=parseInt(document.getElementById('di-craftqty').value)||1;} if(t==='equipment'){ itemDB[k].slot=document.getElementById('di-slot').value; let tl=document.getElementById('di-tool').value; if(tl)itemDB[k].tool=tl; let dmg=parseInt(document.getElementById('di-dmg').value); if(dmg)itemDB[k].bonusDmg=dmg; let def=parseInt(document.getElementById('di-def').value); if(def)itemDB[k].defBonus=def; } if(t==='consumable')itemDB[k].heal=parseInt(document.getElementById('di-heal').value)||0; populateDevItems(); document.getElementById('dev-item-select').value=k; setActionText(`Item ${k} salvo!`); saveGame(); updateUI(); buildDevEntityList();}
+        function populateDevNPCs(){ let s=document.getElementById('dev-npc-select'); s.innerHTML='<option value="NEW">-- CRIAR NOVO --</option>'; Object.keys(npcDB).forEach(k=>{s.innerHTML+=`<option value="${k}">${k} (${npcDB[k].name})</option>`;}); }
+        function loadDevNPCForm(){ let k=document.getElementById('dev-npc-select').value; if(k==='NEW'){ document.getElementById('dn-id').value=''; document.getElementById('dn-name').value='Monstro'; document.getElementById('dn-hp').value=10; document.getElementById('dn-hit').value=1; document.getElementById('dn-xp').value=20; document.getElementById('dn-loot').value=''; document.getElementById('dn-dialog').value=''; document.getElementById('dn-shop').value=''; }else{ let n=npcDB[k]; document.getElementById('dn-id').value=k; document.getElementById('dn-name').value=n.name; document.getElementById('dn-hp').value=n.hp; document.getElementById('dn-hit').value=n.maxHit; document.getElementById('dn-xp').value=n.xp; document.getElementById('dn-c1').value=n.c1; document.getElementById('dn-c2').value=n.c2; document.getElementById('dn-loot').value=n.lootStr||''; document.getElementById('dn-dialog').value=n.dialog||''; document.getElementById('dn-shop').value=n.shopStr||''; } }
+        function saveDevNPC(){ let k=document.getElementById('dn-id').value; if(!k)return; npcDB[k]={name:document.getElementById('dn-name').value,hp:parseInt(document.getElementById('dn-hp').value),maxHit:parseInt(document.getElementById('dn-hit').value),xp:parseInt(document.getElementById('dn-xp').value),c1:document.getElementById('dn-c1').value,c2:document.getElementById('dn-c2').value,lootStr:document.getElementById('dn-loot').value,dialog:document.getElementById('dn-dialog').value,shopStr:document.getElementById('dn-shop').value}; populateDevNPCs(); document.getElementById('dev-npc-select').value=k; setActionText(`NPC salvo!`); saveGame(); buildDevEntityList();}
+        function toggleDevBuild() { isDevBuildMode = !isDevBuildMode; document.getElementById('btn-build-mode').innerText=`Build Mode: ${isDevBuildMode?'ON':'OFF'}`; document.getElementById('btn-build-mode').style.background=isDevBuildMode?'#2ecc71':'#e67e22'; setActionText(isDevBuildMode?"Build ON. Clique para colocar.":"Build OFF.", "#f1c40f"); }
+
+        function loadDevMapManager() { let grid = document.getElementById('map-grid-ui'); if(!grid) return; grid.innerHTML = ''; for(let y = -2; y <= 2; y++) { for(let x = -2; x <= 2; x++) { let m = Object.keys(gameMaps).find(k => gameMaps[k].gridX === x && gameMaps[k].gridY === y); let div = document.createElement('div'); div.className = 'map-tile'; if(m) { div.innerText = m; div.style.background = gameMaps[m].color; } else { div.innerText = "+"; } if(m === currentMap) div.classList.add('active-tile'); div.onclick = () => handleGridClick(x, y, m); grid.appendChild(div); } } let cm = gameMaps[currentMap]; if(cm) { document.getElementById('cur-map-id-disp').innerText = cm.name; document.getElementById('cur-map-name').value = cm.name; document.getElementById('cur-map-w').value = cm.width; document.getElementById('cur-map-h').value = cm.height; document.getElementById('cur-map-color').value = cm.color || '#4a6b2d'; } }
+
+        function handleGridClick(x, y, existingMapId) {
+            if (existingMapId) { openModal(`<h3 style="margin-top:0; color:#f1c40f;">Mapa: ${existingMapId}</h3><div style="display:flex; flex-direction:column; gap:8px; margin-top:10px;"><button class="dev-save-btn" style="background:#3498db;" onclick="closeModal(); switchMap('${existingMapId}', ${gameMaps[existingMapId].width/2}, ${gameMaps[existingMapId].height/2})">Viajar para cá</button><button class="dev-save-btn" style="background:#c0392b;" onclick="unlinkMap('${existingMapId}')">Desvincular da Grade</button><button class="dev-save-btn" style="background:#555;" onclick="closeModal()">Cancelar</button></div>`); } 
+            else { let unlinked = Object.keys(gameMaps).filter(k => gameMaps[k].gridX === null || gameMaps[k].gridX === undefined); let opts = unlinked.map(k => `<option value="${k}">${k} (${gameMaps[k].name})</option>`).join(''); openModal(`<h3 style="margin-top:0; color:#2ecc71;">Vincular Mapa</h3><select id="mod-map-sel" class="dev-select" style="margin-top:5px; margin-bottom:10px;"><option value="">-- Selecione --</option>${opts}</select><div style="display:flex; flex-direction:column; gap:8px;"><button class="dev-save-btn" onclick="linkMap(${x}, ${y})">Vincular Escolhido</button><div style="border-top: 1px solid #444; margin: 5px 0;"></div><button class="dev-save-btn" style="background:#e67e22;" onclick="quickCreateMap(${x}, ${y})">Criar Novo Aqui</button><button class="dev-save-btn" style="background:#555;" onclick="closeModal()">Cancelar</button></div>`); }
+        }
+
+        function linkMap(x, y) { let sel = document.getElementById('mod-map-sel'); if(sel && sel.value && gameMaps[sel.value]) { gameMaps[sel.value].gridX = x; gameMaps[sel.value].gridY = y; saveToNode(); loadDevMapManager(); closeModal(); } else { alert("Selecione um mapa válido."); } }
+        function unlinkMap(mapId) { if(gameMaps[mapId]) { gameMaps[mapId].gridX = null; gameMaps[mapId].gridY = null; saveToNode(); loadDevMapManager(); closeModal(); } }
+        function quickCreateMap(x, y) { let nId = 'mapa_' + Date.now().toString().slice(-4); gameMaps[nId] = { id: nId, name: 'Novo Mapa', width: 800, height: 600, color: '#4a6b2d', gridX: x, gridY: y, entities: [] }; saveToNode(); loadDevMapManager(); closeModal(); }
+        function saveCurrentMapSettings() { let cm = gameMaps[currentMap]; if(cm) { cm.name = document.getElementById('cur-map-name').value || cm.id; cm.width = parseInt(document.getElementById('cur-map-w').value) || 800; cm.height = parseInt(document.getElementById('cur-map-h').value) || 600; cm.color = document.getElementById('cur-map-color').value || '#4a6b2d'; canvas.width = cm.width; canvas.height = cm.height; saveToNode(); loadDevMapManager(); setActionText("Mapa Atualizado!"); } }
+        function createNewMap() { let id = document.getElementById('dm-id').value; let n = document.getElementById('dm-name').value; let w = parseInt(document.getElementById('dm-w').value) || 800; let h = parseInt(document.getElementById('dm-h').value) || 600; let c = document.getElementById('dm-color').value; if(!id || gameMaps[id]) { alert("ID inválido/já existe!"); return; } gameMaps[id] = { id: id, name: n||id, width: w, height: h, color: c, gridX: null, gridY: null, entities: [] }; setActionText("Mapa Criado! Vincule na grade."); saveToNode(); loadDevMapManager(); }
+
+        // --- MANIPULADORES DE EVENTOS DE MOUSE/TOUCH ---
+        function handleInputDown(e) {
+            if(document.getElementById('login-overlay').style.display !== 'none') return;
+            if(e.type === 'touchstart') e.preventDefault(); if(e.type === 'mousedown' && e.button !== 0) return; 
+            const pos = getCoords(e); let curM = gameMaps[currentMap]; if(!curM) return;
+
+            if (isDevBuildMode) { 
+                const val = selectedDevEntity; if(!val) return;
+                let cW = parseInt(document.getElementById('spawn-w') ? document.getElementById('spawn-w').value : 0);
+                let cH = parseInt(document.getElementById('spawn-h') ? document.getElementById('spawn-h').value : 0);
+                let cI = document.getElementById('spawn-img') ? document.getElementById('spawn-img').value : '';
+                
+                let n = { id: Date.now(), x: pos.x - (cW||40)/2, y: pos.y - (cH||40)/2, w: cW||40, h: cH||40, active: true };
+                if (cI) n.imgUrl = cI;
+
+                if(val.startsWith('e_')) { let k = val.substring(2); let nb = npcDB[k]; n.type = nb.hp>0?'enemy':'npc'; n.dbKey = k; n.name = nb.name; n.hp = nb.hp; n.maxHp = nb.hp; n.w=cW||30; n.h=cH||30; n.attackCooldown = 0; }
+                else if(val.startsWith('i_')) { let k = val.substring(2); n.type = 'ground_item'; n.item = k; n.qty = 1; n.life = 999999; n.w=20; n.h=20; }
+                else if (val === 'portal') { 
+                    openModal(`<h3 style="margin-top:0;">Criar Portal</h3><label style="font-size:0.8rem; color:#bdc3c7;">ID do Mapa de Destino:</label><input type="text" id="p-dest" value="lumbridge" class="dev-input" style="margin-bottom:8px;"><div class="dev-row" style="margin-bottom:8px;"><div style="flex:1"><label>Pos X Destino:</label><input type="number" id="p-x" value="400" class="dev-input"></div><div style="flex:1"><label>Pos Y Destino:</label><input type="number" id="p-y" value="300" class="dev-input"></div></div><button class="dev-save-btn" onclick="finalizePortal(${pos.x}, ${pos.y}, ${cW||60}, ${cH||60})">Colocar Portal Aqui</button><button class="dev-save-btn" style="background:#555;" onclick="closeModal()">Cancelar</button>`);
+                    return; 
+                }
+                else if (val === 'tree') { n.type = 'tree'; n.name = 'Tree'; n.hp = 3; n.maxHp = 3; n.h = cH||50; }
+                else if (val === 'fishing_spot') { n.type = 'fishing_spot'; n.name = 'Fishing Spot'; }
+                else if (val === 'house') { n.type = 'house'; n.name = 'House'; n.w=cW||100; n.h=cH||100; }
+                else if (typeof val === 'string' && val.startsWith('rock_')) { n.type = val; n.name = val; n.hp = val==='rock_iron'?3:2; n.maxHp = n.hp; n.color = val==='rock_copper'?'#d35400':val==='rock_iron'?'#7f8c8d':'#bdc3c7'; n.h = cH||30; }
+                else if (val === 'furnace') { n.type = 'furnace'; n.name = 'Furnace'; n.h = cH||45; } else if (val === 'anvil') { n.type = 'anvil'; n.name = 'Anvil'; n.h = cH||25; } else if (val === 'bank') { n.type = 'bank'; n.name = 'Bank Booth'; n.w=cW||50; n.h=cH||30; }
+                else { n.type = 'unknown'; } 
+                
+                if(!curM.entities) curM.entities = []; curM.entities.push(n); addFloatingText(pos.x, pos.y, "Spawn", "#2ecc71"); return;
+            }
+            if(!osrsMenu.contains(e.target) && !document.getElementById('custom-modal-overlay').contains(e.target)) { player.destX = pos.x; player.destY = pos.y; player.isPerformingAction = false; player.pendingAutoAction = null; player.actionToolItem = null; if(isNPCOpen){closeMenus(); openTab('inv');} osrsMenu.style.display = 'none'; }
+        }
+
+        function finalizePortal(px, py, pw, ph) {
+            let dm = document.getElementById('p-dest').value; let dx = parseInt(document.getElementById('p-x').value)||400; let dy = parseInt(document.getElementById('p-y').value)||300;
+            if(!gameMaps[currentMap].entities) gameMaps[currentMap].entities = [];
+            gameMaps[currentMap].entities.push({ id: Date.now(), x: px-pw/2, y: py-ph/2, w: pw, h: ph, active: true, type: 'portal', name: 'Portal', destMap: dm, destX: dx, destY: dy });
+            addFloatingText(px, py, "Portal", "#8e44ad"); closeModal();
+        }
+
+        canvas.addEventListener('mousedown', handleInputDown); canvas.addEventListener('touchstart', handleInputDown, {passive: false});
+
+        canvas.addEventListener('contextmenu', (e) => {
+            if(document.getElementById('login-overlay').style.display !== 'none') return;
+            e.preventDefault(); const pos = getCoords(e);
+            let cObj = null; let cur = gameMaps[currentMap] ? gameMaps[currentMap].entities || [] : [];
+            for (let i = cur.length - 1; i >= 0; i--) { let o = cur[i]; if (o && o.active && pos.x >= o.x && pos.x <= o.x + (o.w||30) && pos.y >= o.y && pos.y <= o.y + (o.h||30)) { cObj = o; break; } }
+            if (isDevBuildMode && cObj) { cObj.active = false; addFloatingText(pos.x, pos.y, "Del", "#e74c3c"); return; }
+            osrsMenu.innerHTML = "";
+            if (cObj && cObj.type) { 
+                if(cObj.type === 'enemy') addMenuOption(`Atacar ${cObj.name}`, () => setPendingAction(cObj));
+                if(cObj.type === 'npc') addMenuOption(`Falar com ${cObj.name}`, () => setPendingAction(cObj));
+                if(cObj.type === 'tree') addMenuOption(`Cortar ${cObj.name}`, () => setPendingAction(cObj));
+                if(cObj.type === 'fishing_spot') addMenuOption(`Pescar`, () => setPendingAction(cObj));
+                if(typeof cObj.type === 'string' && cObj.type.startsWith('rock')) addMenuOption(`Minerar ${cObj.name}`, () => setPendingAction(cObj));
+                if(cObj.type === 'furnace' || cObj.type === 'anvil') addMenuOption(`Usar Aba Craft`, () => setActionText("Use a aba Craft (🛠️)", "#f1c40f"));
+                if(cObj.type === 'fire') addMenuOption(`Cozinhar`, () => setPendingAction(cObj));
+                if(cObj.type === 'bank') addMenuOption(`Usar Banco`, () => setPendingAction(cObj));
+                if(cObj.type === 'portal') addMenuOption(`Entrar`, () => setPendingAction(cObj));
+                if(cObj.type === 'ground_item') addMenuOption(`Pegar ${cObj.item}`, () => setPendingAction(cObj));
+            }
+            addMenuOption("Andar aqui", () => { player.destX = pos.x; player.destY = pos.y; player.isPerformingAction = false; player.pendingAutoAction = null; }); addMenuOption("Cancelar", () => {});
+            osrsMenu.style.left = pos.pageX + 'px'; osrsMenu.style.top = pos.pageY + 'px'; osrsMenu.style.display = 'block';
+        });
+
+        document.addEventListener('click', (e) => { if (!e.target.closest('#osrs-menu') && e.target.id !== 'gameCanvas') osrsMenu.style.display = 'none'; });
+        function addMenuOption(text, callback) { const div = document.createElement('div'); div.className = 'osrs-menu-item'; div.innerText = text; div.onclick = () => { osrsMenu.style.display = 'none'; callback(); }; osrsMenu.appendChild(div); }
+        function setPendingAction(obj) { player.pendingAutoAction = obj; player.destX = obj.x + (obj.w||30)/2; player.destY = obj.y + (obj.h||30)/2; if(isNPCOpen && obj.type !== 'npc') { closeMenus(); openTab('inv'); } osrsMenu.style.display = 'none'; }
+
+        // --- SISTEMA DE AÇÃO INTELIGENTE (ESPAÇO E CTRL) ---
+        function tryPickupOrInteract() {
+            if(player.isPerformingAction) { player.isPerformingAction = false; return; }
+            let cur = gameMaps[currentMap].entities || [];
+            
+            let cItem = null; let minDItem = 35;
+            for(let o of cur) {
+                if(o && o.active && o.type === 'ground_item') {
+                    let d = Math.hypot(player.x - (o.x+10), player.y - (o.y+10));
+                    if(d < minDItem) { minDItem = d; cItem = o; }
+                }
+            }
+            if(cItem) {
+                if(addInvItem(cItem.item, cItem.qty)) { cItem.active = false; addFloatingText(player.x, player.y - 15, "Pegou", "#f1c40f"); updateUI(); }
+                return;
+            }
+
+            let cObj = null; let minDObj = 45;
+            for(let o of cur) {
+                if(!o || !o.active || o.type === 'enemy' || o.type === 'ground_item') continue; 
+                let d = Math.hypot(player.x - (o.x + (o.w||30)/2), player.y - (o.y + (o.h||30)/2));
+                if (d < minDObj + ((o.w||30)/2)) { minDObj = d; cObj = o; }
+            }
+            if(cObj) {
+                let dx = cObj.x + (cObj.w||30)/2 - player.x; let dy = cObj.y + (cObj.h||30)/2 - player.y; 
+                if(Math.abs(dx) > Math.abs(dy)) { player.facing.x = dx>0?1:-1; player.facing.y = 0; } else { player.facing.x = 0; player.facing.y = dy>0?1:-1; }
+                tryInteract(cObj);
+            }
+        }
+
+        function tryAttack() {
+            if(player.isPerformingAction) { player.isPerformingAction = false; return; }
+            const wp = player.equipment.weapon; let range = (wp && (wp.tool === 'magic' || wp.tool === 'ranged')) ? 160 : 45;
+            let cur = gameMaps[currentMap].entities || []; let cEnemy = null; let minDEnemy = range;
+
+            for(let o of cur) {
+                if(o && o.active && o.type === 'enemy') {
+                    let d = Math.hypot(player.x - (o.x + (o.w||30)/2), player.y - (o.y + (o.h||30)/2));
+                    if(d < minDEnemy) { minDEnemy = d; cEnemy = o; }
+                }
+            }
+            if(cEnemy) {
+                let dx = cEnemy.x + (cEnemy.w||30)/2 - player.x; let dy = cEnemy.y + (cEnemy.h||30)/2 - player.y; 
+                if(Math.abs(dx) > Math.abs(dy)) { player.facing.x = dx>0?1:-1; player.facing.y = 0; } else { player.facing.x = 0; player.facing.y = dy>0?1:-1; }
+                tryInteract(cEnemy);
+            }
+        }
+
+        function tryInteract(tObj) {
+            player.actionAnim = 15; const wp = player.equipment.weapon; 
+            if (!tObj || !tObj.type) return;
+
+            if (tObj.type === 'npc') { openShop(npcDB[tObj.dbKey]); return; }
+            if (tObj.type === 'bank') { document.getElementById('btn-bank').style.display='block'; openTab('bank'); setActionText("Banco aberto.", "#3498db"); return; }
+            if (tObj.type === 'portal') { switchMap(tObj.destMap, tObj.destX, tObj.destY); return; }
+
+            if(tObj.type === 'enemy' && player.attackCooldown <= 0) {
+                let d = 1; let sT = 'combat'; player.attackCooldown = 50; 
+                if (wp && wp.tool === 'magic') {
+                    let spell = spellbookDB.find(s => s.id === player.activeSpell);
+                    if(spell && player.stats.skills.magic.level >= spell.lvl) {
+                        let hasRunes = true; Object.keys(spell.req).forEach(rk => { if(getInvCount(rk) < spell.req[rk]) hasRunes = false; });
+                        if(hasRunes) {
+                            Object.keys(spell.req).forEach(rk => removeInvItem(rk, spell.req[rk])); d = spell.dmg + Math.floor(player.stats.skills.magic.level / 2); sT = 'magic';
+                            projectiles.push({ x: player.x, y: player.y, target: tObj, tx: tObj.x + (tObj.w||30)/2, ty: tObj.y + (tObj.h||30)/2, dmg: d, speed: 6, type: 'magic', color: spell.color });
+                            tObj.aggroTarget = player; updateUI(); return; 
+                        } else { setActionText("Sem runas!", "#e74c3c"); return; }
+                    } else { setActionText("Spell inválida/Level Baixo", "#e74c3c"); return; }
+                } 
+                else if (wp && wp.tool === 'ranged') {
+                    let ammo = player.equipment.ammo;
+                    if(ammo && ammo.qty >= 1) {
+                        ammo.qty--; if(ammo.qty <= 0) player.equipment.ammo = null; d = 1 + Math.floor(player.stats.skills.ranged.level / 2) + (wp.bonusDmg || 0) + (ammo.bonusDmg || 0); sT = 'ranged';
+                        projectiles.push({ x: player.x, y: player.y, target: tObj, tx: tObj.x + (tObj.w||30)/2, ty: tObj.y + (tObj.h||30)/2, dmg: d, speed: 8, type: 'ranged' }); 
+                        tObj.aggroTarget = player; updateUI(); return;
+                    } else { setActionText("Sem flechas equipadas!", "#e74c3c"); return; }
+                } else { d += Math.floor(player.stats.skills.combat.level / 2); if(wp && wp.bonusDmg) d += wp.bonusDmg; }
+                applyDamage(tObj, Math.floor(Math.random() * (d + 1)), sT);
+            } 
+            else if(tObj.type === 'tree' || (typeof tObj.type === 'string' && tObj.type.startsWith('rock'))) {
+                let nT = tObj.type === 'tree' ? 'axe' : 'pickaxe';
+                let toolItem = (wp && wp.tool === nT) ? wp : player.inventory.find(i => i.tool === nT);
+                if(toolItem) {
+                    player.isPerformingAction = true; player.actionTarget = tObj; player.actionType = tObj.type === 'tree' ? 'chop' : 'mine';
+                    player.actionToolItem = toolItem;
+                    player.actionTimer = player.actionDelay = Math.max(30, 150 - (player.stats.skills[tObj.type === 'tree' ? 'woodcutting' : 'mining'].level * 5));
+                } else { setActionText(`Requer ${nT} no inventário.`, "#e74c3c"); }
+            }
+            else if(tObj.type === 'fishing_spot') {
+                let toolItem = player.inventory.find(i => i.name === 'Net');
+                if(toolItem) {
+                    player.isPerformingAction = true; player.actionTarget = tObj; player.actionType = 'fish'; player.actionToolItem = toolItem;
+                    player.actionTimer = player.actionDelay = Math.max(40, 150 - (player.stats.skills.fishing.level * 4));
+                } else { setActionText("Requer uma Net no inventário.", "#e74c3c"); }
+            }
+            else if(tObj.type === 'furnace') {
+                if(getInvCount('Iron Ore')>0){ player.actionType='smelt_iron'; } else if(getInvCount('Copper Ore')>0 && getInvCount('Tin Ore')>0){ player.actionType='smelt_brz'; } else { setActionText("Sem minérios.", "#e74c3c"); return;}
+                player.isPerformingAction = true; player.actionTarget = tObj; player.actionTimer = player.actionDelay = Math.max(30, 100 - (player.stats.skills.smithing.level * 2));
+            }
+            else if(tObj.type === 'fire') {
+                if(getInvCount('Raw Meat') > 0) { player.isPerformingAction = true; player.actionTarget = tObj; player.actionType = 'cook_meat'; player.actionTimer = player.actionDelay = Math.max(20, 80 - (player.stats.skills.cooking.level * 2)); }
+                else if (getInvCount('Raw Fish') > 0) { player.isPerformingAction = true; player.actionTarget = tObj; player.actionType = 'cook_fish'; player.actionTimer = player.actionDelay = Math.max(20, 80 - (player.stats.skills.cooking.level * 2)); }
+                else { setActionText("Precisa de Meat ou Fish.", "#e74c3c"); }
+            } updateUI();
+        }
+
+        // --- SISTEMA XP SAUDE ---
+        function applyDamage(t, dmg, sT) {
+            t.hp -= dmg; t.aggroTarget = player; addFloatingText(t.x + 15, t.y, dmg, dmg>0?"#e74c3c":"#bdc3c7");
+            if(t.hp <= 0) { 
+                t.active = false; t.aggroTarget = null; addFloatingText(t.x, t.y, "Morto", "#e74c3c");
+                
+                let bXP = (t.dbKey && npcDB[t.dbKey]) ? npcDB[t.dbKey].xp : 15;
+                let cXP = Math.floor(bXP * 0.3) || 1; let hXP = bXP - cXP;
+                addXP(sT, cXP); addXP('hp', hXP);
+
+                if(t.dbKey && npcDB[t.dbKey] && npcDB[t.dbKey].lootStr){ 
+                    let pts = npcDB[t.dbKey].lootStr.split('|'); 
+                    pts.forEach((p, i) => { 
+                        let d = p.split(','); 
+                        if(d.length >= 3 && Math.random() <= parseFloat(d[1])){ 
+                            gameMaps[currentMap].entities.push({ id: Date.now()+i, type: 'ground_item', item: d[0].trim(), qty: Math.floor(Math.random()*parseInt(d[2]))+1, x: t.x+(Math.random()*20)-10, y: t.y, w: 20, h: 20, active: true, life: 3000 }); 
+                        } 
+                    }); 
+                }
+                setTimeout(() => { t.active = true; t.hp = t.maxHp; }, 15000);
+            }
+        }
+
+        // --- UPDATE LOOP FÍSICO COM CÂMERA E TECLADO ---
+        function update() {
+            try {
+                let curM = gameMaps[currentMap]; if(!curM) return; let cur = curM.entities || [];
+                if(player.attackCooldown > 0) player.attackCooldown--; if(player.actionAnim > 0) player.actionAnim--; 
+
+                // REGEN DE VIDA PASSIVA
+                if(player.regenTimer > 0) player.regenTimer--;
+                if(player.regenTimer <= 0) {
+                    if(player.stats.hp > 0 && player.stats.hp < player.stats.maxHp) {
+                        let heal = 1 + Math.floor(player.stats.skills.hp.level / 10);
+                        player.stats.hp = Math.min(player.stats.maxHp, player.stats.hp + heal);
+                        addFloatingText(player.x, player.y - 20, `+${heal}`, "#2ecc71"); updateUI();
+                    }
+                    player.regenTimer = 300; 
+                }
+
+                for(let i = projectiles.length - 1; i >= 0; i--) {
+                    let p = projectiles[i]; if (p.target && p.target.active) { p.tx = p.target.x + (p.target.w||30) / 2; p.ty = p.target.y + (p.target.h||30) / 2; }
+                    let dx = p.tx - p.x; let dy = p.ty - p.y; let dist = Math.hypot(dx, dy);
+                    if (dist < p.speed) { if(p.target.active) applyDamage(p.target, p.dmg, p.type); projectiles.splice(i, 1); } else { p.x += (dx/dist)*p.speed; p.y += (dy/dist)*p.speed; }
+                }
+
+                let dxK = 0, dyK = 0;
+                if(keys.w || keys.arrowup) dyK -= 1;
+                if(keys.s || keys.arrowdown) dyK += 1;
+                if(keys.a || keys.arrowleft) dxK -= 1;
+                if(keys.d || keys.arrowright) dxK += 1;
+
+                if (dxK !== 0 || dyK !== 0) {
+                    player.destX = player.x; player.destY = player.y; player.pendingAutoAction = null; player.isPerformingAction = false; player.actionToolItem = null;
+                    let dK = Math.hypot(dxK, dyK); let mx = (dxK / dK) * player.speed; let my = (dyK / dK) * player.speed; 
+                    let nX = player.x + mx; let nY = player.y + my; let colX = false, colY = false; let pw = 10, ph = 10;
+                    for(let o of cur) {
+                        if(!o || !o.type || !o.active || o.type==='ground_item' || o.type==='fishing_spot' || o.type==='portal' || o.type==='fire') continue;
+                        let ow = o.w || 30; let oh = o.h || 30;
+                        if(nX-pw < o.x+ow && nX+pw > o.x && player.y-ph < o.y+oh && player.y+ph > o.y) colX = true;
+                        if(player.x-pw < o.x+ow && player.x+pw > o.x && nY-ph < o.y+oh && nY+ph > o.y) colY = true;
+                    }
+                    if(!colX) player.x = nX; if(!colY) player.y = nY;
+                    if(Math.abs(mx) > Math.abs(my)) { player.facing.x = mx > 0 ? 1 : -1; player.facing.y = 0; } else { player.facing.x = 0; player.facing.y = my > 0 ? 1 : -1; }
+                } else {
+                    const dx = player.destX - player.x; const dy = player.destY - player.y; const dist = Math.hypot(dx, dy); let sD = 45; 
+                    if(player.pendingAutoAction) { if (player.pendingAutoAction.type === 'enemy' && player.equipment.weapon && (player.equipment.weapon.tool === 'magic' || player.equipment.weapon.tool === 'ranged')) sD = 140; else if (player.pendingAutoAction.type === 'ground_item') sD = 15; else if (player.pendingAutoAction.type === 'npc') sD = 50; }
+                    if (dist > sD) {
+                        const mx = (dx / dist) * player.speed; const my = (dy / dist) * player.speed; let nX = player.x + mx; let nY = player.y + my; let colX = false, colY = false; let pw = 10, ph = 10;
+                        for(let o of cur) {
+                            if(!o || !o.type || !o.active || o.type==='ground_item' || o.type==='fishing_spot' || o.type==='portal' || o.type==='fire') continue;
+                            let ow = o.w || 30; let oh = o.h || 30;
+                            if(nX-pw < o.x+ow && nX+pw > o.x && player.y-ph < o.y+oh && player.y+ph > o.y) colX = true;
+                            if(player.x-pw < o.x+ow && player.x+pw > o.x && nY-ph < o.y+oh && nY+ph > o.y) colY = true;
+                        }
+                        if(!colX) player.x = nX; if(!colY) player.y = nY;
+                        if(colX && colY) { player.destX = player.x; player.destY = player.y; player.pendingAutoAction = null; }
+                        if(Math.abs(mx) > Math.abs(my)) { player.facing.x = mx > 0 ? 1 : -1; player.facing.y = 0; } else { player.facing.x = 0; player.facing.y = my > 0 ? 1 : -1; }
+                    } else if (player.pendingAutoAction) {
+                        let t = player.pendingAutoAction; player.pendingAutoAction = null;
+                        const d2x = t.x + (t.w||30)/2 - player.x; const d2y = t.y + (t.h||30)/2 - player.y;
+                        if(Math.abs(d2x) > Math.abs(d2y)) { player.facing.x = d2x > 0 ? 1 : -1; player.facing.y = 0; } else { player.facing.x = 0; player.facing.y = d2y > 0 ? 1 : -1; }
+                        tryInteract(t);
+                    }
+                }
+
+                if(player.x < 10) switchMapByGrid(-1, 0);
+                else if(player.x > curM.width - 10) switchMapByGrid(1, 0);
+                else if(player.y < 10) switchMapByGrid(0, -1);
+                else if(player.y > curM.height - 10) switchMapByGrid(0, 1);
+
+                if(player.isPerformingAction && player.actionTarget && player.actionTarget.active) {
+                    if (player.actionTimer % 30 === 0) player.actionAnim = 10; player.actionTimer--;
+                    if(player.actionTimer <= 0) {
+                        const obj = player.actionTarget;
+                        if (player.actionType === 'chop') { obj.hp--; if(addInvItem('Logs', 1)) addXP('woodcutting', 15); } 
+                        else if (player.actionType === 'mine') { obj.hp--; let oreType = obj.type === 'rock_copper' ? 'Copper Ore' : obj.type === 'rock_tin' ? 'Tin Ore' : 'Iron Ore'; if(addInvItem(oreType, 1)) addXP('mining', 20); }
+                        else if (player.actionType === 'fish') { if(addInvItem('Raw Fish', 1)) { addXP('fishing', 20); addFloatingText(player.x, player.y - 15, "Pescado", "#3498db"); } }
+                        else if (player.actionType === 'smelt_brz') { removeInvItem('Copper Ore', 1); removeInvItem('Tin Ore', 1); addInvItem('Bronze Bar', 1); addXP('smithing', 15); player.isPerformingAction = false; }
+                        else if (player.actionType === 'smelt_iron') { removeInvItem('Iron Ore', 1); addInvItem('Iron Bar', 1); addXP('smithing', 25); player.isPerformingAction = false; }
+                        else if (player.actionType.startsWith('cook_')) { let isF = player.actionType === 'cook_fish'; removeInvItem(isF?'Raw Fish':'Raw Meat', 1); addInvItem(isF?'Cooked Fish':'Cooked Meat', 1); addXP('cooking', isF?20:10); player.isPerformingAction = false; addFloatingText(player.x, player.y - 20, "Cozinhou!", "#f1c40f"); }
+
+                        if(obj.hp !== undefined && obj.hp <= 0) { obj.active = false; player.isPerformingAction = false; player.actionToolItem = null; addFloatingText(obj.x, obj.y, "Vazio", "#bdc3c7"); setTimeout(() => { obj.active = true; obj.hp = obj.maxHp; }, 10000); } 
+                        else if (player.isPerformingAction) { player.actionTimer = player.actionDelay; } 
+                        updateUI();
+                    }
+                } else { player.actionToolItem = null; }
+
+                cur.forEach((o, i) => { 
+                    if(!o || !o.type) return; 
+                    if(o.type === 'fire' && o.active) { o.life--; if(o.life <= 0) o.active = false; }
+                    if(o.type === 'ground_item' && o.active) { o.life--; if(o.life <= 0) cur.splice(i, 1); }
+                    if(o.type === 'enemy' && o.active) {
+                        if (o.aggroTarget === player) {
+                            let ow = o.w || 30; let oh = o.h || 30; let ex = player.x - (o.x + ow/2); let ey = player.y - (o.y + oh/2); let ed = Math.hypot(ex, ey);
+                            if (ed > 20) {
+                                let nx = o.x + (ex/ed)*1.5; let ny = o.y + (ey/ed)*1.5; let cx=false, cy=false;
+                                for(let wo of cur) {
+                                    if(!wo || !wo.type || !wo.active || wo===o || wo.type==='ground_item' || wo.type==='fishing_spot' || wo.type==='portal') continue;
+                                    let wow = wo.w || 30; let woh = wo.h || 30;
+                                    if(nx < wo.x+wow && nx+ow > wo.x && o.y < wo.y+woh && o.y+oh > wo.y) cx=true;
+                                    if(o.x < wo.x+wow && o.x+ow > wo.x && ny < wo.y+woh && ny+oh > wo.y) cy=true;
+                                }
+                                if(!cx) o.x = nx; if(!cy) o.y = ny;
+                            } else {
+                                if (o.attackCooldown <= 0) {
+                                    let nB = npcDB[o.dbKey]; let rD = Math.floor(Math.random() * ((nB?nB.maxHit:2) + 1));
+                                    let bl = Math.floor(Math.random() * (getTotalDef() / 2 + 1)); let fD = Math.max(0, rD - bl);
+                                    player.stats.hp -= fD; addFloatingText(player.x, player.y - 20, fD > 0 ? fD : "Block", fD > 0 ? "red" : "#3498db"); o.attackCooldown = 70;
+                                    if(player.stats.hp <= 0) { switchMap('lumbridge', 400, 300); player.stats.hp = player.stats.maxHp; addFloatingText(player.x, player.y - 40, "Renasceu", "#f1c40f"); o.aggroTarget = null; closeMenus();} updateUI();
+                                }
+                            }
+                        } else { 
+                            if(Math.random() < 0.01) { o.destX = o.x + (Math.random()*60-30); o.destY = o.y + (Math.random()*60-30); }
+                            if(o.destX) { let ex = o.destX - o.x; let ey = o.destY - o.y; let ed = Math.hypot(ex, ey); if(ed > 1) { o.x += (ex/ed)*0.5; o.y += (ey/ed)*0.5; } }
+                        } if(o.attackCooldown > 0) o.attackCooldown--;
+                    }
+                });
+
+                // CÂMERA SEGUIDORA AUTOMÁTICA
+                const gc = document.getElementById('game-container');
+                if(gc && canvas.width > gc.clientWidth) gc.scrollLeft = player.x - gc.clientWidth / 2;
+                if(gc && canvas.height > gc.clientHeight) gc.scrollTop = player.y - gc.clientHeight / 2;
+
+            } catch(e) { console.error("Silenced Update Error", e); }
+        }
+
+        // --- RENDERIZADOR ---
+        function draw() {
+            try {
+                ctx.clearRect(0, 0, canvas.width, canvas.height); let mapObj = gameMaps[currentMap]; if(!mapObj) return;
+                ctx.fillStyle = mapObj.color || '#4a6b2d'; ctx.fillRect(0,0,canvas.width, canvas.height);
+                ctx.strokeStyle = "rgba(0,0,0,0.1)"; for(let i=0; i<canvas.width; i+=40) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,canvas.height); ctx.stroke(); } for(let i=0; i<canvas.height; i+=40) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(canvas.width,i); ctx.stroke(); }
+
+                let cur = mapObj.entities || [];
+                
+                cur.forEach(o => {
+                    if(!o || !o.type) return; let ow = o.w || 30; let oh = o.h || 30;
+                    if (o.type === 'ground_item' && o.active) {
+                        ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.beginPath(); ctx.arc(o.x+ow/2, o.y+oh/2+5, ow/2, 0, Math.PI*2); ctx.fill();
+                        ctx.font = '16px Arial'; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(itemDB[o.item]?itemDB[o.item].icon:'?', o.x + ow/2, o.y + oh/2); ctx.textAlign="start";
+                    }
+                });
+
+                cur.forEach(o => {
+                    if (!o || !o.type || !o.active || o.type === 'ground_item') return;
+                    let ow = o.w || 30; let oh = o.h || 30;
+
+                    if(o.imgUrl) {
+                        if(!imgCache[o.imgUrl]) { imgCache[o.imgUrl] = new Image(); imgCache[o.imgUrl].src = o.imgUrl; }
+                        if(imgCache[o.imgUrl].complete) { ctx.drawImage(imgCache[o.imgUrl], o.x, o.y, ow, oh); } return;
+                    }
+                    
+                    if(o.type === 'tree') {
+                        ctx.fillStyle = '#6b4c3a'; ctx.fillRect(o.x + ow/2 - 5, o.y + oh/2, 10, oh/2);
+                        ctx.fillStyle = '#27ae60'; ctx.beginPath(); ctx.arc(o.x + ow/2, o.y + oh/2 - 10, ow/2, 0, Math.PI*2); ctx.fill();
+                        ctx.fillStyle = '#2ecc71'; ctx.beginPath(); ctx.arc(o.x + ow/4, o.y + oh/2, ow/3, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(o.x + ow*0.75, o.y + oh/2, ow/3, 0, Math.PI*2); ctx.fill();
+                    } else if (o.type === 'fishing_spot') {
+                        let t = Date.now() / 400; ctx.fillStyle = 'rgba(52, 152, 219, 0.5)'; ctx.fillRect(o.x, o.y, ow, oh); 
+                        ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)'; ctx.lineWidth = 1.5; let bC = Math.max(2, Math.floor((ow * oh) / 800));
+                        for(let b=0; b<bC; b++) { let bx = o.x + ((b * 47) % ow); let by = o.y + ((b * 31) % oh); ctx.beginPath(); ctx.arc(bx, by + Math.sin(t+b)*6, 2+Math.sin(t)*1, 0, Math.PI*2); ctx.stroke(); }
+                    } else if (o.type === 'house') {
+                        ctx.fillStyle = '#8e44ad'; ctx.fillRect(o.x, o.y + oh*0.3, ow, oh*0.7);
+                        ctx.fillStyle = '#2c3e50'; ctx.beginPath(); ctx.moveTo(o.x, o.y + oh*0.3); ctx.lineTo(o.x + ow/2, o.y); ctx.lineTo(o.x + ow, o.y + oh*0.3); ctx.fill(); 
+                        ctx.fillStyle = '#f1c40f'; ctx.fillRect(o.x + ow/2 - 10, o.y + oh - 20, 20, 20);
+                    } else if (typeof o.type === 'string' && o.type.startsWith('rock')) {
+                        ctx.fillStyle = '#7f8c8d'; ctx.beginPath(); ctx.arc(o.x + ow/2, o.y + oh/2, ow/2, 0, Math.PI*2); ctx.fill();
+                        ctx.fillStyle = o.color; ctx.beginPath(); ctx.arc(o.x + ow/3, o.y + oh/3, 4, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(o.x + ow*0.7, o.y + oh*0.6, 5, 0, Math.PI*2); ctx.fill();
+                    } else if (o.type === 'enemy' || o.type === 'npc') {
+                        let nB = npcDB[o.dbKey]; let c1 = nB ? nB.c1 : '#8e44ad'; let c2 = nB ? nB.c2 : '#f1c27d';
+                        ctx.fillStyle = c1; ctx.fillRect(o.x + 5, o.y + 10, ow-10, oh-10); ctx.fillStyle = c2; ctx.fillRect(o.x + 5, o.y, ow-10, 10);
+                        if(o.type === 'enemy') { ctx.fillStyle = 'red'; ctx.fillRect(o.x + 7, o.y + 3, 3, 3); ctx.fillRect(o.x + ow - 10, o.y + 3, 3, 3); }
+                    } else if (o.type === 'fire') {
+                        ctx.fillStyle = '#5c4033'; ctx.fillRect(o.x + 5, o.y + 20, 20, 5); ctx.fillStyle = '#e67e22'; ctx.beginPath(); ctx.moveTo(o.x+15, o.y); ctx.lineTo(o.x+5, o.y+20); ctx.lineTo(o.x+25, o.y+20); ctx.fill(); ctx.fillStyle = '#f1c40f'; ctx.beginPath(); ctx.moveTo(o.x+15, o.y+5); ctx.lineTo(o.x+10, o.y+20); ctx.lineTo(o.x+20, o.y+20); ctx.fill();
+                    } else if (o.type === 'furnace') {
+                        ctx.fillStyle = '#34495e'; ctx.fillRect(o.x, o.y, ow, oh); ctx.fillStyle = '#e74c3c'; ctx.beginPath(); ctx.arc(o.x + ow/2, o.y + oh/2 + 5, 10, 0, Math.PI*2); ctx.fill(); 
+                    } else if (o.type === 'anvil') {
+                        ctx.fillStyle = '#bdc3c7'; ctx.fillRect(o.x + 5, o.y + 5, 25, 10); ctx.fillStyle = '#95a5a6'; ctx.fillRect(o.x + 12, o.y + 15, 10, 10); 
+                    } else if (o.type === 'bank') {
+                        ctx.fillStyle = '#8e44ad'; ctx.fillRect(o.x, o.y, ow, oh); ctx.fillStyle = '#f1c40f'; ctx.fillRect(o.x + ow/5, o.y + oh/3, ow*0.6, 5); ctx.fillStyle = 'white'; ctx.font = '10px Arial'; ctx.fillText('BANK', o.x + 5, o.y - 5);
+                    } else if (o.type === 'portal') {
+                        ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(o.x + ow/2, o.y + oh, ow/2, Math.PI, 0); ctx.fill(); 
+                        ctx.fillStyle = '#34495e'; ctx.beginPath(); ctx.arc(o.x + 10, o.y + oh - 5, 8, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(o.x + ow - 10, o.y + oh - 5, 8, 0, Math.PI*2); ctx.fill();
+                        ctx.fillStyle = 'white'; ctx.font = '12px Arial'; ctx.textAlign = "center"; ctx.fillText('Portal', o.x + ow/2, o.y - 10); ctx.textAlign = "start";
+                    }
+                    if(o.hp !== undefined && o.type !== 'npc') { ctx.fillStyle = 'red'; ctx.fillRect(o.x, o.y - 10, ow, 4); ctx.fillStyle = o.type === 'enemy' ? '#2ecc71' : '#f1c40f'; ctx.fillRect(o.x, o.y - 10, ow * (o.hp / o.maxHp), 4); }
+                });
+
+                if (Math.hypot(player.destX - player.x, player.destY - player.y) > player.speed && !player.isPerformingAction && !player.pendingAutoAction) { ctx.fillStyle = 'rgba(255, 255, 255, 0.4)'; ctx.beginPath(); ctx.arc(player.destX, player.destY, 5, 0, Math.PI*2); ctx.fill(); }
+                if (player.isPerformingAction) { const prg = 1 - (player.actionTimer / player.actionDelay); ctx.fillStyle = '#222'; ctx.fillRect(player.x - 15, player.y - 25, 30, 6); ctx.fillStyle = '#3498db'; ctx.fillRect(player.x - 14, player.y - 24, 28 * prg, 4); }
+
+                const px = player.x; const py = player.y; 
+                const wp = (player.isPerformingAction && player.actionToolItem) ? player.actionToolItem : player.equipment.weapon; 
+                const sh = player.equipment.shield;
+                const tC = (wp && wp.tool === 'magic') ? '#3498db' : (wp && wp.tool === 'ranged') ? '#27ae60' : '#8e44ad'; 
+                
+                ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.arc(px, py+6, 8, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = tC; ctx.fillRect(px - 8, py - 6, 16, 12); ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(px, py - 10, 8, 0, Math.PI*2); ctx.fill();
+                
+                if(player.facing.y > 0) { ctx.fillStyle = 'white'; ctx.fillRect(px - 4, py - 12, 3, 3); ctx.fillRect(px + 1, py - 12, 3, 3); ctx.fillStyle = 'black'; ctx.fillRect(px - 3, py - 11, 1, 1); ctx.fillRect(px + 2, py - 11, 1, 1); ctx.fillStyle = '#333'; ctx.fillRect(px-8, py+2, 16, 2);
+                } else if (player.facing.y < 0) { ctx.fillStyle = '#6b4c3a'; ctx.beginPath(); ctx.arc(px, py - 10, 8, Math.PI, 0); ctx.fill(); ctx.fillStyle = '#8b4513'; ctx.fillRect(px - 6, py - 4, 12, 8);
+                } else if (player.facing.x < 0) { ctx.fillStyle = '#6b4c3a'; ctx.fillRect(px, py - 18, 8, 16); ctx.fillStyle = 'white'; ctx.fillRect(px - 4, py - 12, 3, 3); ctx.fillStyle = 'black'; ctx.fillRect(px - 3, py - 11, 1, 1); ctx.fillStyle = '#8b4513'; ctx.fillRect(px + 2, py - 4, 6, 8);
+                } else if (player.facing.x > 0) { ctx.fillStyle = '#6b4c3a'; ctx.fillRect(px - 8, py - 18, 8, 16); ctx.fillStyle = 'white'; ctx.fillRect(px + 1, py - 12, 3, 3); ctx.fillStyle = 'black'; ctx.fillRect(px + 2, py - 11, 1, 1); ctx.fillStyle = '#8b4513'; ctx.fillRect(px - 8, py - 4, 6, 8); }
+
+                if(sh) { ctx.save(); ctx.translate(px, py); if(player.facing.x > 0) { ctx.translate(-5, 0); } else if(player.facing.x < 0) { ctx.translate(15, 0); } else { ctx.translate(-10, 5); } ctx.fillStyle = '#7f8c8d'; ctx.beginPath(); ctx.arc(0, 0, 8, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#95a5a6'; ctx.beginPath(); ctx.arc(0, 0, 4, 0, Math.PI*2); ctx.fill(); ctx.restore(); }
+                if(wp) {
+                    ctx.save(); ctx.translate(px, py);
+                    if(player.facing.x > 0) { ctx.rotate(Math.PI/4); ctx.translate(10, 0); } else if(player.facing.x < 0) { ctx.rotate(-Math.PI/4); ctx.translate(-10, 0); } else if(player.facing.y < 0) { ctx.translate(10, -10); } else { ctx.translate(12, 5); }
+                    if (player.actionAnim > 0) { let prg = player.actionAnim / 15; if (wp.tool === 'magic' || wp.tool === 'ranged') { ctx.translate(Math.sin(prg * Math.PI) * 10, -Math.sin(prg * Math.PI) * 10); } else { ctx.rotate(Math.sin(prg * Math.PI) * (Math.PI / 2)); } }
+                    if (wp.tool === 'magic') { ctx.fillStyle = '#8e44ad'; ctx.fillRect(-2, -15, 4, 30); ctx.fillStyle = player.actionAnim > 0 ? '#1abc9c' : '#3498db'; ctx.beginPath(); ctx.arc(0, -15, player.actionAnim > 0 ? 8 : 5, 0, Math.PI*2); ctx.fill();
+                    } else if (wp.tool === 'ranged') { ctx.strokeStyle = '#d35400'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, 15, -Math.PI/2, Math.PI/2); ctx.stroke(); ctx.strokeStyle = '#ecf0f1'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, -15); ctx.lineTo(0, 15); ctx.stroke();
+                    } else if (wp.tool === 'axe' || wp.tool === 'pickaxe') { ctx.fillStyle = '#7f8c8d'; ctx.fillRect(-2, -10, 4, 20); ctx.fillStyle = '#bdc3c7'; ctx.fillRect(-8, -10, 16, 6);
+                    } else if (wp.tool === 'net') { ctx.strokeStyle = '#ecf0f1'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, -10, 8, 0, Math.PI*2); ctx.stroke(); ctx.fillStyle = '#7f8c8d'; ctx.fillRect(-2, 0, 4, 15);
+                    } else { ctx.fillStyle = '#7f8c8d'; ctx.fillRect(-2, -15, 4, 25); ctx.fillStyle = '#2c3e50'; ctx.fillRect(-6, -5, 12, 3); } ctx.restore();
+                }
+
+                projectiles.forEach(p => { if (p.type === 'ranged') { ctx.fillStyle = '#795548'; ctx.fillRect(p.x-2, p.y-2, 4, 4); } else { ctx.fillStyle = p.color || '#1abc9c'; ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#ecf0f1'; ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI*2); ctx.fill(); } });
+                floatingTexts.forEach((ft, i) => { ctx.fillStyle = ft.color; ctx.font = 'bold 16px Arial'; ctx.fillText(ft.text, ft.x, ft.y); ft.y -= 0.5; ft.life--; if(ft.life <= 0) floatingTexts.splice(i, 1); });
+
+            } catch (e) { console.error("Ignorado", e); }
+        }
+
+        // --- SISTEMA DE MINIMAPA DESACOPLADO ---
+        function drawMinimap() {
+            try {
+                const mCanvas = document.getElementById('minimapCanvas'); if(!mCanvas) return;
+                const mCtx = mCanvas.getContext('2d'); mCtx.clearRect(0, 0, mCanvas.width, mCanvas.height);
+                let curM = gameMaps[currentMap]; if(!curM) return;
+                mCtx.fillStyle = curM.color || '#4a6b2d'; mCtx.fillRect(0, 0, mCanvas.width, mCanvas.height);
+                let scaleX = mCanvas.width / (curM.width || 800); let scaleY = mCanvas.height / (curM.height || 600);
+                if(curM.entities) {
+                    curM.entities.forEach(o => {
+                        if(!o || !o.active || !o.type) return;
+                        mCtx.fillStyle = o.type === 'enemy' ? '#e74c3c' : o.type === 'npc' ? '#f1c40f' : o.type === 'tree' ? '#27ae60' : (typeof o.type==='string' && o.type.startsWith('rock')) ? '#7f8c8d' : o.type === 'portal' ? '#8e44ad' : o.type === 'fishing_spot' ? '#3498db' : '#95a5a6';
+                        mCtx.fillRect(o.x * scaleX, o.y * scaleY, (o.w||30) * scaleX, (o.h||30) * scaleY);
+                    });
+                }
+                mCtx.fillStyle = 'white'; mCtx.fillRect(player.x * scaleX, player.y * scaleY, 4, 4);
+            } catch(e) {}
+        }
+
+        // --- INICIALIZAÇÃO BLINDADA ---
+        document.addEventListener('DOMContentLoaded', () => {
+            function startGameLoop() {
+                function loop() { try { update(); } catch(e){} try { draw(); drawMinimap(); } catch(e){} requestAnimationFrame(loop); } loop();
+            }
+            try { 
+                // Evita problemas de foco com as setas do teclado na inicialização
+                window.focus();
+                
+                if(!loadGame(false)) { giveStarterItems(); } 
+                openTab('inv'); 
+                // Inicializa a Dev UI
+                buildDevEntityList();
+                
+                // Força o GameContainer a esconder a barra de rolagem (Câmera por JavaScript funciona sem ela)
+                const gc = document.getElementById('game-container');
+                if(gc) { gc.style.overflow = 'hidden'; }
+                
+                updateUI(); 
+                startGameLoop(); 
+            } catch (e) { console.error("CRÍTICO", e); }
+        });
+    </script>
+</body>
+</html>
