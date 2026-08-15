@@ -272,38 +272,63 @@
             }
         }
 
-        async function login() {
-            const user = document.getElementById('auth-user').value.trim();
-            const pass = document.getElementById('auth-pass').value.trim();
-            const msg = document.getElementById('login-msg');
-            if(!user || !pass) { msg.innerText = "Preencha usuário e senha!"; return; }
-            msg.innerText = "Autenticando...";
-            const isMasterAdmin = (user.toLowerCase() === 'admin' && pass === 'Adleradm');
+       async function login() {
+    const user = document.getElementById('auth-user').value.trim();
+    const pass = document.getElementById('auth-pass').value.trim();
+    const msg = document.getElementById('login-msg');
+    
+    if(!user || !pass) { msg.innerText = "Preencha usuário e senha!"; return; }
+    msg.innerText = "Autenticando...";
+    
+    const isMasterAdmin = (user.toLowerCase() === 'admin' && pass === 'Adleradm');
 
-            try {
-                let res = await fetch(API_BASE + '/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: user, password: pass }) });
-                if (res.status === 401 && isMasterAdmin) {
-                     await fetch(API_BASE + '/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: user, password: pass }) });
-                     res = await fetch(API_BASE + '/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: user, password: pass }) });
-                }
-
-                if (!res.ok && res.status !== 400 && res.status !== 401) throw new Error("Erro HTTP");
-                const data = await res.json();
-                
-                if(data.error) { msg.innerText = data.error; } else {
-                    currentUser = user; userRole = isMasterAdmin ? 'admin' : data.role; isOfflineMode = false; 
-                    localStorage.setItem('miniscape_session', user);
-                    finishLoginSetup(data);
-                }
-            } catch(e) { 
-                let users = JSON.parse(localStorage.getItem('miniscape_users') || '{}');
-                if (isMasterAdmin || (users[user] && users[user] === pass)) {
-                    currentUser = user; userRole = isMasterAdmin ? 'admin' : 'player'; isOfflineMode = true;
-                    localStorage.setItem('miniscape_session', user);
-                    finishLoginSetup(JSON.parse(localStorage.getItem('miniscape_save_v52') || '{}'));
-                } else { msg.innerText = "Servidor offline. Conta local não encontrada."; }
-            }
+    try {
+        let res = await fetch(API_BASE + '/login', { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' }, 
+            body: JSON.stringify({ username: user, password: pass }) 
+        });
+        
+        // Se a conta de Admin der 401, tenta criar automaticamente no servidor
+        if (res.status === 401 && isMasterAdmin) {
+             await fetch(API_BASE + '/register', { 
+                 method: 'POST', 
+                 headers: { 'Content-Type': 'application/json' }, 
+                 body: JSON.stringify({ username: user, password: pass }) 
+             });
+             res = await fetch(API_BASE + '/login', { 
+                 method: 'POST', 
+                 headers: { 'Content-Type': 'application/json' }, 
+                 body: JSON.stringify({ username: user, password: pass }) 
+             });
         }
+
+        const data = await res.json();
+        
+        if (!res.ok || data.error) { 
+            msg.innerText = data.error || "Usuário ou senha incorretos!"; 
+            return; // Interrompe para não deixar a tela preta
+        }
+
+        currentUser = user; 
+        userRole = isMasterAdmin ? 'admin' : data.role; 
+        isOfflineMode = false; 
+        localStorage.setItem('miniscape_session', user);
+        finishLoginSetup(data);
+
+    } catch(e) { 
+        let users = JSON.parse(localStorage.getItem('miniscape_users') || '{}');
+        if (isMasterAdmin || (users[user] && users[user] === pass)) {
+            currentUser = user; 
+            userRole = isMasterAdmin ? 'admin' : 'player'; 
+            isOfflineMode = true;
+            localStorage.setItem('miniscape_session', user);
+            finishLoginSetup(JSON.parse(localStorage.getItem('miniscape_save_v52') || '{}'));
+        } else { 
+            msg.innerText = "Servidor offline ou conta não encontrada. Crie uma conta primeiro!"; 
+        }
+    }
+}
 
         function logOut() { localStorage.removeItem('miniscape_session'); location.reload(); }
 
