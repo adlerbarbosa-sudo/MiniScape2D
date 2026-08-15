@@ -10,18 +10,16 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const DB_FILE = path.join(__dirname, 'database.json');
 
-// Inicialização segura
 function initDB() {
     if (!fs.existsSync(DB_FILE)) {
         const initialDB = {
             users: { "Admin": { password: "Adleradm", role: "admin", playerData: null } },
             worldData: null, itemDB: null, npcDB: null,
             chat: [{sender: 'Sistema', msg: 'Servidor iniciado!', color: '#2ecc71'}],
-            mapVersion: Date.now() // Controle de Atualização de Mundo
+            mapVersion: Date.now()
         };
         fs.writeFileSync(DB_FILE, JSON.stringify(initialDB, null, 2), 'utf8');
     } else {
-        // Garante que DBs antigas ganhem a tag mapVersion
         let db = readDB();
         if(!db.mapVersion) { db.mapVersion = Date.now(); writeDB(db); }
     }
@@ -31,13 +29,12 @@ initDB();
 function readDB() { return JSON.parse(fs.readFileSync(DB_FILE, 'utf8')); }
 function writeDB(data) { fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf8'); }
 
-let activePlayers = {}; // Multiplayer em Tempo Real na RAM (Super Leve)
+let activePlayers = {}; 
 
 app.post('/api/register', (req, res) => {
     const { username, password } = req.body;
     let db = readDB();
     if (db.users[username]) return res.status(400).json({ error: 'Usuário já existe!' });
-    
     db.users[username] = { password: password, role: 'player', playerData: null };
     writeDB(db);
     res.json({ success: true });
@@ -62,7 +59,6 @@ app.post('/api/save', (req, res) => {
     if (db.users[username]) {
         db.users[username].playerData = playerData; 
         if (db.users[username].role === 'admin') { 
-            // Admin modifica o mundo e atualiza a versão para os players baixarem
             if (worldData) { db.worldData = worldData; db.mapVersion = Date.now(); }
             if (itemDB) db.itemDB = itemDB;
             if (npcDB) db.npcDB = npcDB;
@@ -71,38 +67,51 @@ app.post('/api/save', (req, res) => {
     } else { res.status(401).json({ error: 'Sessão inválida.' }); }
 });
 
-// ROTA SUPER LEVE PARA O MOTOR DE JOGO (Sem trafegar o mapa pesado)
+// A MÁGICA DO MULTIPLAYER
 app.post('/api/sync', (req, res) => {
-    const { username, x, y, map } = req.body;
+    const { username, x, y, map, facing, equipment, actionAnim, actionToolItem, entityUpdates } = req.body;
     let db = readDB();
 
-    if (username) { activePlayers[username] = { x, y, map, lastSeen: Date.now() }; }
+    if (username) { 
+        activePlayers[username] = { x, y, map, facing, equipment, actionAnim, actionToolItem, lastSeen: Date.now() }; 
+    }
+
+    // Processa eventos rápidos (bater no monstro, pegar item do chão)
+    if (entityUpdates && entityUpdates.length > 0 && db.worldData) {
+        entityUpdates.forEach(update => {
+            let mapData = db.worldData[update.map];
+            if (mapData && mapData.entities) {
+                if (update.action === 'update') {
+                    let ent = mapData.entities.find(e => e.id === update.entity.id);
+                    if (ent) { ent.hp = update.entity.hp; ent.active = update.entity.active; }
+                } else if (update.action === 'add') {
+                    mapData.entities.push(update.entity);
+                } else if (update.action === 'remove') {
+                    mapData.entities = mapData.entities.filter(e => e.id !== update.id);
+                }
+            }
+        });
+        db.mapVersion = Date.now();
+        writeDB(db);
+    }
 
     let now = Date.now();
     let visiblePlayers = {};
-    
     for(let u in activePlayers) {
-        if (now - activePlayers[u].lastSeen > 4000) { delete activePlayers[u]; } 
+        if (now - activePlayers[u].lastSeen > 3000) { delete activePlayers[u]; } 
         else if (u !== username && activePlayers[u].map === map) { visiblePlayers[u] = activePlayers[u]; }
     }
 
     res.json({ players: visiblePlayers, chat: db.chat, mapVersion: db.mapVersion });
 });
 
-// ROTA EXCLUSIVA PARA BAIXAR O MAPA SOMENTE QUANDO HÁ MUDANÇAS
-app.get('/api/map', (req, res) => {
-    res.json({ worldData: readDB().worldData });
-});
+app.get('/api/map', (req, res) => { res.json({ worldData: readDB().worldData }); });
 
 app.post('/api/chat', (req, res) => {
     const { sender, msg, color } = req.body;
     let db = readDB();
     if (!db.chat) db.chat = [];
-    if(msg) {
-        db.chat.push({sender, msg, color});
-        if(db.chat.length > 50) db.chat.shift();
-        writeDB(db);
-    }
+    if(msg) { db.chat.push({sender, msg, color}); if(db.chat.length > 50) db.chat.shift(); writeDB(db); }
     res.json({ chat: db.chat });
 });
 
