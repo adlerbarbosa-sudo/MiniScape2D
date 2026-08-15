@@ -3,17 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MiniScape 2D - V45 (Motor Blindado & Sem Vazamentos)</title>
+    <title>MiniScape 2D - V46 (Injetor de Mundos)</title>
     <style>
         /* === BASE & RESPONSIVIDADE (TELA CHEIA) === */
         body { margin: 0; padding: 10px; background-color: #121212; color: #e0e0e0; font-family: 'Segoe UI', Tahoma, sans-serif; display: flex; gap: 15px; justify-content: center; height: 100vh; box-sizing: border-box; overflow: hidden; flex-direction: row; align-items: stretch; }
         @media (max-width: 850px) { body { flex-direction: column; align-items: center; padding: 5px; overflow-y: auto; height: auto;} #ui-panel { width: 100% !important; max-width: 100%; min-height: 500px; } .mobile-btn { display: block !important; } #game-container { height: 50vh; min-height: 400px; } }
         
-        /* CÂMERA DINÂMICA: OCUPA 100% DO ESPAÇO. SEM MOLDURA INTRUSIVA */
+        /* CÂMERA DINÂMICA */
         #game-container { position: relative; flex: 1; border: 2px solid #3d2e24; background-color: #000; box-shadow: 0 0 20px rgba(0,0,0,0.8); overflow: hidden; border-radius: 4px; display: block;}
         #gameCanvas { cursor: crosshair; display: block; width: 100%; height: 100%; touch-action: none; }
         
-        /* SISTEMA DE CHAT SOBREPOSTO AO JOGO */
+        /* SISTEMA DE CHAT */
         #chat-container { position: absolute; bottom: 10px; left: 10px; width: 350px; background: rgba(0, 0, 0, 0.6); border: 1px solid #3d2e24; border-radius: 4px; display: flex; flex-direction: column; z-index: 100; }
         #chat-box { height: 150px; overflow-y: auto; padding: 8px; font-size: 0.8rem; font-family: monospace; display: flex; flex-direction: column; gap: 4px;}
         .chat-msg { color: white; text-shadow: 1px 1px 0 #000; word-wrap: break-word;}
@@ -79,11 +79,10 @@
 </head>
 <body>
 
-    <!-- OVERLAY DE LOGIN / REGISTRO -->
     <div id="login-overlay">
         <div class="login-box">
             <h1>MiniScape</h1>
-            <p style="font-size: 0.8rem; color: #bdc3c7;">Servidor Online Oficial</p>
+            <p style="font-size: 0.8rem; color: #bdc3c7;">Servidor Online V46</p>
             <input type="text" id="auth-user" class="login-input" placeholder="Usuário">
             <input type="password" id="auth-pass" class="login-input" placeholder="Senha">
             <div id="login-msg"></div>
@@ -112,7 +111,6 @@
         </div>
 
         <div id="ui-panel">
-            
             <div class="hud-header">
                 <canvas id="minimapCanvas" width="110" height="80"></canvas>
                 <div class="hud-bars-wrapper">
@@ -122,7 +120,7 @@
                 </div>
             </div>
             
-            <div id="action-text">Conectado ao Servidor!</div>
+            <div id="action-text">Conectado ao Mundo!</div>
             
             <button id="mobile-action-btn" class="mobile-btn" onclick="tryPickupOrInteract()">🎯 AÇÃO (ESPAÇO)</button>
             <button id="mobile-atk-btn" class="mobile-btn" style="background:#8e44ad; border-color:#9b59b6; margin-top:-5px;" onclick="tryAttack()">⚔️ ATACAR (CTRL)</button>
@@ -173,7 +171,7 @@
 
                 <div id="dev-import" class="dev-sub-content">
                     <h3 style="color:#2ecc71; margin-top:0;">📡 Injetor de Expansão</h3>
-                    <p style="font-size:0.75rem; color:#bdc3c7; line-height: 1.4;">Cole os <b>Códigos Especiais</b> gerados pela IA para adicionar Novos Bosses, Itens e Recursos.</p>
+                    <p style="font-size:0.75rem; color:#bdc3c7; line-height: 1.4;">Cole os <b>Códigos Especiais</b> gerados pela IA para adicionar Novos Mapas, Bosses, Itens e Recursos.</p>
                     <textarea id="dev-import-code" class="dev-input" style="height:120px; font-family:monospace; resize: none; margin-bottom: 10px;" placeholder="Cole o código Base64 aqui..."></textarea>
                     <button class="dev-save-btn" onclick="importDevCode()" style="background:#8e44ad; font-size: 1rem;">⚡ Injetar Pacote de Dados</button>
                 </div>
@@ -248,16 +246,17 @@
             <div id="tab-bank" class="tab-content"><div id="bank-grid" class="grid-container"></div></div>
 
             <div id="tab-cfg" class="tab-content">
-                <h3 style="color:#ecf0f1; margin-top: 0; border-bottom: 1px solid #3d2e24; padding-bottom: 5px;">Sistema Servidor</h3>
-                <p style="font-size: 0.75rem; color: #bdc3c7;">Seus dados são salvos online automaticamente a cada 60 segundos.</p>
+                <h3 style="color:#ecf0f1; margin-top: 0; border-bottom: 1px solid #3d2e24; padding-bottom: 5px;">Sistema</h3>
+                <p style="font-size: 0.75rem; color: #bdc3c7;">Seus dados são salvos online (ou offline) automaticamente a cada 60 segundos.</p>
                 <button class="dev-save-btn" style="background: #27ae60;" onclick="saveDataLogic(true)">💾 Forçar Save Global</button>
                 <button class="dev-save-btn" style="background: #c0392b; margin-top: 20px;" onclick="logOut()">🚪 Sair da Conta / Reiniciar</button>
             </div>
         </div>
     </div>
 
+    <!-- SCRIPT GIGANTE E UNIFICADO DO JOGO -->
     <script>
-        // === DECLARAÇÕES GLOBAIS ===
+        // === VARIÁVEIS GLOBAIS ÚNICAS ===
         const canvas = document.getElementById('gameCanvas'); 
         const ctx = canvas.getContext('2d');
         const osrsMenu = document.getElementById('osrs-menu'); 
@@ -323,7 +322,8 @@
         };
 
         let spellbookDB = [
-            { id: 'wind_strike', name: 'Wind Strike', lvl: 1, req: {'Air Rune': 1, 'Mind Rune': 1}, dmg: 2, color: '#ecf0f1' }
+            { id: 'wind_strike', name: 'Wind Strike', lvl: 1, req: {'Air Rune': 1, 'Mind Rune': 1}, dmg: 2, color: '#ecf0f1' },
+            { id: 'water_strike', name: 'Water Strike', lvl: 5, req: {'Water Rune': 1, 'Air Rune': 1, 'Mind Rune': 1}, dmg: 4, color: '#3498db' }
         ];
 
         let playerDefault = {
@@ -344,20 +344,30 @@
 
         // --- SISTEMA DE SESSÃO E INICIALIZAÇÃO ---
         document.addEventListener('DOMContentLoaded', async () => {
-            if (window.location.protocol === 'file:') {
+            const isLocalFile = window.location.protocol === 'file:';
+            if (isLocalFile) {
                 console.log("Arquivo Local detectado. Forçando Offline.");
                 forceOfflineMode();
             } else {
                 let savedSession = localStorage.getItem('miniscape_session');
                 if (savedSession) {
-                    document.getElementById('login-msg').innerText = "Sessão Encontrada. Clique entrar para continuar...";
-                    document.getElementById('auth-user').value = savedSession;
-                    document.getElementById('login-overlay').style.display = 'flex';
+                    document.getElementById('login-msg').innerText = "Restaurando sessão...";
+                    await attemptSessionLogin(savedSession);
                 } else {
                     document.getElementById('login-overlay').style.display = 'flex';
                 }
             }
         });
+
+        async function attemptSessionLogin(username) {
+            try {
+                document.getElementById('auth-user').value = username;
+                document.getElementById('login-overlay').style.display = 'flex';
+                document.getElementById('login-msg').innerText = "Sessão encontrada. Digite sua senha.";
+            } catch(e) {
+                document.getElementById('login-overlay').style.display = 'flex';
+            }
+        }
 
         async function register() {
             const user = document.getElementById('auth-user').value.trim();
@@ -365,7 +375,7 @@
             const msg = document.getElementById('login-msg');
             
             if(!user || !pass) { msg.innerText = "Preencha usuário e senha!"; return; }
-            msg.innerText = "Conectando...";
+            msg.innerText = "Conectando ao servidor...";
             
             try {
                 const res = await fetch(API_BASE + '/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: user, password: pass }) });
@@ -410,14 +420,14 @@
                 if (isMasterAdmin || (users[user] && users[user] === pass)) {
                     currentUser = user; userRole = isMasterAdmin ? 'admin' : 'player'; isOfflineMode = true;
                     localStorage.setItem('miniscape_session', user);
-                    finishLoginSetup(JSON.parse(localStorage.getItem('miniscape_save_v44') || '{}'));
+                    finishLoginSetup(JSON.parse(localStorage.getItem('miniscape_save_v45') || '{}'));
                 } else { msg.innerText = "Servidor offline. Conta local não encontrada."; }
             }
         }
 
         function forceOfflineMode() {
             currentUser = 'LocalAdmin'; userRole = 'admin'; isOfflineMode = true;
-            finishLoginSetup(JSON.parse(localStorage.getItem('miniscape_save_v44') || '{}'));
+            finishLoginSetup(JSON.parse(localStorage.getItem('miniscape_save_v45') || '{}'));
         }
 
         function logOut() {
@@ -435,7 +445,6 @@
                 tabContainer.insertBefore(devBtn, document.getElementById('btn-cfg'));
             }
             
-            // CARREGA DADOS. Se online, injeta o mapa, mas mantém a posição atual dos monstros locais se for player
             if(data.worldData && Object.keys(data.worldData).length > 0 && data.worldData['lumbridge']) { 
                 if (userRole === 'admin' || isOfflineMode) {
                     gameMaps = data.worldData; 
@@ -463,7 +472,6 @@
                 player = { ...playerDefault, ...data.playerData };
                 if(data.playerData.stats) player.stats = { ...playerDefault.stats, ...data.playerData.stats };
                 if(data.playerData.stats && data.playerData.stats.skills) player.stats.skills = { ...playerDefault.stats.skills, ...data.playerData.stats.skills };
-                // Garantia que não tem tela preta por conta corrompida!
                 if(isNaN(player.x) || isNaN(player.y)) { player.x = 400; player.y = 300; player.destX = 400; player.destY = 300; }
                 if(player.inventory.length === 0 && player.stats.skills.combat.xp === 0) giveStarterItems();
             } else {
@@ -501,7 +509,7 @@
             }
         }
 
-        // --- SISTEMA MULTIPLAYER E SINCRONIZAÇÃO ---
+        // --- SISTEMA MULTIPLAYER ---
         async function syncMultiplayer() {
             if(!currentUser || isOfflineMode) return;
             try {
@@ -537,7 +545,7 @@
 
             if (isOfflineMode || window.location.protocol === 'file:') {
                 const saveData = { playerData: player, worldData: gameMaps, itemDB: itemDB, npcDB: npcDB }; 
-                localStorage.setItem('miniscape_save_v44', JSON.stringify(saveData));
+                localStorage.setItem('miniscape_save_v45', JSON.stringify(saveData));
                 if(manual) setActionText("Salvo Localmente!", "#f1c40f"); return;
             }
             try {
@@ -561,6 +569,13 @@
                 if(data.chat) { chatMessages = data.chat; updateChatUI(); }
             } catch(e) {}
         }
+        async function pollChat() {
+            try {
+                const res = await fetch(API_BASE + '/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sender: '', msg: '' }) });
+                const data = await res.json();
+                if(data.chat) { chatMessages = data.chat; updateChatUI(); }
+            } catch(e) {}
+        }
         function updateChatUI() {
             const box = document.getElementById('chat-box'); if(!box) return; box.innerHTML = '';
             chatMessages.forEach(c => { box.innerHTML += `<div class="chat-msg"><span style="color:${c.color}; font-weight:bold;">[${c.sender}]</span>: ${c.msg}</div>`; });
@@ -568,49 +583,30 @@
         }
         document.getElementById('chat-input').addEventListener('keypress', function (e) { if (e.key === 'Enter') sendChat(); });
 
-        // --- SISTEMAS DE CONTROLE (TECLADO E MOUSE SEGURO) ---
-        window.addEventListener("keydown", function(e) {
-            if(document.getElementById('login-overlay').style.display !== 'none') return; 
-            if(["Space","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].indexOf(e.code) > -1) {
-                if(e.target.tagName !== "INPUT" && e.target.tagName !== "TEXTAREA") e.preventDefault();
-            }
-        }, false);
-        document.addEventListener('keydown', (e) => { 
-            if(document.getElementById('login-overlay').style.display !== 'none') return;
-            if(e.target.tagName === "INPUT" || e.target.tagName === "SELECT" || e.target.tagName === "TEXTAREA") return;
-            let k = e.key.toLowerCase(); if(['w','a','s','d','arrowup','arrowleft','arrowdown','arrowright'].includes(k)) keys[k] = true;
-            if (e.code === 'Space') { tryPickupOrInteract(); } if (e.key === 'Control') { tryAttack(); } 
-        });
-        document.addEventListener('keyup', (e) => { 
-            if(document.getElementById('login-overlay').style.display !== 'none') return;
-            if(e.target.tagName === "INPUT" || e.target.tagName === "SELECT" || e.target.tagName === "TEXTAREA") return;
-            let k = e.key.toLowerCase(); if(['w','a','s','d','arrowup','arrowleft','arrowdown','arrowright'].includes(k)) keys[k] = false;
-        });
-
-        document.addEventListener('mousemove', (e) => { if (tooltip.style.display === 'block') { tooltip.style.left = (e.pageX + 15) + 'px'; tooltip.style.top = (e.pageY + 15) + 'px'; } });
-        function showTooltip(item) { if(!item) return; let html = `<div class="tt-title">${item.name}</div><div class="tt-desc">${item.desc||''}</div>`; if (item.bonusDmg) html += `<div class="tt-stat">⚔️ Dano: +${item.bonusDmg}</div>`; if (item.defBonus) html += `<div class="tt-stat">🛡️ Defesa: +${item.defBonus}</div>`; if (item.heal) html += `<div class="tt-stat">❤️ Cura: +${item.heal}</div>`; html += `<div class="tt-weight">⚖️ Peso: ${item.weight||0} kg</div>`; tooltip.innerHTML = html; tooltip.style.display = 'block'; }
-        function hideTooltip() { tooltip.style.display = 'none'; }
-        
+        // --- CÁLCULO PRECISO DE CÂMERA E MOUSE ---
         function getCameraOffset() {
             let mapObj = gameMaps[currentMap];
             if (!mapObj) return { x: 0, y: 0 };
+            
+            let mapW = mapObj.width || 800;
+            let mapH = mapObj.height || 600;
+
             let camX = (canvas.width / 2) - player.x;
             let camY = (canvas.height / 2) - player.y;
 
-            if (mapObj.width > canvas.width) {
+            if (mapW > canvas.width) {
                 if (camX > 0) camX = 0;
-                if (camX < canvas.width - mapObj.width) camX = canvas.width - mapObj.width;
-            } else { camX = (canvas.width - mapObj.width) / 2; }
+                if (camX < canvas.width - mapW) camX = canvas.width - mapW;
+            } else { camX = (canvas.width - mapW) / 2; }
 
-            if (mapObj.height > canvas.height) {
+            if (mapH > canvas.height) {
                 if (camY > 0) camY = 0;
-                if (camY < canvas.height - mapObj.height) camY = canvas.height - mapObj.height;
-            } else { camY = (canvas.height - mapObj.height) / 2; }
+                if (camY < canvas.height - mapH) camY = canvas.height - mapH;
+            } else { camY = (canvas.height - mapH) / 2; }
             
             return { x: isNaN(camX) ? 0 : camX, y: isNaN(camY) ? 0 : camY };
         }
 
-        // CÁLCULO PRECISO PARA O MOUSE ACOMPANHAR A CÂMERA
         function getCoords(e) {
             const rect = canvas.getBoundingClientRect(); 
             const scaleX = rect.width > 0 ? canvas.width / rect.width : 1; 
@@ -623,32 +619,48 @@
             return { x: ((cX - rect.left) * scaleX) - offset.x, y: ((cY - rect.top) * scaleY) - offset.y, pageX: pX, pageY: pY };
         }
 
-        // --- INVENTÁRIO E UI ---
+        // --- DEV ENGINE & IMPORTAÇÃO ATUALIZADA (AGORA LÊ MAPAS!) ---
+        function importDevCode() {
+            const codeInput = document.getElementById('dev-import-code').value.trim(); if (!codeInput) { setActionText("Cole o código!", "#e74c3c"); return; }
+            try { 
+                let decoded = atob(codeInput); let parsed = JSON.parse(decoded); 
+                if(parsed.items) Object.assign(itemDB, parsed.items); 
+                if(parsed.npcs) Object.assign(npcDB, parsed.npcs); 
+                
+                // NOVIDADE: O Injetor agora engole novos mapas!
+                if(parsed.maps) {
+                    Object.keys(parsed.maps).forEach(mId => {
+                        if(gameMaps[mId]) {
+                            // Se o mapa já existe, só adiciona as coisas novas nele.
+                            if(parsed.maps[mId].entities) {
+                                gameMaps[mId].entities = gameMaps[mId].entities.concat(parsed.maps[mId].entities);
+                            }
+                        } else {
+                            // Se não existe, cria ele inteiro
+                            gameMaps[mId] = parsed.maps[mId];
+                        }
+                    });
+                }
+
+                saveDataLogic(true); updateUI(); buildDevEntityList(); loadDevMapManager();
+                document.getElementById('dev-import-code').value = ''; setActionText("Importado com sucesso!", "#2ecc71"); alert("Pacote injetado com sucesso!"); 
+            } catch(e) { setActionText("Código inválido.", "#e74c3c"); console.error(e); }
+        }
+
+        // --- SISTEMAS INTERNOS (MANTIDOS E BLINDADOS) ---
         function getInvCount(iName) { return player.inventory.reduce((acc, i) => acc + (i.name === iName ? (i.qty||1) : 0), 0); }
         function calcTotalWeight() { return player.inventory.reduce((acc, i) => acc + ((i&&i.weight?i.weight:0) * (i&&i.qty?i.qty:1)), 0).toFixed(1); }
         function removeInvItem(iName, amount) { let tr = amount; for(let i = player.inventory.length - 1; i >= 0; i--) { if(player.inventory[i].name === iName) { if(player.inventory[i].stackable) { if(player.inventory[i].qty > tr) { player.inventory[i].qty -= tr; return true; } else { tr -= player.inventory[i].qty; player.inventory.splice(i, 1); } } else { player.inventory.splice(i, 1); tr--; if(tr === 0) return true; } } } return false; }
         function addInvItem(iName, qty = 1) { const b = itemDB[iName]; if(!b) return false; if (b.stackable) { let r = qty; for(let i of player.inventory) { if(i.name === iName && i.qty < 254) { let sp = 254 - i.qty; if(r <= sp) { i.qty += r; return true; } else { i.qty = 254; r -= sp; } } } while(r > 0 && player.inventory.length < 28) { let t = Math.min(r, 254); player.inventory.push({...b, qty: t}); r -= t; } return r <= 0; } else { if(player.inventory.length < 28) { player.inventory.push({...b}); return true; } return false; } }
         function transferToBank(invIndex) { const item = player.inventory[invIndex]; if(!item) return; let bankItem = player.bank.find(i => i.name === item.name); if(bankItem && item.stackable) { bankItem.qty += item.qty; } else if (item.stackable) { player.bank.push({...item, qty: item.qty}); } else { player.bank.push({...item, qty: 1}); } player.inventory.splice(invIndex, 1); hideTooltip(); updateUI(); }
         function withdrawFromBank(bankIndex) { const item = player.bank[bankIndex]; if(!item) return; let wQ = item.stackable ? Math.min(item.qty, 254) : 1; if(addInvItem(item.name, wQ)) { item.qty -= wQ; if(item.qty <= 0) player.bank.splice(bankIndex, 1); hideTooltip(); updateUI(); } else { setActionText("Inventário Cheio!", "#e74c3c"); } }
-
-        function useItem(index) {
-            if(isBankOpen) { transferToBank(index); return; } const item = player.inventory[index]; if(!item) return;
-            if(item.type === 'equipment') { if(item.stackable && item.slot === 'ammo') { let curAm = player.equipment.ammo; player.equipment.ammo = player.inventory.splice(index, 1)[0]; if(curAm) addInvItem(curAm.name, curAm.qty); } else { player.inventory.splice(index, 1); if(player.equipment[item.slot]) player.inventory.push(player.equipment[item.slot]); player.equipment[item.slot] = item; } } 
-            else if(item.type === 'consumable') { if(item.heal > 0) { player.stats.hp = Math.min(player.stats.maxHp, player.stats.hp + item.heal); setActionText(`Curou ${item.heal} HP.`); } if(item.name === 'Bones') { addXP('prayer', 5); addFloatingText(player.x, player.y - 15, "Enterrou", "#bdc3c7"); } removeInvItem(item.name, 1); } 
-            else if(item.name === 'Tinderbox') { if(getInvCount('Logs') >= 1) { removeInvItem('Logs', 1); if(!gameMaps[currentMap].entities) gameMaps[currentMap].entities = []; gameMaps[currentMap].entities.push({ id: Date.now(), type: 'fire', name: 'Fire', x: player.x - 15, y: player.y - 15, w: 30, h: 30, active: true, life: 1000 }); addXP('firemaking', 15); setActionText("Acendeu fogo!"); } else { setActionText("Precisa de Logs.", "#e74c3c"); } } 
-            else if(item.name === 'Knife') { setActionText("Use a aba Craft para criar itens.", "#e74c3c"); }
-            player.isPerformingAction = false; player.pendingAutoAction = null; player.actionToolItem = null; hideTooltip(); updateUI();
-        }
-
+        function useItem(index) { if(isBankOpen) { transferToBank(index); return; } const item = player.inventory[index]; if(!item) return; if(item.type === 'equipment') { if(item.stackable && item.slot === 'ammo') { let curAm = player.equipment.ammo; player.equipment.ammo = player.inventory.splice(index, 1)[0]; if(curAm) addInvItem(curAm.name, curAm.qty); } else { player.inventory.splice(index, 1); if(player.equipment[item.slot]) player.inventory.push(player.equipment[item.slot]); player.equipment[item.slot] = item; } } else if(item.type === 'consumable') { if(item.heal > 0) { player.stats.hp = Math.min(player.stats.maxHp, player.stats.hp + item.heal); setActionText(`Curou ${item.heal} HP.`); } if(item.name === 'Bones') { addXP('prayer', 5); addFloatingText(player.x, player.y - 15, "Enterrou", "#bdc3c7"); } removeInvItem(item.name, 1); } else if(item.name === 'Tinderbox') { if(getInvCount('Logs') >= 1) { removeInvItem('Logs', 1); if(!gameMaps[currentMap].entities) gameMaps[currentMap].entities = []; gameMaps[currentMap].entities.push({ id: Date.now(), type: 'fire', name: 'Fire', x: player.x - 15, y: player.y - 15, w: 30, h: 30, active: true, life: 1000 }); addXP('firemaking', 15); setActionText("Acendeu fogo!"); } else { setActionText("Precisa de Logs.", "#e74c3c"); } } else if(item.name === 'Knife') { setActionText("Use a aba Craft para criar itens.", "#e74c3c"); } player.isPerformingAction = false; player.pendingAutoAction = null; player.actionToolItem = null; hideTooltip(); updateUI(); }
         function unequip(slot) { const item = player.equipment[slot]; if(item) { if(item.stackable && slot === 'ammo') { if(addInvItem(item.name, item.qty)) { player.equipment[slot] = null; updateUI(); } else { setActionText("Inv. Cheio!", "#e74c3c"); } } else { if(player.inventory.length >= 28) { setActionText("Inv. Cheio!", "#e74c3c"); return; } player.equipment[slot] = null; player.inventory.push(item); hideTooltip(); updateUI(); } } }
-
         function craftItem(iName) { let it = itemDB[iName]; if(!it || !it.recipe) return; let reqs = it.recipe.split('|'); let hasAll = true; reqs.forEach(r => { let p = r.split(','); if(getInvCount(p[0].trim()) < parseInt(p[1])) hasAll = false; }); if(hasAll) { reqs.forEach(r => { let p = r.split(','); removeInvItem(p[0].trim(), parseInt(p[1])); }); if(addInvItem(iName, it.craftQty || 1)) { addXP('crafting', 15); setActionText(`Criou ${iName}!`); } updateUI(); } else { setActionText(`Faltam materiais!`, '#e74c3c'); } }
-
         function closeMenus() { isBankOpen = false; isNPCOpen = false; activeNPCShop = null; document.getElementById('btn-bank').style.display='none'; document.getElementById('btn-npc').style.display='none'; }
         function openTab(tP) { document.querySelectorAll('.tab-content').forEach(e=>e.classList.remove('active-tab')); document.querySelectorAll('.tab-btn').forEach(e=>e.classList.remove('active-btn')); const tb = document.getElementById(`tab-${tP}`); if(tb) tb.classList.add('active-tab'); const bt = document.getElementById(`btn-${tP}`); if(bt) bt.classList.add('active-btn'); isBankOpen = (tP === 'bank'); isNPCOpen = (tP === 'npc'); if (['craft', 'mag', 'inv', 'eq', 'sk', 'bank'].includes(tP)) { updateUI(); } }
         function setActionText(t, c="#2ecc71") { const el = document.getElementById('action-text'); el.innerText = t; el.style.color = c; setTimeout(() => { if(el.innerText === t) el.innerText = ""; }, 3000); }
         function addFloatingText(x, y, t, c) { floatingTexts.push({ x: x, y: y, text: t, color: c, life: 50 }); }
-        
         function addXP(sK, a) { const sk = player.stats.skills[sK]; if(!sk) return; sk.xp += a; addFloatingText(player.x, player.y - 20, `+${a} XP`, '#f1c40f'); let leveledUp = false; while (sk.xp >= sk.next) { sk.level++; sk.xp -= sk.next; sk.next = Math.floor(sk.next * 1.5); leveledUp = true; if (sK === 'hp') { player.stats.maxHp += 2; player.stats.hp = player.stats.maxHp; } } if(leveledUp) { setActionText(`${sk.name} Nível ${sk.level}!`, "#f1c40f"); addFloatingText(player.x, player.y - 40, `Level Up!`, '#2ecc71'); } updateUI(); }
         function getTotalDef() { let d = player.stats.skills.combat.level; if(player.equipment.shield) d += player.equipment.shield.defBonus; if(player.equipment.body) d += player.equipment.body.defBonus; return d; }
         function openShop(nData) { document.getElementById('btn-npc').style.display = 'block'; openTab('npc'); document.getElementById('npc-title').innerText = nData.name; document.getElementById('npc-dialog').innerText = `"${nData.dialog || '...'}"`; let sL = document.getElementById('npc-shop-list'); sL.innerHTML = ''; if(nData.shopStr) { nData.shopStr.split('|').forEach(p => { let pt = p.split(','); if(pt.length >= 2) { let iN = pt[0].trim(); let ct = parseInt(pt[1]); let iD = itemDB[iN]; if(iD) { sL.innerHTML += `<div class="shop-item"><span>${iD.icon} ${iD.name}</span><button class="shop-btn" onclick="buyItem('${iN}', ${ct})">Comprar (${ct} 🪙)</button></div>`; } } }); } }
@@ -667,31 +679,10 @@
             } catch(e) { }
         }
 
-        // --- DEV ENGINE ---
+        // --- DEV ENGINE GERAL ---
         function openModal(htmlContent) { const overlay = document.getElementById('custom-modal-overlay'); const box = document.getElementById('custom-modal-box'); box.innerHTML = htmlContent; overlay.style.display = 'flex'; }
         function closeModal() { document.getElementById('custom-modal-overlay').style.display = 'none'; }
         function openDevSub(tabId, btn) { document.querySelectorAll('.dev-sub-content').forEach(e=>e.classList.remove('active')); document.querySelectorAll('.dev-sub-btn').forEach(e=>e.classList.remove('active')); const t = document.getElementById(tabId); if(t) t.classList.add('active'); if(btn) btn.classList.add('active'); if(tabId==='dev-map') buildDevEntityList(); if(tabId==='dev-items') populateDevItems(); if(tabId==='dev-npcs') populateDevNPCs(); if(tabId==='dev-map-manager') loadDevMapManager(); if(tabId==='dev-import') document.getElementById('dev-import-code').value = ''; }
-
-        function importDevCode() {
-            const codeInput = document.getElementById('dev-import-code').value.trim(); if (!codeInput) { setActionText("Cole o código!", "#e74c3c"); return; }
-            try { let decoded = atob(codeInput); let parsed = JSON.parse(decoded); if(parsed.items) Object.assign(itemDB, parsed.items); if(parsed.npcs) Object.assign(npcDB, parsed.npcs); saveDataLogic(); updateUI(); buildDevEntityList(); document.getElementById('dev-import-code').value = ''; setActionText("Importado com sucesso!", "#2ecc71"); alert("Pacote injetado com sucesso!"); } catch(e) { setActionText("Código inválido.", "#e74c3c"); }
-        }
-
-        function filterDevEntities(term) { let val = removeAccents(term).toLowerCase(); document.querySelectorAll('.dev-ent-item').forEach(el => { let txt = removeAccents(el.getAttribute('data-name')).toLowerCase(); if(txt.includes(val)) el.style.display = devViewMode === 'list' ? 'flex' : 'flex'; else el.style.display = 'none'; }); if(devViewMode === 'list') { document.querySelectorAll('.dev-ent-cat').forEach(cat => { let hasVisible = false; let next = cat.nextElementSibling; while(next && next.classList.contains('dev-ent-item')) { if(next.style.display !== 'none') hasVisible = true; next = next.nextElementSibling; } cat.style.display = hasVisible ? 'block' : 'none'; }); } }
-        function setDevObj(val, el) { selectedDevEntity = val; document.querySelectorAll('.dev-ent-item').forEach(e => e.classList.remove('selected')); el.classList.add('selected'); }
-        function toggleDevView() { devViewMode = devViewMode === 'list' ? 'grid' : 'list'; buildDevEntityList(); let search = document.getElementById('dev-search'); if(search) filterDevEntities(search.value); }
-        
-        function buildDevEntityList() { 
-            let cont = document.getElementById('dev-entity-list'); if(!cont) return; let html = ''; 
-            let list = [ 
-                { cat: '🌲 Ambiente', items: [ { v: 'tree', n: 'Árvore', ic: '🌲' }, { v: 'fishing_spot', n: 'Lagos', ic: '🐟' }, { v: 'rock_copper', n: 'Minério (Copper)', ic: '🪨' }, { v: 'rock_tin', n: 'Minério (Tin)', ic: '🪨' }, { v: 'rock_iron', n: 'Minério (Iron)', ic: '🪨' } ]}, 
-                { cat: '🏠 Construções', items: [ { v: 'furnace', n: 'Fornalha', ic: '♨️' }, { v: 'anvil', n: 'Bigorna', ic: '🔨' }, { v: 'bank', n: 'Bank', ic: '🏦' }, { v: 'portal', n: 'Portal', ic: '🚪' }, { v: 'house', n: 'Casa', ic: '🏠' } ]}, 
-                { cat: '🎨 Chão e Pintura', items: [ { v: 'paint_dirt', n: 'Estrada de Terra', ic: '🟫' }, { v: 'paint_stone', n: 'Piso de Pedra', ic: '⬜' }, { v: 'paint_grass', n: 'Grama Escura', ic: '🟩' }, { v: 'paint_water', n: 'Água', ic: '🟦' } ]}, 
-                { cat: '👹 Monstros e NPCs', items: Object.keys(npcDB).map(k => ({ v: 'e_'+k, n: npcDB[k].name, ic: '👹' })) }, 
-                { cat: '📦 Itens', items: Object.keys(itemDB).map(k => ({ v: 'i_'+k, n: itemDB[k].name, ic: itemDB[k].icon })) } 
-            ]; 
-            if(devViewMode === 'list') { cont.style.display = 'block'; list.forEach(g => { html += `<div class="dev-ent-cat">${g.cat}</div>`; g.items.forEach(i => { let sel = selectedDevEntity === i.v ? 'selected' : ''; html += `<div class="dev-ent-item ${sel}" data-name="${i.n}" onclick="setDevObj('${i.v}', this)">${i.ic} <span style="margin-left:8px;">${i.n}</span></div>`; }); }); } else { cont.style.display = 'flex'; cont.style.flexWrap = 'wrap'; cont.style.gap = '5px'; list.forEach(g => { g.items.forEach(i => { let sel = selectedDevEntity === i.v ? 'selected' : ''; let border = selectedDevEntity === i.v ? 'border: 2px solid #e74c3c;' : 'border: 1px solid #3d2e24;'; html += `<div class="dev-ent-item ${sel}" style="width:40px; height:40px; display:flex; align-items:center; justify-content:center; background:#111; ${border} font-size:1.5rem; cursor:pointer;" data-name="${i.n}" title="${i.n}" onclick="setDevObj('${i.v}', this)">${i.ic}</div>`; }); }); } cont.innerHTML = html; 
-        }
 
         function toggleItemFields(){ let t = document.getElementById('di-type').value; document.getElementById('di-eq-fields').style.display = t==='equipment'?'block':'none'; document.getElementById('di-cons-fields').style.display = t==='consumable'?'block':'none'; }
         function populateDevItems(){ let s = document.getElementById('dev-item-select'); s.innerHTML='<option value="NEW">-- CRIAR NOVO ITEM --</option>'; Object.keys(itemDB).forEach(k=>{s.innerHTML+=`<option value="${k}">${k} (${itemDB[k].icon})</option>`;}); }
@@ -702,7 +693,7 @@
         function saveDevNPC(){ let k=document.getElementById('dn-id').value; if(!k)return; npcDB[k]={name:document.getElementById('dn-name').value,hp:parseInt(document.getElementById('dn-hp').value),maxHit:parseInt(document.getElementById('dn-hit').value),xp:parseInt(document.getElementById('dn-xp').value),c1:document.getElementById('dn-c1').value,c2:document.getElementById('dn-c2').value,lootStr:document.getElementById('dn-loot').value,dialog:document.getElementById('dn-dialog').value,shopStr:document.getElementById('dn-shop').value}; populateDevNPCs(); document.getElementById('dev-npc-select').value=k; setActionText(`NPC salvo!`); saveDataLogic(); buildDevEntityList();}
         function toggleDevBuild() { isDevBuildMode = !isDevBuildMode; document.getElementById('btn-build-mode').innerText=`Modo Construção: ${isDevBuildMode?'ON':'OFF'}`; document.getElementById('btn-build-mode').style.background=isDevBuildMode?'#2ecc71':'#e67e22'; setActionText(isDevBuildMode?"Build ON.":"Build OFF.", "#f1c40f"); }
 
-        function loadDevMapManager() { let grid = document.getElementById('map-grid-ui'); if(!grid) return; grid.innerHTML = ''; for(let y = -2; y <= 2; y++) { for(let x = -2; x <= 2; x++) { let m = Object.keys(gameMaps).find(k => gameMaps[k].gridX === x && gameMaps[k].gridY === y); let div = document.createElement('div'); div.className = 'map-tile'; if(m) { div.innerText = m; div.style.background = gameMaps[m].color; } else { div.innerText = "+"; } if(m === currentMap) div.classList.add('active-tile'); div.onclick = () => handleGridClick(x, y, m); grid.appendChild(div); } } let cm = gameMaps[currentMap]; if(cm) { document.getElementById('cur-map-id-disp').innerText = cm.name; document.getElementById('cur-map-name').value = cm.name; document.getElementById('cur-map-w').value = cm.width; document.getElementById('cur-map-h').value = cm.height; document.getElementById('cur-map-color').value = cm.color || '#4a6b2d'; } }
+        function loadDevMapManager() { let grid = document.getElementById('map-grid-ui'); if(!grid) return; grid.innerHTML = ''; for(let y = -2; y <= 2; y++) { for(let x = -2; x <= 2; x++) { let m = Object.keys(gameMaps).find(k => gameMaps[k].gridX === x && gameMaps[k].gridY === y); let div = document.createElement('div'); div.className = 'map-tile'; if(m) { div.innerText = m; div.style.background = gameMaps[m].color; } else { div.innerText = "+"; } if(m === currentMap) div.classList.add('active-tile'); div.onclick = () => handleGridClick(x, y, m); grid.appendChild(div); } } let cm = gameMaps[currentMap]; if(cm) { document.getElementById('cur-map-id-disp').innerText = cm.name; document.getElementById('cur-map-name').value = cm.name; document.getElementById('cur-map-w').value = cm.width || 800; document.getElementById('cur-map-h').value = cm.height || 600; document.getElementById('cur-map-color').value = cm.color || '#4a6b2d'; } }
 
         function handleGridClick(x, y, existingMapId) {
             if (existingMapId) { openModal(`<h3 style="margin-top:0; color:#f1c40f;">Mapa: ${existingMapId}</h3><div style="display:flex; flex-direction:column; gap:8px; margin-top:10px;"><button class="dev-save-btn" style="background:#3498db;" onclick="closeModal(); switchMap('${existingMapId}', ${gameMaps[existingMapId].width/2}, ${gameMaps[existingMapId].height/2})">Viajar para cá</button><button class="dev-save-btn" style="background:#c0392b;" onclick="unlinkMap('${existingMapId}')">Desvincular</button><button class="dev-save-btn" style="background:#555;" onclick="closeModal()">Cancelar</button></div>`); } 
@@ -712,9 +703,9 @@
         function unlinkMap(mapId) { if(gameMaps[mapId]) { gameMaps[mapId].gridX = null; gameMaps[mapId].gridY = null; saveDataLogic(); loadDevMapManager(); closeModal(); } }
         function quickCreateMap(x, y) { let nId = 'mapa_' + Date.now().toString().slice(-4); gameMaps[nId] = { id: nId, name: 'Novo Mapa', width: 800, height: 600, color: '#4a6b2d', gridX: x, gridY: y, entities: [] }; saveDataLogic(); loadDevMapManager(); closeModal(); }
         function saveCurrentMapSettings() { let cm = gameMaps[currentMap]; if(cm) { cm.name = document.getElementById('cur-map-name').value || cm.id; cm.width = parseInt(document.getElementById('cur-map-w').value) || 800; cm.height = parseInt(document.getElementById('cur-map-h').value) || 600; cm.color = document.getElementById('cur-map-color').value || '#4a6b2d'; resizeCanvas(); saveDataLogic(); loadDevMapManager(); setActionText("Mapa Atualizado!"); } }
-        function createNewMap() { let id = document.getElementById('dm-id').value; let n = document.getElementById('dm-name').value; let w = parseInt(document.getElementById('dm-w').value) || 800; let h = parseInt(document.getElementById('dm-h').value) || 600; let c = document.getElementById('dm-color').value; if(!id || gameMaps[id]) { alert("ID inválido/já existe!"); return; } gameMaps[id] = { id: id, name: n||id, width: w, height: h, color: c, gridX: null, gridY: null, entities: [] }; setActionText("Mapa Criado!"); saveDataLogic(); loadDevMapManager(); }
+        function createNewMap() { let id = document.getElementById('dm-id').value; let n = document.getElementById('dm-name').value; let w = parseInt(document.getElementById('dm-w').value) || 800; let h = parseInt(document.getElementById('dm-h').value) || 600; let c = document.getElementById('dm-color').value; if(!id || gameMaps[id]) { alert("ID inválido!"); return; } gameMaps[id] = { id: id, name: n||id, width: w, height: h, color: c, gridX: null, gridY: null, entities: [] }; setActionText("Mapa Criado!"); saveDataLogic(); loadDevMapManager(); }
 
-        // --- MANIPULADORES DE MOUSE E DEV SPAWN/DELETE ---
+        // --- SISTEMA DE CLIQUE / MOUSE / SPAWN / BORRACHA ---
         function handleInputDown(e) {
             if(document.getElementById('login-overlay').style.display !== 'none') return;
             if(e.type === 'touchstart') e.preventDefault(); 
@@ -769,6 +760,7 @@
             e.preventDefault(); const pos = getCoords(e);
             let cObj = null; let cur = gameMaps[currentMap] ? gameMaps[currentMap].entities || [] : [];
             
+            // BORRACHA DEV SEGURO DE BACKUP
             if (isDevBuildMode) { 
                 for (let i = cur.length - 1; i >= 0; i--) { 
                     let o = cur[i]; 
@@ -928,7 +920,7 @@
             }
         }
 
-        // --- UPDATE LOOP FÍSICO ---
+        // --- UPDATE LOOP FÍSICO COM BARREIRAS SÓLIDAS DE MAPA ---
         function update() {
             try {
                 let curM = gameMaps[currentMap]; if(!curM) return; let cur = curM.entities || [];
@@ -990,7 +982,7 @@
                     }
                 }
 
-                // COLISÃO COM OS LIMITES DO MAPA (Sem mapas adjacentes)
+                // COLISÃO COM OS LIMITES DO MAPA
                 let mapW = curM.width || 800;
                 let mapH = curM.height || 600;
 
@@ -1076,6 +1068,7 @@
         // --- RENDERIZADOR ---
         function draw() {
             ctx.setTransform(1, 0, 0, 1, 0, 0); 
+
             try {
                 let container = document.getElementById('game-container');
                 if(!container) return;
@@ -1106,11 +1099,13 @@
 
                 let cur = mapObj.entities || [];
                 
+                // 1. PINTURAS DE CHÃO
                 cur.forEach(o => {
                     if(!o || !o.type) return; let ow = o.w || 40; let oh = o.h || 40;
                     if(o.type === 'paint') { ctx.fillStyle = o.color; ctx.fillRect(o.x, o.y, ow, oh); }
                 });
 
+                // 2. ITENS DE CHÃO
                 cur.forEach(o => {
                     if(!o || !o.type) return; let ow = o.w || 30; let oh = o.h || 30;
                     if (o.type === 'ground_item' && o.active) {
@@ -1119,6 +1114,7 @@
                     }
                 });
 
+                // 3. ENTIDADES ACIMA
                 cur.forEach(o => {
                     if (!o || !o.type || !o.active || o.type === 'ground_item' || o.type === 'paint') return;
                     let ow = o.w || 30; let oh = o.h || 30;
@@ -1166,6 +1162,7 @@
                 if (Math.hypot(player.destX - player.x, player.destY - player.y) > player.speed && !player.isPerformingAction && !player.pendingAutoAction) { ctx.fillStyle = 'rgba(255, 255, 255, 0.4)'; ctx.beginPath(); ctx.arc(player.destX, player.destY, 5, 0, Math.PI*2); ctx.fill(); }
                 if (player.isPerformingAction) { const prg = 1 - (player.actionTimer / player.actionDelay); ctx.fillStyle = '#222'; ctx.fillRect(player.x - 15, player.y - 25, 30, 6); ctx.fillStyle = '#3498db'; ctx.fillRect(player.x - 14, player.y - 24, 28 * prg, 4); }
 
+                // DESENHA MULTIPLAYER
                 if (typeof otherPlayers !== 'undefined') {
                     Object.keys(otherPlayers).forEach(u => {
                         let op = otherPlayers[u];
@@ -1177,6 +1174,7 @@
                     });
                 }
 
+                // DESENHA O JOGADOR PRINCIPAL
                 const px = player.x; const py = player.y; 
                 const wp = (player.isPerformingAction && player.actionToolItem) ? player.actionToolItem : player.equipment.weapon; 
                 const sh = player.equipment.shield;
@@ -1185,7 +1183,7 @@
                 ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.arc(px, py+6, 8, 0, Math.PI*2); ctx.fill();
                 ctx.fillStyle = tC; ctx.fillRect(px - 8, py - 6, 16, 12); ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(px, py - 10, 8, 0, Math.PI*2); ctx.fill();
                 
-                if(player.facing.y > 0) { ctx.fillStyle = 'white'; ctx.fillRect(px - 4, py - 12, 3, 3); ctx.fillRect(px + 1, py - 12, 3, 3); ctx.fillStyle = 'black'; ctx.fillRect(px - 3, py - 11, 1, 1); ctx.fillRect(px + 2, py - 11, 1, 1); ctx.fillStyle = '#333'; ctx.fillRect(px-8, py+2, 16, 2);
+                if(player.facing.y > 0) { ctx.fillStyle = 'white'; ctx.fillRect(px - 4, py - 12, 3, 3); ctx.fillRect(px + 1, py - 12, 3, 3); ctx.fillStyle = 'black'; ctx.fillRect(px - 3, py - 11, 1, 1); ctx.fillStyle = '#333'; ctx.fillRect(px-8, py+2, 16, 2);
                 } else if (player.facing.y < 0) { ctx.fillStyle = '#6b4c3a'; ctx.beginPath(); ctx.arc(px, py - 10, 8, Math.PI, 0); ctx.fill(); ctx.fillStyle = '#8b4513'; ctx.fillRect(px - 6, py - 4, 12, 8);
                 } else if (player.facing.x < 0) { ctx.fillStyle = '#6b4c3a'; ctx.fillRect(px, py - 18, 8, 16); ctx.fillStyle = 'white'; ctx.fillRect(px - 4, py - 12, 3, 3); ctx.fillStyle = 'black'; ctx.fillRect(px - 3, py - 11, 1, 1); ctx.fillStyle = '#8b4513'; ctx.fillRect(px + 2, py - 4, 6, 8);
                 } else if (player.facing.x > 0) { ctx.fillStyle = '#6b4c3a'; ctx.fillRect(px - 8, py - 18, 8, 16); ctx.fillStyle = 'white'; ctx.fillRect(px + 1, py - 12, 3, 3); ctx.fillStyle = 'black'; ctx.fillRect(px + 2, py - 11, 1, 1); ctx.fillStyle = '#8b4513'; ctx.fillRect(px - 8, py - 4, 6, 8); }
@@ -1205,7 +1203,7 @@
                 projectiles.forEach(p => { if (p.type === 'ranged') { ctx.fillStyle = '#795548'; ctx.fillRect(p.x-2, p.y-2, 4, 4); } else { ctx.fillStyle = p.color || '#1abc9c'; ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#ecf0f1'; ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI*2); ctx.fill(); } });
                 floatingTexts.forEach((ft, i) => { ctx.fillStyle = ft.color; ctx.font = 'bold 16px Arial'; ctx.fillText(ft.text, ft.x, ft.y); ft.y -= 0.5; ft.life--; if(ft.life <= 0) floatingTexts.splice(i, 1); });
 
-                ctx.restore(); 
+                ctx.restore(); // Restaura a câmera matemática
 
             } catch (e) { console.error("Ignorado Draw Error", e); }
         }
@@ -1236,10 +1234,11 @@
             } catch(e) {}
         }
 
+        // --- LOOP PRINCIPAL DO MOTOR GRÁFICO ---
         function gameLoop() { 
-            try { update(); } catch(e){} 
-            try { draw(); } catch(e){} 
-            try { drawMinimap(); } catch(e){} 
+            try { update(); } catch(e){ console.error(e); } 
+            try { draw(); } catch(e){ console.error(e); } 
+            try { drawMinimap(); } catch(e){ console.error(e); } 
             requestAnimationFrame(gameLoop); 
         }
     </script>
