@@ -16,9 +16,14 @@ function initDB() {
         const initialDB = {
             users: { "Admin": { password: "Adleradm", role: "admin", playerData: null } },
             worldData: null, itemDB: null, npcDB: null,
-            chat: [{sender: 'Sistema', msg: 'Servidor iniciado!', color: '#2ecc71'}]
+            chat: [{sender: 'Sistema', msg: 'Servidor iniciado!', color: '#2ecc71'}],
+            mapVersion: Date.now() // Controle de Atualização de Mundo
         };
         fs.writeFileSync(DB_FILE, JSON.stringify(initialDB, null, 2), 'utf8');
+    } else {
+        // Garante que DBs antigas ganhem a tag mapVersion
+        let db = readDB();
+        if(!db.mapVersion) { db.mapVersion = Date.now(); writeDB(db); }
     }
 }
 initDB();
@@ -26,7 +31,7 @@ initDB();
 function readDB() { return JSON.parse(fs.readFileSync(DB_FILE, 'utf8')); }
 function writeDB(data) { fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf8'); }
 
-let activePlayers = {}; // Multiplayer em Tempo Real (Memória RAM)
+let activePlayers = {}; // Multiplayer em Tempo Real na RAM (Super Leve)
 
 app.post('/api/register', (req, res) => {
     const { username, password } = req.body;
@@ -46,7 +51,8 @@ app.post('/api/login', (req, res) => {
     
     res.json({ 
         success: true, role: user.role, playerData: user.playerData,
-        worldData: db.worldData, itemDB: db.itemDB, npcDB: db.npcDB, chat: db.chat
+        worldData: db.worldData, itemDB: db.itemDB, npcDB: db.npcDB, chat: db.chat,
+        mapVersion: db.mapVersion
     });
 });
 
@@ -55,38 +61,37 @@ app.post('/api/save', (req, res) => {
     let db = readDB();
     if (db.users[username]) {
         db.users[username].playerData = playerData; 
-        if (db.users[username].role === 'admin') { // Somente Admin edita o mundo
-            if (worldData) db.worldData = worldData;
+        if (db.users[username].role === 'admin') { 
+            // Admin modifica o mundo e atualiza a versão para os players baixarem
+            if (worldData) { db.worldData = worldData; db.mapVersion = Date.now(); }
             if (itemDB) db.itemDB = itemDB;
             if (npcDB) db.npcDB = npcDB;
         }
-        writeDB(db); res.json({ success: true });
+        writeDB(db); res.json({ success: true, mapVersion: db.mapVersion });
     } else { res.status(401).json({ error: 'Sessão inválida.' }); }
 });
 
-// A GRANDE MAGIA: Rota de Sincronização Multiplayer
+// ROTA SUPER LEVE PARA O MOTOR DE JOGO (Sem trafegar o mapa pesado)
 app.post('/api/sync', (req, res) => {
     const { username, x, y, map } = req.body;
     let db = readDB();
 
-    // Atualiza a posição da sua conta no mundo
-    if (username) {
-        activePlayers[username] = { x, y, map, lastSeen: Date.now() };
-    }
+    if (username) { activePlayers[username] = { x, y, map, lastSeen: Date.now() }; }
 
     let now = Date.now();
     let visiblePlayers = {};
     
-    // Varre quem está online no mesmo mapa que você
     for(let u in activePlayers) {
-        if (now - activePlayers[u].lastSeen > 5000) {
-            delete activePlayers[u]; // Remove quem desconectou
-        } else if (u !== username && activePlayers[u].map === map) {
-            visiblePlayers[u] = activePlayers[u];
-        }
+        if (now - activePlayers[u].lastSeen > 4000) { delete activePlayers[u]; } 
+        else if (u !== username && activePlayers[u].map === map) { visiblePlayers[u] = activePlayers[u]; }
     }
 
-    res.json({ players: visiblePlayers, chat: db.chat, worldData: db.worldData });
+    res.json({ players: visiblePlayers, chat: db.chat, mapVersion: db.mapVersion });
+});
+
+// ROTA EXCLUSIVA PARA BAIXAR O MAPA SOMENTE QUANDO HÁ MUDANÇAS
+app.get('/api/map', (req, res) => {
+    res.json({ worldData: readDB().worldData });
 });
 
 app.post('/api/chat', (req, res) => {

@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MiniScape 2D - V47 (Engine Definitiva MMORPG)</title>
+    <title>MiniScape 2D - V48 (Multiplayer Liso & Mapas Sincronizados)</title>
     <style>
-        /* === BASE & RESPONSIVIDADE (TELA CHEIA 1900px) === */
+        /* === BASE & RESPONSIVIDADE === */
         body { margin: 0; padding: 10px; background-color: #121212; color: #e0e0e0; font-family: 'Segoe UI', Tahoma, sans-serif; display: flex; gap: 15px; justify-content: center; height: 100vh; box-sizing: border-box; overflow: hidden; flex-direction: row; align-items: stretch; }
         @media (max-width: 850px) { body { flex-direction: column; align-items: center; padding: 5px; overflow-y: auto; height: auto;} #ui-panel { width: 100% !important; max-width: 100%; min-height: 500px; } .mobile-btn { display: block !important; } #game-container { height: 50vh; min-height: 400px; } }
         
-        /* CÂMERA DINÂMICA (SEM SCROLL, 100% MATEMÁTICO) */
+        /* CÂMERA DINÂMICA */
         #game-container { position: relative; flex: 1; border: 2px solid #3d2e24; background-color: #000; box-shadow: 0 0 20px rgba(0,0,0,0.8); overflow: hidden; border-radius: 4px; display: block;}
-        #gameCanvas { cursor: crosshair; display: block; padding: 0; margin: 0; width: 100%; height: 100%; touch-action: none; border: none; }
+        #gameCanvas { cursor: crosshair; display: block; width: 100%; height: 100%; touch-action: none; border: none; padding: 0; margin: 0;}
         
         /* SISTEMA DE CHAT */
         #chat-container { position: absolute; bottom: 10px; left: 10px; width: 350px; background: rgba(0, 0, 0, 0.7); border: 1px solid #3d2e24; border-radius: 4px; display: flex; flex-direction: column; z-index: 100; pointer-events: auto; }
@@ -33,7 +33,7 @@
         #custom-modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); z-index: 10000; align-items: center; justify-content: center; }
         #custom-modal-box { background: #2c241b; border: 3px solid #5d4037; border-radius: 4px; padding: 20px; width: 320px; box-shadow: 0 0 25px black; color: white; display: flex; flex-direction: column; gap: 10px; }
         
-        /* UI PAINEL RPG ELEGANTE */
+        /* UI PAINEL */
         #ui-panel { width: 360px; min-width: 360px; background-color: #231c15; border: 2px solid #3d2e24; padding: 10px; display: flex; flex-direction: column; gap: 8px; box-sizing: border-box; overflow-y: hidden; border-radius: 4px; height: 100%; box-shadow: inset 0 0 15px rgba(0,0,0,0.8); }
         .hud-header { display: flex; gap: 10px; align-items: stretch; background: #1a1511; padding: 8px; border: 1px solid #3d2e24; border-radius: 4px; }
         #minimapCanvas { border: 2px solid #5d4037; background: #000; border-radius: 4px; width: 110px; height: 80px; flex-shrink: 0;}
@@ -49,7 +49,6 @@
         .tab-btn { flex: 1 1 20%; padding: 6px 2px; background: #3d2e24; color: #bdc3c7; border: 1px solid #231912; cursor: pointer; font-weight: bold; font-size: 0.70rem; text-align: center; border-radius: 2px 2px 0 0;} 
         .tab-btn:hover { background: #5d4037; color: white;} .active-btn { background: #5d4037 !important; border-bottom: none !important; color: #f1c40f !important;} 
         
-        /* BOTÃO DEV DESTRUTIVO E BLINDADO */
         #btn-dev { display: none !important; background-color: #c0392b; color: white; border-color: #900 !important; }
         #btn-dev.is-admin { display: block !important; }
         
@@ -68,7 +67,7 @@
         .map-tile-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; background: #222; padding: 2px; border: 2px solid #111; border-radius: 4px;} .map-tile { aspect-ratio: 1; background: #111; color: #888; font-size: 0.6rem; display: flex; align-items: center; justify-content: center; cursor: pointer; text-align: center; word-break: break-all; border-radius: 2px;} .map-tile:hover { background: #333; color: white;} .map-tile.active-tile { border: 2px solid #f1c40f; background: #5d4037; color: white;}
 
         /* TELA DE LOGIN ONLINE */
-        #login-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #121212; z-index: 20000; align-items: center; justify-content: center; flex-direction: column; }
+        #login-overlay { display: flex; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #121212; z-index: 20000; align-items: center; justify-content: center; flex-direction: column; }
         .login-box { background: #1e1e1e; border: 4px solid #3d2e24; padding: 30px; border-radius: 8px; width: 300px; box-shadow: 0 0 30px black; text-align: center;}
         .login-box h1 { color: #f1c40f; margin-top: 0; text-transform: uppercase; letter-spacing: 2px;}
         .login-input { width: 100%; padding: 10px; margin-bottom: 15px; background: #111; border: 1px solid #5d4037; color: white; box-sizing: border-box; border-radius: 4px;}
@@ -79,11 +78,10 @@
 </head>
 <body>
 
-    <!-- TELA DE LOGIN -->
     <div id="login-overlay">
         <div class="login-box">
             <h1>MiniScape</h1>
-            <p style="font-size: 0.8rem; color: #bdc3c7;">Servidor Online e Local</p>
+            <p style="font-size: 0.8rem; color: #bdc3c7;">Servidor Online / Offline</p>
             <input type="text" id="auth-user" class="login-input" placeholder="Usuário">
             <input type="password" id="auth-pass" class="login-input" placeholder="Senha">
             <div id="login-msg"></div>
@@ -92,7 +90,7 @@
         </div>
     </div>
 
-    <!-- O JOGO FICA OCULTO ATÉ O LOGIN SER APROVADO COM O MAX-WIDTH 1900px MANTIDO -->
+    <!-- O JOGO (LAYOUT MANTIDO) -->
     <div id="game-wrapper" style="display: none; width: 100%; height: 100%; max-width: 1900px; gap: 15px;">
         <div id="custom-modal-overlay"><div id="custom-modal-box"></div></div>
         <div id="tooltip"></div>
@@ -100,8 +98,7 @@
         
         <div id="game-container">
             <canvas id="gameCanvas"></canvas>
-            
-            <!-- CHAT SOBREPOSTO -->
+            <!-- CHAT -->
             <div id="chat-container">
                 <div id="chat-box"></div>
                 <div id="chat-input-area">
@@ -126,7 +123,7 @@
             <button id="mobile-action-btn" class="mobile-btn" onclick="tryPickupOrInteract()">🎯 AÇÃO (ESPAÇO)</button>
             <button id="mobile-atk-btn" class="mobile-btn" style="background:#8e44ad; border-color:#9b59b6; margin-top:-5px;" onclick="tryAttack()">⚔️ ATACAR (CTRL)</button>
 
-            <!-- AQUI É ONDE O BOTÃO DEV SERÁ INJETADO PELO JS SOMENTE PARA O ADMIN -->
+            <!-- BOTÕES -->
             <div class="tab-buttons" id="tab-buttons-container">
                 <button id="btn-inv" class="tab-btn active-btn" onclick="openTab('inv')">Inv</button>
                 <button id="btn-eq" class="tab-btn" onclick="openTab('eq')">Equip</button>
@@ -137,24 +134,9 @@
                 <button id="btn-cfg" class="tab-btn" onclick="openTab('cfg')">⚙️</button>
             </div>
 
-            <!-- ABAS DA UI -->
-            <div id="tab-inv" class="tab-content active-tab">
-                <div id="inv-grid" class="grid-container"></div>
-                <div style="font-size: 0.65rem; color: #888; margin-top: 10px; text-align: right;">Peso: <span id="weight-txt" style="color:#bdc3c7;">0</span> / 50 kg</div>
-            </div>
-
-            <div id="tab-eq" class="tab-content">
-                <div id="equip-grid">
-                    <div class="equip-slot-box" onclick="unequip('head')"><span class="slot-name">Cabeça</span><span id="eq-head" class="equip-icon"></span></div>
-                    <div class="equip-slot-box" onclick="unequip('body')"><span class="slot-name">Tronco</span><span id="eq-body" class="equip-icon"></span></div>
-                    <div class="equip-slot-box" onclick="unequip('ammo')"><span class="slot-name">Munição</span><span id="eq-ammo" class="equip-icon"></span><span id="ammo-qty" class="item-qty" style="top:auto; bottom:2px;"></span></div>
-                    <div class="equip-slot-box" onclick="unequip('weapon')"><span class="slot-name">Arma</span><span id="eq-weapon" class="equip-icon"></span></div>
-                    <div class="equip-slot-box" onclick="unequip('shield')"><span class="slot-name">Escudo</span><span id="eq-shield" class="equip-icon"></span></div>
-                    <div class="equip-slot-box"></div> 
-                </div>
-                <div style="margin-top:10px; font-size:0.75rem; color:#f1c40f; text-align: center;" id="def-stats">Bônus de Defesa: 0</div>
-            </div>
-
+            <!-- ABAS -->
+            <div id="tab-inv" class="tab-content active-tab"><div id="inv-grid" class="grid-container"></div><div style="font-size: 0.65rem; color: #888; margin-top: 10px; text-align: right;">Peso: <span id="weight-txt" style="color:#bdc3c7;">0</span> / 50 kg</div></div>
+            <div id="tab-eq" class="tab-content"><div id="equip-grid"><div class="equip-slot-box" onclick="unequip('head')"><span class="slot-name">Cabeça</span><span id="eq-head" class="equip-icon"></span></div><div class="equip-slot-box" onclick="unequip('body')"><span class="slot-name">Tronco</span><span id="eq-body" class="equip-icon"></span></div><div class="equip-slot-box" onclick="unequip('ammo')"><span class="slot-name">Munição</span><span id="eq-ammo" class="equip-icon"></span><span id="ammo-qty" class="item-qty" style="top:auto; bottom:2px;"></span></div><div class="equip-slot-box" onclick="unequip('weapon')"><span class="slot-name">Arma</span><span id="eq-weapon" class="equip-icon"></span></div><div class="equip-slot-box" onclick="unequip('shield')"><span class="slot-name">Escudo</span><span id="eq-shield" class="equip-icon"></span></div><div class="equip-slot-box"></div></div><div style="margin-top:10px; font-size:0.75rem; color:#f1c40f; text-align: center;" id="def-stats">Bônus de Defesa: 0</div></div>
             <div id="tab-sk" class="tab-content"><div id="skills-list"></div></div>
             <div id="tab-craft" class="tab-content"><div style="font-size: 0.7rem; color: #bdc3c7; margin-bottom: 10px;">Crie itens e armas.</div><div id="craft-list"></div></div>
             <div id="tab-mag" class="tab-content"><div style="font-size: 0.7rem; color: #bdc3c7; margin-bottom: 10px;">Equipe um Cajado e clique na magia.</div><div id="spellbook-list"></div></div>
@@ -169,93 +151,20 @@
                     <button class="dev-sub-btn" onclick="openDevSub('dev-npcs', this)">NPCs</button>
                     <button class="dev-sub-btn" onclick="openDevSub('dev-import', this)" style="color: #9b59b6; font-weight:bold;">📥 Import</button>
                 </div>
-
-                <div id="dev-import" class="dev-sub-content">
-                    <h3 style="color:#2ecc71; margin-top:0;">📡 Injetor de Expansão</h3>
-                    <p style="font-size:0.75rem; color:#bdc3c7; line-height: 1.4;">Cole os <b>Códigos Especiais</b> gerados pela IA para adicionar Novos Bosses, Itens e Mapas.</p>
-                    <textarea id="dev-import-code" class="dev-input" style="height:120px; font-family:monospace; resize: none; margin-bottom: 10px;" placeholder="Cole o código Base64 aqui..."></textarea>
-                    <button class="dev-save-btn" onclick="importDevCode()" style="background:#8e44ad; font-size: 1rem;">⚡ Injetar Pacote</button>
-                </div>
-
-                <div id="dev-map" class="dev-sub-content active">
-                    <div class="dev-row" style="margin-bottom: 5px;">
-                        <input type="text" id="dev-search" class="dev-input" placeholder="🔍 Buscar entidade..." oninput="filterDevEntities(this.value)" style="flex: 1; border-color: #5d4037;">
-                        <button class="dev-save-btn" style="width: auto; margin:0; background:#3d2e24;" onclick="toggleDevView()" title="Alternar Vista">🔲/📄</button>
-                    </div>
-                    <div id="dev-entity-list"></div>
-                    <div class="dev-row" style="margin-top: 8px;">
-                        <input type="number" id="spawn-w" class="dev-input" placeholder="Largura (W)">
-                        <input type="number" id="spawn-h" class="dev-input" placeholder="Altura (H)">
-                    </div>
-                    <div class="dev-form-group" style="margin-top: 5px;">
-                        <input type="text" id="spawn-img" class="dev-input" placeholder="URL Imagem PNG (Opcional)">
-                    </div>
-                    <button onclick="toggleDevBuild()" id="btn-build-mode" style="width: 100%; padding: 10px; background: #e67e22; color: white; border: none; font-weight: bold; cursor: pointer; margin-top:5px; border-radius:4px;">
-                        Modo Construção: OFF
-                    </button>
-                    <p style="font-size: 0.7rem; color: #f1c40f; margin-top:10px;">ESQUERDO: Colocar | DIREITO: <b>Apagar</b></p>
-                </div>
-
-                <div id="dev-map-manager" class="dev-sub-content">
-                    <div class="dev-form-group" style="background:#1a1511; padding:10px; border:1px solid #3d2e24; margin-bottom:10px; border-radius:4px;">
-                        <label style="color:#2ecc71; margin-bottom:5px;">🗺️ Editar Mapa Atual: <span id="cur-map-id-disp"></span></label>
-                        <div class="dev-row"><input type="text" id="cur-map-name" class="dev-input" placeholder="Nome"><input type="color" id="cur-map-color" class="dev-input" style="padding:0; height:28px;"></div>
-                        <div class="dev-row" style="margin-top:5px;"><input type="number" id="cur-map-w" class="dev-input" placeholder="Larg (W)"><input type="number" id="cur-map-h" class="dev-input" placeholder="Alt (H)"></div>
-                        <button class="dev-save-btn" onclick="saveCurrentMapSettings()">Salvar Alterações</button>
-                    </div>
-                    <p style="font-size:0.7rem; color:#bdc3c7;">Conecte seus mapas clicando na grade.</p>
-                    <div id="map-grid-ui" class="map-tile-grid"></div>
-                    <div class="dev-form-group" style="margin-top:10px; padding-top: 10px; border-top: 1px solid #444;">
-                        <label style="color:#f39c12;">Criar Novo Mapa Solto:</label>
-                        <div class="dev-row"><input type="text" id="dm-id" class="dev-input" placeholder="ID (floresta)"><input type="text" id="dm-name" class="dev-input" placeholder="Nome Exibição"></div>
-                        <button class="dev-save-btn" onclick="createNewMap()">Criar Mapa Base</button>
-                    </div>
-                </div>
-
-                <div id="dev-items" class="dev-sub-content">
-                    <div class="dev-form-group"><label>Editar/Criar:</label><select id="dev-item-select" class="dev-select" onchange="loadDevItemForm()"><option value="NEW">-- CRIAR NOVO ITEM --</option></select></div>
-                    <div class="dev-form-group"><label>Nome (ID Único):</label><input type="text" id="di-name" class="dev-input"></div>
-                    <div class="dev-row"><div class="dev-form-group" style="flex:1"><label>Ícone:</label><input type="text" id="di-icon" class="dev-input"></div><div class="dev-form-group" style="flex:1"><label>Peso (kg):</label><input type="number" step="0.1" id="di-weight" class="dev-input"></div></div>
-                    <div class="dev-form-group"><label>Tipo:</label><select id="di-type" class="dev-select" onchange="toggleItemFields()"><option value="resource">Recurso/Material</option><option value="equipment">Equipamento</option><option value="consumable">Consumível</option><option value="tool">Ferramenta</option></select></div>
-                    <div class="dev-form-group"><label>Stackable:</label><select id="di-stack" class="dev-select"><option value="true">Sim</option><option value="false">Não</option></select></div>
-                    <div id="di-eq-fields" style="display:none; padding:5px; border:1px solid #3d2e24; background:#111; margin-bottom:5px;">
-                        <div class="dev-row"><select id="di-slot" class="dev-select" style="flex:1"><option value="weapon">Arma</option><option value="shield">Escudo</option><option value="head">Cabeça</option><option value="body">Tronco</option><option value="ammo">Munição</option></select><select id="di-tool" class="dev-select" style="flex:1"><option value="">Melee</option><option value="magic">Magia</option><option value="ranged">Arco</option><option value="pickaxe">Picareta</option><option value="axe">Machado</option><option value="net">Rede</option></select></div>
-                        <div class="dev-row"><div class="dev-form-group"><label>Dano:</label><input type="number" id="di-dmg" class="dev-input" value="0"></div><div class="dev-form-group"><label>Defesa:</label><input type="number" id="di-def" class="dev-input" value="0"></div></div>
-                    </div>
-                    <div id="di-cons-fields" style="display:none; padding:5px; border:1px solid #3d2e24; background:#111; margin-bottom:5px;"><div class="dev-form-group"><label>Cura HP:</label><input type="number" id="di-heal" class="dev-input" value="0"></div></div>
-                    <div class="dev-form-group"><label>Receita Crafting:</label><input type="text" id="di-recipe" class="dev-input" placeholder="Logs,1|Copper Ore,1"></div>
-                    <div class="dev-form-group"><label>Quantidade Criada na Receita:</label><input type="number" id="di-craftqty" class="dev-input" value="1"></div>
-                    <div class="dev-form-group"><label>Descrição Tooltip:</label><input type="text" id="di-desc" class="dev-input"></div>
-                    <button class="dev-save-btn" onclick="saveDevItem()">Salvar/Atualizar Item</button>
-                </div>
-
-                <div id="dev-npcs" class="dev-sub-content">
-                    <div class="dev-form-group"><label>Editar/Criar NPC/Monstro:</label><select id="dev-npc-select" class="dev-select" onchange="loadDevNPCForm()"><option value="NEW">-- CRIAR NOVO --</option></select></div>
-                    <div class="dev-form-group"><label>ID Único:</label><input type="text" id="dn-id" class="dev-input"></div>
-                    <div class="dev-form-group"><label>Nome:</label><input type="text" id="dn-name" class="dev-input"></div>
-                    <div class="dev-row"><div class="dev-form-group" style="flex:1"><label>HP Máx (0=NPC):</label><input type="number" id="dn-hp" class="dev-input" value="10"></div><div class="dev-form-group" style="flex:1"><label>Dano Máx:</label><input type="number" id="dn-hit" class="dev-input" value="1"></div><div class="dev-form-group" style="flex:1"><label>XP Base:</label><input type="number" id="dn-xp" class="dev-input" value="10"></div></div>
-                    <div class="dev-row"><div class="dev-form-group" style="flex:1"><label>Cor Corpo:</label><input type="color" id="dn-c1" class="dev-input" value="#e74c3c" style="padding:0; height:30px;"></div><div class="dev-form-group" style="flex:1"><label>Cor Cabeça:</label><input type="color" id="dn-c2" class="dev-input" value="#c0392b" style="padding:0; height:30px;"></div></div>
-                    <div class="dev-form-group"><label>Diálogo (Se for NPC):</label><input type="text" id="dn-dialog" class="dev-input"></div>
-                    <div class="dev-form-group"><label>Loja (Item,Preço|...):</label><input type="text" id="dn-shop" class="dev-input"></div>
-                    <div class="dev-form-group"><label>Loot Drop (Item,Chance,MaxQty|...):</label><input type="text" id="dn-loot" class="dev-input" placeholder="Bones,1,1"></div>
-                    <button class="dev-save-btn" onclick="saveDevNPC()">Salvar NPC/Monstro</button>
-                </div>
+                <div id="dev-import" class="dev-sub-content"><h3 style="color:#2ecc71; margin-top:0;">📡 Injetor de Expansão</h3><p style="font-size:0.75rem; color:#bdc3c7; line-height: 1.4;">Cole os <b>Códigos Especiais</b> gerados pela IA para adicionar Novos Bosses, Itens e Mapas.</p><textarea id="dev-import-code" class="dev-input" style="height:120px; font-family:monospace; resize: none; margin-bottom: 10px;" placeholder="Cole o código Base64 aqui..."></textarea><button class="dev-save-btn" onclick="importDevCode()" style="background:#8e44ad; font-size: 1rem;">⚡ Injetar Pacote</button></div>
+                <div id="dev-map" class="dev-sub-content active"><div class="dev-row" style="margin-bottom: 5px;"><input type="text" id="dev-search" class="dev-input" placeholder="🔍 Buscar entidade..." oninput="filterDevEntities(this.value)" style="flex: 1; border-color: #5d4037;"><button class="dev-save-btn" style="width: auto; margin:0; background:#3d2e24;" onclick="toggleDevView()" title="Alternar Vista">🔲/📄</button></div><div id="dev-entity-list"></div><div class="dev-row" style="margin-top: 8px;"><input type="number" id="spawn-w" class="dev-input" placeholder="Largura (W)"><input type="number" id="spawn-h" class="dev-input" placeholder="Altura (H)"></div><div class="dev-form-group" style="margin-top: 5px;"><input type="text" id="spawn-img" class="dev-input" placeholder="URL Imagem PNG (Opcional)"></div><button onclick="toggleDevBuild()" id="btn-build-mode" style="width: 100%; padding: 10px; background: #e67e22; color: white; border: none; font-weight: bold; cursor: pointer; margin-top:5px; border-radius:4px;">Modo Construção: OFF</button><p style="font-size: 0.7rem; color: #f1c40f; margin-top:10px;">ESQUERDO: Colocar | DIREITO: <b>Apagar</b></p></div>
+                <div id="dev-map-manager" class="dev-sub-content"><div class="dev-form-group" style="background:#1a1511; padding:10px; border:1px solid #3d2e24; margin-bottom:10px; border-radius:4px;"><label style="color:#2ecc71; margin-bottom:5px;">🗺️ Editar Mapa Atual: <span id="cur-map-id-disp"></span></label><div class="dev-row"><input type="text" id="cur-map-name" class="dev-input" placeholder="Nome"><input type="color" id="cur-map-color" class="dev-input" style="padding:0; height:28px;"></div><div class="dev-row" style="margin-top:5px;"><input type="number" id="cur-map-w" class="dev-input" placeholder="Larg (W)"><input type="number" id="cur-map-h" class="dev-input" placeholder="Alt (H)"></div><button class="dev-save-btn" onclick="saveCurrentMapSettings()">Salvar Alterações</button></div><p style="font-size:0.7rem; color:#bdc3c7;">Conecte seus mapas clicando na grade.</p><div id="map-grid-ui" class="map-tile-grid"></div><div class="dev-form-group" style="margin-top:10px; padding-top: 10px; border-top: 1px solid #444;"><label style="color:#f39c12;">Criar Novo Mapa Solto:</label><div class="dev-row"><input type="text" id="dm-id" class="dev-input" placeholder="ID (floresta)"><input type="text" id="dm-name" class="dev-input" placeholder="Nome Exibição"></div><button class="dev-save-btn" onclick="createNewMap()">Criar Mapa Base</button></div></div>
+                <div id="dev-items" class="dev-sub-content"><div class="dev-form-group"><label>Editar/Criar:</label><select id="dev-item-select" class="dev-select" onchange="loadDevItemForm()"><option value="NEW">-- CRIAR NOVO ITEM --</option></select></div><div class="dev-form-group"><label>Nome (ID Único):</label><input type="text" id="di-name" class="dev-input"></div><div class="dev-row"><div class="dev-form-group" style="flex:1"><label>Ícone:</label><input type="text" id="di-icon" class="dev-input"></div><div class="dev-form-group" style="flex:1"><label>Peso (kg):</label><input type="number" step="0.1" id="di-weight" class="dev-input"></div></div><div class="dev-form-group"><label>Tipo:</label><select id="di-type" class="dev-select" onchange="toggleItemFields()"><option value="resource">Recurso/Material</option><option value="equipment">Equipamento</option><option value="consumable">Consumível</option><option value="tool">Ferramenta</option></select></div><div class="dev-form-group"><label>Stackable:</label><select id="di-stack" class="dev-select"><option value="true">Sim</option><option value="false">Não</option></select></div><div id="di-eq-fields" style="display:none; padding:5px; border:1px solid #3d2e24; background:#111; margin-bottom:5px;"><div class="dev-row"><select id="di-slot" class="dev-select" style="flex:1"><option value="weapon">Arma</option><option value="shield">Escudo</option><option value="head">Cabeça</option><option value="body">Tronco</option><option value="ammo">Munição</option></select><select id="di-tool" class="dev-select" style="flex:1"><option value="">Melee</option><option value="magic">Magia</option><option value="ranged">Arco</option><option value="pickaxe">Picareta</option><option value="axe">Machado</option><option value="net">Rede</option></select></div><div class="dev-row"><div class="dev-form-group"><label>Dano:</label><input type="number" id="di-dmg" class="dev-input" value="0"></div><div class="dev-form-group"><label>Defesa:</label><input type="number" id="di-def" class="dev-input" value="0"></div></div></div><div id="di-cons-fields" style="display:none; padding:5px; border:1px solid #3d2e24; background:#111; margin-bottom:5px;"><div class="dev-form-group"><label>Cura HP:</label><input type="number" id="di-heal" class="dev-input" value="0"></div></div><div class="dev-form-group"><label>Receita Crafting:</label><input type="text" id="di-recipe" class="dev-input" placeholder="Logs,1|Copper Ore,1"></div><div class="dev-form-group"><label>Quantidade Criada na Receita:</label><input type="number" id="di-craftqty" class="dev-input" value="1"></div><div class="dev-form-group"><label>Descrição Tooltip:</label><input type="text" id="di-desc" class="dev-input"></div><button class="dev-save-btn" onclick="saveDevItem()">Salvar/Atualizar Item</button></div>
+                <div id="dev-npcs" class="dev-sub-content"><div class="dev-form-group"><label>Editar/Criar NPC/Monstro:</label><select id="dev-npc-select" class="dev-select" onchange="loadDevNPCForm()"><option value="NEW">-- CRIAR NOVO --</option></select></div><div class="dev-form-group"><label>ID Único:</label><input type="text" id="dn-id" class="dev-input"></div><div class="dev-form-group"><label>Nome:</label><input type="text" id="dn-name" class="dev-input"></div><div class="dev-row"><div class="dev-form-group" style="flex:1"><label>HP Máx (0=NPC):</label><input type="number" id="dn-hp" class="dev-input" value="10"></div><div class="dev-form-group" style="flex:1"><label>Dano Máx:</label><input type="number" id="dn-hit" class="dev-input" value="1"></div><div class="dev-form-group" style="flex:1"><label>XP Base:</label><input type="number" id="dn-xp" class="dev-input" value="10"></div></div><div class="dev-row"><div class="dev-form-group" style="flex:1"><label>Cor Corpo:</label><input type="color" id="dn-c1" class="dev-input" value="#e74c3c" style="padding:0; height:30px;"></div><div class="dev-form-group" style="flex:1"><label>Cor Cabeça:</label><input type="color" id="dn-c2" class="dev-input" value="#c0392b" style="padding:0; height:30px;"></div></div><div class="dev-form-group"><label>Diálogo (Se for NPC):</label><input type="text" id="dn-dialog" class="dev-input"></div><div class="dev-form-group"><label>Loja (Item,Preço|...):</label><input type="text" id="dn-shop" class="dev-input"></div><div class="dev-form-group"><label>Loot Drop (Item,Chance,MaxQty|...):</label><input type="text" id="dn-loot" class="dev-input" placeholder="Bones,1,1"></div><button class="dev-save-btn" onclick="saveDevNPC()">Salvar NPC/Monstro</button></div>
             </div>
-
             <div id="tab-bank" class="tab-content"><div id="bank-grid" class="grid-container"></div></div>
-
-            <div id="tab-cfg" class="tab-content">
-                <h3 style="color:#ecf0f1; margin-top: 0; border-bottom: 1px solid #3d2e24; padding-bottom: 5px;">Sistema Servidor</h3>
-                <p style="font-size: 0.75rem; color: #bdc3c7;">Seus dados são salvos online (ou offline) automaticamente.</p>
-                <button class="dev-save-btn" style="background: #27ae60;" onclick="saveDataLogic(true)">💾 Forçar Save Global</button>
-                <button class="dev-save-btn" style="background: #c0392b; margin-top: 20px;" onclick="logOut()">🚪 Sair da Conta / Reiniciar</button>
-            </div>
+            <div id="tab-cfg" class="tab-content"><h3 style="color:#ecf0f1; margin-top: 0; border-bottom: 1px solid #3d2e24; padding-bottom: 5px;">Sistema</h3><p style="font-size: 0.75rem; color: #bdc3c7;">Seus dados são salvos online automaticamente.</p><button class="dev-save-btn" style="background: #27ae60;" onclick="saveDataLogic(true)">💾 Forçar Save Global</button><button class="dev-save-btn" style="background: #c0392b; margin-top: 20px;" onclick="logOut()">🚪 Sair da Conta / Reiniciar</button></div>
         </div>
     </div>
 
     <!-- SCRIPT GIGANTE E UNIFICADO DO JOGO -->
     <script>
-        // === 1. DECLARAÇÕES GLOBAIS ÚNICAS ===
+        // === 1. DECLARAÇÕES GLOBAIS ===
         const canvas = document.getElementById('gameCanvas'); 
         const ctx = canvas.getContext('2d');
         const osrsMenu = document.getElementById('osrs-menu'); 
@@ -267,17 +176,20 @@
         let isOfflineMode = false;
         let chatMessages = [];
         let otherPlayers = {}; 
+        let currentMapVersion = 0; // O SEGREDO DO SYNC SEM LAG
         
         let floatingTexts = []; let projectiles = []; let isBankOpen = false; let isNPCOpen = false; let isDevBuildMode = false; let activeNPCShop = null;
         let selectedDevEntity = 'tree'; let devViewMode = 'list'; const imgCache = {};
-        
-        // VARIÁVEL TECLADO BLINDADA
         let keys = { w: false, a: false, s: false, d: false, arrowup: false, arrowdown: false, arrowleft: false, arrowright: false };
 
-        // AUTO BYPASS DE MODO LOCAL: Identifica o arquivo HTML direto
         const API_BASE = (window.location.protocol === 'file:') ? 'http://localhost:3000/api' : '/api';
 
+        // --- FUNÇÕES UTILITÁRIAS ---
         function removeAccents(str) { return str.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); }
+        
+        document.addEventListener('mousemove', (e) => { if (tooltip.style.display === 'block') { tooltip.style.left = (e.pageX + 15) + 'px'; tooltip.style.top = (e.pageY + 15) + 'px'; } });
+        function showTooltip(item) { if(!item) return; let html = `<div class="tt-title">${item.name}</div><div class="tt-desc">${item.desc||''}</div>`; if (item.bonusDmg) html += `<div class="tt-stat">⚔️ Dano: +${item.bonusDmg}</div>`; if (item.defBonus) html += `<div class="tt-stat">🛡️ Defesa: +${item.defBonus}</div>`; if (item.heal) html += `<div class="tt-stat">❤️ Cura: +${item.heal}</div>`; html += `<div class="tt-weight">⚖️ Peso: ${item.weight||0} kg</div>`; tooltip.innerHTML = html; tooltip.style.display = 'block'; }
+        function hideTooltip() { tooltip.style.display = 'none'; }
         
         function giveStarterItems() { 
             addInvItem('Bronze Sword', 1); addInvItem('Shortbow', 1); addInvItem('Staff', 1); 
@@ -286,7 +198,7 @@
             addInvItem('Mind Rune', 50); addInvItem('Bronze Arrow', 50); 
         }
 
-        // --- 2. BANCOS DE DADOS DE FÁBRICA ---
+        // --- BANCOS DE DADOS DE FÁBRICA ---
         let itemDB = {
             'Bronze Pickaxe': { name: 'Bronze Pickaxe', icon: '⛏️', type: 'equipment', slot: 'weapon', tool: 'pickaxe', stackable: false, weight: 2.0, desc: 'Ferramenta de mineração.', recipe: 'Bronze Bar,2|Logs,1', craftQty: 1 },
             'Iron Pickaxe': { name: 'Iron Pickaxe', icon: '⛏️', type: 'equipment', slot: 'weapon', tool: 'pickaxe', stackable: false, weight: 2.0, desc: 'Minera rápido.', recipe: 'Iron Bar,2|Logs,1', craftQty: 1 },
@@ -324,7 +236,8 @@
         };
 
         let spellbookDB = [
-            { id: 'wind_strike', name: 'Wind Strike', lvl: 1, req: {'Air Rune': 1, 'Mind Rune': 1}, dmg: 2, color: '#ecf0f1' }
+            { id: 'wind_strike', name: 'Wind Strike', lvl: 1, req: {'Air Rune': 1, 'Mind Rune': 1}, dmg: 2, color: '#ecf0f1' },
+            { id: 'water_strike', name: 'Water Strike', lvl: 5, req: {'Water Rune': 1, 'Air Rune': 1, 'Mind Rune': 1}, dmg: 4, color: '#3498db' }
         ];
 
         let playerDefault = {
@@ -337,20 +250,20 @@
         let player = JSON.parse(JSON.stringify(playerDefault));
 
         let defaultGameMaps = {
-            'lumbridge': { id: 'lumbridge', name: 'Cidade Principal', width: 800, height: 600, color: '#4a6b2d', gridX: 0, gridY: 0, entities: [ { id: 1, type: 'tree', name: 'Oak Tree', x: 150, y: 150, w: 40, h: 50, active: true, hp: 3, maxHp: 3 }, { id: 3, type: 'enemy', dbKey: 'goblin_base', name: 'Goblin', x: 300, y: 400, w: 25, h: 25, active: true, hp: 15, maxHp: 15, attackCooldown: 0 }, { id: 4, type: 'bank', name: 'Bank Booth', x: 400, y: 50, w: 50, h: 30, active: true } ] }
+            'lumbridge': { id: 'lumbridge', name: 'Cidade Principal', width: 800, height: 600, color: '#4a6b2d', gridX: 0, gridY: 0, entities: [ { id: 1, type: 'tree', name: 'Oak Tree', x: 150, y: 150, w: 40, h: 50, active: true, hp: 3, maxHp: 3 }, { id: 3, type: 'enemy', dbKey: 'goblin_base', name: 'Goblin', x: 300, y: 400, w: 25, h: 25, active: true, hp: 15, maxHp: 15, attackCooldown: 0 }, { id: 4, type: 'bank', name: 'Bank Booth', x: 400, y: 50, w: 50, h: 30, active: true }, { id: 6, type: 'npc', dbKey: 'merchant_base', name: 'Merchant', x: 100, y: 100, w: 25, h: 25, active: true }, { id: 7, type: 'fishing_spot', name: 'Fishing Spot', x: 600, y: 450, w: 100, h: 80, active: true } ] }
         };
         let gameMaps = JSON.parse(JSON.stringify(defaultGameMaps));
         let currentMap = 'lumbridge';
 
-        // --- 3. INICIALIZAÇÃO DE SESSÃO COM BYPASS SEGURO ---
+        // --- SISTEMA DE SESSÃO E INICIALIZAÇÃO ---
         document.addEventListener('DOMContentLoaded', async () => {
-            document.getElementById('login-overlay').style.display = 'flex';
-            document.getElementById('game-wrapper').style.display = 'none';
-            
             let savedSession = localStorage.getItem('miniscape_session');
             if (savedSession) {
-                document.getElementById('login-msg').innerText = "Sessão Encontrada. Digite a senha para logar.";
+                document.getElementById('login-msg').innerText = "Sessão Encontrada. Clique entrar para continuar...";
                 document.getElementById('auth-user').value = savedSession;
+                document.getElementById('login-overlay').style.display = 'flex';
+            } else {
+                document.getElementById('login-overlay').style.display = 'flex';
             }
         });
 
@@ -360,7 +273,7 @@
             const msg = document.getElementById('login-msg');
             
             if(!user || !pass) { msg.innerText = "Preencha usuário e senha!"; return; }
-            msg.innerText = "Conectando...";
+            msg.innerText = "Conectando ao servidor...";
             
             try {
                 const res = await fetch(API_BASE + '/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: user, password: pass }) });
@@ -396,7 +309,7 @@
                 const data = await res.json();
                 
                 if(data.error) { msg.innerText = data.error; } else {
-                    currentUser = user; userRole = isMasterAdmin ? 'admin' : data.role; isOfflineMode = false; 
+                    currentUser = user; userRole = data.role; isOfflineMode = false; 
                     localStorage.setItem('miniscape_session', user);
                     finishLoginSetup(data);
                 }
@@ -405,14 +318,9 @@
                 if (isMasterAdmin || (users[user] && users[user] === pass)) {
                     currentUser = user; userRole = isMasterAdmin ? 'admin' : 'player'; isOfflineMode = true;
                     localStorage.setItem('miniscape_session', user);
-                    finishLoginSetup(JSON.parse(localStorage.getItem('miniscape_save_v47') || '{}'));
+                    finishLoginSetup(JSON.parse(localStorage.getItem('miniscape_save_v48') || '{}'));
                 } else { msg.innerText = "Servidor offline. Conta local não encontrada."; }
             }
-        }
-
-        function forceOfflineMode() {
-            currentUser = 'LocalAdmin'; userRole = 'admin'; isOfflineMode = true;
-            finishLoginSetup(JSON.parse(localStorage.getItem('miniscape_save_v47') || '{}'));
         }
 
         function logOut() {
@@ -421,7 +329,6 @@
         }
 
         function finishLoginSetup(data) {
-            // MOSTRA O BOTÃO DEV SE FOR ADMIN
             if(userRole === 'admin') {
                 let tabContainer = document.getElementById('tab-buttons-container');
                 let devBtn = document.createElement('button');
@@ -431,10 +338,13 @@
                 tabContainer.insertBefore(devBtn, document.getElementById('btn-cfg'));
             }
             
-            // CARREGA DADOS DO SERVIDOR OU OFFLINE (Sem resetar monstro local toda hora)
+            // O MAPA É A ABSOLUTA VERDADE DO SERVIDOR! Sem mesclas estranhas.
             if(data.worldData && Object.keys(data.worldData).length > 0 && data.worldData['lumbridge']) { 
-                gameMaps = data.worldData;
-            } else { gameMaps = JSON.parse(JSON.stringify(defaultGameMaps)); }
+                gameMaps = data.worldData; 
+            } else { 
+                gameMaps = JSON.parse(JSON.stringify(defaultGameMaps)); 
+            }
+            currentMapVersion = data.mapVersion || 0;
             
             if(data.itemDB) itemDB = data.itemDB;
             if(data.npcDB) npcDB = data.npcDB;
@@ -444,34 +354,31 @@
                 player = { ...playerDefault, ...data.playerData };
                 if(data.playerData.stats) player.stats = { ...playerDefault.stats, ...data.playerData.stats };
                 if(data.playerData.stats && data.playerData.stats.skills) player.stats.skills = { ...playerDefault.stats.skills, ...data.playerData.stats.skills };
+                // Garantia contra NaN
+                if(isNaN(player.x) || isNaN(player.y)) { player.x = 400; player.y = 300; player.destX = 400; player.destY = 300; }
+                if(player.inventory.length === 0 && player.stats.skills.combat.xp === 0) giveStarterItems();
             } else {
                 player = JSON.parse(JSON.stringify(playerDefault));
                 giveStarterItems();
             }
             
-            // ANTI-TELA PRETA: Sanitização matemática 
-            if (typeof player.x !== 'number' || isNaN(player.x)) player.x = 400;
-            if (typeof player.y !== 'number' || isNaN(player.y)) player.y = 300;
-            if (typeof player.destX !== 'number' || isNaN(player.destX)) player.destX = player.x;
-            if (typeof player.destY !== 'number' || isNaN(player.destY)) player.destY = player.y;
-            if (typeof player.speed !== 'number' || isNaN(player.speed)) player.speed = 4.0;
-
             currentMap = player.currentMap || 'lumbridge'; if(!gameMaps[currentMap]) currentMap = 'lumbridge';
             
-            // LIGA A TELA DO JOGO
             document.getElementById('login-overlay').style.display = 'none';
             document.getElementById('game-wrapper').style.display = 'flex';
             
             setTimeout(() => {
-                resizeCanvas(); window.addEventListener('resize', resizeCanvas);
+                resizeCanvas();
+                window.addEventListener('resize', resizeCanvas);
+                
                 openTab('inv'); updateUI(); 
                 if(userRole === 'admin') { buildDevEntityList(); loadDevMapManager(); }
+                
                 updateChatUI();
                 
-                // MULTIPLAYER SYNC
-                if(!isOfflineMode) setInterval(syncMultiplayer, 500);
+                // MULTIPLAYER SYNC RÁPIDO (150ms) E LEVE
+                if(!isOfflineMode) setInterval(syncMultiplayer, 150);
 
-                // INICIA LAÇO GRÁFICO
                 if(!gameLoopStarted) {
                     gameLoopStarted = true;
                     requestAnimationFrame(gameLoop);
@@ -482,12 +389,12 @@
         function resizeCanvas() {
             const container = document.getElementById('game-container');
             if(container) {
-                const w = container.clientWidth; const h = container.clientHeight;
-                if(canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+                if(canvas.width !== container.clientWidth && container.clientWidth > 0) canvas.width = container.clientWidth;
+                if(canvas.height !== container.clientHeight && container.clientHeight > 0) canvas.height = container.clientHeight;
             }
         }
 
-        // --- SISTEMA MULTIPLAYER (SÓ SINCRONIZA JOGADOR E CHAT AGORA!) ---
+        // --- SISTEMA MULTIPLAYER (O FIM DO LAG E DO DESYNC) ---
         async function syncMultiplayer() {
             if(!currentUser || isOfflineMode) return;
             try {
@@ -496,8 +403,35 @@
                     body: JSON.stringify({ username: currentUser, x: player.x, y: player.y, map: currentMap })
                 });
                 const data = await res.json();
-                if(data.players) otherPlayers = data.players;
+                
+                // Atualiza posições para Interpolação Lerp
+                if(data.players) {
+                    Object.keys(data.players).forEach(u => {
+                        if (!otherPlayers[u]) {
+                            otherPlayers[u] = data.players[u];
+                            otherPlayers[u].displayX = data.players[u].x;
+                            otherPlayers[u].displayY = data.players[u].y;
+                        } else {
+                            otherPlayers[u].x = data.players[u].x;
+                            otherPlayers[u].y = data.players[u].y;
+                            otherPlayers[u].map = data.players[u].map;
+                        }
+                    });
+                    // Remove quem saiu
+                    Object.keys(otherPlayers).forEach(u => {
+                        if(!data.players[u]) delete otherPlayers[u];
+                    });
+                }
+                
                 if(data.chat) { chatMessages = data.chat; updateChatUI(); }
+                
+                // Só baixa o mapa se o Admin tiver salvo alguma alteração nova! (O SEGREDO CONTRA O LAG)
+                if(data.mapVersion > currentMapVersion && userRole !== 'admin') {
+                    currentMapVersion = data.mapVersion;
+                    fetch(API_BASE + '/map').then(r => r.json()).then(m => {
+                        if(m.worldData) gameMaps = m.worldData;
+                    });
+                }
             } catch(e) {}
         }
 
@@ -506,13 +440,15 @@
             for (let map in gameMaps) { if (gameMaps[map] && gameMaps[map].entities) { gameMaps[map].entities.forEach(obj => { if(obj && obj.aggroTarget) obj.aggroTarget = null; }); } }
             player.currentMap = currentMap; player.actionTarget = null; player.actionToolItem = null; player.pendingAutoAction = null;
 
-            if (isOfflineMode) {
+            if (isOfflineMode || window.location.protocol === 'file:') {
                 const saveData = { playerData: player, worldData: gameMaps, itemDB: itemDB, npcDB: npcDB }; 
-                localStorage.setItem('miniscape_save_v47', JSON.stringify(saveData));
+                localStorage.setItem('miniscape_save_v48', JSON.stringify(saveData));
                 if(manual) setActionText("Salvo Localmente!", "#f1c40f"); return;
             }
             try {
-                await fetch(API_BASE + '/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: currentUser, playerData: player, worldData: gameMaps, itemDB: itemDB, npcDB: npcDB }) });
+                let res = await fetch(API_BASE + '/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: currentUser, playerData: player, worldData: gameMaps, itemDB: itemDB, npcDB: npcDB }) });
+                let data = await res.json();
+                if (data.mapVersion) currentMapVersion = data.mapVersion; // Atualiza a versão local do Admin
                 if(manual) setActionText("Progresso salvo online!", "#3498db");
             } catch (e) {
                 if(manual) setActionText("Erro ao salvar no servidor.", "#e74c3c");
@@ -539,7 +475,7 @@
         }
         document.getElementById('chat-input').addEventListener('keypress', function (e) { if (e.key === 'Enter') sendChat(); });
 
-        // --- CÁLCULO PRECISO DO MOUSE (LIVRE DE ESCALAS FALSAS) ---
+        // --- CÁLCULO PRECISO DE CÂMERA E MOUSE (ESCALA 1:1) ---
         function getCameraOffset() {
             let mapObj = gameMaps[currentMap];
             if (!mapObj) return { x: 0, y: 0 };
@@ -568,37 +504,12 @@
             let cX = e.clientX, cY = e.clientY, pX = e.pageX, pY = e.pageY;
             if(e.type && e.type.includes('touch')) { cX = e.touches[0].clientX; cY = e.touches[0].clientY; pX = e.touches[0].pageX; pY = e.touches[0].pageY; }
             
-            let rawX = cX - rect.left;
-            let rawY = cY - rect.top;
-
             let offset = getCameraOffset();
-            return { x: rawX - offset.x, y: rawY - offset.y, pageX: pX, pageY: pY };
+            // Sem "scale" maluco. O pixel que o mouse tocou é a coordenada exata!
+            return { x: (cX - rect.left) - offset.x, y: (cY - rect.top) - offset.y, pageX: pX, pageY: pY };
         }
 
-        // --- SISTEMAS DE CONTROLE (TECLADO SEGURO) ---
-        window.addEventListener("keydown", function(e) {
-            if(document.getElementById('login-overlay').style.display !== 'none') return; 
-            if(["Space","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].indexOf(e.code) > -1) {
-                if(e.target.tagName !== "INPUT" && e.target.tagName !== "TEXTAREA") e.preventDefault();
-            }
-        }, false);
-        document.addEventListener('keydown', (e) => { 
-            if(document.getElementById('login-overlay').style.display !== 'none') return;
-            if(e.target.tagName === "INPUT" || e.target.tagName === "SELECT" || e.target.tagName === "TEXTAREA") return;
-            let k = e.key.toLowerCase(); if(['w','a','s','d','arrowup','arrowleft','arrowdown','arrowright'].includes(k)) keys[k] = true;
-            if (e.code === 'Space') { tryPickupOrInteract(); } if (e.key === 'Control') { tryAttack(); } 
-        });
-        document.addEventListener('keyup', (e) => { 
-            if(document.getElementById('login-overlay').style.display !== 'none') return;
-            if(e.target.tagName === "INPUT" || e.target.tagName === "SELECT" || e.target.tagName === "TEXTAREA") return;
-            let k = e.key.toLowerCase(); if(['w','a','s','d','arrowup','arrowleft','arrowdown','arrowright'].includes(k)) keys[k] = false;
-        });
-
-        document.addEventListener('mousemove', (e) => { if (tooltip.style.display === 'block') { tooltip.style.left = (e.pageX + 15) + 'px'; tooltip.style.top = (e.pageY + 15) + 'px'; } });
-        function showTooltip(item) { if(!item) return; let html = `<div class="tt-title">${item.name}</div><div class="tt-desc">${item.desc||''}</div>`; if (item.bonusDmg) html += `<div class="tt-stat">⚔️ Dano: +${item.bonusDmg}</div>`; if (item.defBonus) html += `<div class="tt-stat">🛡️ Defesa: +${item.defBonus}</div>`; if (item.heal) html += `<div class="tt-stat">❤️ Cura: +${item.heal}</div>`; html += `<div class="tt-weight">⚖️ Peso: ${item.weight||0} kg</div>`; tooltip.innerHTML = html; tooltip.style.display = 'block'; }
-        function hideTooltip() { tooltip.style.display = 'none'; }
-
-        // --- SISTEMAS DE INVENTÁRIO, UI, CRAFT E BANK ---
+        // --- INVENTÁRIO E UI ---
         function getInvCount(iName) { return player.inventory.reduce((acc, i) => acc + (i.name === iName ? (i.qty||1) : 0), 0); }
         function calcTotalWeight() { return player.inventory.reduce((acc, i) => acc + ((i&&i.weight?i.weight:0) * (i&&i.qty?i.qty:1)), 0).toFixed(1); }
         function removeInvItem(iName, amount) { let tr = amount; for(let i = player.inventory.length - 1; i >= 0; i--) { if(player.inventory[i].name === iName) { if(player.inventory[i].stackable) { if(player.inventory[i].qty > tr) { player.inventory[i].qty -= tr; return true; } else { tr -= player.inventory[i].qty; player.inventory.splice(i, 1); } } else { player.inventory.splice(i, 1); tr--; if(tr === 0) return true; } } } return false; }
@@ -614,12 +525,16 @@
             else if(item.name === 'Knife') { setActionText("Use a aba Craft para criar itens.", "#e74c3c"); }
             player.isPerformingAction = false; player.pendingAutoAction = null; player.actionToolItem = null; hideTooltip(); updateUI();
         }
+
         function unequip(slot) { const item = player.equipment[slot]; if(item) { if(item.stackable && slot === 'ammo') { if(addInvItem(item.name, item.qty)) { player.equipment[slot] = null; updateUI(); } else { setActionText("Inv. Cheio!", "#e74c3c"); } } else { if(player.inventory.length >= 28) { setActionText("Inv. Cheio!", "#e74c3c"); return; } player.equipment[slot] = null; player.inventory.push(item); hideTooltip(); updateUI(); } } }
+
         function craftItem(iName) { let it = itemDB[iName]; if(!it || !it.recipe) return; let reqs = it.recipe.split('|'); let hasAll = true; reqs.forEach(r => { let p = r.split(','); if(getInvCount(p[0].trim()) < parseInt(p[1])) hasAll = false; }); if(hasAll) { reqs.forEach(r => { let p = r.split(','); removeInvItem(p[0].trim(), parseInt(p[1])); }); if(addInvItem(iName, it.craftQty || 1)) { addXP('crafting', 15); setActionText(`Criou ${iName}!`); } updateUI(); } else { setActionText(`Faltam materiais!`, '#e74c3c'); } }
+
         function closeMenus() { isBankOpen = false; isNPCOpen = false; activeNPCShop = null; document.getElementById('btn-bank').style.display='none'; document.getElementById('btn-npc').style.display='none'; }
         function openTab(tP) { document.querySelectorAll('.tab-content').forEach(e=>e.classList.remove('active-tab')); document.querySelectorAll('.tab-btn').forEach(e=>e.classList.remove('active-btn')); const tb = document.getElementById(`tab-${tP}`); if(tb) tb.classList.add('active-tab'); const bt = document.getElementById(`btn-${tP}`); if(bt) bt.classList.add('active-btn'); isBankOpen = (tP === 'bank'); isNPCOpen = (tP === 'npc'); if (['craft', 'mag', 'inv', 'eq', 'sk', 'bank'].includes(tP)) { updateUI(); } }
         function setActionText(t, c="#2ecc71") { const el = document.getElementById('action-text'); el.innerText = t; el.style.color = c; setTimeout(() => { if(el.innerText === t) el.innerText = ""; }, 3000); }
         function addFloatingText(x, y, t, c) { floatingTexts.push({ x: x, y: y, text: t, color: c, life: 50 }); }
+        
         function addXP(sK, a) { const sk = player.stats.skills[sK]; if(!sk) return; sk.xp += a; addFloatingText(player.x, player.y - 20, `+${a} XP`, '#f1c40f'); let leveledUp = false; while (sk.xp >= sk.next) { sk.level++; sk.xp -= sk.next; sk.next = Math.floor(sk.next * 1.5); leveledUp = true; if (sK === 'hp') { player.stats.maxHp += 2; player.stats.hp = player.stats.maxHp; } } if(leveledUp) { setActionText(`${sk.name} Nível ${sk.level}!`, "#f1c40f"); addFloatingText(player.x, player.y - 40, `Level Up!`, '#2ecc71'); } updateUI(); }
         function getTotalDef() { let d = player.stats.skills.combat.level; if(player.equipment.shield) d += player.equipment.shield.defBonus; if(player.equipment.body) d += player.equipment.body.defBonus; return d; }
         function openShop(nData) { document.getElementById('btn-npc').style.display = 'block'; openTab('npc'); document.getElementById('npc-title').innerText = nData.name; document.getElementById('npc-dialog').innerText = `"${nData.dialog || '...'}"`; let sL = document.getElementById('npc-shop-list'); sL.innerHTML = ''; if(nData.shopStr) { nData.shopStr.split('|').forEach(p => { let pt = p.split(','); if(pt.length >= 2) { let iN = pt[0].trim(); let ct = parseInt(pt[1]); let iD = itemDB[iN]; if(iD) { sL.innerHTML += `<div class="shop-item"><span>${iD.icon} ${iD.name}</span><button class="shop-btn" onclick="buyItem('${iN}', ${ct})">Comprar (${ct} 🪙)</button></div>`; } } }); } }
@@ -638,7 +553,7 @@
             } catch(e) { }
         }
 
-        // --- SISTEMA DEV ENGINE (INJETOR E CONSTRUTOR) ---
+        // --- DEV ENGINE & INJETOR DE CÓDIGO ---
         function openModal(htmlContent) { const overlay = document.getElementById('custom-modal-overlay'); const box = document.getElementById('custom-modal-box'); box.innerHTML = htmlContent; overlay.style.display = 'flex'; }
         function closeModal() { document.getElementById('custom-modal-overlay').style.display = 'none'; }
         function openDevSub(tabId, btn) { document.querySelectorAll('.dev-sub-content').forEach(e=>e.classList.remove('active')); document.querySelectorAll('.dev-sub-btn').forEach(e=>e.classList.remove('active')); const t = document.getElementById(tabId); if(t) t.classList.add('active'); if(btn) btn.classList.add('active'); if(tabId==='dev-map') buildDevEntityList(); if(tabId==='dev-items') populateDevItems(); if(tabId==='dev-npcs') populateDevNPCs(); if(tabId==='dev-map-manager') loadDevMapManager(); if(tabId==='dev-import') document.getElementById('dev-import-code').value = ''; }
@@ -658,7 +573,7 @@
                 }
                 saveDataLogic(true); updateUI(); buildDevEntityList(); loadDevMapManager();
                 document.getElementById('dev-import-code').value = ''; setActionText("Importado com sucesso!", "#2ecc71"); alert("Pacote injetado com sucesso!"); 
-            } catch(e) { setActionText("Código inválido.", "#e74c3c"); }
+            } catch(e) { setActionText("Código inválido.", "#e74c3c"); console.error(e); }
         }
 
         function filterDevEntities(term) { let val = removeAccents(term).toLowerCase(); document.querySelectorAll('.dev-ent-item').forEach(el => { let txt = removeAccents(el.getAttribute('data-name')).toLowerCase(); if(txt.includes(val)) el.style.display = devViewMode === 'list' ? 'flex' : 'flex'; else el.style.display = 'none'; }); if(devViewMode === 'list') { document.querySelectorAll('.dev-ent-cat').forEach(cat => { let hasVisible = false; let next = cat.nextElementSibling; while(next && next.classList.contains('dev-ent-item')) { if(next.style.display !== 'none') hasVisible = true; next = next.nextElementSibling; } cat.style.display = hasVisible ? 'block' : 'none'; }); } }
@@ -698,8 +613,8 @@
         function saveCurrentMapSettings() { let cm = gameMaps[currentMap]; if(cm) { cm.name = document.getElementById('cur-map-name').value || cm.id; cm.width = parseInt(document.getElementById('cur-map-w').value) || 800; cm.height = parseInt(document.getElementById('cur-map-h').value) || 600; cm.color = document.getElementById('cur-map-color').value || '#4a6b2d'; resizeCanvas(); saveDataLogic(); loadDevMapManager(); setActionText("Mapa Atualizado!"); } }
         function createNewMap() { let id = document.getElementById('dm-id').value; let n = document.getElementById('dm-name').value; let w = parseInt(document.getElementById('dm-w').value) || 800; let h = parseInt(document.getElementById('dm-h').value) || 600; let c = document.getElementById('dm-color').value; if(!id || gameMaps[id]) { alert("ID inválido!"); return; } gameMaps[id] = { id: id, name: n||id, width: w, height: h, color: c, gridX: null, gridY: null, entities: [] }; setActionText("Mapa Criado!"); saveDataLogic(); loadDevMapManager(); }
 
-        // --- SISTEMA DE MAPAS E TRANSIÇÕES ---
-        function switchMap(targetMap, nx, ny) { if(!gameMaps[targetMap]) return; currentMap = targetMap; player.x = nx; player.y = ny; player.destX = nx; player.destY = ny; player.isPerformingAction = false; player.pendingAutoAction = null; player.actionTarget = null; player.actionToolItem = null; projectiles = []; canvas.width = gameMaps[currentMap].width || 800; canvas.height = gameMaps[currentMap].height || 600; setActionText(`Viajou: ${gameMaps[currentMap].name}`); saveDataLogic(); loadDevMapManager(); }
+        // --- SISTEMA DE MAPAS E LIMITES RÍGIDOS ---
+        function switchMap(targetMap, nx, ny) { if(!gameMaps[targetMap]) return; currentMap = targetMap; player.x = nx; player.y = ny; player.destX = nx; player.destY = ny; player.isPerformingAction = false; player.pendingAutoAction = null; player.actionTarget = null; player.actionToolItem = null; projectiles = []; setActionText(`Viajou: ${gameMaps[currentMap].name}`); saveDataLogic(); loadDevMapManager(); }
         
         function switchMapByGrid(dx, dy) {
             let cm = gameMaps[currentMap]; 
@@ -722,14 +637,13 @@
             return false;
         }
 
-        // --- SISTEMA DE CLIQUE / MOUSE / SPAWN / BORRACHA ---
+        // --- MOUSE & SPAWN ---
         function handleInputDown(e) {
             if(document.getElementById('login-overlay').style.display !== 'none') return;
             if(e.type === 'touchstart') e.preventDefault(); 
             
             const pos = getCoords(e); let curM = gameMaps[currentMap]; if(!curM) return;
 
-            // BORRACHA (CLIQUE DIREITO)
             if (isDevBuildMode && (e.button === 2 || e.which === 3)) {
                 let cur = curM.entities || [];
                 for (let i = cur.length - 1; i >= 0; i--) { 
@@ -743,7 +657,6 @@
 
             if (e.button !== 0 && e.type === 'mousedown') return;
 
-            // SPAWN DEV (CLIQUE ESQUERDO)
             if (isDevBuildMode) { 
                 const val = selectedDevEntity; if(!val) return;
                 let cW = parseInt(document.getElementById('spawn-w') ? document.getElementById('spawn-w').value : 0);
@@ -777,7 +690,6 @@
             e.preventDefault(); const pos = getCoords(e);
             let cObj = null; let cur = gameMaps[currentMap] ? gameMaps[currentMap].entities || [] : [];
             
-            // BORRACHA DEV SEGURO
             if (isDevBuildMode) { 
                 for (let i = cur.length - 1; i >= 0; i--) { 
                     let o = cur[i]; 
@@ -810,7 +722,7 @@
         function addMenuOption(text, callback) { const div = document.createElement('div'); div.className = 'osrs-menu-item'; div.innerText = text; div.onclick = () => { osrsMenu.style.display = 'none'; callback(); }; osrsMenu.appendChild(div); }
         function setPendingAction(obj) { player.pendingAutoAction = obj; player.destX = obj.x + (obj.w||30)/2; player.destY = obj.y + (obj.h||30)/2; if(isNPCOpen && obj.type !== 'npc') { closeMenus(); openTab('inv'); } osrsMenu.style.display = 'none'; }
 
-        // --- SISTEMA DE AÇÃO E LUTA ---
+        // --- SISTEMA DE AÇÃO DE LUTA E SKILL ---
         function tryPickupOrInteract() {
             if(player.isPerformingAction) { player.isPerformingAction = false; return; }
             let cur = gameMaps[currentMap].entities || [];
@@ -937,7 +849,7 @@
             }
         }
 
-        // --- UPDATE LOOP FÍSICO COM COLISÃO REVISADA ---
+        // --- UPDATE LOOP FÍSICO COM COLISÃO REVISADA E INTERPOLAÇÃO LERP MULTIPLAYER ---
         function update() {
             try {
                 let curM = gameMaps[currentMap]; if(!curM) return; let cur = curM.entities || [];
@@ -951,6 +863,17 @@
                         addFloatingText(player.x, player.y - 20, `+${heal}`, "#2ecc71"); updateUI();
                     }
                     player.regenTimer = 300; 
+                }
+
+                // INTERPOLAÇÃO MULTIPLAYER (Deslizar suave)
+                if (typeof otherPlayers !== 'undefined') {
+                    Object.keys(otherPlayers).forEach(u => {
+                        let op = otherPlayers[u];
+                        if (op.displayX !== undefined && op.displayY !== undefined) {
+                            op.displayX += (op.x - op.displayX) * 0.3;
+                            op.displayY += (op.y - op.displayY) * 0.3;
+                        }
+                    });
                 }
 
                 for(let i = projectiles.length - 1; i >= 0; i--) {
@@ -971,7 +894,7 @@
                     let nX = player.x + mx; let nY = player.y + my; let colX = false, colY = false; let pw = 10, ph = 10;
                     
                     for(let o of cur) {
-                        // IGNORA INIMIGOS E NPCS (O jogador não trava mais neles)
+                        // IGNORA COLISÃO COM INIMIGOS E NPCs PARA NÃO TRAVAR O JOGADOR
                         if(!o || !o.type || !o.active || ['ground_item','fishing_spot','portal','fire','paint','enemy','npc'].includes(o.type)) continue;
                         let ow = o.w || 30; let oh = o.h || 30;
                         if(nX-pw < o.x+ow && nX+pw > o.x && player.y-ph < o.y+oh && player.y+ph > o.y) colX = true;
@@ -1001,32 +924,36 @@
                     }
                 }
 
-                // LIMITES DO MAPA E TRANSIÇÃO (As Paredes Invisíveis)
+                // LIMITES DO MAPA E TRANSIÇÃO (As Paredes Sólidas)
                 let mapW = curM.width || 800;
                 let mapH = curM.height || 600;
 
+                function attemptGridTransition(dx, dy) {
+                    let cm = gameMaps[currentMap];
+                    if (cm.gridX == null || cm.gridY == null) return false;
+                    let tgX = cm.gridX + dx; let tgY = cm.gridY + dy;
+                    let targetMapId = Object.keys(gameMaps).find(k => gameMaps[k].gridX === tgX && gameMaps[k].gridY === tgY);
+                    if (targetMapId) {
+                        let tm = gameMaps[targetMapId]; let tmW = tm.width || 800; let tmH = tm.height || 600;
+                        let nx = player.x; let ny = player.y;
+                        if (dx !== 0) { let ratio = player.y / mapH; ny = tmH * ratio; if (dx > 0) nx = 40; if (dx < 0) nx = tmW - 40; }
+                        if (dy !== 0) { let ratio = player.x / mapW; nx = tmW * ratio; if (dy > 0) ny = 40; if (dy < 0) ny = tmH - 40; }
+                        switchMap(targetMapId, nx, ny);
+                        return true;
+                    }
+                    return false;
+                }
+
                 if (player.x <= 15) {
-                    let tgX = curM.gridX !== null ? curM.gridX - 1 : null;
-                    let tgY = curM.gridY !== null ? curM.gridY : null;
-                    let tMapId = Object.keys(gameMaps).find(k => gameMaps[k].gridX === tgX && gameMaps[k].gridY === tgY);
-                    if (tMapId) { switchMapByGrid(-1, 0); } else { player.x = 15; player.destX = 15; }
+                    if (!attemptGridTransition(-1, 0)) { player.x = 15; player.destX = 15; }
                 } else if (player.x >= mapW - 15) {
-                    let tgX = curM.gridX !== null ? curM.gridX + 1 : null;
-                    let tgY = curM.gridY !== null ? curM.gridY : null;
-                    let tMapId = Object.keys(gameMaps).find(k => gameMaps[k].gridX === tgX && gameMaps[k].gridY === tgY);
-                    if (tMapId) { switchMapByGrid(1, 0); } else { player.x = mapW - 15; player.destX = mapW - 15; }
+                    if (!attemptGridTransition(1, 0)) { player.x = mapW - 15; player.destX = mapW - 15; }
                 }
 
                 if (player.y <= 15) {
-                    let tgX = curM.gridX !== null ? curM.gridX : null;
-                    let tgY = curM.gridY !== null ? curM.gridY - 1 : null;
-                    let tMapId = Object.keys(gameMaps).find(k => gameMaps[k].gridX === tgX && gameMaps[k].gridY === tgY);
-                    if (tMapId) { switchMapByGrid(0, -1); } else { player.y = 15; player.destY = 15; }
+                    if (!attemptGridTransition(0, -1)) { player.y = 15; player.destY = 15; }
                 } else if (player.y >= mapH - 15) {
-                    let tgX = curM.gridX !== null ? curM.gridX : null;
-                    let tgY = curM.gridY !== null ? curM.gridY + 1 : null;
-                    let tMapId = Object.keys(gameMaps).find(k => gameMaps[k].gridX === tgX && gameMaps[k].gridY === tgY);
-                    if (tMapId) { switchMapByGrid(0, 1); } else { player.y = mapH - 15; player.destY = mapH - 15; }
+                    if (!attemptGridTransition(0, 1)) { player.y = mapH - 15; player.destY = mapH - 15; }
                 }
 
                 if(player.isPerformingAction && player.actionTarget && player.actionTarget.active) {
@@ -1056,7 +983,7 @@
                             if (ed > 20) {
                                 let nx = o.x + (ex/ed)*1.5; let ny = o.y + (ey/ed)*1.5; let cx=false, cy=false;
                                 for(let wo of cur) {
-                                    if(!wo || !wo.type || !wo.active || ['ground_item','fishing_spot','portal','paint'].includes(wo.type) || wo===o) continue;
+                                    if(!wo || !wo.type || !wo.active || ['ground_item','fishing_spot','portal','paint','enemy','npc'].includes(wo.type) || wo===o) continue;
                                     let wow = wo.w || 30; let woh = wo.h || 30;
                                     if(nx < wo.x+wow && nx+ow > wo.x && o.y < wo.y+woh && o.y+oh > wo.y) cx=true;
                                     if(o.x < wo.x+wow && o.x+ow > wo.x && ny < wo.y+woh && ny+oh > wo.y) cy=true;
@@ -1114,11 +1041,13 @@
 
                 let cur = mapObj.entities || [];
                 
+                // 1. PINTURAS DE CHÃO
                 cur.forEach(o => {
                     if(!o || !o.type) return; let ow = o.w || 40; let oh = o.h || 40;
                     if(o.type === 'paint') { ctx.fillStyle = o.color; ctx.fillRect(o.x, o.y, ow, oh); }
                 });
 
+                // 2. ITENS DE CHÃO
                 cur.forEach(o => {
                     if(!o || !o.type) return; let ow = o.w || 30; let oh = o.h || 30;
                     if (o.type === 'ground_item' && o.active) {
@@ -1127,6 +1056,7 @@
                     }
                 });
 
+                // 3. ENTIDADES ACIMA
                 cur.forEach(o => {
                     if (!o || !o.type || !o.active || o.type === 'ground_item' || o.type === 'paint') return;
                     let ow = o.w || 30; let oh = o.h || 30;
@@ -1174,11 +1104,12 @@
                 if (Math.hypot(player.destX - player.x, player.destY - player.y) > player.speed && !player.isPerformingAction && !player.pendingAutoAction) { ctx.fillStyle = 'rgba(255, 255, 255, 0.4)'; ctx.beginPath(); ctx.arc(player.destX, player.destY, 5, 0, Math.PI*2); ctx.fill(); }
                 if (player.isPerformingAction) { const prg = 1 - (player.actionTimer / player.actionDelay); ctx.fillStyle = '#222'; ctx.fillRect(player.x - 15, player.y - 25, 30, 6); ctx.fillStyle = '#3498db'; ctx.fillRect(player.x - 14, player.y - 24, 28 * prg, 4); }
 
-                // DESENHA MULTIPLAYER
+                // DESENHA MULTIPLAYER LERP
                 if (typeof otherPlayers !== 'undefined') {
                     Object.keys(otherPlayers).forEach(u => {
                         let op = otherPlayers[u];
-                        let px = op.x; let py = op.y;
+                        let px = op.displayX !== undefined ? op.displayX : op.x; 
+                        let py = op.displayY !== undefined ? op.displayY : op.y;
                         ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.arc(px, py+6, 8, 0, Math.PI*2); ctx.fill();
                         ctx.fillStyle = '#2980b9'; ctx.fillRect(px - 8, py - 6, 16, 12);
                         ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(px, py - 10, 8, 0, Math.PI*2); ctx.fill();
@@ -1215,7 +1146,7 @@
                 projectiles.forEach(p => { if (p.type === 'ranged') { ctx.fillStyle = '#795548'; ctx.fillRect(p.x-2, p.y-2, 4, 4); } else { ctx.fillStyle = p.color || '#1abc9c'; ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#ecf0f1'; ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI*2); ctx.fill(); } });
                 floatingTexts.forEach((ft, i) => { ctx.fillStyle = ft.color; ctx.font = 'bold 16px Arial'; ctx.fillText(ft.text, ft.x, ft.y); ft.y -= 0.5; ft.life--; if(ft.life <= 0) floatingTexts.splice(i, 1); });
 
-                ctx.restore(); // Restaura a câmera matemática
+                ctx.restore(); 
 
             } catch (e) { console.error("Ignorado Draw Error", e); }
         }
@@ -1226,8 +1157,10 @@
                 const mCtx = mCanvas.getContext('2d'); mCtx.clearRect(0, 0, mCanvas.width, mCanvas.height);
                 let curM = gameMaps[currentMap]; if(!curM) return;
                 mCtx.fillStyle = curM.color || '#4a6b2d'; mCtx.fillRect(0, 0, mCanvas.width, mCanvas.height);
+                
                 let mapW = curM.width || 800; let mapH = curM.height || 600;
                 let scaleX = mCanvas.width / mapW; let scaleY = mCanvas.height / mapH;
+                
                 if(curM.entities) {
                     curM.entities.forEach(o => {
                         if(!o || !o.active || !o.type || o.type === 'paint') return;
@@ -1235,18 +1168,24 @@
                         mCtx.fillRect(o.x * scaleX, o.y * scaleY, (o.w||30) * scaleX, (o.h||30) * scaleY);
                     });
                 }
+                
                 if (typeof otherPlayers !== 'undefined') {
-                    Object.keys(otherPlayers).forEach(u => { mCtx.fillStyle = '#2980b9'; mCtx.fillRect(otherPlayers[u].x * scaleX, otherPlayers[u].y * scaleY, 4, 4); });
+                    Object.keys(otherPlayers).forEach(u => { 
+                        let px = otherPlayers[u].displayX !== undefined ? otherPlayers[u].displayX : otherPlayers[u].x;
+                        let py = otherPlayers[u].displayY !== undefined ? otherPlayers[u].displayY : otherPlayers[u].y;
+                        mCtx.fillStyle = '#2980b9'; mCtx.fillRect(px * scaleX, py * scaleY, 4, 4); 
+                    });
                 }
+                
                 mCtx.fillStyle = 'white'; mCtx.fillRect(player.x * scaleX, player.y * scaleY, 4, 4);
             } catch(e) {}
         }
 
-        // --- LOOP PRINCIPAL DO MOTOR GRÁFICO ---
+        // --- LOOP PRINCIPAL ---
         function gameLoop() { 
-            try { update(); } catch(e){ console.error(e); } 
-            try { draw(); } catch(e){ console.error(e); } 
-            try { drawMinimap(); } catch(e){ console.error(e); } 
+            try { update(); } catch(e){} 
+            try { draw(); } catch(e){} 
+            try { drawMinimap(); } catch(e){} 
             requestAnimationFrame(gameLoop); 
         }
 
