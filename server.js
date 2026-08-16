@@ -30,8 +30,7 @@ function readDB() { return JSON.parse(fs.readFileSync(DB_FILE, 'utf8')); }
 function writeDB(data) { fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf8'); }
 
 let activePlayers = {}; 
-let mapHosts = {}; 
-let mapEntitiesRAM = {}; 
+let serverMobs = {}; // Juiz Oficial de Combate (Previne Rubber-banding)
 
 app.post('/api/register', (req, res) => {
     const { username, password } = req.body;
@@ -74,30 +73,47 @@ app.post('/api/save', (req, res) => {
 });
 
 app.post('/api/sync', (req, res) => {
-    const { username, x, y, map, facing, actionAnim, equipment, entities } = req.body;
+    const { username, x, y, map, facing, actionAnim, equipment, combatLogs } = req.body;
     let db = readDB();
 
     if (username) { activePlayers[username] = { x, y, map, facing, actionAnim, equipment, lastSeen: Date.now() }; }
 
-    let now = Date.now();
+    // === PROCESSA O COMBATE EM TEMPO REAL ===
+    if (!serverMobs[map]) serverMobs[map] = {};
+    if (combatLogs && combatLogs.length > 0) {
+        combatLogs.forEach(log => {
+            let sm = serverMobs[map][log.id];
+            if (!sm) {
+                sm = { hp: log.maxHp, maxHp: log.maxHp, aggro: null, isDead: false, deadTime: 0 };
+                serverMobs[map][log.id] = sm;
+            }
+            if (!sm.isDead) {
+                sm.hp -= log.dmg;
+                sm.aggro = log.aggro; // O monstro foca em quem bateu por último
+                if (sm.hp <= 0) {
+                    sm.hp = 0; sm.isDead = true; sm.deadTime = Date.now(); sm.aggro = null;
+                }
+            }
+        });
+    }
+
+    // === SISTEMA DE RESPAWN NO SERVIDOR (15 Segundos) ===
+    let nowTime = Date.now();
+    for (let mId in serverMobs[map]) {
+        let sm = serverMobs[map][mId];
+        if (sm.isDead && nowTime - sm.deadTime > 15000) {
+            sm.isDead = false; sm.hp = sm.maxHp; sm.aggro = null;
+        }
+    }
+
+    // === LIMPEZA DE PLAYERS ===
     let visiblePlayers = {};
-    
     for(let u in activePlayers) {
-        if (now - activePlayers[u].lastSeen > 4000) { 
-            if (mapHosts[activePlayers[u].map] === u) delete mapHosts[activePlayers[u].map];
-            delete activePlayers[u]; 
-        } 
+        if (nowTime - activePlayers[u].lastSeen > 4000) { delete activePlayers[u]; } 
         else if (u !== username && activePlayers[u].map === map) { visiblePlayers[u] = activePlayers[u]; }
     }
 
-    if (!mapHosts[map] || !activePlayers[mapHosts[map]] || activePlayers[mapHosts[map]].map !== map) {
-        mapHosts[map] = username;
-    } else if (username && username.toLowerCase() === 'admin') { mapHosts[map] = username; }
-
-    let isHost = (mapHosts[map] === username);
-    if (isHost && entities) { mapEntitiesRAM[map] = entities; }
-
-    res.json({ players: visiblePlayers, chat: db.chat, mapVersion: db.mapVersion, syncEntities: mapEntitiesRAM[map] || null, isHost: isHost });
+    res.json({ players: visiblePlayers, chat: db.chat, mapVersion: db.mapVersion, serverMobs: serverMobs[map] });
 });
 
 // === SISTEMA DE CONTAS E VIP ===
@@ -118,17 +134,13 @@ app.post('/api/users/role', (req, res) => {
     } else res.status(401).json({ error: 'Unauthorized' });
 });
 
-// === SISTEMA DE BACKUP CONTRA O RENDER ===
-app.get('/api/backup', (req, res) => {
-    let db = readDB(); res.json(db);
-});
+app.get('/api/backup', (req, res) => { let db = readDB(); res.json(db); });
 
 app.post('/api/restore', (req, res) => {
     const { adminUser, dbData } = req.body;
     let db = readDB();
     if(db.users[adminUser] && db.users[adminUser].role === 'admin') {
-        writeDB(dbData);
-        res.json({ success: true, mapVersion: dbData.mapVersion });
+        writeDB(dbData); res.json({ success: true, mapVersion: dbData.mapVersion });
     } else res.status(401).json({ error: 'Unauthorized' });
 });
 
