@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MiniScape 2D - V55 (Engine Híbrida & Ações Fluidas)</title>
+    <title>MiniScape 2D - V55 (Engine Estável e Fluida)</title>
     <style>
         /* === BASE & RESPONSIVIDADE === */
         body { margin: 0; padding: 10px; background-color: #121212; color: #e0e0e0; font-family: 'Segoe UI', Tahoma, sans-serif; display: flex; gap: 15px; justify-content: center; height: 100vh; box-sizing: border-box; overflow: hidden; flex-direction: row; align-items: stretch; }
@@ -155,11 +155,6 @@
 
     <!-- SCRIPT GIGANTE E UNIFICADO DO JOGO -->
     <script>
-        const canvas = document.getElementById('gameCanvas'); 
-        const ctx = canvas.getContext('2d');
-        const osrsMenu = document.getElementById('osrs-menu'); 
-        const tooltip = document.getElementById('tooltip');
-        
         let gameLoopStarted = false;
         let currentUser = null;
         let userRole = 'player';
@@ -168,12 +163,18 @@
         let otherPlayers = {}; 
         let currentMapVersion = 0; 
         let isSyncing = false; 
+        let isMapHost = false; // CORREÇÃO AQUI
         
         let floatingTexts = []; let projectiles = []; let isBankOpen = false; let isNPCOpen = false; let isDevBuildMode = false; let activeNPCShop = null;
         let selectedDevEntity = 'tree'; let devViewMode = 'list'; const imgCache = {};
         let keys = { w: false, a: false, s: false, d: false, arrowup: false, arrowdown: false, arrowleft: false, arrowright: false };
 
         const API_BASE = (window.location.protocol === 'file:') ? 'http://localhost:3000/api' : '/api';
+
+        const canvas = document.getElementById('gameCanvas'); 
+        const ctx = canvas.getContext('2d');
+        const osrsMenu = document.getElementById('osrs-menu'); 
+        const tooltip = document.getElementById('tooltip');
 
         function removeAccents(str) { return str.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); }
         
@@ -275,20 +276,12 @@
             const user = document.getElementById('auth-user').value.trim();
             const pass = document.getElementById('auth-pass').value.trim();
             const msg = document.getElementById('login-msg');
-            
-            if(!user || !pass) { 
-                msg.innerText = "Preencha usuário e senha!"; 
-                return; 
-            }
+            if(!user || !pass) { msg.innerText = "Preencha usuário e senha!"; return; }
             msg.innerText = "Autenticando...";
-            
             const isMasterAdmin = (user.toLowerCase() === 'admin' && pass === 'Adleradm');
 
             try {
-                let res = await fetch(API_BASE + '/login', { 
-                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: user, password: pass }) 
-                });
-                
+                let res = await fetch(API_BASE + '/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: user, password: pass }) });
                 if (res.status === 401 && isMasterAdmin) {
                      await fetch(API_BASE + '/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: user, password: pass }) });
                      res = await fetch(API_BASE + '/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: user, password: pass }) });
@@ -313,10 +306,8 @@
                 if (isMasterAdmin || (users[user] && users[user] === pass)) {
                     currentUser = user; userRole = isMasterAdmin ? 'admin' : 'player'; isOfflineMode = true;
                     localStorage.setItem('miniscape_session', user);
-                    finishLoginSetup(JSON.parse(localStorage.getItem('miniscape_save_v52') || '{}'));
-                } else { 
-                    msg.innerText = "Servidor indisponível ou conta não encontrada."; 
-                }
+                    finishLoginSetup(JSON.parse(localStorage.getItem('miniscape_save_v54') || '{}'));
+                } else { msg.innerText = "Servidor indisponível ou conta não encontrada."; }
             }
         }
 
@@ -397,10 +388,7 @@
                     facing: player.facing, actionAnim: player.actionAnim, equipment: player.equipment
                 };
                 
-                // Manda as entidades se for admin (apenas para garantir updates do DEV mode massivo)
-                if (userRole === 'admin' && gameMaps[currentMap]) {
-                    payload.entities = gameMaps[currentMap].entities;
-                }
+                if (gameMaps[currentMap]) { payload.entities = gameMaps[currentMap].entities; }
 
                 const res = await fetch(API_BASE + '/sync', {
                     method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -408,6 +396,8 @@
                 });
                 const data = await res.json();
                 
+                isMapHost = data.isHost === true;
+
                 if(data.players) {
                     Object.keys(data.players).forEach(u => {
                         if (!otherPlayers[u]) {
@@ -428,7 +418,7 @@
                 
                 if(data.chat) { chatMessages = data.chat; updateChatUI(); }
 
-                if (data.syncEntities && userRole !== 'admin') {
+                if (data.syncEntities) {
                     let curM = gameMaps[currentMap];
                     if (curM && curM.entities) {
                         data.syncEntities.forEach(sEnt => {
@@ -437,12 +427,10 @@
                                 if (lEnt.type === 'enemy' || lEnt.type === 'npc') {
                                     lEnt.serverX = sEnt.x; lEnt.serverY = sEnt.y;
                                     lEnt.hp = sEnt.hp; lEnt.active = sEnt.active;
-                                    // Sincroniza quem ele tá atacando
                                     if(sEnt.aggroTarget) lEnt.aggroTarget = sEnt.aggroTarget;
                                 } else { Object.assign(lEnt, sEnt); }
                             } else { curM.entities.push(sEnt); }
                         });
-                        // Filtra itens pegos do chão
                         curM.entities = curM.entities.filter(lEnt => data.syncEntities.find(sEnt => sEnt.id === lEnt.id));
                     }
                 }
@@ -459,7 +447,6 @@
 
         async function saveDataLogic(manual = false) {
             if (!currentUser) return;
-            // Clonagem segura para não quebrar a referência local do monstro ao salvar
             let tempMaps = JSON.parse(JSON.stringify(gameMaps));
             for (let map in tempMaps) { if (tempMaps[map] && tempMaps[map].entities) { tempMaps[map].entities.forEach(obj => { if(obj && obj.aggroTarget) obj.aggroTarget = null; }); } }
             
@@ -469,7 +456,7 @@
 
             if (isOfflineMode || window.location.protocol === 'file:') {
                 const saveData = { playerData: player, worldData: tempMaps, itemDB: itemDB, npcDB: npcDB }; 
-                localStorage.setItem('miniscape_save_v52', JSON.stringify(saveData));
+                localStorage.setItem('miniscape_save_v54', JSON.stringify(saveData));
                 if(manual) setActionText("Salvo Localmente!", "#f1c40f"); 
             } else {
                 try {
@@ -480,7 +467,6 @@
                 } catch (e) { if(manual) setActionText("Erro ao salvar no servidor.", "#e74c3c"); }
             }
             
-            // Restaura as referências pro jogador não parar de bater na hora do auto-save
             player.actionTarget = tempTarget; player.actionToolItem = tempTool; player.pendingAutoAction = tempAuto;
         }
         setInterval(() => { if(currentUser) saveDataLogic(); }, 60000);
@@ -512,6 +498,7 @@
 
         window.addEventListener("keydown", function(e) {
             if(document.getElementById('login-overlay').style.display !== 'none') return; 
+            
             if (e.code === 'Enter') {
                 const chatInput = document.getElementById('chat-input');
                 if (document.activeElement !== chatInput) {
@@ -520,6 +507,7 @@
                     return;
                 }
             }
+
             if(["Space","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].indexOf(e.code) > -1) {
                 if(e.target.tagName !== "INPUT" && e.target.tagName !== "TEXTAREA") e.preventDefault();
             }
@@ -881,11 +869,11 @@
             } updateUI();
         }
 
-        // CORREÇÃO CRÍTICA DO DANO DO MONSTRO (Apenas manda salvar a nova HP)
+        // CORREÇÃO CRÍTICA DO DANO DO MONSTRO
         function applyDamage(t, dmg, sT) {
             t.hp -= dmg; t.aggroTarget = player; addFloatingText(t.x + 15, t.y, dmg, dmg>0?"#e74c3c":"#bdc3c7");
             
-            saveDataLogic(); // Salva HP do monstro pro server!
+            saveDataLogic(); 
 
             if(t.hp <= 0) { 
                 t.active = false; t.aggroTarget = null; addFloatingText(t.x, t.y, "Morto", "#e74c3c");
@@ -933,7 +921,6 @@
                     });
                 }
                 
-                // MANTÉM OS MONSTROS ANDANDO (APENAS UM HOST CALCULA PRA NÃO DAR DESYNC)
                 if (userRole !== 'admin' && !isMapHost && !isOfflineMode) {
                     cur.forEach(o => {
                         if ((o.type === 'enemy' || o.type === 'npc') && o.serverX !== undefined && o.serverY !== undefined) {
@@ -1231,10 +1218,8 @@
                 const mCtx = mCanvas.getContext('2d'); mCtx.clearRect(0, 0, mCanvas.width, mCanvas.height);
                 let curM = gameMaps[currentMap]; if(!curM) return;
                 mCtx.fillStyle = curM.color || '#4a6b2d'; mCtx.fillRect(0, 0, mCanvas.width, mCanvas.height);
-                
                 let mapW = curM.width || 800; let mapH = curM.height || 600;
                 let scaleX = mCanvas.width / mapW; let scaleY = mCanvas.height / mapH;
-                
                 if(curM.entities) {
                     curM.entities.forEach(o => {
                         if(!o || !o.active || !o.type || o.type === 'paint') return;
@@ -1242,7 +1227,6 @@
                         mCtx.fillRect(o.x * scaleX, o.y * scaleY, (o.w||30) * scaleX, (o.h||30) * scaleY);
                     });
                 }
-                
                 if (typeof otherPlayers !== 'undefined') {
                     Object.keys(otherPlayers).forEach(u => { 
                         let px = otherPlayers[u].displayX !== undefined ? otherPlayers[u].displayX : otherPlayers[u].x;
@@ -1250,7 +1234,6 @@
                         mCtx.fillStyle = '#2980b9'; mCtx.fillRect(px * scaleX, py * scaleY, 4, 4); 
                     });
                 }
-                
                 mCtx.fillStyle = 'white'; mCtx.fillRect(player.x * scaleX, player.y * scaleY, 4, 4);
             } catch(e) {}
         }
@@ -1261,6 +1244,7 @@
             try { drawMinimap(); } catch(e){} 
             requestAnimationFrame(gameLoop); 
         }
+
     </script>
 </body>
 </html>
