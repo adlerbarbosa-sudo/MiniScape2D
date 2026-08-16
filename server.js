@@ -30,7 +30,7 @@ function readDB() { return JSON.parse(fs.readFileSync(DB_FILE, 'utf8')); }
 function writeDB(data) { fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf8'); }
 
 let activePlayers = {}; 
-let mapHosts = {}; // O Segredo da Inteligência Artificial sem lag
+let mapHosts = {}; 
 let mapEntitiesRAM = {}; 
 
 app.post('/api/register', (req, res) => {
@@ -96,7 +96,6 @@ app.post('/api/sync', (req, res) => {
         }
     }
 
-    // Eleição de Host Inteligente: Se o Admin estiver no mapa, ele calcula. Se não, o primeiro player assume.
     if (!mapHosts[map] || !activePlayers[mapHosts[map]] || activePlayers[mapHosts[map]].map !== map) {
         mapHosts[map] = username;
     } else if (username && username.toLowerCase() === 'admin') {
@@ -105,7 +104,6 @@ app.post('/api/sync', (req, res) => {
 
     let isHost = (mapHosts[map] === username);
 
-    // O servidor só aceita posições de monstros vindas do Host oficial para não bugar
     if (isHost && entities) {
         mapEntitiesRAM[map] = entities;
     }
