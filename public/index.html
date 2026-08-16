@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MiniScape 2D - V57 (Host Fix & Dev Mode Blindado)</title>
+    <title>MiniScape 2D - V58 (Correção Crítica de Inventário)</title>
     <style>
         /* === BASE & RESPONSIVIDADE === */
         body { margin: 0; padding: 10px; background-color: #121212; color: #e0e0e0; font-family: 'Segoe UI', Tahoma, sans-serif; display: flex; gap: 15px; justify-content: center; height: 100vh; box-sizing: border-box; overflow: hidden; flex-direction: row; align-items: stretch; }
@@ -153,14 +153,7 @@
         </div>
     </div>
 
-    <!-- SCRIPT GIGANTE E UNIFICADO DO JOGO -->
     <script>
-        // === 1. DECLARAÇÕES GLOBAIS ÚNICAS ===
-        const canvas = document.getElementById('gameCanvas'); 
-        const ctx = canvas.getContext('2d');
-        const osrsMenu = document.getElementById('osrs-menu'); 
-        const tooltip = document.getElementById('tooltip');
-        
         let gameLoopStarted = false;
         let currentUser = null;
         let userRole = 'player';
@@ -169,13 +162,18 @@
         let otherPlayers = {}; 
         let currentMapVersion = 0; 
         let isSyncing = false; 
-        let isMapHost = false; // CORREÇÃO AQUI: Declaração fundamental para os players rodarem a Engine sem erro
+        let isMapHost = false; 
         
         let floatingTexts = []; let projectiles = []; let isBankOpen = false; let isNPCOpen = false; let isDevBuildMode = false; let activeNPCShop = null;
         let selectedDevEntity = 'tree'; let devViewMode = 'list'; const imgCache = {};
         let keys = { w: false, a: false, s: false, d: false, arrowup: false, arrowdown: false, arrowleft: false, arrowright: false };
 
         const API_BASE = (window.location.protocol === 'file:') ? 'http://localhost:3000/api' : '/api';
+
+        const canvas = document.getElementById('gameCanvas'); 
+        const ctx = canvas.getContext('2d');
+        const osrsMenu = document.getElementById('osrs-menu'); 
+        const tooltip = document.getElementById('tooltip');
 
         function removeAccents(str) { return str.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); }
         
@@ -240,7 +238,7 @@
         let player = JSON.parse(JSON.stringify(playerDefault));
 
         let defaultGameMaps = {
-            'lumbridge': { id: 'lumbridge', name: 'Cidade Principal', width: 800, height: 600, color: '#4a6b2d', gridX: 0, gridY: 0, entities: [ { id: 1, type: 'tree', name: 'Oak Tree', x: 150, y: 150, w: 40, h: 50, active: true, hp: 3, maxHp: 3 }, { id: 3, type: 'enemy', dbKey: 'goblin_base', name: 'Goblin', x: 300, y: 400, w: 25, h: 25, active: true, hp: 15, maxHp: 15, attackCooldown: 0 }, { id: 4, type: 'bank', name: 'Bank Booth', x: 400, y: 50, w: 50, h: 30, active: true } ] }
+            'lumbridge': { id: 'lumbridge', name: 'Cidade Principal', width: 800, height: 600, color: '#4a6b2d', gridX: 0, gridY: 0, entities: [ { id: 1, type: 'tree', name: 'Oak Tree', x: 150, y: 150, w: 40, h: 50, active: true, hp: 3, maxHp: 3 }, { id: 3, type: 'enemy', dbKey: 'goblin_base', name: 'Goblin', x: 300, y: 400, w: 25, h: 25, active: true, hp: 15, maxHp: 15, attackCooldown: 0 }, { id: 4, type: 'bank', name: 'Bank Booth', x: 400, y: 50, w: 50, h: 30, active: true }, { id: 6, type: 'npc', dbKey: 'merchant_base', name: 'Merchant', x: 100, y: 100, w: 25, h: 25, active: true }, { id: 7, type: 'fishing_spot', name: 'Fishing Spot', x: 600, y: 450, w: 100, h: 80, active: true } ] }
         };
         let gameMaps = JSON.parse(JSON.stringify(defaultGameMaps));
         let currentMap = 'lumbridge';
@@ -389,7 +387,6 @@
                     facing: player.facing, actionAnim: player.actionAnim, equipment: player.equipment
                 };
                 
-                // Só envia as entidades se for o Host oficial ou o Admin
                 if ((isMapHost || userRole === 'admin') && gameMaps[currentMap]) {
                     payload.entities = gameMaps[currentMap].entities;
                 }
@@ -434,10 +431,10 @@
                                     lEnt.serverX = sEnt.x; lEnt.serverY = sEnt.y;
                                     lEnt.hp = sEnt.hp; lEnt.active = sEnt.active;
                                     if(sEnt.aggroTarget) lEnt.aggroTarget = sEnt.aggroTarget;
-                                }
-                            } 
+                                } else { Object.assign(lEnt, sEnt); }
+                            } else { curM.entities.push(sEnt); }
                         });
-                        // Sem filtro .filter() que deleta os itens do chão antes de sincronizar o mapVersion
+                        curM.entities = curM.entities.filter(lEnt => data.syncEntities.find(sEnt => sEnt.id === lEnt.id));
                     }
                 }
                 
@@ -558,6 +555,46 @@
             let rawY = (cY - rect.top) * scaleY;
             let offset = getCameraOffset();
             return { x: rawX - offset.x, y: rawY - offset.y, pageX: pX, pageY: pY };
+        }
+
+        function getInvCount(iName) { return player.inventory.reduce((acc, i) => acc + (i.name === iName ? (i.qty||1) : 0), 0); }
+        function calcTotalWeight() { return player.inventory.reduce((acc, i) => acc + ((i&&i.weight?i.weight:0) * (i&&i.qty?i.qty:1)), 0).toFixed(1); }
+        function removeInvItem(iName, amount) { let tr = amount; for(let i = player.inventory.length - 1; i >= 0; i--) { if(player.inventory[i].name === iName) { if(player.inventory[i].stackable) { if(player.inventory[i].qty > tr) { player.inventory[i].qty -= tr; return true; } else { tr -= player.inventory[i].qty; player.inventory.splice(i, 1); } } else { player.inventory.splice(i, 1); tr--; if(tr === 0) return true; } } } return false; }
+        function addInvItem(iName, qty = 1) { const b = itemDB[iName]; if(!b) return false; if (b.stackable) { let r = qty; for(let i of player.inventory) { if(i.name === iName && i.qty < 254) { let sp = 254 - i.qty; if(r <= sp) { i.qty += r; return true; } else { i.qty = 254; r -= sp; } } } while(r > 0 && player.inventory.length < 28) { let t = Math.min(r, 254); player.inventory.push({...b, qty: t}); r -= t; } return r <= 0; } else { if(player.inventory.length < 28) { player.inventory.push({...b}); return true; } return false; } }
+        function transferToBank(invIndex) { const item = player.inventory[invIndex]; if(!item) return; let bankItem = player.bank.find(i => i.name === item.name); if(bankItem && item.stackable) { bankItem.qty += item.qty; } else if (item.stackable) { player.bank.push({...item, qty: item.qty}); } else { player.bank.push({...item, qty: 1}); } player.inventory.splice(invIndex, 1); hideTooltip(); updateUI(); }
+        function withdrawFromBank(bankIndex) { const item = player.bank[bankIndex]; if(!item) return; let wQ = item.stackable ? Math.min(item.qty, 254) : 1; if(addInvItem(item.name, wQ)) { item.qty -= wQ; if(item.qty <= 0) player.bank.splice(bankIndex, 1); hideTooltip(); updateUI(); } else { setActionText("Inventário Cheio!", "#e74c3c"); } }
+
+        function useItem(index) {
+            if(isBankOpen) { transferToBank(index); return; } const item = player.inventory[index]; if(!item) return;
+            if(item.type === 'equipment') { if(item.stackable && item.slot === 'ammo') { let curAm = player.equipment.ammo; player.equipment.ammo = player.inventory.splice(index, 1)[0]; if(curAm) addInvItem(curAm.name, curAm.qty); } else { player.inventory.splice(index, 1); if(player.equipment[item.slot]) player.inventory.push(player.equipment[item.slot]); player.equipment[item.slot] = item; } } 
+            else if(item.type === 'consumable') { if(item.heal > 0) { player.stats.hp = Math.min(player.stats.maxHp, player.stats.hp + item.heal); setActionText(`Curou ${item.heal} HP.`); } if(item.name === 'Bones') { addXP('prayer', 5); addFloatingText(player.x, player.y - 15, "Enterrou", "#bdc3c7"); } removeInvItem(item.name, 1); } 
+            else if(item.name === 'Tinderbox') { if(getInvCount('Logs') >= 1) { removeInvItem('Logs', 1); if(!gameMaps[currentMap].entities) gameMaps[currentMap].entities = []; gameMaps[currentMap].entities.push({ id: Date.now(), type: 'fire', name: 'Fire', x: player.x - 15, y: player.y - 15, w: 30, h: 30, active: true, life: 1000 }); addXP('firemaking', 15); setActionText("Acendeu fogo!"); saveDataLogic(); } else { setActionText("Precisa de Logs.", "#e74c3c"); } } 
+            else if(item.name === 'Knife') { setActionText("Use a aba Craft para criar itens.", "#e74c3c"); }
+            player.isPerformingAction = false; player.pendingAutoAction = null; player.actionToolItem = null; hideTooltip(); updateUI();
+        }
+
+        function unequip(slot) { const item = player.equipment[slot]; if(item) { if(item.stackable && slot === 'ammo') { if(addInvItem(item.name, item.qty)) { player.equipment[slot] = null; updateUI(); } else { setActionText("Inv. Cheio!", "#e74c3c"); } } else { if(player.inventory.length >= 28) { setActionText("Inv. Cheio!", "#e74c3c"); return; } player.equipment[slot] = null; player.inventory.push(item); hideTooltip(); updateUI(); } } }
+        function craftItem(iName) { let it = itemDB[iName]; if(!it || !it.recipe) return; let reqs = it.recipe.split('|'); let hasAll = true; reqs.forEach(r => { let p = r.split(','); if(getInvCount(p[0].trim()) < parseInt(p[1])) hasAll = false; }); if(hasAll) { reqs.forEach(r => { let p = r.split(','); removeInvItem(p[0].trim(), parseInt(p[1])); }); if(addInvItem(iName, it.craftQty || 1)) { addXP('crafting', 15); setActionText(`Criou ${iName}!`); } updateUI(); } else { setActionText(`Faltam materiais!`, '#e74c3c'); } }
+        function closeMenus() { isBankOpen = false; isNPCOpen = false; activeNPCShop = null; document.getElementById('btn-bank').style.display='none'; document.getElementById('btn-npc').style.display='none'; }
+        function openTab(tP) { document.querySelectorAll('.tab-content').forEach(e=>e.classList.remove('active-tab')); document.querySelectorAll('.tab-btn').forEach(e=>e.classList.remove('active-btn')); const tb = document.getElementById(`tab-${tP}`); if(tb) tb.classList.add('active-tab'); const bt = document.getElementById(`btn-${tP}`); if(bt) bt.classList.add('active-btn'); isBankOpen = (tP === 'bank'); isNPCOpen = (tP === 'npc'); if (['craft', 'mag', 'inv', 'eq', 'sk', 'bank'].includes(tP)) { updateUI(); } }
+        function setActionText(t, c="#2ecc71") { const el = document.getElementById('action-text'); el.innerText = t; el.style.color = c; setTimeout(() => { if(el.innerText === t) el.innerText = ""; }, 3000); }
+        function addFloatingText(x, y, t, c) { floatingTexts.push({ x: x, y: y, text: t, color: c, life: 50 }); }
+        function addXP(sK, a) { const sk = player.stats.skills[sK]; if(!sk) return; sk.xp += a; addFloatingText(player.x, player.y - 20, `+${a} XP`, '#f1c40f'); let leveledUp = false; while (sk.xp >= sk.next) { sk.level++; sk.xp -= sk.next; sk.next = Math.floor(sk.next * 1.5); leveledUp = true; if (sK === 'hp') { player.stats.maxHp += 2; player.stats.hp = player.stats.maxHp; } } if(leveledUp) { setActionText(`${sk.name} Nível ${sk.level}!`, "#f1c40f"); addFloatingText(player.x, player.y - 40, `Level Up!`, '#2ecc71'); } updateUI(); }
+        function getTotalDef() { let d = player.stats.skills.combat.level; if(player.equipment.shield) d += player.equipment.shield.defBonus; if(player.equipment.body) d += player.equipment.body.defBonus; return d; }
+        function openShop(nData) { document.getElementById('btn-npc').style.display = 'block'; openTab('npc'); document.getElementById('npc-title').innerText = nData.name; document.getElementById('npc-dialog').innerText = `"${nData.dialog || '...'}"`; let sL = document.getElementById('npc-shop-list'); sL.innerHTML = ''; if(nData.shopStr) { nData.shopStr.split('|').forEach(p => { let pt = p.split(','); if(pt.length >= 2) { let iN = pt[0].trim(); let ct = parseInt(pt[1]); let iD = itemDB[iN]; if(iD) { sL.innerHTML += `<div class="shop-item"><span>${iD.icon} ${iD.name}</span><button class="shop-btn" onclick="buyItem('${iN}', ${ct})">Comprar (${ct} 🪙)</button></div>`; } } }); } }
+        function buyItem(iN, ct) { if(getInvCount('Coins') >= ct) { if(addInvItem(iN, 1)) { removeInvItem('Coins', ct); setActionText(`Comprou ${iN}!`); updateUI(); } else { setActionText("Inv Cheio!", "#e74c3c"); } } else { setActionText("Coins insuficientes!", "#e74c3c"); } }
+        function setActiveSpell(sId) { player.activeSpell = sId; updateUI(); }
+
+        function updateUI() {
+            try {
+                document.getElementById('bar-hp').style.width = `${(player.stats.hp / player.stats.maxHp)*100}%`; document.getElementById('text-hp').innerText = `HP ${player.stats.hp}/${player.stats.maxHp}`; document.getElementById('bar-mp').style.width = `${(player.stats.mp / player.stats.maxMp)*100}%`; document.getElementById('text-mp').innerText = `MP ${player.stats.mp}/${player.stats.maxMp}`;
+                const iG = document.getElementById('inv-grid'); iG.innerHTML = ''; for(let i = 0; i < 30; i++) { const item = player.inventory[i]; const div = document.createElement('div'); div.className = 'item-slot'; if(item) { div.innerText = item.icon || '?'; if(item.stackable && item.qty > 1) div.innerHTML += `<span class="item-qty">${item.qty}</span>`; div.onclick = () => useItem(i); div.onmouseenter = () => showTooltip(item); div.onmouseleave = () => hideTooltip(); } iG.appendChild(div); } document.getElementById('weight-txt').innerText = calcTotalWeight();
+                Object.keys(player.equipment || {}).forEach(sl => { const el = document.getElementById(`eq-${sl}`); if(el && player.equipment[sl]) { el.innerText = player.equipment[sl].icon || '?'; if (sl === 'ammo' && player.equipment.ammo) document.getElementById('ammo-qty').innerText = player.equipment.ammo.qty || ''; el.parentElement.onmouseenter = () => showTooltip(player.equipment[sl]); el.parentElement.onmouseleave = () => hideTooltip(); } else if(el) { el.innerText = ''; if (sl === 'ammo') document.getElementById('ammo-qty').innerText = ''; el.parentElement.onmouseenter = null; } }); document.getElementById('def-stats').innerText = `Bônus de Defesa: ${getTotalDef()}`;
+                const sL = document.getElementById('skills-list'); sL.innerHTML = ''; let tL = 0; Object.values(player.stats.skills || {}).forEach(s => { tL += s.level; sL.innerHTML += `<div class="skill-line"><span>${s.name}: Lvl ${s.level}</span> <span style="color:#888;">${s.xp}/${s.next} XP</span></div>`; }); document.getElementById('text-xp').innerText = `Nível Geral: ${tL}`;
+                const bG = document.getElementById('bank-grid'); bG.innerHTML = ''; for(let i = 0; i < Math.max(30, player.bank.length + 4); i++) { const item = player.bank[i]; const div = document.createElement('div'); div.className = 'item-slot'; if(item) { div.innerText = item.icon || '?'; if(item.qty > 1) div.innerHTML += `<span class="item-qty">${item.qty}</span>`; div.onclick = () => withdrawFromBank(i); div.onmouseenter = () => showTooltip(item); div.onmouseleave = () => hideTooltip(); } bG.appendChild(div); }
+                const mL = document.getElementById('spellbook-list'); if (mL) { mL.innerHTML = ''; spellbookDB.forEach(sp => { let rT = Object.keys(sp.req).map(k => `${sp.req[k]}x ${itemDB[k]?itemDB[k].icon:'?'}`).join(' '); let iA = player.stats.skills.magic.level >= sp.lvl; let sC = player.activeSpell === sp.id ? 'spell-card spell-active' : 'spell-card'; mL.innerHTML += `<div class="${sC}" onclick="setActiveSpell('${sp.id}')" style="opacity:${iA?1:0.5}"><div><strong>${sp.name}</strong> <span style="font-size:0.7rem; color:${sp.color}">Dano: +${sp.dmg}</span><br><span class="spell-runes">Req: Lvl ${sp.lvl} | ${rT}</span></div>${player.activeSpell === sp.id ? '⭐' : ''}</div>`; }); }
+                const cG = document.getElementById('craft-list'); if(cG) { cG.innerHTML = ''; Object.values(itemDB).forEach(it => { if(it.recipe) { let reqs = it.recipe.split('|'); let hasAll = true; reqs.forEach(r => { let p = r.split(','); if(getInvCount(p[0].trim()) < parseInt(p[1])) hasAll = false; }); let rT = reqs.map(r => { let p=r.split(','); let ic = itemDB[p[0].trim()] ? itemDB[p[0].trim()].icon : '?'; return `${p[1]}x ${ic}`; }).join(' + '); let opacity = hasAll ? "1" : "0.4"; let btnDisabled = hasAll ? "" : "disabled"; let filter = hasAll ? "" : "filter: grayscale(100%);"; cG.innerHTML += `<div class="spell-card" style="opacity: ${opacity}; ${filter}" onclick="${hasAll ? `craftItem('${it.name}')` : ''}"> <div><strong>${it.icon} ${it.name}</strong> <span style="font-size:0.7rem; color:#bdc3c7;">(Cria ${it.craftQty||1})</span><br><span class="spell-runes">Req: ${rT}</span></div> <button class="shop-btn" ${btnDisabled}>Criar</button> </div>`; } }); }
+            } catch(e) { }
         }
 
         function openModal(htmlContent) { const overlay = document.getElementById('custom-modal-overlay'); const box = document.getElementById('custom-modal-box'); box.innerHTML = htmlContent; overlay.style.display = 'flex'; }
