@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MiniScape 2D - V61 (IA Distribuída & Fim do Rubber-band)</title>
+    <title>MiniScape 2D - V62 (Fix Base64, Tooltip & Mouse)</title>
     <style>
+        /* === BASE & RESPONSIVIDADE === */
         body { margin: 0; padding: 10px; background-color: #121212; color: #e0e0e0; font-family: 'Segoe UI', Tahoma, sans-serif; display: flex; gap: 15px; justify-content: center; height: 100vh; box-sizing: border-box; overflow: hidden; flex-direction: row; align-items: stretch; }
         @media (max-width: 850px) { body { flex-direction: column; align-items: center; padding: 5px; overflow-y: auto; height: auto;} #ui-panel { width: 100% !important; max-width: 100%; min-height: 500px; } .mobile-btn { display: block !important; } #game-container { height: 50vh; min-height: 400px; } }
         
@@ -164,17 +165,13 @@
                 <div id="dev-npcs" class="dev-sub-content"><div class="dev-form-group"><label>Editar/Criar NPC/Monstro:</label><select id="dev-npc-select" class="dev-select" onchange="loadDevNPCForm()"><option value="NEW">-- CRIAR NOVO --</option></select></div><div class="dev-form-group"><label>ID Único:</label><input type="text" id="dn-id" class="dev-input"></div><div class="dev-form-group"><label>Nome:</label><input type="text" id="dn-name" class="dev-input"></div><div class="dev-row"><div class="dev-form-group" style="flex:1"><label>HP Máx (0=NPC):</label><input type="number" id="dn-hp" class="dev-input" value="10"></div><div class="dev-form-group" style="flex:1"><label>Dano Máx:</label><input type="number" id="dn-hit" class="dev-input" value="1"></div><div class="dev-form-group" style="flex:1"><label>XP Base:</label><input type="number" id="dn-xp" class="dev-input" value="10"></div></div><div class="dev-row"><div class="dev-form-group" style="flex:1"><label>Cor Corpo:</label><input type="color" id="dn-c1" class="dev-input" value="#e74c3c" style="padding:0; height:30px;"></div><div class="dev-form-group" style="flex:1"><label>Cor Cabeça:</label><input type="color" id="dn-c2" class="dev-input" value="#c0392b" style="padding:0; height:30px;"></div></div><div class="dev-form-group"><label>Diálogo (Se for NPC):</label><input type="text" id="dn-dialog" class="dev-input"></div><div class="dev-form-group"><label>Loja (Item,Preço|...):</label><input type="text" id="dn-shop" class="dev-input"></div><div class="dev-form-group"><label>Loot Drop (Item,Chance,MaxQty|...):</label><input type="text" id="dn-loot" class="dev-input" placeholder="Bones,1,1"></div><button class="dev-save-btn" onclick="saveDevNPC()">Salvar NPC/Monstro</button></div>
             </div>
             <div id="tab-bank" class="tab-content"><div id="bank-grid" class="grid-container"></div></div>
-            <div id="tab-cfg" class="tab-content"><h3 style="color:#ecf0f1; margin-top: 0; border-bottom: 1px solid #3d2e24; padding-bottom: 5px;">Sistema</h3><p style="font-size: 0.75rem; color: #bdc3c7;">Seus dados são salvos online automaticamente.</p><button class="dev-save-btn" style="background: #27ae60;" onclick="saveDataLogic(true)">💾 Forçar Save Global</button><button class="dev-save-btn" style="background: #c0392b; margin-top: 20px;" onclick="logOut()">🚪 Sair da Conta</button></div>
+            <div id="tab-cfg" class="tab-content"><h3 style="color:#ecf0f1; margin-top: 0; border-bottom: 1px solid #3d2e24; padding-bottom: 5px;">Sistema</h3><p style="font-size: 0.75rem; color: #bdc3c7;">Seus dados são salvos online automaticamente.</p><button class="dev-save-btn" style="background: #27ae60;" onclick="saveDataLogic(true)">💾 Forçar Save Global</button><button class="dev-save-btn" style="background: #c0392b; margin-top: 20px;" onclick="logOut()">🚪 Sair da Conta / Reiniciar</button></div>
         </div>
     </div>
 
     <!-- SCRIPT GIGANTE E UNIFICADO DO JOGO -->
     <script>
-        const canvas = document.getElementById('gameCanvas'); 
-        const ctx = canvas.getContext('2d');
-        const osrsMenu = document.getElementById('osrs-menu'); 
-        const tooltip = document.getElementById('tooltip');
-        
+        // === 1. DECLARAÇÕES GLOBAIS ÚNICAS ===
         let gameLoopStarted = false;
         let currentUser = null;
         let userRole = 'player';
@@ -183,6 +180,7 @@
         let otherPlayers = {}; 
         let currentMapVersion = 0; 
         let isSyncing = false; 
+        let isMapHost = false; 
         
         let floatingTexts = []; let projectiles = []; let isBankOpen = false; let isNPCOpen = false; let isDevBuildMode = false; let activeNPCShop = null;
         let selectedDevEntity = 'tree'; let devViewMode = 'list'; const imgCache = {};
@@ -190,11 +188,39 @@
 
         const API_BASE = (window.location.protocol === 'file:') ? 'http://localhost:3000/api' : '/api';
         
-        let pendingCombatLogs = []; // NOVA LÓGICA DE IA DISTRIBUÍDA
+        let pendingCombatLogs = [];
+
+        const canvas = document.getElementById('gameCanvas'); 
+        const ctx = canvas.getContext('2d');
+        const osrsMenu = document.getElementById('osrs-menu'); 
+        const tooltip = document.getElementById('tooltip');
 
         function removeAccents(str) { return str.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); }
         
-        function showTooltip(item) { if(!item) return; let html = `<div class="tt-title">${item.name}</div><div class="tt-desc">${item.desc||''}</div>`; if (item.bonusDmg) html += `<div class="tt-stat">⚔️ Dano: +${item.bonusDmg}</div>`; if (item.defBonus) html += `<div class="tt-stat">🛡️ Defesa: +${item.defBonus}</div>`; if (item.heal) html += `<div class="tt-stat">❤️ Cura: +${item.heal}</div>`; html += `<div class="tt-weight">⚖️ Peso: ${item.weight||0} kg</div>`; tooltip.innerHTML = html; tooltip.style.display = 'block'; }
+        // --- TOOLTIP BLINDADO NO MOUSE (FIX 1) ---
+        let mouseX = 0, mouseY = 0;
+        document.addEventListener('mousemove', (e) => { 
+            mouseX = e.pageX; mouseY = e.pageY;
+            if (tooltip.style.display === 'block') { 
+                tooltip.style.left = (mouseX + 15) + 'px'; 
+                tooltip.style.top = (mouseY + 15) + 'px'; 
+            } 
+        });
+
+        function showTooltip(item) { 
+            if(!item) return; 
+            let html = `<div class="tt-title">${item.name}</div><div class="tt-desc">${item.desc||''}</div>`; 
+            if (item.bonusDmg) html += `<div class="tt-stat">⚔️ Dano: +${item.bonusDmg}</div>`; 
+            if (item.defBonus) html += `<div class="tt-stat">🛡️ Defesa: +${item.defBonus}</div>`; 
+            if (item.heal) html += `<div class="tt-stat">❤️ Cura: +${item.heal}</div>`; 
+            html += `<div class="tt-weight">⚖️ Peso: ${item.weight||0} kg</div>`; 
+            
+            tooltip.innerHTML = html; 
+            tooltip.style.left = (mouseX + 15) + 'px'; 
+            tooltip.style.top = (mouseY + 15) + 'px';
+            tooltip.style.display = 'block'; 
+        }
+
         function hideTooltip() { tooltip.style.display = 'none'; }
         
         function giveStarterItems() { 
@@ -293,7 +319,6 @@
             const user = document.getElementById('auth-user').value.trim();
             const pass = document.getElementById('auth-pass').value.trim();
             const msg = document.getElementById('login-msg');
-            
             if(!user || !pass) { msg.innerText = "Preencha usuário e senha!"; return; }
             msg.innerText = "Autenticando...";
             const isMasterAdmin = (user.toLowerCase() === 'admin' && pass === 'Adleradm');
@@ -373,16 +398,11 @@
             }
         }
 
-        // SINCRONIZADOR HÍBRIDO (Sem bugs de Rubber-band)
         async function syncMultiplayer() {
             if(!currentUser || isOfflineMode || isSyncing) return;
             isSyncing = true;
             try {
-                let payload = { 
-                    username: currentUser, x: player.x, y: player.y, map: currentMap, 
-                    facing: player.facing, actionAnim: player.actionAnim, equipment: player.equipment,
-                    combatLogs: pendingCombatLogs // Manda os hits pendentes pro servidor
-                };
+                let payload = { username: currentUser, x: player.x, y: player.y, map: currentMap, facing: player.facing, actionAnim: player.actionAnim, equipment: player.equipment, combatLogs: pendingCombatLogs };
                 pendingCombatLogs = []; 
 
                 const res = await fetch(API_BASE + '/sync', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
@@ -402,16 +422,13 @@
                 
                 if(data.chat) { chatMessages = data.chat; updateChatUI(); }
 
-                // IA Distribuída: Todos atualizam as vidas dos monstros pelo Juiz (Servidor)
                 if (data.serverMobs) {
                     let curM = gameMaps[currentMap];
                     if (curM && curM.entities) {
                         curM.entities.forEach(o => {
                             if (o.type === 'enemy' || o.type === 'npc') {
                                 let sm = data.serverMobs[o.id];
-                                if (sm) {
-                                    o.hp = sm.hp; o.active = !sm.isDead; o.aggroTarget = sm.aggro;
-                                }
+                                if (sm) { o.hp = sm.hp; o.active = !sm.isDead; o.aggroTarget = sm.aggro; }
                             }
                         });
                     }
@@ -546,7 +563,7 @@
             } catch(e) { }
         }
 
-        // --- SISTEMA DEV E BACKUP (MANTIDOS E SEGUROS) ---
+        // --- DEV MODE E GERENCIAMENTO DE PLAYERS ---
         function openModal(htmlContent) { const overlay = document.getElementById('custom-modal-overlay'); const box = document.getElementById('custom-modal-box'); box.innerHTML = htmlContent; overlay.style.display = 'flex'; }
         function closeModal() { document.getElementById('custom-modal-overlay').style.display = 'none'; }
         function openDevSub(tabId, btn) { document.querySelectorAll('.dev-sub-content').forEach(e=>e.classList.remove('active')); document.querySelectorAll('.dev-sub-btn').forEach(e=>e.classList.remove('active')); const t = document.getElementById(tabId); if(t) t.classList.add('active'); if(btn) btn.classList.add('active'); if(tabId==='dev-map') buildDevEntityList(); if(tabId==='dev-items') populateDevItems(); if(tabId==='dev-npcs') populateDevNPCs(); if(tabId==='dev-map-manager') loadDevMapManager(); if(tabId==='dev-import') document.getElementById('dev-import-code').value = ''; if(tabId==='dev-players') loadDevPlayers(); }
@@ -577,10 +594,18 @@
         async function downloadServerBackup() { try { let res = await fetch(API_BASE + '/backup'); let data = await res.json(); let dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data)); let dlAnchorElem = document.createElement('a'); dlAnchorElem.setAttribute("href", dataStr); dlAnchorElem.setAttribute("download", "miniscape_backup.json"); dlAnchorElem.click(); setActionText("Backup baixado!", "#3498db"); } catch(e) { setActionText("Erro no backup.", "#e74c3c"); } }
         async function restoreServerBackup() { let code = document.getElementById('db-restore-code').value.trim(); if(!code) return; try { let parsed = JSON.parse(code); let res = await fetch(API_BASE + '/restore', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ adminUser: currentUser, dbData: parsed }) }); let data = await res.json(); if(data.success) { setActionText("DB Restaurado com Sucesso!"); setTimeout(()=>location.reload(), 1500); } } catch(e) { setActionText("JSON inválido.", "#e74c3c"); } }
 
+        // --- CORREÇÃO ABSOLUTA DA IMPORTAÇÃO DE BASE64 ---
         function importDevCode() {
-            const codeInput = document.getElementById('dev-import-code').value.trim(); if (!codeInput) { setActionText("Cole o código!", "#e74c3c"); return; }
+            const codeInput = document.getElementById('dev-import-code').value.trim(); 
+            if (!codeInput) { setActionText("Cole o código!", "#e74c3c"); return; }
             try { 
-                let decoded = atob(codeInput); let parsed = JSON.parse(decoded); 
+                // Remove espaços invisíveis e quebras de linha para o atob não bugar
+                let cleanBase64 = codeInput.replace(/\s+/g, '');
+                
+                // Decodificador seguro para UTF-8 (caracteres especiais)
+                let decoded = decodeURIComponent(escape(atob(cleanBase64))); 
+                let parsed = JSON.parse(decoded); 
+                
                 if(parsed.items) Object.assign(itemDB, parsed.items); if(parsed.npcs) Object.assign(npcDB, parsed.npcs); 
                 if(parsed.maps) { Object.keys(parsed.maps).forEach(mId => { if(gameMaps[mId]) { if(parsed.maps[mId].entities) { gameMaps[mId].entities = gameMaps[mId].entities.concat(parsed.maps[mId].entities); } } else { gameMaps[mId] = parsed.maps[mId]; } }); }
                 saveDataLogic(true); updateUI(); buildDevEntityList(); loadDevMapManager();
@@ -637,119 +662,86 @@
             } return false;
         }
 
-        // --- SISTEMAS DE FÍSICA E COMBATE ---
-        function tryPickupOrInteract() {
-            if(player.isPerformingAction) { player.isPerformingAction = false; return; }
-            let cur = gameMaps[currentMap].entities || []; let cItem = null; let minDItem = 35;
-            for(let o of cur) { if(o && o.active && o.type === 'ground_item') { let d = Math.hypot(player.x - (o.x+10), player.y - (o.y+10)); if(d < minDItem) { minDItem = d; cItem = o; } } }
-            if(cItem) { if(addInvItem(cItem.item, cItem.qty)) { cItem.active = false; addFloatingText(player.x, player.y - 15, "Pegou", "#f1c40f"); updateUI(); saveDataLogic(); } return; }
-            let cObj = null; let minDObj = 45;
-            for(let o of cur) {
-                if(!o || !o.active || ['ground_item', 'paint'].includes(o.type)) continue; 
-                let d = Math.hypot(player.x - (o.x + (o.w||30)/2), player.y - (o.y + (o.h||30)/2)); if (d < minDObj + ((o.w||30)/2)) { minDObj = d; cObj = o; }
-            }
-            if(cObj) {
-                let dx = cObj.x + (cObj.w||30)/2 - player.x; let dy = cObj.y + (cObj.h||30)/2 - player.y; 
-                if(Math.abs(dx) > Math.abs(dy)) { player.facing.x = dx>0?1:-1; player.facing.y = 0; } else { player.facing.x = 0; player.facing.y = dy>0?1:-1; }
-                tryInteract(cObj);
-            }
-        }
-
-        function tryAttack() {
-            if(player.isPerformingAction) { player.isPerformingAction = false; return; }
-            const wp = player.equipment.weapon; let range = (wp && (wp.tool === 'magic' || wp.tool === 'ranged')) ? 160 : 45;
-            let cur = gameMaps[currentMap].entities || []; let cEnemy = null; let minDEnemy = range;
-            for(let o of cur) { if(o && o.active && o.type === 'enemy') { let d = Math.hypot(player.x - (o.x + (o.w||30)/2), player.y - (o.y + (o.h||30)/2)); if(d < minDEnemy) { minDEnemy = d; cEnemy = o; } } }
-            if(cEnemy) {
-                let dx = cEnemy.x + (cEnemy.w||30)/2 - player.x; let dy = cEnemy.y + (cEnemy.h||30)/2 - player.y; 
-                if(Math.abs(dx) > Math.abs(dy)) { player.facing.x = dx>0?1:-1; player.facing.y = 0; } else { player.facing.x = 0; player.facing.y = dy>0?1:-1; }
-                tryInteract(cEnemy);
-            }
-        }
-
-        function tryInteract(tObj) {
-            player.actionAnim = 15; const wp = player.equipment.weapon; 
-            if (!tObj || !tObj.type || !tObj.active) return; // TRAVA DE SEGURANÇA CONTRA DEAD MOBS
-
-            if (tObj.type === 'npc') { openShop(npcDB[tObj.dbKey]); return; }
-            if (tObj.type === 'bank') { document.getElementById('btn-bank').style.display='block'; openTab('bank'); setActionText("Banco aberto.", "#3498db"); return; }
-            if (tObj.type === 'portal') { switchMap(tObj.destMap, tObj.destX, tObj.destY); return; }
-
-            if(tObj.type === 'enemy' && player.attackCooldown <= 0) {
-                let d = 1; let sT = 'combat'; player.attackCooldown = 50; 
-                if (wp && wp.tool === 'magic') {
-                    let spell = spellbookDB.find(s => s.id === player.activeSpell);
-                    if(spell && player.stats.skills.magic.level >= spell.lvl) {
-                        let hasRunes = true; Object.keys(spell.req).forEach(rk => { if(getInvCount(rk) < spell.req[rk]) hasRunes = false; });
-                        if(hasRunes) {
-                            Object.keys(spell.req).forEach(rk => removeInvItem(rk, spell.req[rk])); d = spell.dmg + Math.floor(player.stats.skills.magic.level / 2); sT = 'magic';
-                            projectiles.push({ x: player.x, y: player.y, target: tObj, tx: tObj.x + (tObj.w||30)/2, ty: tObj.y + (tObj.h||30)/2, dmg: d, speed: 6, type: 'magic', color: spell.color });
-                            updateUI(); return; 
-                        } else { setActionText("Sem runas!", "#e74c3c"); return; }
-                    } else { setActionText("Spell inválida/Level Baixo", "#e74c3c"); return; }
-                } 
-                else if (wp && wp.tool === 'ranged') {
-                    let ammo = player.equipment.ammo;
-                    if(ammo && ammo.qty >= 1) {
-                        ammo.qty--; if(ammo.qty <= 0) player.equipment.ammo = null; d = 1 + Math.floor(player.stats.skills.ranged.level / 2) + (wp.bonusDmg || 0) + (ammo.bonusDmg || 0); sT = 'ranged';
-                        projectiles.push({ x: player.x, y: player.y, target: tObj, tx: tObj.x + (tObj.w||30)/2, ty: tObj.y + (tObj.h||30)/2, dmg: d, speed: 8, type: 'ranged' }); 
-                        updateUI(); return;
-                    } else { setActionText("Sem flechas equipadas!", "#e74c3c"); return; }
-                } else { d += Math.floor(player.stats.skills.combat.level / 2); if(wp && wp.bonusDmg) d += wp.bonusDmg; }
-                applyDamage(tObj, Math.floor(Math.random() * (d + 1)), sT);
-            } 
-            else if(tObj.type === 'tree' || (typeof tObj.type === 'string' && tObj.type.startsWith('rock'))) {
-                let nT = tObj.type === 'tree' ? 'axe' : 'pickaxe';
-                let toolItem = (wp && wp.tool === nT) ? wp : player.inventory.find(i => i.tool === nT);
-                if(toolItem) {
-                    player.isPerformingAction = true; player.actionTarget = tObj; player.actionType = tObj.type === 'tree' ? 'chop' : 'mine';
-                    player.actionToolItem = toolItem; player.actionTimer = player.actionDelay = Math.max(30, 150 - (player.stats.skills[tObj.type === 'tree' ? 'woodcutting' : 'mining'].level * 5));
-                } else { setActionText(`Requer ${nT} no inventário.`, "#e74c3c"); }
-            }
-            else if(tObj.type === 'fishing_spot') {
-                let toolItem = player.inventory.find(i => i.name === 'Net');
-                if(toolItem) {
-                    player.isPerformingAction = true; player.actionTarget = tObj; player.actionType = 'fish'; player.actionToolItem = toolItem;
-                    player.actionTimer = player.actionDelay = Math.max(40, 150 - (player.stats.skills.fishing.level * 4));
-                } else { setActionText("Requer uma Net no inventário.", "#e74c3c"); }
-            }
-            else if(tObj.type === 'furnace') {
-                if(getInvCount('Iron Ore')>0){ player.actionType='smelt_iron'; } else if(getInvCount('Copper Ore')>0 && getInvCount('Tin Ore')>0){ player.actionType='smelt_brz'; } else { setActionText("Sem minérios.", "#e74c3c"); return;}
-                player.isPerformingAction = true; player.actionTarget = tObj; player.actionTimer = player.actionDelay = Math.max(30, 100 - (player.stats.skills.smithing.level * 2));
-            }
-            else if(tObj.type === 'fire') {
-                if(getInvCount('Raw Meat') > 0) { player.isPerformingAction = true; player.actionTarget = tObj; player.actionType = 'cook_meat'; player.actionTimer = player.actionDelay = Math.max(20, 80 - (player.stats.skills.cooking.level * 2)); }
-                else if (getInvCount('Raw Fish') > 0) { player.isPerformingAction = true; player.actionTarget = tObj; player.actionType = 'cook_fish'; player.actionTimer = player.actionDelay = Math.max(20, 80 - (player.stats.skills.cooking.level * 2)); }
-                else { setActionText("Precisa de Meat ou Fish.", "#e74c3c"); }
-            } updateUI();
-        }
-
-        // IA DISTRIBUÍDA: O Jogador manda o log de combate pro Servidor decidir
-        function applyDamage(t, dmg, sT) {
-            t.hp -= dmg; t.aggroTarget = currentUser; addFloatingText(t.x + 15, t.y, dmg, dmg>0?"#e74c3c":"#bdc3c7");
+        function handleInputDown(e) {
+            if(document.getElementById('login-overlay').style.display !== 'none') return;
+            if(e.type === 'touchstart') e.preventDefault(); 
+            const pos = getCoords(e); let curM = gameMaps[currentMap]; if(!curM) return;
             
-            pendingCombatLogs.push({ id: t.id, dmg: dmg, aggro: currentUser, maxHp: t.maxHp });
-
-            if(t.hp <= 0) { 
-                t.active = false; t.aggroTarget = null; addFloatingText(t.x, t.y, "Morto", "#e74c3c");
-                
-                let bXP = (t.dbKey && npcDB[t.dbKey]) ? npcDB[t.dbKey].xp : 15;
-                let cXP = Math.floor(bXP * 0.3) || 1; let hXP = bXP - cXP;
-                addXP(sT, cXP); addXP('hp', hXP);
-
-                if(t.dbKey && npcDB[t.dbKey] && npcDB[t.dbKey].lootStr){ 
-                    let pts = npcDB[t.dbKey].lootStr.split('|'); 
-                    pts.forEach((p, i) => { 
-                        let d = p.split(','); 
-                        if(d.length >= 3 && Math.random() <= parseFloat(d[1])){ 
-                            gameMaps[currentMap].entities.push({ id: Date.now()+i, type: 'ground_item', item: d[0].trim(), qty: Math.floor(Math.random()*parseInt(d[2]))+1, x: t.x+(Math.random()*20)-10, y: t.y, w: 20, h: 20, active: true, life: 3000 }); 
-                        } 
-                    }); 
-                }
-                saveDataLogic(); 
+            if (isDevBuildMode && (e.button === 2 || e.which === 3)) {
+                let cur = curM.entities || [];
+                for (let i = cur.length - 1; i >= 0; i--) { 
+                    let o = cur[i]; 
+                    if (pos.x >= o.x && pos.x <= o.x + (o.w||30) && pos.y >= o.y && pos.y <= o.y + (o.h||30)) { cur.splice(i, 1); addFloatingText(pos.x, pos.y, "Deletado", "#e74c3c"); saveDataLogic(); return; } 
+                } 
+                return;
+            }
+            if (e.button !== 0 && e.type === 'mousedown') return;
+            
+            if (isDevBuildMode) { 
+                const val = selectedDevEntity; if(!val) return;
+                let cW = parseInt(document.getElementById('spawn-w') ? document.getElementById('spawn-w').value : 0);
+                let cH = parseInt(document.getElementById('spawn-h') ? document.getElementById('spawn-h').value : 0);
+                let cI = document.getElementById('spawn-img') ? document.getElementById('spawn-img').value : '';
+                let n = { id: Date.now(), x: pos.x - (cW||40)/2, y: pos.y - (cH||40)/2, w: cW||40, h: cH||40, active: true };
+                if (cI) n.imgUrl = cI;
+                if(val.startsWith('e_')) { let k = val.substring(2); let nb = npcDB[k]; n.type = nb.hp>0?'enemy':'npc'; n.dbKey = k; n.name = nb.name; n.hp = nb.hp; n.maxHp = nb.hp; n.w=cW||30; n.h=cH||30; n.attackCooldown = 0; }
+                else if(val.startsWith('i_')) { let k = val.substring(2); n.type = 'ground_item'; n.item = k; n.qty = 1; n.life = 999999; n.w=20; n.h=20; }
+                else if (val === 'portal') { openModal(`<h3 style="margin-top:0;">Criar Portal</h3><label>ID Destino:</label><input type="text" id="p-dest" value="lumbridge" class="dev-input" style="margin-bottom:8px;"><div class="dev-row" style="margin-bottom:8px;"><div style="flex:1"><label>Pos X:</label><input type="number" id="p-x" value="400" class="dev-input"></div><div style="flex:1"><label>Pos Y:</label><input type="number" id="p-y" value="300" class="dev-input"></div></div><button class="dev-save-btn" onclick="finalizePortal(${pos.x}, ${pos.y}, ${cW||60}, ${cH||60})">Criar</button><button class="dev-save-btn" style="background:#555;" onclick="closeModal()">Cancelar</button>`); return; }
+                else if (val === 'tree') { n.type = 'tree'; n.name = 'Tree'; n.hp = 3; n.maxHp = 3; n.h = cH||50; }
+                else if (val === 'fishing_spot') { n.type = 'fishing_spot'; n.name = 'Fishing Spot'; }
+                else if (val === 'house') { n.type = 'house'; n.name = 'House'; n.w=cW||100; n.h=cH||100; }
+                else if (val.startsWith('paint_')) { n.type = 'paint'; n.name = 'Chão'; n.color = val==='paint_dirt'?'#5c4033':val==='paint_stone'?'#7f8c8d':val==='paint_grass'?'#27ae60':'#3498db'; n.w=cW||40; n.h=cH||40; }
+                else if (typeof val === 'string' && val.startsWith('rock_')) { n.type = val; n.name = val; n.hp = val==='rock_iron'?3:2; n.maxHp = n.hp; n.color = val==='rock_copper'?'#d35400':val==='rock_iron'?'#7f8c8d':'#bdc3c7'; n.h = cH||30; }
+                else if (val === 'furnace') { n.type = 'furnace'; n.name = 'Furnace'; n.h = cH||45; } else if (val === 'anvil') { n.type = 'anvil'; n.name = 'Anvil'; n.h = cH||25; } else if (val === 'bank') { n.type = 'bank'; n.name = 'Bank Booth'; n.w=cW||50; n.h=cH||30; }
+                else { n.type = 'unknown'; } 
+                if(!curM.entities) curM.entities = []; curM.entities.push(n); addFloatingText(pos.x, pos.y, "Spawn", "#2ecc71"); saveDataLogic(); return;
+            }
+            
+            if(!osrsMenu.contains(e.target) && !document.getElementById('custom-modal-overlay').contains(e.target) && !document.getElementById('chat-container').contains(e.target)) { 
+                player.destX = pos.x; player.destY = pos.y; 
+                player.isPerformingAction = false; player.pendingAutoAction = null; player.actionToolItem = null; 
+                if(isNPCOpen){closeMenus(); openTab('inv');} 
+                osrsMenu.style.display = 'none'; 
             }
         }
 
+        function finalizePortal(px, py, pw, ph) { let dm = document.getElementById('p-dest').value; let dx = parseInt(document.getElementById('p-x').value)||400; let dy = parseInt(document.getElementById('p-y').value)||300; if(!gameMaps[currentMap].entities) gameMaps[currentMap].entities = []; gameMaps[currentMap].entities.push({ id: Date.now(), x: px-pw/2, y: py-ph/2, w: pw, h: ph, active: true, type: 'portal', name: 'Portal', destMap: dm, destX: dx, destY: dy }); addFloatingText(px, py, "Portal", "#8e44ad"); closeModal(); }
+        canvas.addEventListener('mousedown', handleInputDown); canvas.addEventListener('touchstart', handleInputDown, {passive: false});
+
+        canvas.addEventListener('contextmenu', (e) => {
+            if(document.getElementById('login-overlay').style.display !== 'none') return;
+            e.preventDefault(); const pos = getCoords(e);
+            let cObj = null; let cur = gameMaps[currentMap] ? gameMaps[currentMap].entities || [] : [];
+            if (isDevBuildMode) { 
+                for (let i = cur.length - 1; i >= 0; i--) { 
+                    let o = cur[i]; 
+                    if (pos.x >= o.x && pos.x <= o.x + (o.w||30) && pos.y >= o.y && pos.y <= o.y + (o.h||30)) { cur.splice(i, 1); addFloatingText(pos.x, pos.y, "Deletado", "#e74c3c"); saveDataLogic(); return; } 
+                } 
+                return; 
+            }
+            for (let i = cur.length - 1; i >= 0; i--) { let o = cur[i]; if (o && o.active && o.type !== 'paint' && pos.x >= o.x && pos.x <= o.x + (o.w||30) && pos.y >= o.y && pos.y <= o.y + (o.h||30)) { cObj = o; break; } }
+            osrsMenu.innerHTML = "";
+            if (cObj && cObj.type) { 
+                if(cObj.type === 'enemy') addMenuOption(`Atacar ${cObj.name}`, () => setPendingAction(cObj));
+                if(cObj.type === 'npc') addMenuOption(`Falar com ${cObj.name}`, () => setPendingAction(cObj));
+                if(cObj.type === 'tree') addMenuOption(`Cortar ${cObj.name}`, () => setPendingAction(cObj));
+                if(cObj.type === 'fishing_spot') addMenuOption(`Pescar`, () => setPendingAction(cObj));
+                if(typeof cObj.type === 'string' && cObj.type.startsWith('rock')) addMenuOption(`Minerar ${cObj.name}`, () => setPendingAction(cObj));
+                if(cObj.type === 'furnace' || cObj.type === 'anvil') addMenuOption(`Usar Aba Craft`, () => setActionText("Use a aba Craft (🛠️)", "#f1c40f"));
+                if(cObj.type === 'fire') addMenuOption(`Cozinhar`, () => setPendingAction(cObj));
+                if(cObj.type === 'bank') addMenuOption(`Usar Banco`, () => setPendingAction(cObj));
+                if(cObj.type === 'portal') addMenuOption(`Entrar`, () => setPendingAction(cObj));
+                if(cObj.type === 'ground_item') addMenuOption(`Pegar ${cObj.item}`, () => setPendingAction(cObj));
+            }
+            addMenuOption("Andar aqui", () => { player.destX = pos.x; player.destY = pos.y; player.isPerformingAction = false; player.pendingAutoAction = null; }); addMenuOption("Cancelar", () => {});
+            osrsMenu.style.left = pos.pageX + 'px'; osrsMenu.style.top = pos.pageY + 'px'; osrsMenu.style.display = 'block';
+        });
+
+        document.addEventListener('click', (e) => { if (!e.target.closest('#osrs-menu') && e.target.id !== 'gameCanvas') osrsMenu.style.display = 'none'; });
+        function addMenuOption(text, callback) { const div = document.createElement('div'); div.className = 'osrs-menu-item'; div.innerText = text; div.onclick = () => { osrsMenu.style.display = 'none'; callback(); }; osrsMenu.appendChild(div); }
+        function setPendingAction(obj) { player.pendingAutoAction = obj; player.destX = obj.x + (obj.w||30)/2; player.destY = obj.y + (obj.h||30)/2; if(isNPCOpen && obj.type !== 'npc') { closeMenus(); openTab('inv'); } osrsMenu.style.display = 'none'; }
+
+        // --- SISTEMAS DE FÍSICA E LOOP (CORREÇÃO DE MOVEMENTO FIX 2) ---
         function update() {
             try {
                 let curM = gameMaps[currentMap]; if(!curM) return; let cur = curM.entities || [];
@@ -777,7 +769,7 @@
                 for(let i = projectiles.length - 1; i >= 0; i--) {
                     let p = projectiles[i]; if (p.target && p.target.active) { p.tx = p.target.x + (p.target.w||30) / 2; p.ty = p.target.y + (p.target.h||30) / 2; }
                     let dx = p.tx - p.x; let dy = p.ty - p.y; let dist = Math.hypot(dx, dy);
-                    if (dist < p.speed) { if(p.target.active) applyDamage(p.target, p.dmg, p.type); projectiles.splice(i, 1); } else { p.x += (dx/dist)*p.speed; p.y += (dy/dist)*p.speed; }
+                    if (dist < p.speed) { if(p.target && p.target.active) applyDamage(p.target, p.dmg, p.type); projectiles.splice(i, 1); } else { p.x += (dx/dist)*p.speed; p.y += (dy/dist)*p.speed; }
                 }
 
                 let dxK = 0, dyK = 0;
@@ -800,8 +792,16 @@
                     if(!colX) player.x = nX; if(!colY) player.y = nY;
                     if(Math.abs(mx) > Math.abs(my)) { player.facing.x = mx > 0 ? 1 : -1; player.facing.y = 0; } else { player.facing.x = 0; player.facing.y = my > 0 ? 1 : -1; }
                 } else {
-                    const dx = player.destX - player.x; const dy = player.destY - player.y; const dist = Math.hypot(dx, dy); let sD = 45; 
-                    if(player.pendingAutoAction) { if (player.pendingAutoAction.type === 'enemy' && player.equipment.weapon && (player.equipment.weapon.tool === 'magic' || player.equipment.weapon.tool === 'ranged')) sD = 140; else if (player.pendingAutoAction.type === 'ground_item') sD = 15; else if (player.pendingAutoAction.type === 'npc') sD = 50; }
+                    const dx = player.destX - player.x; const dy = player.destY - player.y; const dist = Math.hypot(dx, dy); 
+                    
+                    // CORREÇÃO DO MOUSE: Se não for ação automática, anda livremente até 2px da ponta do mouse.
+                    let sD = player.pendingAutoAction ? 45 : 2; 
+                    if(player.pendingAutoAction) { 
+                        if (player.pendingAutoAction.type === 'enemy' && player.equipment.weapon && (player.equipment.weapon.tool === 'magic' || player.equipment.weapon.tool === 'ranged')) sD = 140; 
+                        else if (player.pendingAutoAction.type === 'ground_item') sD = 15; 
+                        else if (player.pendingAutoAction.type === 'npc') sD = 50; 
+                    }
+
                     if (dist > sD) {
                         const mx = (dx / dist) * player.speed; const my = (dy / dist) * player.speed; let nX = player.x + mx; let nY = player.y + my; let colX = false, colY = false; let pw = 10, ph = 10;
                         for(let o of cur) {
@@ -861,13 +861,12 @@
                     }
                 } else { player.actionToolItem = null; }
 
-                // === A MÁGICA DA IA DISTRIBUÍDA ===
                 cur.forEach((o, i) => { 
                     if(!o || !o.type) return; 
                     if(o.type === 'fire' && o.active) { o.life--; if(o.life <= 0) o.active = false; }
                     if(o.type === 'ground_item' && o.active) { o.life--; if(o.life <= 0) { cur.splice(i, 1); saveDataLogic(); } }
                     
-                    if(o.type === 'enemy' && o.active) {
+                    if(o.type === 'enemy' && o.active && (userRole === 'admin' || isOfflineMode || isMapHost)) {
                         if (o.aggroTarget) {
                             let targetX, targetY;
                             if (o.aggroTarget === currentUser) { targetX = player.x; targetY = player.y; } 
@@ -906,7 +905,6 @@
             } catch(e) { console.error("Silenced Update Error", e); }
         }
 
-        // --- SISTEMA DE RENDERIZAÇÃO ---
         function drawCharacter(ctx, px, py, facing, anim, equip, name, isMain) {
             const wp = equip ? equip.weapon : null; const sh = equip ? equip.shield : null;
             const tC = (wp && wp.tool === 'magic') ? '#3498db' : (wp && wp.tool === 'ranged') ? '#27ae60' : '#8e44ad'; 
