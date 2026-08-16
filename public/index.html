@@ -229,7 +229,7 @@
         ];
 
         let playerDefault = {
-            x: 400, y: 300, width: 24, height: 24, destX: 400, destY: 300, speed: 4.0, facing: { x: 0, y: 1 }, 
+            x: 400, y: 300, width: 24, height: 24, destX: 400, destY: 300, speed: 2.0, facing: { x: 0, y: 1 }, 
             isPerformingAction: false, actionTarget: null, actionType: null, actionTimer: 0, actionDelay: 100, attackCooldown: 0, pendingAutoAction: null, actionAnim: 0, actionToolItem: null,
             activeSpell: 'wind_strike', regenTimer: 300, currentMap: 'lumbridge',
             equipment: { head: null, body: null, weapon: null, shield: null, ammo: null }, inventory: [], bank: [],
@@ -1108,12 +1108,22 @@
                 mCtx.fillStyle = 'white'; mCtx.fillRect(player.x * scaleX, player.y * scaleY, 4, 4);
             } catch(e) {}
         }
+let lastFrameTime = 0;
+        const frameDelay = 1000 / 90; // Trava o jogo em exatos 60 FPS
 
-        function gameLoop() { 
-            try { update(); } catch(e){} 
-            try { draw(); } catch(e){} 
-            try { drawMinimap(); } catch(e){} 
+        function gameLoop(timestamp) { 
             requestAnimationFrame(gameLoop); 
+            
+            if (!timestamp) timestamp = 0;
+            let elapsed = timestamp - lastFrameTime;
+            
+            // Só atualiza a física e a tela se tiver passado o tempo de 1 frame (16.6ms)
+            if (elapsed >= frameDelay) {
+                lastFrameTime = timestamp - (elapsed % frameDelay);
+                try { update(); } catch(e){} 
+                try { draw(); } catch(e){} 
+                try { drawMinimap(); } catch(e){} 
+            }
         }
 
     </script>
