@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MiniScape 2D - V60 (VIP System & Restaurado)</title>
+    <title>MiniScape 2D - V61 (IA Distribuída & Fim do Rubber-band)</title>
     <style>
-        /* === BASE & RESPONSIVIDADE === */
         body { margin: 0; padding: 10px; background-color: #121212; color: #e0e0e0; font-family: 'Segoe UI', Tahoma, sans-serif; display: flex; gap: 15px; justify-content: center; height: 100vh; box-sizing: border-box; overflow: hidden; flex-direction: row; align-items: stretch; }
         @media (max-width: 850px) { body { flex-direction: column; align-items: center; padding: 5px; overflow-y: auto; height: auto;} #ui-panel { width: 100% !important; max-width: 100%; min-height: 500px; } .mobile-btn { display: block !important; } #game-container { height: 50vh; min-height: 400px; } }
         
@@ -134,7 +133,6 @@
             <div id="tab-mag" class="tab-content"><div style="font-size: 0.7rem; color: #bdc3c7; margin-bottom: 10px;">Equipe um Cajado e clique na magia.</div><div id="spellbook-list"></div></div>
             <div id="tab-npc" class="tab-content"><h3 id="npc-title" style="margin-top:0; color:#f39c12;">NPC</h3><div id="npc-dialog" class="npc-dialog">...</div><div id="npc-shop-list"></div></div>
 
-            <!-- PAINEL DEV EXPANDIDO -->
             <div id="tab-dev" class="tab-content">
                 <div class="dev-sub-tabs">
                     <button id="btn-dev-map" class="dev-sub-btn active" onclick="openDevSub('dev-map', this)">Colocar</button>
@@ -152,7 +150,6 @@
                     <div id="dev-players-list" style="margin-top:10px; display:flex; flex-direction:column; gap:5px; max-height:250px; overflow-y:auto; border: 1px solid #3d2e24; padding:5px;">
                         <span style="color:#888; font-size:0.8rem; text-align:center;">Clique em Atualizar...</span>
                     </div>
-                    
                     <h3 style="color:#f39c12; margin-top:20px; border-bottom: 1px solid #333; padding-bottom:5px;">💾 Backup do Servidor</h3>
                     <p style="font-size:0.7rem; color:#bdc3c7;">Previna o wipe do Render! Baixe seu mapa e contas.</p>
                     <button class="dev-save-btn" onclick="downloadServerBackup()">📥 Baixar Backup DB</button>
@@ -167,11 +164,17 @@
                 <div id="dev-npcs" class="dev-sub-content"><div class="dev-form-group"><label>Editar/Criar NPC/Monstro:</label><select id="dev-npc-select" class="dev-select" onchange="loadDevNPCForm()"><option value="NEW">-- CRIAR NOVO --</option></select></div><div class="dev-form-group"><label>ID Único:</label><input type="text" id="dn-id" class="dev-input"></div><div class="dev-form-group"><label>Nome:</label><input type="text" id="dn-name" class="dev-input"></div><div class="dev-row"><div class="dev-form-group" style="flex:1"><label>HP Máx (0=NPC):</label><input type="number" id="dn-hp" class="dev-input" value="10"></div><div class="dev-form-group" style="flex:1"><label>Dano Máx:</label><input type="number" id="dn-hit" class="dev-input" value="1"></div><div class="dev-form-group" style="flex:1"><label>XP Base:</label><input type="number" id="dn-xp" class="dev-input" value="10"></div></div><div class="dev-row"><div class="dev-form-group" style="flex:1"><label>Cor Corpo:</label><input type="color" id="dn-c1" class="dev-input" value="#e74c3c" style="padding:0; height:30px;"></div><div class="dev-form-group" style="flex:1"><label>Cor Cabeça:</label><input type="color" id="dn-c2" class="dev-input" value="#c0392b" style="padding:0; height:30px;"></div></div><div class="dev-form-group"><label>Diálogo (Se for NPC):</label><input type="text" id="dn-dialog" class="dev-input"></div><div class="dev-form-group"><label>Loja (Item,Preço|...):</label><input type="text" id="dn-shop" class="dev-input"></div><div class="dev-form-group"><label>Loot Drop (Item,Chance,MaxQty|...):</label><input type="text" id="dn-loot" class="dev-input" placeholder="Bones,1,1"></div><button class="dev-save-btn" onclick="saveDevNPC()">Salvar NPC/Monstro</button></div>
             </div>
             <div id="tab-bank" class="tab-content"><div id="bank-grid" class="grid-container"></div></div>
-            <div id="tab-cfg" class="tab-content"><h3 style="color:#ecf0f1; margin-top: 0; border-bottom: 1px solid #3d2e24; padding-bottom: 5px;">Sistema</h3><p style="font-size: 0.75rem; color: #bdc3c7;">Seus dados são salvos online automaticamente.</p><button class="dev-save-btn" style="background: #27ae60;" onclick="saveDataLogic(true)">💾 Forçar Save Global</button><button class="dev-save-btn" style="background: #c0392b; margin-top: 20px;" onclick="logOut()">🚪 Sair da Conta / Reiniciar</button></div>
+            <div id="tab-cfg" class="tab-content"><h3 style="color:#ecf0f1; margin-top: 0; border-bottom: 1px solid #3d2e24; padding-bottom: 5px;">Sistema</h3><p style="font-size: 0.75rem; color: #bdc3c7;">Seus dados são salvos online automaticamente.</p><button class="dev-save-btn" style="background: #27ae60;" onclick="saveDataLogic(true)">💾 Forçar Save Global</button><button class="dev-save-btn" style="background: #c0392b; margin-top: 20px;" onclick="logOut()">🚪 Sair da Conta</button></div>
         </div>
     </div>
 
+    <!-- SCRIPT GIGANTE E UNIFICADO DO JOGO -->
     <script>
+        const canvas = document.getElementById('gameCanvas'); 
+        const ctx = canvas.getContext('2d');
+        const osrsMenu = document.getElementById('osrs-menu'); 
+        const tooltip = document.getElementById('tooltip');
+        
         let gameLoopStarted = false;
         let currentUser = null;
         let userRole = 'player';
@@ -180,18 +183,14 @@
         let otherPlayers = {}; 
         let currentMapVersion = 0; 
         let isSyncing = false; 
-        let isMapHost = false; 
         
         let floatingTexts = []; let projectiles = []; let isBankOpen = false; let isNPCOpen = false; let isDevBuildMode = false; let activeNPCShop = null;
         let selectedDevEntity = 'tree'; let devViewMode = 'list'; const imgCache = {};
         let keys = { w: false, a: false, s: false, d: false, arrowup: false, arrowdown: false, arrowleft: false, arrowright: false };
 
         const API_BASE = (window.location.protocol === 'file:') ? 'http://localhost:3000/api' : '/api';
-
-        const canvas = document.getElementById('gameCanvas'); 
-        const ctx = canvas.getContext('2d');
-        const osrsMenu = document.getElementById('osrs-menu'); 
-        const tooltip = document.getElementById('tooltip');
+        
+        let pendingCombatLogs = []; // NOVA LÓGICA DE IA DISTRIBUÍDA
 
         function removeAccents(str) { return str.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); }
         
@@ -297,7 +296,6 @@
             
             if(!user || !pass) { msg.innerText = "Preencha usuário e senha!"; return; }
             msg.innerText = "Autenticando...";
-            
             const isMasterAdmin = (user.toLowerCase() === 'admin' && pass === 'Adleradm');
 
             try {
@@ -307,17 +305,11 @@
                      res = await fetch(API_BASE + '/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: user, password: pass }) });
                 }
 
-                let data = {};
-                try { data = await res.json(); } catch(err) {}
-                
+                let data = {}; try { data = await res.json(); } catch(err) {}
                 if (!res.ok || data.error) { msg.innerText = data.error || "Usuário ou senha incorretos!"; return; }
 
-                currentUser = user; 
-                userRole = isMasterAdmin ? 'admin' : (data.role || 'player'); 
-                isOfflineMode = false; 
-                localStorage.setItem('miniscape_session', user);
-                finishLoginSetup(data);
-
+                currentUser = user; userRole = isMasterAdmin ? 'admin' : (data.role || 'player'); isOfflineMode = false; 
+                localStorage.setItem('miniscape_session', user); finishLoginSetup(data);
             } catch(e) { 
                 let users = JSON.parse(localStorage.getItem('miniscape_users') || '{}');
                 if (isMasterAdmin || (users[user] && users[user] === pass)) {
@@ -342,32 +334,20 @@
                 }
             }
             
-            if(data.worldData && Object.keys(data.worldData).length > 0 && data.worldData['lumbridge']) { 
-                gameMaps = data.worldData; 
-            } else { gameMaps = JSON.parse(JSON.stringify(defaultGameMaps)); }
+            if(data.worldData && Object.keys(data.worldData).length > 0 && data.worldData['lumbridge']) { gameMaps = data.worldData; } else { gameMaps = JSON.parse(JSON.stringify(defaultGameMaps)); }
             currentMapVersion = data.mapVersion || 0;
             
-            if(data.itemDB) itemDB = data.itemDB;
-            if(data.npcDB) npcDB = data.npcDB;
-            if(data.chat) chatMessages = data.chat;
+            if(data.itemDB) itemDB = data.itemDB; if(data.npcDB) npcDB = data.npcDB; if(data.chat) chatMessages = data.chat;
             
             if(data.playerData && Object.keys(data.playerData).length > 0) {
                 player = { ...playerDefault, ...data.playerData };
                 if(data.playerData.stats) player.stats = { ...playerDefault.stats, ...data.playerData.stats };
                 if(data.playerData.stats && data.playerData.stats.skills) player.stats.skills = { ...playerDefault.stats.skills, ...data.playerData.stats.skills };
-            } else {
-                player = JSON.parse(JSON.stringify(playerDefault));
-                giveStarterItems();
-            }
+            } else { player = JSON.parse(JSON.stringify(playerDefault)); giveStarterItems(); }
 
-            if (typeof player.x !== 'number' || isNaN(player.x)) player.x = 400;
-            if (typeof player.y !== 'number' || isNaN(player.y)) player.y = 300;
-            if (!player.facing) player.facing = { x: 0, y: 1 };
-            if (!player.equipment) player.equipment = { head: null, body: null, weapon: null, shield: null, ammo: null };
-            if (!player.inventory) player.inventory = [];
-            if (!player.bank) player.bank = [];
-            player.actionAnim = player.actionAnim || 0;
-            
+            if (typeof player.x !== 'number' || isNaN(player.x)) player.x = 400; if (typeof player.y !== 'number' || isNaN(player.y)) player.y = 300;
+            if (!player.facing) player.facing = { x: 0, y: 1 }; if (!player.equipment) player.equipment = { head: null, body: null, weapon: null, shield: null, ammo: null };
+            if (!player.inventory) player.inventory = []; if (!player.bank) player.bank = []; player.actionAnim = player.actionAnim || 0;
             currentMap = player.currentMap || 'lumbridge'; if(!gameMaps[currentMap]) currentMap = 'lumbridge';
             
             document.getElementById('login-overlay').style.display = 'none';
@@ -380,11 +360,7 @@
                 updateChatUI();
                 
                 if(!isOfflineMode) setInterval(syncMultiplayer, 150);
-
-                if(!gameLoopStarted) {
-                    gameLoopStarted = true;
-                    requestAnimationFrame(gameLoop);
-                }
+                if(!gameLoopStarted) { gameLoopStarted = true; requestAnimationFrame(gameLoop); }
             }, 100);
         }
 
@@ -397,18 +373,21 @@
             }
         }
 
+        // SINCRONIZADOR HÍBRIDO (Sem bugs de Rubber-band)
         async function syncMultiplayer() {
             if(!currentUser || isOfflineMode || isSyncing) return;
             isSyncing = true;
             try {
-                let payload = { username: currentUser, x: player.x, y: player.y, map: currentMap, facing: player.facing, actionAnim: player.actionAnim, equipment: player.equipment };
-                if ((isMapHost || userRole === 'admin') && gameMaps[currentMap]) { payload.entities = gameMaps[currentMap].entities; }
+                let payload = { 
+                    username: currentUser, x: player.x, y: player.y, map: currentMap, 
+                    facing: player.facing, actionAnim: player.actionAnim, equipment: player.equipment,
+                    combatLogs: pendingCombatLogs // Manda os hits pendentes pro servidor
+                };
+                pendingCombatLogs = []; 
 
                 const res = await fetch(API_BASE + '/sync', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
                 const data = await res.json();
                 
-                if (data.isHost !== undefined) { isMapHost = data.isHost; }
-
                 if(data.players) {
                     Object.keys(data.players).forEach(u => {
                         if (!otherPlayers[u]) {
@@ -423,19 +402,18 @@
                 
                 if(data.chat) { chatMessages = data.chat; updateChatUI(); }
 
-                if (data.syncEntities && !isMapHost && userRole !== 'admin') {
+                // IA Distribuída: Todos atualizam as vidas dos monstros pelo Juiz (Servidor)
+                if (data.serverMobs) {
                     let curM = gameMaps[currentMap];
                     if (curM && curM.entities) {
-                        data.syncEntities.forEach(sEnt => {
-                            let lEnt = curM.entities.find(e => e.id === sEnt.id);
-                            if (lEnt) {
-                                if (lEnt.type === 'enemy' || lEnt.type === 'npc') {
-                                    lEnt.serverX = sEnt.x; lEnt.serverY = sEnt.y; lEnt.hp = sEnt.hp; lEnt.active = sEnt.active;
-                                    if(sEnt.aggroTarget) lEnt.aggroTarget = sEnt.aggroTarget;
-                                } else { Object.assign(lEnt, sEnt); }
-                            } else { curM.entities.push(sEnt); }
+                        curM.entities.forEach(o => {
+                            if (o.type === 'enemy' || o.type === 'npc') {
+                                let sm = data.serverMobs[o.id];
+                                if (sm) {
+                                    o.hp = sm.hp; o.active = !sm.isDead; o.aggroTarget = sm.aggro;
+                                }
+                            }
                         });
-                        curM.entities = curM.entities.filter(lEnt => data.syncEntities.find(sEnt => sEnt.id === lEnt.id));
                     }
                 }
                 
@@ -474,8 +452,7 @@
 
         async function sendChat() {
             if (isOfflineMode) { setActionText("Chat offline.", "#e74c3c"); return; }
-            const input = document.getElementById('chat-input');
-            const msg = input.value.trim(); if(!msg) return; input.value = ''; input.blur(); 
+            const input = document.getElementById('chat-input'); const msg = input.value.trim(); if(!msg) return; input.value = ''; input.blur(); 
             let color = userRole === 'admin' ? '#e74c3c' : (userRole === 'vip_full' ? '#f1c40f' : (userRole === 'vip_light' ? '#3498db' : '#ecf0f1'));
             let prefix = userRole === 'admin' ? '[ADM] ' : (userRole.includes('vip') ? '[VIP] ' : '');
             try {
@@ -483,12 +460,7 @@
                 const data = await res.json(); if(data.chat) { chatMessages = data.chat; updateChatUI(); }
             } catch(e) {}
         }
-        
-        function updateChatUI() {
-            const box = document.getElementById('chat-box'); if(!box) return; box.innerHTML = '';
-            chatMessages.forEach(c => { box.innerHTML += `<div class="chat-msg"><span style="color:${c.color}; font-weight:bold;">[${c.sender}]</span>: ${c.msg}</div>`; });
-            box.scrollTop = box.scrollHeight;
-        }
+        function updateChatUI() { const box = document.getElementById('chat-box'); if(!box) return; box.innerHTML = ''; chatMessages.forEach(c => { box.innerHTML += `<div class="chat-msg"><span style="color:${c.color}; font-weight:bold;">[${c.sender}]</span>: ${c.msg}</div>`; }); box.scrollTop = box.scrollHeight; }
         
         document.getElementById('chat-input').addEventListener('keydown', function(e) { e.stopPropagation(); if (e.key === 'Enter') sendChat(); });
         document.getElementById('chat-input').addEventListener('keyup', function(e) { e.stopPropagation(); });
@@ -498,70 +470,39 @@
             if (e.code === 'Enter') { const chatInput = document.getElementById('chat-input'); if (document.activeElement !== chatInput) { e.preventDefault(); chatInput.focus(); return; } }
             if(["Space","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].indexOf(e.code) > -1) { if(e.target.tagName !== "INPUT" && e.target.tagName !== "TEXTAREA") e.preventDefault(); }
         }, false);
-
         document.addEventListener('keydown', (e) => { 
             if(document.getElementById('login-overlay').style.display !== 'none') return;
             if(e.target.tagName === "INPUT" || e.target.tagName === "SELECT" || e.target.tagName === "TEXTAREA") return;
             let k = e.key.toLowerCase(); if(['w','a','s','d','arrowup','arrowleft','arrowdown','arrowright'].includes(k)) keys[k] = true;
             if (e.code === 'Space') { tryPickupOrInteract(); } if (e.key === 'Control') { tryAttack(); } 
         });
-
         document.addEventListener('keyup', (e) => { 
             if(document.getElementById('login-overlay').style.display !== 'none') return;
             let k = e.key.toLowerCase(); if(['w','a','s','d','arrowup','arrowleft','arrowdown','arrowright'].includes(k)) keys[k] = false;
         });
 
-        // --- SISTEMA DE INVENTÁRIO, UI E AÇÕES ---
         function getCameraOffset() {
-            let mapObj = gameMaps[currentMap];
-            if (!mapObj) return { x: 0, y: 0 };
+            let mapObj = gameMaps[currentMap]; if (!mapObj) return { x: 0, y: 0 };
             let mapW = mapObj.width || 800; let mapH = mapObj.height || 600;
             let camX = (canvas.width / 2) - player.x; let camY = (canvas.height / 2) - player.y;
-
-            if (mapW > canvas.width) {
-                if (camX > 0) camX = 0; if (camX < canvas.width - mapW) camX = canvas.width - mapW;
-            } else { camX = (canvas.width - mapW) / 2; }
-
-            if (mapH > canvas.height) {
-                if (camY > 0) camY = 0; if (camY < canvas.height - mapH) camY = canvas.height - mapH;
-            } else { camY = (canvas.height - mapH) / 2; }
-            
+            if (mapW > canvas.width) { if (camX > 0) camX = 0; if (camX < canvas.width - mapW) camX = canvas.width - mapW; } else { camX = (canvas.width - mapW) / 2; }
+            if (mapH > canvas.height) { if (camY > 0) camY = 0; if (camY < canvas.height - mapH) camY = canvas.height - mapH; } else { camY = (canvas.height - mapH) / 2; }
             return { x: isNaN(camX) ? 0 : camX, y: isNaN(camY) ? 0 : camY };
         }
 
         function getCoords(e) {
-            const rect = canvas.getBoundingClientRect(); 
-            const scaleX = rect.width > 0 ? canvas.width / rect.width : 1; 
-            const scaleY = rect.height > 0 ? canvas.height / rect.height : 1;
+            const rect = canvas.getBoundingClientRect(); const scaleX = rect.width > 0 ? canvas.width / rect.width : 1; const scaleY = rect.height > 0 ? canvas.height / rect.height : 1;
             let cX = e.clientX, cY = e.clientY, pX = e.pageX, pY = e.pageY;
             if(e.type && e.type.includes('touch')) { cX = e.touches[0].clientX; cY = e.touches[0].clientY; pX = e.touches[0].pageX; pY = e.touches[0].pageY; }
             let rawX = (cX - rect.left) * scaleX; let rawY = (cY - rect.top) * scaleY;
-            let offset = getCameraOffset();
-            return { x: rawX - offset.x, y: rawY - offset.y, pageX: pX, pageY: pY };
+            let offset = getCameraOffset(); return { x: rawX - offset.x, y: rawY - offset.y, pageX: pX, pageY: pY };
         }
 
+        // --- SISTEMAS DE INVENTÁRIO, UI E AÇÕES ---
         function getInvCount(iName) { return player.inventory.reduce((acc, i) => acc + (i.name === iName ? (i.qty||1) : 0), 0); }
         function calcTotalWeight() { return player.inventory.reduce((acc, i) => acc + ((i&&i.weight?i.weight:0) * (i&&i.qty?i.qty:1)), 0).toFixed(1); }
         function removeInvItem(iName, amount) { let tr = amount; for(let i = player.inventory.length - 1; i >= 0; i--) { if(player.inventory[i].name === iName) { if(player.inventory[i].stackable) { if(player.inventory[i].qty > tr) { player.inventory[i].qty -= tr; return true; } else { tr -= player.inventory[i].qty; player.inventory.splice(i, 1); } } else { player.inventory.splice(i, 1); tr--; if(tr === 0) return true; } } } return false; }
-        
-        function addInvItem(iName, qty = 1) { 
-            const b = itemDB[iName]; if(!b) return false; 
-            if (b.stackable) { 
-                let r = qty; 
-                for(let i of player.inventory) { 
-                    if(i.name === iName && i.qty < 254) { 
-                        let sp = 254 - i.qty; 
-                        if(r <= sp) { i.qty += r; return true; } else { i.qty = 254; r -= sp; } 
-                    } 
-                } 
-                while(r > 0 && player.inventory.length < 28) { let t = Math.min(r, 254); player.inventory.push({...b, qty: t}); r -= t; } 
-                return r <= 0; 
-            } else { 
-                if(player.inventory.length < 28) { player.inventory.push({...b}); return true; } 
-                return false; 
-            } 
-        }
-
+        function addInvItem(iName, qty = 1) { const b = itemDB[iName]; if(!b) return false; if (b.stackable) { let r = qty; for(let i of player.inventory) { if(i.name === iName && i.qty < 254) { let sp = 254 - i.qty; if(r <= sp) { i.qty += r; return true; } else { i.qty = 254; r -= sp; } } } while(r > 0 && player.inventory.length < 28) { let t = Math.min(r, 254); player.inventory.push({...b, qty: t}); r -= t; } return r <= 0; } else { if(player.inventory.length < 28) { player.inventory.push({...b}); return true; } return false; } }
         function transferToBank(invIndex) { const item = player.inventory[invIndex]; if(!item) return; let bankItem = player.bank.find(i => i.name === item.name); if(bankItem && item.stackable) { bankItem.qty += item.qty; } else if (item.stackable) { player.bank.push({...item, qty: item.qty}); } else { player.bank.push({...item, qty: 1}); } player.inventory.splice(invIndex, 1); hideTooltip(); updateUI(); }
         function withdrawFromBank(bankIndex) { const item = player.bank[bankIndex]; if(!item) return; let wQ = item.stackable ? Math.min(item.qty, 254) : 1; if(addInvItem(item.name, wQ)) { item.qty -= wQ; if(item.qty <= 0) player.bank.splice(bankIndex, 1); hideTooltip(); updateUI(); } else { setActionText("Inventário Cheio!", "#e74c3c"); } }
 
@@ -581,24 +522,11 @@
         function setActionText(t, c="#2ecc71") { const el = document.getElementById('action-text'); el.innerText = t; el.style.color = c; setTimeout(() => { if(el.innerText === t) el.innerText = ""; }, 3000); }
         function addFloatingText(x, y, t, c) { floatingTexts.push({ x: x, y: y, text: t, color: c, life: 50 }); }
         
-        // SISTEMA VIP: MULTIPLICADOR DE XP
         function addXP(sK, a) { 
-            let mult = 1;
-            if(userRole === 'vip_light') mult = 2;
-            if(userRole === 'vip_full' || userRole === 'admin') mult = 4;
-            let finalXP = a * mult;
-
-            const sk = player.stats.skills[sK]; if(!sk) return; 
-            sk.xp += finalXP; 
-            addFloatingText(player.x, player.y - 20, `+${finalXP} XP`, '#f1c40f'); 
-            
-            let leveledUp = false; 
-            while (sk.xp >= sk.next) { 
-                sk.level++; sk.xp -= sk.next; sk.next = Math.floor(sk.next * 1.5); leveledUp = true; 
-                if (sK === 'hp') { player.stats.maxHp += 2; player.stats.hp = player.stats.maxHp; } 
-            } 
-            if(leveledUp) { setActionText(`${sk.name} Nível ${sk.level}!`, "#f1c40f"); addFloatingText(player.x, player.y - 40, `Level Up!`, '#2ecc71'); } 
-            updateUI(); 
+            let mult = 1; if(userRole === 'vip_light') mult = 2; if(userRole === 'vip_full' || userRole === 'admin') mult = 4; let finalXP = a * mult;
+            const sk = player.stats.skills[sK]; if(!sk) return; sk.xp += finalXP; addFloatingText(player.x, player.y - 20, `+${finalXP} XP`, '#f1c40f'); 
+            let leveledUp = false; while (sk.xp >= sk.next) { sk.level++; sk.xp -= sk.next; sk.next = Math.floor(sk.next * 1.5); leveledUp = true; if (sK === 'hp') { player.stats.maxHp += 2; player.stats.hp = player.stats.maxHp; } } 
+            if(leveledUp) { setActionText(`${sk.name} Nível ${sk.level}!`, "#f1c40f"); addFloatingText(player.x, player.y - 40, `Level Up!`, '#2ecc71'); } updateUI(); 
         }
 
         function getTotalDef() { let d = player.stats.skills.combat.level; if(player.equipment.shield) d += player.equipment.shield.defBonus; if(player.equipment.body) d += player.equipment.body.defBonus; return d; }
@@ -618,7 +546,7 @@
             } catch(e) { }
         }
 
-        // --- DEV MODE E GERENCIAMENTO DE PLAYERS ---
+        // --- SISTEMA DEV E BACKUP (MANTIDOS E SEGUROS) ---
         function openModal(htmlContent) { const overlay = document.getElementById('custom-modal-overlay'); const box = document.getElementById('custom-modal-box'); box.innerHTML = htmlContent; overlay.style.display = 'flex'; }
         function closeModal() { document.getElementById('custom-modal-overlay').style.display = 'none'; }
         function openDevSub(tabId, btn) { document.querySelectorAll('.dev-sub-content').forEach(e=>e.classList.remove('active')); document.querySelectorAll('.dev-sub-btn').forEach(e=>e.classList.remove('active')); const t = document.getElementById(tabId); if(t) t.classList.add('active'); if(btn) btn.classList.add('active'); if(tabId==='dev-map') buildDevEntityList(); if(tabId==='dev-items') populateDevItems(); if(tabId==='dev-npcs') populateDevNPCs(); if(tabId==='dev-map-manager') loadDevMapManager(); if(tabId==='dev-import') document.getElementById('dev-import-code').value = ''; if(tabId==='dev-players') loadDevPlayers(); }
@@ -645,38 +573,15 @@
             } catch(e) { }
         }
 
-        async function changeUserRole(tUser) {
-            let nRole = document.getElementById('role-'+tUser).value;
-            try {
-                await fetch(API_BASE + '/users/role', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ adminUser: currentUser, targetUser: tUser, newRole: nRole }) });
-                setActionText(`Cargo de ${tUser} alterado!`); loadDevPlayers();
-            } catch(e) {}
-        }
-
-        async function downloadServerBackup() {
-            try {
-                let res = await fetch(API_BASE + '/backup'); let data = await res.json();
-                let dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data));
-                let dlAnchorElem = document.createElement('a'); dlAnchorElem.setAttribute("href", dataStr); dlAnchorElem.setAttribute("download", "miniscape_backup.json"); dlAnchorElem.click();
-                setActionText("Backup baixado!", "#3498db");
-            } catch(e) { setActionText("Erro no backup.", "#e74c3c"); }
-        }
-
-        async function restoreServerBackup() {
-            let code = document.getElementById('db-restore-code').value.trim(); if(!code) return;
-            try {
-                let parsed = JSON.parse(code);
-                let res = await fetch(API_BASE + '/restore', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ adminUser: currentUser, dbData: parsed }) });
-                let data = await res.json(); if(data.success) { setActionText("DB Restaurado com Sucesso!"); setTimeout(()=>location.reload(), 1500); }
-            } catch(e) { setActionText("JSON inválido.", "#e74c3c"); }
-        }
+        async function changeUserRole(tUser) { let nRole = document.getElementById('role-'+tUser).value; try { await fetch(API_BASE + '/users/role', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ adminUser: currentUser, targetUser: tUser, newRole: nRole }) }); setActionText(`Cargo de ${tUser} alterado!`); loadDevPlayers(); } catch(e) {} }
+        async function downloadServerBackup() { try { let res = await fetch(API_BASE + '/backup'); let data = await res.json(); let dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data)); let dlAnchorElem = document.createElement('a'); dlAnchorElem.setAttribute("href", dataStr); dlAnchorElem.setAttribute("download", "miniscape_backup.json"); dlAnchorElem.click(); setActionText("Backup baixado!", "#3498db"); } catch(e) { setActionText("Erro no backup.", "#e74c3c"); } }
+        async function restoreServerBackup() { let code = document.getElementById('db-restore-code').value.trim(); if(!code) return; try { let parsed = JSON.parse(code); let res = await fetch(API_BASE + '/restore', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ adminUser: currentUser, dbData: parsed }) }); let data = await res.json(); if(data.success) { setActionText("DB Restaurado com Sucesso!"); setTimeout(()=>location.reload(), 1500); } } catch(e) { setActionText("JSON inválido.", "#e74c3c"); } }
 
         function importDevCode() {
             const codeInput = document.getElementById('dev-import-code').value.trim(); if (!codeInput) { setActionText("Cole o código!", "#e74c3c"); return; }
             try { 
                 let decoded = atob(codeInput); let parsed = JSON.parse(decoded); 
-                if(parsed.items) Object.assign(itemDB, parsed.items); 
-                if(parsed.npcs) Object.assign(npcDB, parsed.npcs); 
+                if(parsed.items) Object.assign(itemDB, parsed.items); if(parsed.npcs) Object.assign(npcDB, parsed.npcs); 
                 if(parsed.maps) { Object.keys(parsed.maps).forEach(mId => { if(gameMaps[mId]) { if(parsed.maps[mId].entities) { gameMaps[mId].entities = gameMaps[mId].entities.concat(parsed.maps[mId].entities); } } else { gameMaps[mId] = parsed.maps[mId]; } }); }
                 saveDataLogic(true); updateUI(); buildDevEntityList(); loadDevMapManager();
                 document.getElementById('dev-import-code').value = ''; setActionText("Importado com sucesso!", "#2ecc71"); alert("Pacote injetado com sucesso!"); 
@@ -709,7 +614,6 @@
         function toggleDevBuild() { isDevBuildMode = !isDevBuildMode; document.getElementById('btn-build-mode').innerText=`Modo Construção: ${isDevBuildMode?'ON':'OFF'}`; document.getElementById('btn-build-mode').style.background=isDevBuildMode?'#2ecc71':'#e67e22'; setActionText(isDevBuildMode?"Build ON.":"Build OFF.", "#f1c40f"); }
 
         function loadDevMapManager() { let grid = document.getElementById('map-grid-ui'); if(!grid) return; grid.innerHTML = ''; for(let y = -2; y <= 2; y++) { for(let x = -2; x <= 2; x++) { let m = Object.keys(gameMaps).find(k => gameMaps[k].gridX === x && gameMaps[k].gridY === y); let div = document.createElement('div'); div.className = 'map-tile'; if(m) { div.innerText = m; div.style.background = gameMaps[m].color; } else { div.innerText = "+"; } if(m === currentMap) div.classList.add('active-tile'); div.onclick = () => handleGridClick(x, y, m); grid.appendChild(div); } } let cm = gameMaps[currentMap]; if(cm) { document.getElementById('cur-map-id-disp').innerText = cm.name; document.getElementById('cur-map-name').value = cm.name; document.getElementById('cur-map-w').value = cm.width || 800; document.getElementById('cur-map-h').value = cm.height || 600; document.getElementById('cur-map-color').value = cm.color || '#4a6b2d'; } }
-
         function handleGridClick(x, y, existingMapId) {
             if (existingMapId) { openModal(`<h3 style="margin-top:0; color:#f1c40f;">Mapa: ${existingMapId}</h3><div style="display:flex; flex-direction:column; gap:8px; margin-top:10px;"><button class="dev-save-btn" style="background:#3498db;" onclick="closeModal(); switchMap('${existingMapId}', ${gameMaps[existingMapId].width/2}, ${gameMaps[existingMapId].height/2})">Viajar para cá</button><button class="dev-save-btn" style="background:#c0392b;" onclick="unlinkMap('${existingMapId}')">Desvincular</button><button class="dev-save-btn" style="background:#555;" onclick="closeModal()">Cancelar</button></div>`); } 
             else { let unlinked = Object.keys(gameMaps).filter(k => gameMaps[k].gridX === null || gameMaps[k].gridX === undefined); let opts = unlinked.map(k => `<option value="${k}">${k} (${gameMaps[k].name})</option>`).join(''); openModal(`<h3 style="margin-top:0; color:#2ecc71;">Vincular Mapa</h3><select id="mod-map-sel" class="dev-select" style="margin-top:5px; margin-bottom:10px;"><option value="">-- Selecione --</option>${opts}</select><div style="display:flex; flex-direction:column; gap:8px;"><button class="dev-save-btn" onclick="linkMap(${x}, ${y})">Vincular</button><button class="dev-save-btn" style="background:#e67e22;" onclick="quickCreateMap(${x}, ${y})">Criar Novo Aqui</button><button class="dev-save-btn" style="background:#555;" onclick="closeModal()">Cancelar</button></div>`); }
@@ -721,16 +625,11 @@
         function createNewMap() { let id = document.getElementById('dm-id').value; let n = document.getElementById('dm-name').value; let w = parseInt(document.getElementById('dm-w').value) || 800; let h = parseInt(document.getElementById('dm-h').value) || 600; let c = document.getElementById('dm-color').value; if(!id || gameMaps[id]) { alert("ID inválido/já existe!"); return; } gameMaps[id] = { id: id, name: n||id, width: w, height: h, color: c, gridX: null, gridY: null, entities: [] }; setActionText("Mapa Criado!"); saveDataLogic(); loadDevMapManager(); }
 
         function switchMap(targetMap, nx, ny) { if(!gameMaps[targetMap]) return; currentMap = targetMap; player.x = nx; player.y = ny; player.destX = nx; player.destY = ny; player.isPerformingAction = false; player.pendingAutoAction = null; player.actionTarget = null; player.actionToolItem = null; projectiles = []; setActionText(`Viajou: ${gameMaps[currentMap].name}`); saveDataLogic(); loadDevMapManager(); }
-        
         function switchMapByGrid(dx, dy) {
-            let cm = gameMaps[currentMap]; 
-            let tgX = cm.gridX !== null ? cm.gridX + dx : null;
-            let tgY = cm.gridY !== null ? cm.gridY + dy : null;
-            if (tgX !== null && tgY !== null) {
-                let targetMapId = Object.keys(gameMaps).find(k => gameMaps[k].gridX === tgX && gameMaps[k].gridY === tgY);
+            let cm = gameMaps[currentMap]; let tgX = cm.gridX !== null ? cm.gridX + dx : null; let tgY = cm.gridY !== null ? cm.gridY + dy : null;
+            if (tgX !== null && tgY !== null) { let targetMapId = Object.keys(gameMaps).find(k => gameMaps[k].gridX === tgX && gameMaps[k].gridY === tgY);
                 if(targetMapId) { 
-                    let tm = gameMaps[targetMapId]; let tmW = tm.width || 800; let tmH = tm.height || 600;
-                    let nx = player.x; let ny = player.y;
+                    let tm = gameMaps[targetMapId]; let tmW = tm.width || 800; let tmH = tm.height || 600; let nx = player.x; let ny = player.y;
                     if (dx !== 0) { let ratio = player.y / (cm.height||600); ny = tmH * ratio; if (dx > 0) nx = 40; if (dx < 0) nx = tmW - 40; }
                     if (dy !== 0) { let ratio = player.x / (cm.width||800); nx = tmW * ratio; if (dy > 0) ny = 40; if (dy < 0) ny = tmH - 40; }
                     switchMap(targetMapId, nx, ny); return true;
@@ -738,77 +637,7 @@
             } return false;
         }
 
-        function handleInputDown(e) {
-            if(document.getElementById('login-overlay').style.display !== 'none') return;
-            if(e.type === 'touchstart') e.preventDefault(); 
-            const pos = getCoords(e); let curM = gameMaps[currentMap]; if(!curM) return;
-            if (isDevBuildMode && (e.button === 2 || e.which === 3)) {
-                let cur = curM.entities || [];
-                for (let i = cur.length - 1; i >= 0; i--) { 
-                    let o = cur[i]; 
-                    if (pos.x >= o.x && pos.x <= o.x + (o.w||30) && pos.y >= o.y && pos.y <= o.y + (o.h||30)) { cur.splice(i, 1); addFloatingText(pos.x, pos.y, "Deletado", "#e74c3c"); saveDataLogic(); return; } 
-                } 
-                return;
-            }
-            if (e.button !== 0 && e.type === 'mousedown') return;
-            if (isDevBuildMode) { 
-                const val = selectedDevEntity; if(!val) return;
-                let cW = parseInt(document.getElementById('spawn-w') ? document.getElementById('spawn-w').value : 0);
-                let cH = parseInt(document.getElementById('spawn-h') ? document.getElementById('spawn-h').value : 0);
-                let cI = document.getElementById('spawn-img') ? document.getElementById('spawn-img').value : '';
-                let n = { id: Date.now(), x: pos.x - (cW||40)/2, y: pos.y - (cH||40)/2, w: cW||40, h: cH||40, active: true };
-                if (cI) n.imgUrl = cI;
-                if(val.startsWith('e_')) { let k = val.substring(2); let nb = npcDB[k]; n.type = nb.hp>0?'enemy':'npc'; n.dbKey = k; n.name = nb.name; n.hp = nb.hp; n.maxHp = nb.hp; n.w=cW||30; n.h=cH||30; n.attackCooldown = 0; }
-                else if(val.startsWith('i_')) { let k = val.substring(2); n.type = 'ground_item'; n.item = k; n.qty = 1; n.life = 999999; n.w=20; n.h=20; }
-                else if (val === 'portal') { openModal(`<h3 style="margin-top:0;">Criar Portal</h3><label>ID Destino:</label><input type="text" id="p-dest" value="lumbridge" class="dev-input" style="margin-bottom:8px;"><div class="dev-row" style="margin-bottom:8px;"><div style="flex:1"><label>Pos X:</label><input type="number" id="p-x" value="400" class="dev-input"></div><div style="flex:1"><label>Pos Y:</label><input type="number" id="p-y" value="300" class="dev-input"></div></div><button class="dev-save-btn" onclick="finalizePortal(${pos.x}, ${pos.y}, ${cW||60}, ${cH||60})">Criar</button><button class="dev-save-btn" style="background:#555;" onclick="closeModal()">Cancelar</button>`); return; }
-                else if (val === 'tree') { n.type = 'tree'; n.name = 'Tree'; n.hp = 3; n.maxHp = 3; n.h = cH||50; }
-                else if (val === 'fishing_spot') { n.type = 'fishing_spot'; n.name = 'Fishing Spot'; }
-                else if (val === 'house') { n.type = 'house'; n.name = 'House'; n.w=cW||100; n.h=cH||100; }
-                else if (val.startsWith('paint_')) { n.type = 'paint'; n.name = 'Chão'; n.color = val==='paint_dirt'?'#5c4033':val==='paint_stone'?'#7f8c8d':val==='paint_grass'?'#27ae60':'#3498db'; n.w=cW||40; n.h=cH||40; }
-                else if (typeof val === 'string' && val.startsWith('rock_')) { n.type = val; n.name = val; n.hp = val==='rock_iron'?3:2; n.maxHp = n.hp; n.color = val==='rock_copper'?'#d35400':val==='rock_iron'?'#7f8c8d':'#bdc3c7'; n.h = cH||30; }
-                else if (val === 'furnace') { n.type = 'furnace'; n.name = 'Furnace'; n.h = cH||45; } else if (val === 'anvil') { n.type = 'anvil'; n.name = 'Anvil'; n.h = cH||25; } else if (val === 'bank') { n.type = 'bank'; n.name = 'Bank Booth'; n.w=cW||50; n.h=cH||30; }
-                else { n.type = 'unknown'; } 
-                if(!curM.entities) curM.entities = []; curM.entities.push(n); addFloatingText(pos.x, pos.y, "Spawn", "#2ecc71"); saveDataLogic(); return;
-            }
-            if(!osrsMenu.contains(e.target) && !document.getElementById('custom-modal-overlay').contains(e.target) && !document.getElementById('chat-container').contains(e.target)) { player.destX = pos.x; player.destY = pos.y; player.isPerformingAction = false; player.pendingAutoAction = null; player.actionToolItem = null; if(isNPCOpen){closeMenus(); openTab('inv');} osrsMenu.style.display = 'none'; }
-        }
-
-        function finalizePortal(px, py, pw, ph) { let dm = document.getElementById('p-dest').value; let dx = parseInt(document.getElementById('p-x').value)||400; let dy = parseInt(document.getElementById('p-y').value)||300; if(!gameMaps[currentMap].entities) gameMaps[currentMap].entities = []; gameMaps[currentMap].entities.push({ id: Date.now(), x: px-pw/2, y: py-ph/2, w: pw, h: ph, active: true, type: 'portal', name: 'Portal', destMap: dm, destX: dx, destY: dy }); addFloatingText(px, py, "Portal", "#8e44ad"); closeModal(); }
-        canvas.addEventListener('mousedown', handleInputDown); canvas.addEventListener('touchstart', handleInputDown, {passive: false});
-
-        canvas.addEventListener('contextmenu', (e) => {
-            if(document.getElementById('login-overlay').style.display !== 'none') return;
-            e.preventDefault(); const pos = getCoords(e);
-            let cObj = null; let cur = gameMaps[currentMap] ? gameMaps[currentMap].entities || [] : [];
-            if (isDevBuildMode) { 
-                for (let i = cur.length - 1; i >= 0; i--) { 
-                    let o = cur[i]; 
-                    if (pos.x >= o.x && pos.x <= o.x + (o.w||30) && pos.y >= o.y && pos.y <= o.y + (o.h||30)) { cur.splice(i, 1); addFloatingText(pos.x, pos.y, "Deletado", "#e74c3c"); saveDataLogic(); return; } 
-                } 
-                return; 
-            }
-            for (let i = cur.length - 1; i >= 0; i--) { let o = cur[i]; if (o && o.active && o.type !== 'paint' && pos.x >= o.x && pos.x <= o.x + (o.w||30) && pos.y >= o.y && pos.y <= o.y + (o.h||30)) { cObj = o; break; } }
-            osrsMenu.innerHTML = "";
-            if (cObj && cObj.type) { 
-                if(cObj.type === 'enemy') addMenuOption(`Atacar ${cObj.name}`, () => setPendingAction(cObj));
-                if(cObj.type === 'npc') addMenuOption(`Falar com ${cObj.name}`, () => setPendingAction(cObj));
-                if(cObj.type === 'tree') addMenuOption(`Cortar ${cObj.name}`, () => setPendingAction(cObj));
-                if(cObj.type === 'fishing_spot') addMenuOption(`Pescar`, () => setPendingAction(cObj));
-                if(typeof cObj.type === 'string' && cObj.type.startsWith('rock')) addMenuOption(`Minerar ${cObj.name}`, () => setPendingAction(cObj));
-                if(cObj.type === 'furnace' || cObj.type === 'anvil') addMenuOption(`Usar Aba Craft`, () => setActionText("Use a aba Craft (🛠️)", "#f1c40f"));
-                if(cObj.type === 'fire') addMenuOption(`Cozinhar`, () => setPendingAction(cObj));
-                if(cObj.type === 'bank') addMenuOption(`Usar Banco`, () => setPendingAction(cObj));
-                if(cObj.type === 'portal') addMenuOption(`Entrar`, () => setPendingAction(cObj));
-                if(cObj.type === 'ground_item') addMenuOption(`Pegar ${cObj.item}`, () => setPendingAction(cObj));
-            }
-            addMenuOption("Andar aqui", () => { player.destX = pos.x; player.destY = pos.y; player.isPerformingAction = false; player.pendingAutoAction = null; }); addMenuOption("Cancelar", () => {});
-            osrsMenu.style.left = pos.pageX + 'px'; osrsMenu.style.top = pos.pageY + 'px'; osrsMenu.style.display = 'block';
-        });
-
-        document.addEventListener('click', (e) => { if (!e.target.closest('#osrs-menu') && e.target.id !== 'gameCanvas') osrsMenu.style.display = 'none'; });
-        function addMenuOption(text, callback) { const div = document.createElement('div'); div.className = 'osrs-menu-item'; div.innerText = text; div.onclick = () => { osrsMenu.style.display = 'none'; callback(); }; osrsMenu.appendChild(div); }
-        function setPendingAction(obj) { player.pendingAutoAction = obj; player.destX = obj.x + (obj.w||30)/2; player.destY = obj.y + (obj.h||30)/2; if(isNPCOpen && obj.type !== 'npc') { closeMenus(); openTab('inv'); } osrsMenu.style.display = 'none'; }
-
+        // --- SISTEMAS DE FÍSICA E COMBATE ---
         function tryPickupOrInteract() {
             if(player.isPerformingAction) { player.isPerformingAction = false; return; }
             let cur = gameMaps[currentMap].entities || []; let cItem = null; let minDItem = 35;
@@ -817,8 +646,7 @@
             let cObj = null; let minDObj = 45;
             for(let o of cur) {
                 if(!o || !o.active || ['ground_item', 'paint'].includes(o.type)) continue; 
-                let d = Math.hypot(player.x - (o.x + (o.w||30)/2), player.y - (o.y + (o.h||30)/2));
-                if (d < minDObj + ((o.w||30)/2)) { minDObj = d; cObj = o; }
+                let d = Math.hypot(player.x - (o.x + (o.w||30)/2), player.y - (o.y + (o.h||30)/2)); if (d < minDObj + ((o.w||30)/2)) { minDObj = d; cObj = o; }
             }
             if(cObj) {
                 let dx = cObj.x + (cObj.w||30)/2 - player.x; let dy = cObj.y + (cObj.h||30)/2 - player.y; 
@@ -841,7 +669,8 @@
 
         function tryInteract(tObj) {
             player.actionAnim = 15; const wp = player.equipment.weapon; 
-            if (!tObj || !tObj.type || !tObj.active) return;
+            if (!tObj || !tObj.type || !tObj.active) return; // TRAVA DE SEGURANÇA CONTRA DEAD MOBS
+
             if (tObj.type === 'npc') { openShop(npcDB[tObj.dbKey]); return; }
             if (tObj.type === 'bank') { document.getElementById('btn-bank').style.display='block'; openTab('bank'); setActionText("Banco aberto.", "#3498db"); return; }
             if (tObj.type === 'portal') { switchMap(tObj.destMap, tObj.destX, tObj.destY); return; }
@@ -855,7 +684,7 @@
                         if(hasRunes) {
                             Object.keys(spell.req).forEach(rk => removeInvItem(rk, spell.req[rk])); d = spell.dmg + Math.floor(player.stats.skills.magic.level / 2); sT = 'magic';
                             projectiles.push({ x: player.x, y: player.y, target: tObj, tx: tObj.x + (tObj.w||30)/2, ty: tObj.y + (tObj.h||30)/2, dmg: d, speed: 6, type: 'magic', color: spell.color });
-                            tObj.aggroTarget = player; updateUI(); return; 
+                            updateUI(); return; 
                         } else { setActionText("Sem runas!", "#e74c3c"); return; }
                     } else { setActionText("Spell inválida/Level Baixo", "#e74c3c"); return; }
                 } 
@@ -864,7 +693,7 @@
                     if(ammo && ammo.qty >= 1) {
                         ammo.qty--; if(ammo.qty <= 0) player.equipment.ammo = null; d = 1 + Math.floor(player.stats.skills.ranged.level / 2) + (wp.bonusDmg || 0) + (ammo.bonusDmg || 0); sT = 'ranged';
                         projectiles.push({ x: player.x, y: player.y, target: tObj, tx: tObj.x + (tObj.w||30)/2, ty: tObj.y + (tObj.h||30)/2, dmg: d, speed: 8, type: 'ranged' }); 
-                        tObj.aggroTarget = player; updateUI(); return;
+                        updateUI(); return;
                     } else { setActionText("Sem flechas equipadas!", "#e74c3c"); return; }
                 } else { d += Math.floor(player.stats.skills.combat.level / 2); if(wp && wp.bonusDmg) d += wp.bonusDmg; }
                 applyDamage(tObj, Math.floor(Math.random() * (d + 1)), sT);
@@ -895,23 +724,29 @@
             } updateUI();
         }
 
+        // IA DISTRIBUÍDA: O Jogador manda o log de combate pro Servidor decidir
         function applyDamage(t, dmg, sT) {
-            t.hp -= dmg; t.aggroTarget = player; addFloatingText(t.x + 15, t.y, dmg, dmg>0?"#e74c3c":"#bdc3c7");
-            saveDataLogic(); 
+            t.hp -= dmg; t.aggroTarget = currentUser; addFloatingText(t.x + 15, t.y, dmg, dmg>0?"#e74c3c":"#bdc3c7");
+            
+            pendingCombatLogs.push({ id: t.id, dmg: dmg, aggro: currentUser, maxHp: t.maxHp });
+
             if(t.hp <= 0) { 
                 t.active = false; t.aggroTarget = null; addFloatingText(t.x, t.y, "Morto", "#e74c3c");
+                
                 let bXP = (t.dbKey && npcDB[t.dbKey]) ? npcDB[t.dbKey].xp : 15;
                 let cXP = Math.floor(bXP * 0.3) || 1; let hXP = bXP - cXP;
                 addXP(sT, cXP); addXP('hp', hXP);
+
                 if(t.dbKey && npcDB[t.dbKey] && npcDB[t.dbKey].lootStr){ 
                     let pts = npcDB[t.dbKey].lootStr.split('|'); 
                     pts.forEach((p, i) => { 
                         let d = p.split(','); 
-                        if(d.length >= 3 && Math.random() <= parseFloat(d[1])){ gameMaps[currentMap].entities.push({ id: Date.now()+i, type: 'ground_item', item: d[0].trim(), qty: Math.floor(Math.random()*parseInt(d[2]))+1, x: t.x+(Math.random()*20)-10, y: t.y, w: 20, h: 20, active: true, life: 3000 }); } 
+                        if(d.length >= 3 && Math.random() <= parseFloat(d[1])){ 
+                            gameMaps[currentMap].entities.push({ id: Date.now()+i, type: 'ground_item', item: d[0].trim(), qty: Math.floor(Math.random()*parseInt(d[2]))+1, x: t.x+(Math.random()*20)-10, y: t.y, w: 20, h: 20, active: true, life: 3000 }); 
+                        } 
                     }); 
                 }
                 saveDataLogic(); 
-                setTimeout(() => { t.active = true; t.hp = t.maxHp; saveDataLogic(); }, 15000);
             }
         }
 
@@ -935,14 +770,6 @@
                         let op = otherPlayers[u];
                         if (op.displayX !== undefined && op.displayY !== undefined) {
                             op.displayX += (op.x - op.displayX) * 0.3; op.displayY += (op.y - op.displayY) * 0.3;
-                        }
-                    });
-                }
-                
-                if (userRole !== 'admin' && !isMapHost && !isOfflineMode) {
-                    cur.forEach(o => {
-                        if ((o.type === 'enemy' || o.type === 'npc') && o.serverX !== undefined && o.serverY !== undefined) {
-                            o.x += (o.serverX - o.x) * 0.3; o.y += (o.serverY - o.y) * 0.3;
                         }
                     });
                 }
@@ -997,8 +824,7 @@
                 let mapW = curM.width || 800; let mapH = curM.height || 600;
 
                 function attemptGridTransition(dx, dy) {
-                    let cm = gameMaps[currentMap];
-                    if (cm.gridX == null || cm.gridY == null) return false;
+                    let cm = gameMaps[currentMap]; if (cm.gridX == null || cm.gridY == null) return false;
                     let tgX = cm.gridX + dx; let tgY = cm.gridY + dy;
                     let targetMapId = Object.keys(gameMaps).find(k => gameMaps[k].gridX === tgX && gameMaps[k].gridY === tgY);
                     if (targetMapId) {
@@ -1035,29 +861,39 @@
                     }
                 } else { player.actionToolItem = null; }
 
+                // === A MÁGICA DA IA DISTRIBUÍDA ===
                 cur.forEach((o, i) => { 
                     if(!o || !o.type) return; 
                     if(o.type === 'fire' && o.active) { o.life--; if(o.life <= 0) o.active = false; }
                     if(o.type === 'ground_item' && o.active) { o.life--; if(o.life <= 0) { cur.splice(i, 1); saveDataLogic(); } }
                     
-                    if(o.type === 'enemy' && o.active && (userRole === 'admin' || isOfflineMode || isMapHost)) {
-                        if (o.aggroTarget === player) {
-                            let ow = o.w || 30; let oh = o.h || 30; let ex = player.x - (o.x + ow/2); let ey = player.y - (o.y + oh/2); let ed = Math.hypot(ex, ey);
-                            if (ed > 20) {
-                                let nx = o.x + (ex/ed)*1.5; let ny = o.y + (ey/ed)*1.5; let cx=false, cy=false;
-                                for(let wo of cur) {
-                                    if(!wo || !wo.type || !wo.active || ['ground_item','fishing_spot','portal','paint','enemy','npc'].includes(wo.type) || wo===o) continue;
-                                    let wow = wo.w || 30; let woh = wo.h || 30;
-                                    if(nx < wo.x+wow && nx+ow > wo.x && o.y < wo.y+woh && o.y+oh > wo.y) cx=true;
-                                    if(o.x < wo.x+wow && o.x+ow > wo.x && ny < wo.y+woh && ny+oh > wo.y) cy=true;
-                                }
-                                if(!cx) o.x = nx; if(!cy) o.y = ny;
-                            } else {
-                                if (o.attackCooldown <= 0) {
-                                    let nB = npcDB[o.dbKey]; let rD = Math.floor(Math.random() * ((nB?nB.maxHit:2) + 1));
-                                    let bl = Math.floor(Math.random() * (getTotalDef() / 2 + 1)); let fD = Math.max(0, rD - bl);
-                                    player.stats.hp -= fD; addFloatingText(player.x, player.y - 20, fD > 0 ? fD : "Block", fD > 0 ? "red" : "#3498db"); o.attackCooldown = 70;
-                                    if(player.stats.hp <= 0) { switchMap('lumbridge', 400, 300); player.stats.hp = player.stats.maxHp; addFloatingText(player.x, player.y - 40, "Renasceu", "#f1c40f"); o.aggroTarget = null; closeMenus();} updateUI();
+                    if(o.type === 'enemy' && o.active) {
+                        if (o.aggroTarget) {
+                            let targetX, targetY;
+                            if (o.aggroTarget === currentUser) { targetX = player.x; targetY = player.y; } 
+                            else if (otherPlayers[o.aggroTarget]) {
+                                targetX = otherPlayers[o.aggroTarget].displayX !== undefined ? otherPlayers[o.aggroTarget].displayX : otherPlayers[o.aggroTarget].x;
+                                targetY = otherPlayers[o.aggroTarget].displayY !== undefined ? otherPlayers[o.aggroTarget].displayY : otherPlayers[o.aggroTarget].y;
+                            }
+                            
+                            if (targetX !== undefined && targetY !== undefined) {
+                                let ow = o.w || 30; let oh = o.h || 30; let ex = targetX - (o.x + ow/2); let ey = targetY - (o.y + oh/2); let ed = Math.hypot(ex, ey);
+                                if (ed > 20) {
+                                    let nx = o.x + (ex/ed)*1.5; let ny = o.y + (ey/ed)*1.5; let cx=false, cy=false;
+                                    for(let wo of cur) {
+                                        if(!wo || !wo.type || !wo.active || ['ground_item','fishing_spot','portal','paint','enemy','npc'].includes(wo.type) || wo===o) continue;
+                                        let wow = wo.w || 30; let woh = wo.h || 30;
+                                        if(nx < wo.x+wow && nx+ow > wo.x && o.y < wo.y+woh && o.y+oh > wo.y) cx=true;
+                                        if(o.x < wo.x+wow && o.x+ow > wo.x && ny < wo.y+woh && ny+oh > wo.y) cy=true;
+                                    }
+                                    if(!cx) o.x = nx; if(!cy) o.y = ny;
+                                } else if (o.aggroTarget === currentUser) {
+                                    if (o.attackCooldown <= 0) {
+                                        let nB = npcDB[o.dbKey]; let rD = Math.floor(Math.random() * ((nB?nB.maxHit:2) + 1));
+                                        let bl = Math.floor(Math.random() * (getTotalDef() / 2 + 1)); let fD = Math.max(0, rD - bl);
+                                        player.stats.hp -= fD; addFloatingText(player.x, player.y - 20, fD > 0 ? fD : "Block", fD > 0 ? "red" : "#3498db"); o.attackCooldown = 70;
+                                        if(player.stats.hp <= 0) { switchMap('lumbridge', 400, 300); player.stats.hp = player.stats.maxHp; addFloatingText(player.x, player.y - 40, "Renasceu", "#f1c40f"); o.aggroTarget = null; closeMenus();} updateUI();
+                                    }
                                 }
                             }
                         } else { 
@@ -1066,9 +902,11 @@
                         } if(o.attackCooldown > 0) o.attackCooldown--;
                     }
                 });
+
             } catch(e) { console.error("Silenced Update Error", e); }
         }
 
+        // --- SISTEMA DE RENDERIZAÇÃO ---
         function drawCharacter(ctx, px, py, facing, anim, equip, name, isMain) {
             const wp = equip ? equip.weapon : null; const sh = equip ? equip.shield : null;
             const tC = (wp && wp.tool === 'magic') ? '#3498db' : (wp && wp.tool === 'ranged') ? '#27ae60' : '#8e44ad'; 
@@ -1128,9 +966,6 @@
                     else if (o.type === 'portal') { ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(o.x + ow/2, o.y + oh, ow/2, Math.PI, 0); ctx.fill(); ctx.fillStyle = '#34495e'; ctx.beginPath(); ctx.arc(o.x + 10, o.y + oh - 5, 8, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(o.x + ow - 10, o.y + oh - 5, 8, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = 'white'; ctx.font = '12px Arial'; ctx.textAlign = "center"; ctx.fillText('Portal', o.x + ow/2, o.y - 10); ctx.textAlign = "start"; }
                     if(o.hp !== undefined && o.type !== 'npc') { ctx.fillStyle = 'red'; ctx.fillRect(o.x, o.y - 10, ow, 4); ctx.fillStyle = o.type === 'enemy' ? '#2ecc71' : '#f1c40f'; ctx.fillRect(o.x, o.y - 10, ow * (o.hp / o.maxHp), 4); }
                 });
-
-                if (Math.hypot(player.destX - player.x, player.destY - player.y) > player.speed && !player.isPerformingAction && !player.pendingAutoAction) { ctx.fillStyle = 'rgba(255, 255, 255, 0.4)'; ctx.beginPath(); ctx.arc(player.destX, player.destY, 5, 0, Math.PI*2); ctx.fill(); }
-                if (player.isPerformingAction) { const prg = 1 - (player.actionTimer / player.actionDelay); ctx.fillStyle = '#222'; ctx.fillRect(player.x - 15, player.y - 25, 30, 6); ctx.fillStyle = '#3498db'; ctx.fillRect(player.x - 14, player.y - 24, 28 * prg, 4); }
 
                 if (typeof otherPlayers !== 'undefined') {
                     Object.keys(otherPlayers).forEach(u => {
