@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MiniScape 2D - V54 (Correção de Escopo & Engine Estável)</title>
+    <title>MiniScape 2D - V55 (Engine Híbrida & Ações Fluidas)</title>
     <style>
         /* === BASE & RESPONSIVIDADE === */
         body { margin: 0; padding: 10px; background-color: #121212; color: #e0e0e0; font-family: 'Segoe UI', Tahoma, sans-serif; display: flex; gap: 15px; justify-content: center; height: 100vh; box-sizing: border-box; overflow: hidden; flex-direction: row; align-items: stretch; }
@@ -155,7 +155,6 @@
 
     <!-- SCRIPT GIGANTE E UNIFICADO DO JOGO -->
     <script>
-        // === 1. DECLARAÇÕES GLOBAIS ÚNICAS ===
         const canvas = document.getElementById('gameCanvas'); 
         const ctx = canvas.getContext('2d');
         const osrsMenu = document.getElementById('osrs-menu'); 
@@ -169,7 +168,6 @@
         let otherPlayers = {}; 
         let currentMapVersion = 0; 
         let isSyncing = false; 
-        let isMapHost = true; 
         
         let floatingTexts = []; let projectiles = []; let isBankOpen = false; let isNPCOpen = false; let isDevBuildMode = false; let activeNPCShop = null;
         let selectedDevEntity = 'tree'; let devViewMode = 'list'; const imgCache = {};
@@ -189,7 +187,6 @@
             addInvItem('Mind Rune', 50); addInvItem('Bronze Arrow', 50); 
         }
 
-        // --- BANCOS DE DADOS DE FÁBRICA ---
         let itemDB = {
             'Bronze Pickaxe': { name: 'Bronze Pickaxe', icon: '⛏️', type: 'equipment', slot: 'weapon', tool: 'pickaxe', stackable: false, weight: 2.0, desc: 'Ferramenta de mineração.', recipe: 'Bronze Bar,2|Logs,1', craftQty: 1 },
             'Iron Pickaxe': { name: 'Iron Pickaxe', icon: '⛏️', type: 'equipment', slot: 'weapon', tool: 'pickaxe', stackable: false, weight: 2.0, desc: 'Minera rápido.', recipe: 'Iron Bar,2|Logs,1', craftQty: 1 },
@@ -246,139 +243,6 @@
         let gameMaps = JSON.parse(JSON.stringify(defaultGameMaps));
         let currentMap = 'lumbridge';
 
-        // ACCÇÕES DE COMBATE / AÇÕES (DEFINIDAS EXPLICITAMENTE NO ESCOPO GLOBAL)
-        function tryPickupOrInteract() {
-            if(player.isPerformingAction) { player.isPerformingAction = false; return; }
-            let cur = gameMaps[currentMap] ? gameMaps[currentMap].entities || [] : [];
-            let cItem = null; let minDItem = 35;
-            for(let o of cur) {
-                if(o && o.active && o.type === 'ground_item') {
-                    let d = Math.hypot(player.x - (o.x+10), player.y - (o.y+10));
-                    if(d < minDItem) { minDItem = d; cItem = o; }
-                }
-            }
-            if(cItem) {
-                if(addInvItem(cItem.item, cItem.qty)) { 
-                    cItem.active = false; addFloatingText(player.x, player.y - 15, "Pegou", "#f1c40f"); updateUI(); 
-                    saveDataLogic();
-                }
-                return;
-            }
-
-            let cObj = null; let minDObj = 45;
-            for(let o of cur) {
-                if(!o || !o.active || ['ground_item', 'paint'].includes(o.type)) continue; 
-                let d = Math.hypot(player.x - (o.x + (o.w||30)/2), player.y - (o.y + (o.h||30)/2));
-                if (d < minDObj + ((o.w||30)/2)) { minDObj = d; cObj = o; }
-            }
-            if(cObj) {
-                let dx = cObj.x + (cObj.w||30)/2 - player.x; let dy = cObj.y + (cObj.h||30)/2 - player.y; 
-                if(Math.abs(dx) > Math.abs(dy)) { player.facing.x = dx>0?1:-1; player.facing.y = 0; } else { player.facing.x = 0; player.facing.y = dy>0?1:-1; }
-                tryInteract(cObj);
-            }
-        }
-
-        function tryAttack() {
-            if(player.isPerformingAction) { player.isPerformingAction = false; return; }
-            const wp = player.equipment ? player.equipment.weapon : null; 
-            let range = (wp && (wp.tool === 'magic' || wp.tool === 'ranged')) ? 160 : 45;
-            let cur = gameMaps[currentMap] ? gameMaps[currentMap].entities || [] : []; 
-            let cEnemy = null; let minDEnemy = range;
-
-            for(let o of cur) {
-                if(o && o.active && o.type === 'enemy') {
-                    let d = Math.hypot(player.x - (o.x + (o.w||30)/2), player.y - (o.y + (o.h||30)/2));
-                    if(d < minDEnemy) { minDEnemy = d; cEnemy = o; }
-                }
-            }
-            if(cEnemy) {
-                let dx = cEnemy.x + (cEnemy.w||30)/2 - player.x; let dy = cEnemy.y + (cEnemy.h||30)/2 - player.y; 
-                if(Math.abs(dx) > Math.abs(dy)) { player.facing.x = dx>0?1:-1; player.facing.y = 0; } else { player.facing.x = 0; player.facing.y = dy>0?1:-1; }
-                tryInteract(cEnemy);
-            }
-        }
-
-        function tryInteract(tObj) {
-            player.actionAnim = 15; const wp = player.equipment ? player.equipment.weapon : null; 
-            if (!tObj || !tObj.type) return;
-
-            if (tObj.type === 'npc') { openShop(npcDB[tObj.dbKey]); return; }
-            if (tObj.type === 'bank') { document.getElementById('btn-bank').style.display='block'; openTab('bank'); setActionText("Banco aberto.", "#3498db"); return; }
-            if (tObj.type === 'portal') { switchMap(tObj.destMap, tObj.destX, tObj.destY); return; }
-
-            if(tObj.type === 'enemy' && player.attackCooldown <= 0) {
-                let d = 1; let sT = 'combat'; player.attackCooldown = 50; 
-                if (wp && wp.tool === 'magic') {
-                    let spell = spellbookDB.find(s => s.id === player.activeSpell);
-                    if(spell && player.stats.skills.magic.level >= spell.lvl) {
-                        let hasRunes = true; Object.keys(spell.req).forEach(rk => { if(getInvCount(rk) < spell.req[rk]) hasRunes = false; });
-                        if(hasRunes) {
-                            Object.keys(spell.req).forEach(rk => removeInvItem(rk, spell.req[rk])); d = spell.dmg + Math.floor(player.stats.skills.magic.level / 2); sT = 'magic';
-                            projectiles.push({ x: player.x, y: player.y, target: tObj, tx: tObj.x + (tObj.w||30)/2, ty: tObj.y + (tObj.h||30)/2, dmg: d, speed: 6, type: 'magic', color: spell.color });
-                            tObj.aggroTarget = player; updateUI(); return; 
-                        } else { setActionText("Sem runas!", "#e74c3c"); return; }
-                    } else { setActionText("Spell inválida/Level Baixo", "#e74c3c"); return; }
-                } 
-                else if (wp && wp.tool === 'ranged') {
-                    let ammo = player.equipment.ammo;
-                    if(ammo && ammo.qty >= 1) {
-                        ammo.qty--; if(ammo.qty <= 0) player.equipment.ammo = null; d = 1 + Math.floor(player.stats.skills.ranged.level / 2) + (wp.bonusDmg || 0) + (ammo.bonusDmg || 0); sT = 'ranged';
-                        projectiles.push({ x: player.x, y: player.y, target: tObj, tx: tObj.x + (tObj.w||30)/2, ty: tObj.y + (tObj.h||30)/2, dmg: d, speed: 8, type: 'ranged' }); 
-                        tObj.aggroTarget = player; updateUI(); return;
-                    } else { setActionText("Sem flechas equipadas!", "#e74c3c"); return; }
-                } else { d += Math.floor(player.stats.skills.combat.level / 2); if(wp && wp.bonusDmg) d += wp.bonusDmg; }
-                applyDamage(tObj, Math.floor(Math.random() * (d + 1)), sT);
-            } 
-            else if(tObj.type === 'tree' || (typeof tObj.type === 'string' && tObj.type.startsWith('rock'))) {
-                let nT = tObj.type === 'tree' ? 'axe' : 'pickaxe';
-                let toolItem = (wp && wp.tool === nT) ? wp : player.inventory.find(i => i.tool === nT);
-                if(toolItem) {
-                    player.isPerformingAction = true; player.actionTarget = tObj; player.actionType = tObj.type === 'tree' ? 'chop' : 'mine';
-                    player.actionToolItem = toolItem; player.actionTimer = player.actionDelay = Math.max(30, 150 - (player.stats.skills[tObj.type === 'tree' ? 'woodcutting' : 'mining'].level * 5));
-                } else { setActionText(`Requer ${nT} no inventário.`, "#e74c3c"); }
-            }
-            else if(tObj.type === 'fishing_spot') {
-                let toolItem = player.inventory.find(i => i.name === 'Net');
-                if(toolItem) {
-                    player.isPerformingAction = true; player.actionTarget = tObj; player.actionType = 'fish'; player.actionToolItem = toolItem;
-                    player.actionTimer = player.actionDelay = Math.max(40, 150 - (player.stats.skills.fishing.level * 4));
-                } else { setActionText("Requer uma Net no inventário.", "#e74c3c"); }
-            }
-            else if(tObj.type === 'furnace') {
-                if(getInvCount('Iron Ore')>0){ player.actionType='smelt_iron'; } else if(getInvCount('Copper Ore')>0 && getInvCount('Tin Ore')>0){ player.actionType='smelt_brz'; } else { setActionText("Sem minérios.", "#e74c3c"); return;}
-                player.isPerformingAction = true; player.actionTarget = tObj; player.actionTimer = player.actionDelay = Math.max(30, 100 - (player.stats.skills.smithing.level * 2));
-            }
-            else if(tObj.type === 'fire') {
-                if(getInvCount('Raw Meat') > 0) { player.isPerformingAction = true; player.actionTarget = tObj; player.actionType = 'cook_meat'; player.actionTimer = player.actionDelay = Math.max(20, 80 - (player.stats.skills.cooking.level * 2)); }
-                else if (getInvCount('Raw Fish') > 0) { player.isPerformingAction = true; player.actionTarget = tObj; player.actionType = 'cook_fish'; player.actionTimer = player.actionDelay = Math.max(20, 80 - (player.stats.skills.cooking.level * 2)); }
-                else { setActionText("Precisa de Meat ou Fish.", "#e74c3c"); }
-            } updateUI();
-        }
-
-        function applyDamage(t, dmg, sT) {
-            t.hp -= dmg; t.aggroTarget = player; addFloatingText(t.x + 15, t.y, dmg, dmg>0?"#e74c3c":"#bdc3c7");
-            saveDataLogic();
-
-            if(t.hp <= 0) { 
-                t.active = false; t.aggroTarget = null; addFloatingText(t.x, t.y, "Morto", "#e74c3c");
-                let bXP = (t.dbKey && npcDB[t.dbKey]) ? npcDB[t.dbKey].xp : 15;
-                let cXP = Math.floor(bXP * 0.3) || 1; let hXP = bXP - cXP;
-                addXP(sT, cXP); addXP('hp', hXP);
-
-                if(t.dbKey && npcDB[t.dbKey] && npcDB[t.dbKey].lootStr){ 
-                    let pts = npcDB[t.dbKey].lootStr.split('|'); 
-                    pts.forEach((p, i) => { 
-                        let d = p.split(','); 
-                        if(d.length >= 3 && Math.random() <= parseFloat(d[1])){ 
-                            gameMaps[currentMap].entities.push({ id: Date.now()+i, type: 'ground_item', item: d[0].trim(), qty: Math.floor(Math.random()*parseInt(d[2]))+1, x: t.x+(Math.random()*20)-10, y: t.y, w: 20, h: 20, active: true, life: 3000 }); 
-                        } 
-                    }); 
-                }
-                saveDataLogic(); 
-                setTimeout(() => { t.active = true; t.hp = t.maxHp; saveDataLogic(); }, 15000);
-            }
-        }
-
         document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('login-overlay').style.display = 'flex';
             document.getElementById('game-wrapper').style.display = 'none';
@@ -411,32 +275,48 @@
             const user = document.getElementById('auth-user').value.trim();
             const pass = document.getElementById('auth-pass').value.trim();
             const msg = document.getElementById('login-msg');
-            if(!user || !pass) { msg.innerText = "Preencha usuário e senha!"; return; }
+            
+            if(!user || !pass) { 
+                msg.innerText = "Preencha usuário e senha!"; 
+                return; 
+            }
             msg.innerText = "Autenticando...";
+            
             const isMasterAdmin = (user.toLowerCase() === 'admin' && pass === 'Adleradm');
 
             try {
-                let res = await fetch(API_BASE + '/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: user, password: pass }) });
+                let res = await fetch(API_BASE + '/login', { 
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: user, password: pass }) 
+                });
+                
                 if (res.status === 401 && isMasterAdmin) {
                      await fetch(API_BASE + '/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: user, password: pass }) });
                      res = await fetch(API_BASE + '/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: user, password: pass }) });
                 }
 
-                if (!res.ok && res.status !== 400 && res.status !== 401) throw new Error("Erro HTTP");
-                const data = await res.json();
+                let data = {};
+                try { data = await res.json(); } catch(err) {}
                 
-                if(data.error) { msg.innerText = data.error; } else {
-                    currentUser = user; userRole = isMasterAdmin ? 'admin' : data.role; isOfflineMode = false; 
-                    localStorage.setItem('miniscape_session', user);
-                    finishLoginSetup(data);
+                if (!res.ok || data.error) { 
+                    msg.innerText = data.error || "Usuário ou senha incorretos!"; 
+                    return; 
                 }
+
+                currentUser = user; 
+                userRole = isMasterAdmin ? 'admin' : (data.role || 'player'); 
+                isOfflineMode = false; 
+                localStorage.setItem('miniscape_session', user);
+                finishLoginSetup(data);
+
             } catch(e) { 
                 let users = JSON.parse(localStorage.getItem('miniscape_users') || '{}');
                 if (isMasterAdmin || (users[user] && users[user] === pass)) {
                     currentUser = user; userRole = isMasterAdmin ? 'admin' : 'player'; isOfflineMode = true;
                     localStorage.setItem('miniscape_session', user);
-                    finishLoginSetup(JSON.parse(localStorage.getItem('miniscape_save_v54') || '{}'));
-                } else { msg.innerText = "Servidor offline. Conta local não encontrada."; }
+                    finishLoginSetup(JSON.parse(localStorage.getItem('miniscape_save_v52') || '{}'));
+                } else { 
+                    msg.innerText = "Servidor indisponível ou conta não encontrada."; 
+                }
             }
         }
 
@@ -472,7 +352,6 @@
                 giveStarterItems();
             }
 
-            // SANITIZAÇÃO RIGOROSA DO PLAYER (Evita Uncaught TypeError no Canvas)
             if (typeof player.x !== 'number' || isNaN(player.x)) player.x = 400;
             if (typeof player.y !== 'number' || isNaN(player.y)) player.y = 300;
             if (!player.facing) player.facing = { x: 0, y: 1 };
@@ -518,7 +397,10 @@
                     facing: player.facing, actionAnim: player.actionAnim, equipment: player.equipment
                 };
                 
-                if (gameMaps[currentMap]) { payload.entities = gameMaps[currentMap].entities; }
+                // Manda as entidades se for admin (apenas para garantir updates do DEV mode massivo)
+                if (userRole === 'admin' && gameMaps[currentMap]) {
+                    payload.entities = gameMaps[currentMap].entities;
+                }
 
                 const res = await fetch(API_BASE + '/sync', {
                     method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -526,8 +408,6 @@
                 });
                 const data = await res.json();
                 
-                isMapHost = data.isHost === true;
-
                 if(data.players) {
                     Object.keys(data.players).forEach(u => {
                         if (!otherPlayers[u]) {
@@ -548,7 +428,7 @@
                 
                 if(data.chat) { chatMessages = data.chat; updateChatUI(); }
 
-                if (data.syncEntities) {
+                if (data.syncEntities && userRole !== 'admin') {
                     let curM = gameMaps[currentMap];
                     if (curM && curM.entities) {
                         data.syncEntities.forEach(sEnt => {
@@ -557,9 +437,13 @@
                                 if (lEnt.type === 'enemy' || lEnt.type === 'npc') {
                                     lEnt.serverX = sEnt.x; lEnt.serverY = sEnt.y;
                                     lEnt.hp = sEnt.hp; lEnt.active = sEnt.active;
+                                    // Sincroniza quem ele tá atacando
+                                    if(sEnt.aggroTarget) lEnt.aggroTarget = sEnt.aggroTarget;
                                 } else { Object.assign(lEnt, sEnt); }
                             } else { curM.entities.push(sEnt); }
                         });
+                        // Filtra itens pegos do chão
+                        curM.entities = curM.entities.filter(lEnt => data.syncEntities.find(sEnt => sEnt.id === lEnt.id));
                     }
                 }
                 
@@ -575,20 +459,29 @@
 
         async function saveDataLogic(manual = false) {
             if (!currentUser) return;
-            for (let map in gameMaps) { if (gameMaps[map] && gameMaps[map].entities) { gameMaps[map].entities.forEach(obj => { if(obj && obj.aggroTarget) obj.aggroTarget = null; }); } }
-            player.currentMap = currentMap; player.actionTarget = null; player.actionToolItem = null; player.pendingAutoAction = null;
+            // Clonagem segura para não quebrar a referência local do monstro ao salvar
+            let tempMaps = JSON.parse(JSON.stringify(gameMaps));
+            for (let map in tempMaps) { if (tempMaps[map] && tempMaps[map].entities) { tempMaps[map].entities.forEach(obj => { if(obj && obj.aggroTarget) obj.aggroTarget = null; }); } }
+            
+            player.currentMap = currentMap; 
+            let tempTarget = player.actionTarget; let tempTool = player.actionToolItem; let tempAuto = player.pendingAutoAction;
+            player.actionTarget = null; player.actionToolItem = null; player.pendingAutoAction = null;
 
             if (isOfflineMode || window.location.protocol === 'file:') {
-                const saveData = { playerData: player, worldData: gameMaps, itemDB: itemDB, npcDB: npcDB }; 
-                localStorage.setItem('miniscape_save_v54', JSON.stringify(saveData));
-                if(manual) setActionText("Salvo Localmente!", "#f1c40f"); return;
+                const saveData = { playerData: player, worldData: tempMaps, itemDB: itemDB, npcDB: npcDB }; 
+                localStorage.setItem('miniscape_save_v52', JSON.stringify(saveData));
+                if(manual) setActionText("Salvo Localmente!", "#f1c40f"); 
+            } else {
+                try {
+                    let res = await fetch(API_BASE + '/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: currentUser, playerData: player, worldData: tempMaps, itemDB: itemDB, npcDB: npcDB }) });
+                    let data = await res.json();
+                    if (data.mapVersion) currentMapVersion = data.mapVersion; 
+                    if(manual) setActionText("Progresso salvo online!", "#3498db");
+                } catch (e) { if(manual) setActionText("Erro ao salvar no servidor.", "#e74c3c"); }
             }
-            try {
-                let res = await fetch(API_BASE + '/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: currentUser, playerData: player, worldData: gameMaps, itemDB: itemDB, npcDB: npcDB }) });
-                let data = await res.json();
-                if (data.mapVersion) currentMapVersion = data.mapVersion; 
-                if(manual) setActionText("Progresso salvo online!", "#3498db");
-            } catch (e) { if(manual) setActionText("Erro ao salvar no servidor.", "#e74c3c"); }
+            
+            // Restaura as referências pro jogador não parar de bater na hora do auto-save
+            player.actionTarget = tempTarget; player.actionToolItem = tempTool; player.pendingAutoAction = tempAuto;
         }
         setInterval(() => { if(currentUser) saveDataLogic(); }, 60000);
 
@@ -693,7 +586,6 @@
 
         function unequip(slot) { const item = player.equipment[slot]; if(item) { if(item.stackable && slot === 'ammo') { if(addInvItem(item.name, item.qty)) { player.equipment[slot] = null; updateUI(); } else { setActionText("Inv. Cheio!", "#e74c3c"); } } else { if(player.inventory.length >= 28) { setActionText("Inv. Cheio!", "#e74c3c"); return; } player.equipment[slot] = null; player.inventory.push(item); hideTooltip(); updateUI(); } } }
         function craftItem(iName) { let it = itemDB[iName]; if(!it || !it.recipe) return; let reqs = it.recipe.split('|'); let hasAll = true; reqs.forEach(r => { let p = r.split(','); if(getInvCount(p[0].trim()) < parseInt(p[1])) hasAll = false; }); if(hasAll) { reqs.forEach(r => { let p = r.split(','); removeInvItem(p[0].trim(), parseInt(p[1])); }); if(addInvItem(iName, it.craftQty || 1)) { addXP('crafting', 15); setActionText(`Criou ${iName}!`); } updateUI(); } else { setActionText(`Faltam materiais!`, '#e74c3c'); } }
-
         function closeMenus() { isBankOpen = false; isNPCOpen = false; activeNPCShop = null; document.getElementById('btn-bank').style.display='none'; document.getElementById('btn-npc').style.display='none'; }
         function openTab(tP) { document.querySelectorAll('.tab-content').forEach(e=>e.classList.remove('active-tab')); document.querySelectorAll('.tab-btn').forEach(e=>e.classList.remove('active-btn')); const tb = document.getElementById(`tab-${tP}`); if(tb) tb.classList.add('active-tab'); const bt = document.getElementById(`btn-${tP}`); if(bt) bt.classList.add('active-btn'); isBankOpen = (tP === 'bank'); isNPCOpen = (tP === 'npc'); if (['craft', 'mag', 'inv', 'eq', 'sk', 'bank'].includes(tP)) { updateUI(); } }
         function setActionText(t, c="#2ecc71") { const el = document.getElementById('action-text'); el.innerText = t; el.style.color = c; setTimeout(() => { if(el.innerText === t) el.innerText = ""; }, 3000); }
@@ -758,7 +650,7 @@
         function populateDevItems(){ let s = document.getElementById('dev-item-select'); s.innerHTML='<option value="NEW">-- CRIAR NOVO ITEM --</option>'; Object.keys(itemDB).forEach(k=>{s.innerHTML+=`<option value="${k}">${k} (${itemDB[k].icon})</option>`;}); }
         function loadDevItemForm(){ let k = document.getElementById('dev-item-select').value; if(k==='NEW'){ document.getElementById('di-name').value=''; document.getElementById('di-icon').value='📦'; document.getElementById('di-weight').value='1.0'; document.getElementById('di-desc').value=''; document.getElementById('di-type').value='resource'; document.getElementById('di-stack').value='true'; document.getElementById('di-recipe').value=''; document.getElementById('di-craftqty').value='1';}else{ let i=itemDB[k]; document.getElementById('di-name').value=k; document.getElementById('di-icon').value=i.icon; document.getElementById('di-weight').value=i.weight||0; document.getElementById('di-desc').value=i.desc||''; document.getElementById('di-type').value=i.type; document.getElementById('di-stack').value=i.stackable?'true':'false'; document.getElementById('di-recipe').value=i.recipe||''; document.getElementById('di-craftqty').value=i.craftQty||1; if(i.type==='equipment'){ document.getElementById('di-slot').value=i.slot; document.getElementById('di-tool').value=i.tool||''; document.getElementById('di-dmg').value=i.bonusDmg||0; document.getElementById('di-def').value=i.defBonus||0; } if(i.type==='consumable')document.getElementById('di-heal').value=i.heal||0; } toggleItemFields(); }
         function saveDevItem(){ let k=document.getElementById('di-name').value; if(!k)return; let t=document.getElementById('di-type').value; itemDB[k]={name:k,icon:document.getElementById('di-icon').value,type:t,stackable:document.getElementById('di-stack').value==='true',weight:parseFloat(document.getElementById('di-weight').value)||0,desc:document.getElementById('di-desc').value}; let rec=document.getElementById('di-recipe').value; if(rec) {itemDB[k].recipe=rec; itemDB[k].craftQty=parseInt(document.getElementById('di-craftqty').value)||1;} if(t==='equipment'){ itemDB[k].slot=document.getElementById('di-slot').value; let tl=document.getElementById('di-tool').value; if(tl)itemDB[k].tool=tl; let dmg=parseInt(document.getElementById('di-dmg').value); if(dmg)itemDB[k].bonusDmg=dmg; let def=parseInt(document.getElementById('di-def').value); if(def)itemDB[k].defBonus=def; } if(t==='consumable')itemDB[k].heal=parseInt(document.getElementById('di-heal').value)||0; populateDevItems(); document.getElementById('dev-item-select').value=k; setActionText(`Item ${k} salvo!`); saveDataLogic(); updateUI(); buildDevEntityList();}
-        function populateDevNPCs(){ let s = document.getElementById('dev-npc-select'); s.innerHTML='<option value="NEW">-- CRIAR NOVO --</option>'; Object.keys(npcDB).forEach(k=>{s.innerHTML+=`<option value="${k}">${k} (${npcDB[k].name})</option>`;}); }
+        function populateDevNPCs(){ let s=document.getElementById('dev-npc-select'); s.innerHTML='<option value="NEW">-- CRIAR NOVO --</option>'; Object.keys(npcDB).forEach(k=>{s.innerHTML+=`<option value="${k}">${k} (${npcDB[k].name})</option>`;}); }
         function loadDevNPCForm(){ let k=document.getElementById('dev-npc-select').value; if(k==='NEW'){ document.getElementById('dn-id').value=''; document.getElementById('dn-name').value='Monstro'; document.getElementById('dn-hp').value=10; document.getElementById('dn-hit').value=1; document.getElementById('dn-xp').value=20; document.getElementById('dn-loot').value=''; document.getElementById('dn-dialog').value=''; document.getElementById('dn-shop').value=''; }else{ let n=npcDB[k]; document.getElementById('dn-id').value=k; document.getElementById('dn-name').value=n.name; document.getElementById('dn-hp').value=n.hp; document.getElementById('dn-hit').value=n.maxHit; document.getElementById('dn-xp').value=n.xp; document.getElementById('dn-c1').value=n.c1; document.getElementById('dn-c2').value=n.c2; document.getElementById('dn-loot').value=n.lootStr||''; document.getElementById('dn-dialog').value=n.dialog||''; document.getElementById('dn-shop').value=n.shopStr||''; } }
         function saveDevNPC(){ let k=document.getElementById('dn-id').value; if(!k)return; npcDB[k]={name:document.getElementById('dn-name').value,hp:parseInt(document.getElementById('dn-hp').value),maxHit:parseInt(document.getElementById('dn-hit').value),xp:parseInt(document.getElementById('dn-xp').value),c1:document.getElementById('dn-c1').value,c2:document.getElementById('dn-c2').value,lootStr:document.getElementById('dn-loot').value,dialog:document.getElementById('dn-dialog').value,shopStr:document.getElementById('dn-shop').value}; populateDevNPCs(); document.getElementById('dev-npc-select').value=k; setActionText(`NPC salvo!`); saveDataLogic(); buildDevEntityList();}
         function toggleDevBuild() { isDevBuildMode = !isDevBuildMode; document.getElementById('btn-build-mode').innerText=`Modo Construção: ${isDevBuildMode?'ON':'OFF'}`; document.getElementById('btn-build-mode').style.background=isDevBuildMode?'#2ecc71':'#e67e22'; setActionText(isDevBuildMode?"Build ON.":"Build OFF.", "#f1c40f"); }
@@ -773,7 +665,7 @@
         function unlinkMap(mapId) { if(gameMaps[mapId]) { gameMaps[mapId].gridX = null; gameMaps[mapId].gridY = null; saveDataLogic(); loadDevMapManager(); closeModal(); } }
         function quickCreateMap(x, y) { let nId = 'mapa_' + Date.now().toString().slice(-4); gameMaps[nId] = { id: nId, name: 'Novo Mapa', width: 800, height: 600, color: '#4a6b2d', gridX: x, gridY: y, entities: [] }; saveDataLogic(); loadDevMapManager(); closeModal(); }
         function saveCurrentMapSettings() { let cm = gameMaps[currentMap]; if(cm) { cm.name = document.getElementById('cur-map-name').value || cm.id; cm.width = parseInt(document.getElementById('cur-map-w').value) || 800; cm.height = parseInt(document.getElementById('cur-map-h').value) || 600; cm.color = document.getElementById('cur-map-color').value || '#4a6b2d'; resizeCanvas(); saveDataLogic(); loadDevMapManager(); setActionText("Mapa Atualizado!"); } }
-        function createNewMap() { let id = document.getElementById('dm-id').value; let n = document.getElementById('dm-name').value; let w = parseInt(document.getElementById('dm-w').value) || 800; let h = parseInt(document.getElementById('dm-h').value) || 600; let c = document.getElementById('dm-color').value; if(!id || gameMaps[id]) { alert("ID inválido!"); return; } gameMaps[id] = { id: id, name: n||id, width: w, height: h, color: c, gridX: null, gridY: null, entities: [] }; setActionText("Mapa Criado!"); saveDataLogic(); loadDevMapManager(); }
+        function createNewMap() { let id = document.getElementById('dm-id').value; let n = document.getElementById('dm-name').value; let w = parseInt(document.getElementById('dm-w').value) || 800; let h = parseInt(document.getElementById('dm-h').value) || 600; let c = document.getElementById('dm-color').value; if(!id || gameMaps[id]) { alert("ID inválido/já existe!"); return; } gameMaps[id] = { id: id, name: n||id, width: w, height: h, color: c, gridX: null, gridY: null, entities: [] }; setActionText("Mapa Criado!"); saveDataLogic(); loadDevMapManager(); }
 
         function switchMap(targetMap, nx, ny) { if(!gameMaps[targetMap]) return; currentMap = targetMap; player.x = nx; player.y = ny; player.destX = nx; player.destY = ny; player.isPerformingAction = false; player.pendingAutoAction = null; player.actionTarget = null; player.actionToolItem = null; projectiles = []; setActionText(`Viajou: ${gameMaps[currentMap].name}`); saveDataLogic(); loadDevMapManager(); }
         
@@ -882,6 +774,140 @@
         function addMenuOption(text, callback) { const div = document.createElement('div'); div.className = 'osrs-menu-item'; div.innerText = text; div.onclick = () => { osrsMenu.style.display = 'none'; callback(); }; osrsMenu.appendChild(div); }
         function setPendingAction(obj) { player.pendingAutoAction = obj; player.destX = obj.x + (obj.w||30)/2; player.destY = obj.y + (obj.h||30)/2; if(isNPCOpen && obj.type !== 'npc') { closeMenus(); openTab('inv'); } osrsMenu.style.display = 'none'; }
 
+        function tryPickupOrInteract() {
+            if(player.isPerformingAction) { player.isPerformingAction = false; return; }
+            let cur = gameMaps[currentMap].entities || [];
+            
+            let cItem = null; let minDItem = 35;
+            for(let o of cur) {
+                if(o && o.active && o.type === 'ground_item') {
+                    let d = Math.hypot(player.x - (o.x+10), player.y - (o.y+10));
+                    if(d < minDItem) { minDItem = d; cItem = o; }
+                }
+            }
+            if(cItem) {
+                if(addInvItem(cItem.item, cItem.qty)) { 
+                    cItem.active = false; addFloatingText(player.x, player.y - 15, "Pegou", "#f1c40f"); updateUI(); 
+                    saveDataLogic();
+                }
+                return;
+            }
+
+            let cObj = null; let minDObj = 45;
+            for(let o of cur) {
+                if(!o || !o.active || ['ground_item', 'paint'].includes(o.type)) continue; 
+                let d = Math.hypot(player.x - (o.x + (o.w||30)/2), player.y - (o.y + (o.h||30)/2));
+                if (d < minDObj + ((o.w||30)/2)) { minDObj = d; cObj = o; }
+            }
+            if(cObj) {
+                let dx = cObj.x + (cObj.w||30)/2 - player.x; let dy = cObj.y + (cObj.h||30)/2 - player.y; 
+                if(Math.abs(dx) > Math.abs(dy)) { player.facing.x = dx>0?1:-1; player.facing.y = 0; } else { player.facing.x = 0; player.facing.y = dy>0?1:-1; }
+                tryInteract(cObj);
+            }
+        }
+
+        function tryAttack() {
+            if(player.isPerformingAction) { player.isPerformingAction = false; return; }
+            const wp = player.equipment.weapon; let range = (wp && (wp.tool === 'magic' || wp.tool === 'ranged')) ? 160 : 45;
+            let cur = gameMaps[currentMap].entities || []; let cEnemy = null; let minDEnemy = range;
+
+            for(let o of cur) {
+                if(o && o.active && o.type === 'enemy') {
+                    let d = Math.hypot(player.x - (o.x + (o.w||30)/2), player.y - (o.y + (o.h||30)/2));
+                    if(d < minDEnemy) { minDEnemy = d; cEnemy = o; }
+                }
+            }
+            if(cEnemy) {
+                let dx = cEnemy.x + (cEnemy.w||30)/2 - player.x; let dy = cEnemy.y + (cEnemy.h||30)/2 - player.y; 
+                if(Math.abs(dx) > Math.abs(dy)) { player.facing.x = dx>0?1:-1; player.facing.y = 0; } else { player.facing.x = 0; player.facing.y = dy>0?1:-1; }
+                tryInteract(cEnemy);
+            }
+        }
+
+        function tryInteract(tObj) {
+            player.actionAnim = 15; const wp = player.equipment.weapon; 
+            if (!tObj || !tObj.type) return;
+
+            if (tObj.type === 'npc') { openShop(npcDB[tObj.dbKey]); return; }
+            if (tObj.type === 'bank') { document.getElementById('btn-bank').style.display='block'; openTab('bank'); setActionText("Banco aberto.", "#3498db"); return; }
+            if (tObj.type === 'portal') { switchMap(tObj.destMap, tObj.destX, tObj.destY); return; }
+
+            if(tObj.type === 'enemy' && player.attackCooldown <= 0) {
+                let d = 1; let sT = 'combat'; player.attackCooldown = 50; 
+                if (wp && wp.tool === 'magic') {
+                    let spell = spellbookDB.find(s => s.id === player.activeSpell);
+                    if(spell && player.stats.skills.magic.level >= spell.lvl) {
+                        let hasRunes = true; Object.keys(spell.req).forEach(rk => { if(getInvCount(rk) < spell.req[rk]) hasRunes = false; });
+                        if(hasRunes) {
+                            Object.keys(spell.req).forEach(rk => removeInvItem(rk, spell.req[rk])); d = spell.dmg + Math.floor(player.stats.skills.magic.level / 2); sT = 'magic';
+                            projectiles.push({ x: player.x, y: player.y, target: tObj, tx: tObj.x + (tObj.w||30)/2, ty: tObj.y + (tObj.h||30)/2, dmg: d, speed: 6, type: 'magic', color: spell.color });
+                            tObj.aggroTarget = player; updateUI(); return; 
+                        } else { setActionText("Sem runas!", "#e74c3c"); return; }
+                    } else { setActionText("Spell inválida/Level Baixo", "#e74c3c"); return; }
+                } 
+                else if (wp && wp.tool === 'ranged') {
+                    let ammo = player.equipment.ammo;
+                    if(ammo && ammo.qty >= 1) {
+                        ammo.qty--; if(ammo.qty <= 0) player.equipment.ammo = null; d = 1 + Math.floor(player.stats.skills.ranged.level / 2) + (wp.bonusDmg || 0) + (ammo.bonusDmg || 0); sT = 'ranged';
+                        projectiles.push({ x: player.x, y: player.y, target: tObj, tx: tObj.x + (tObj.w||30)/2, ty: tObj.y + (tObj.h||30)/2, dmg: d, speed: 8, type: 'ranged' }); 
+                        tObj.aggroTarget = player; updateUI(); return;
+                    } else { setActionText("Sem flechas equipadas!", "#e74c3c"); return; }
+                } else { d += Math.floor(player.stats.skills.combat.level / 2); if(wp && wp.bonusDmg) d += wp.bonusDmg; }
+                applyDamage(tObj, Math.floor(Math.random() * (d + 1)), sT);
+            } 
+            else if(tObj.type === 'tree' || (typeof tObj.type === 'string' && tObj.type.startsWith('rock'))) {
+                let nT = tObj.type === 'tree' ? 'axe' : 'pickaxe';
+                let toolItem = (wp && wp.tool === nT) ? wp : player.inventory.find(i => i.tool === nT);
+                if(toolItem) {
+                    player.isPerformingAction = true; player.actionTarget = tObj; player.actionType = tObj.type === 'tree' ? 'chop' : 'mine';
+                    player.actionToolItem = toolItem; player.actionTimer = player.actionDelay = Math.max(30, 150 - (player.stats.skills[tObj.type === 'tree' ? 'woodcutting' : 'mining'].level * 5));
+                } else { setActionText(`Requer ${nT} no inventário.`, "#e74c3c"); }
+            }
+            else if(tObj.type === 'fishing_spot') {
+                let toolItem = player.inventory.find(i => i.name === 'Net');
+                if(toolItem) {
+                    player.isPerformingAction = true; player.actionTarget = tObj; player.actionType = 'fish'; player.actionToolItem = toolItem;
+                    player.actionTimer = player.actionDelay = Math.max(40, 150 - (player.stats.skills.fishing.level * 4));
+                } else { setActionText("Requer uma Net no inventário.", "#e74c3c"); }
+            }
+            else if(tObj.type === 'furnace') {
+                if(getInvCount('Iron Ore')>0){ player.actionType='smelt_iron'; } else if(getInvCount('Copper Ore')>0 && getInvCount('Tin Ore')>0){ player.actionType='smelt_brz'; } else { setActionText("Sem minérios.", "#e74c3c"); return;}
+                player.isPerformingAction = true; player.actionTarget = tObj; player.actionTimer = player.actionDelay = Math.max(30, 100 - (player.stats.skills.smithing.level * 2));
+            }
+            else if(tObj.type === 'fire') {
+                if(getInvCount('Raw Meat') > 0) { player.isPerformingAction = true; player.actionTarget = tObj; player.actionType = 'cook_meat'; player.actionTimer = player.actionDelay = Math.max(20, 80 - (player.stats.skills.cooking.level * 2)); }
+                else if (getInvCount('Raw Fish') > 0) { player.isPerformingAction = true; player.actionTarget = tObj; player.actionType = 'cook_fish'; player.actionTimer = player.actionDelay = Math.max(20, 80 - (player.stats.skills.cooking.level * 2)); }
+                else { setActionText("Precisa de Meat ou Fish.", "#e74c3c"); }
+            } updateUI();
+        }
+
+        // CORREÇÃO CRÍTICA DO DANO DO MONSTRO (Apenas manda salvar a nova HP)
+        function applyDamage(t, dmg, sT) {
+            t.hp -= dmg; t.aggroTarget = player; addFloatingText(t.x + 15, t.y, dmg, dmg>0?"#e74c3c":"#bdc3c7");
+            
+            saveDataLogic(); // Salva HP do monstro pro server!
+
+            if(t.hp <= 0) { 
+                t.active = false; t.aggroTarget = null; addFloatingText(t.x, t.y, "Morto", "#e74c3c");
+                
+                let bXP = (t.dbKey && npcDB[t.dbKey]) ? npcDB[t.dbKey].xp : 15;
+                let cXP = Math.floor(bXP * 0.3) || 1; let hXP = bXP - cXP;
+                addXP(sT, cXP); addXP('hp', hXP);
+
+                if(t.dbKey && npcDB[t.dbKey] && npcDB[t.dbKey].lootStr){ 
+                    let pts = npcDB[t.dbKey].lootStr.split('|'); 
+                    pts.forEach((p, i) => { 
+                        let d = p.split(','); 
+                        if(d.length >= 3 && Math.random() <= parseFloat(d[1])){ 
+                            gameMaps[currentMap].entities.push({ id: Date.now()+i, type: 'ground_item', item: d[0].trim(), qty: Math.floor(Math.random()*parseInt(d[2]))+1, x: t.x+(Math.random()*20)-10, y: t.y, w: 20, h: 20, active: true, life: 3000 }); 
+                        } 
+                    }); 
+                }
+                saveDataLogic(); 
+                setTimeout(() => { t.active = true; t.hp = t.maxHp; saveDataLogic(); }, 15000);
+            }
+        }
+
         function update() {
             try {
                 let curM = gameMaps[currentMap]; if(!curM) return; let cur = curM.entities || [];
@@ -907,7 +933,8 @@
                     });
                 }
                 
-                if (userRole !== 'admin' && !isOfflineMode) {
+                // MANTÉM OS MONSTROS ANDANDO (APENAS UM HOST CALCULA PRA NÃO DAR DESYNC)
+                if (userRole !== 'admin' && !isMapHost && !isOfflineMode) {
                     cur.forEach(o => {
                         if ((o.type === 'enemy' || o.type === 'npc') && o.serverX !== undefined && o.serverY !== undefined) {
                             o.x += (o.serverX - o.x) * 0.3;
@@ -1234,7 +1261,6 @@
             try { drawMinimap(); } catch(e){} 
             requestAnimationFrame(gameLoop); 
         }
-
     </script>
 </body>
 </html>
