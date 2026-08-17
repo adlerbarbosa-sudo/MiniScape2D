@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MiniScape 2D - V62 (Fix Base64, Tooltip & Mouse)</title>
+    <title>MiniScape 2D - V73 (Fix Sintaxe & Engine Limpa)</title>
     <style>
         /* === BASE & RESPONSIVIDADE === */
         body { margin: 0; padding: 10px; background-color: #121212; color: #e0e0e0; font-family: 'Segoe UI', Tahoma, sans-serif; display: flex; gap: 15px; justify-content: center; height: 100vh; box-sizing: border-box; overflow: hidden; flex-direction: row; align-items: stretch; }
@@ -117,6 +117,7 @@
             <button id="mobile-action-btn" class="mobile-btn" onclick="tryPickupOrInteract()">🎯 AÇÃO (ESPAÇO)</button>
             <button id="mobile-atk-btn" class="mobile-btn" style="background:#8e44ad; border-color:#9b59b6; margin-top:-5px;" onclick="tryAttack()">⚔️ ATACAR (CTRL)</button>
 
+            <!-- O BOTÃO DO BANCO ESTÁ AQUI -->
             <div class="tab-buttons" id="tab-buttons-container">
                 <button id="btn-inv" class="tab-btn active-btn" onclick="openTab('inv')">Inv</button>
                 <button id="btn-eq" class="tab-btn" onclick="openTab('eq')">Equip</button>
@@ -124,6 +125,7 @@
                 <button id="btn-craft" class="tab-btn" onclick="openTab('craft'); updateUI();" style="background-color: #d35400;">Craft</button>
                 <button id="btn-mag" class="tab-btn" onclick="openTab('mag')" style="background-color: #3498db;">✨</button>
                 <button id="btn-npc" class="tab-btn" onclick="openTab('npc')" style="display:none;">Falar</button>
+                <button id="btn-bank" class="tab-btn" onclick="openTab('bank')" style="display:none;">Banco</button>
                 <button id="btn-cfg" class="tab-btn" onclick="openTab('cfg')">⚙️</button>
             </div>
 
@@ -172,6 +174,9 @@
     <!-- SCRIPT GIGANTE E UNIFICADO DO JOGO -->
     <script>
         // === 1. DECLARAÇÕES GLOBAIS ÚNICAS ===
+        let lastFrameTime = 0; 
+        const frameDelay = 1000 / 60;
+        
         let gameLoopStarted = false;
         let currentUser = null;
         let userRole = 'player';
@@ -187,7 +192,6 @@
         let keys = { w: false, a: false, s: false, d: false, arrowup: false, arrowdown: false, arrowleft: false, arrowright: false };
 
         const API_BASE = (window.location.protocol === 'file:') ? 'http://localhost:3000/api' : '/api';
-        
         let pendingCombatLogs = [];
 
         const canvas = document.getElementById('gameCanvas'); 
@@ -197,14 +201,22 @@
 
         function removeAccents(str) { return str.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); }
         
-        // --- TOOLTIP BLINDADO NO MOUSE (FIX 1) ---
+        // --- BLOQUEIO ABSOLUTO DO MENU DO NAVEGADOR ---
+        window.addEventListener('contextmenu', function (e) { 
+            if(e.target.id === 'gameCanvas') { e.preventDefault(); } 
+        }, false);
+
+        // --- GHOSTING (PROJEÇÃO) E TOOLTIP BLINDADO NO MOUSE ---
         let mouseX = 0, mouseY = 0;
+        let lastWorldX = 0, lastWorldY = 0;
+
         document.addEventListener('mousemove', (e) => { 
             mouseX = e.pageX; mouseY = e.pageY;
-            if (tooltip.style.display === 'block') { 
-                tooltip.style.left = (mouseX + 15) + 'px'; 
-                tooltip.style.top = (mouseY + 15) + 'px'; 
-            } 
+            if(document.getElementById('login-overlay').style.display === 'none') {
+                const pos = getCoords(e);
+                lastWorldX = pos.x; lastWorldY = pos.y;
+            }
+            if (tooltip.style.display === 'block') { tooltip.style.left = (mouseX + 15) + 'px'; tooltip.style.top = (mouseY + 15) + 'px'; } 
         });
 
         function showTooltip(item) { 
@@ -214,13 +226,8 @@
             if (item.defBonus) html += `<div class="tt-stat">🛡️ Defesa: +${item.defBonus}</div>`; 
             if (item.heal) html += `<div class="tt-stat">❤️ Cura: +${item.heal}</div>`; 
             html += `<div class="tt-weight">⚖️ Peso: ${item.weight||0} kg</div>`; 
-            
-            tooltip.innerHTML = html; 
-            tooltip.style.left = (mouseX + 15) + 'px'; 
-            tooltip.style.top = (mouseY + 15) + 'px';
-            tooltip.style.display = 'block'; 
+            tooltip.innerHTML = html; tooltip.style.left = (mouseX + 15) + 'px'; tooltip.style.top = (mouseY + 15) + 'px'; tooltip.style.display = 'block'; 
         }
-
         function hideTooltip() { tooltip.style.display = 'none'; }
         
         function giveStarterItems() { 
@@ -263,7 +270,8 @@
         let npcDB = {
             'goblin_base': { name: 'Goblin', hp: 15, maxHit: 2, xp: 15, c1: '#16a085', c2: '#1abc9c', lootStr: 'Bones,1,1|Raw Meat,0.5,1|Coins,0.3,15', dialog: '', shopStr: '' },
             'orc_base': { name: 'Orc', hp: 30, maxHit: 5, xp: 40, c1: '#2c3e50', c2: '#34495e', lootStr: 'Bones,1,1|Coins,1,30', dialog: '', shopStr: '' },
-            'merchant_base': { name: 'Merchant', hp: 0, maxHit: 0, xp: 0, c1: '#8e44ad', c2: '#f1c27d', lootStr: '', dialog: 'Bem-vindo à minha loja!', shopStr: 'Net,20|Water Rune,10|Tinderbox,50' }
+            'merchant_base': { name: 'Merchant', hp: 0, maxHit: 0, xp: 0, c1: '#8e44ad', c2: '#f1c27d', lootStr: '', dialog: 'Bem-vindo à minha loja!', shopStr: 'Net,20|Water Rune,10|Tinderbox,50' },
+            'dragon_boss': { name: 'Dragon', hp: 200, maxHit: 15, xp: 500, c1: '#c0392b', c2: '#e74c3c', lootStr: 'Coins,1,500|Bronze Sword,0.5,1', dialog: '', shopStr: '' }
         };
 
         let spellbookDB = [
@@ -281,7 +289,7 @@
         let player = JSON.parse(JSON.stringify(playerDefault));
 
         let defaultGameMaps = {
-            'lumbridge': { id: 'lumbridge', name: 'Cidade Principal', width: 800, height: 600, color: '#4a6b2d', gridX: 0, gridY: 0, entities: [ { id: 1, type: 'tree', name: 'Oak Tree', x: 150, y: 150, w: 40, h: 50, active: true, hp: 3, maxHp: 3 }, { id: 3, type: 'enemy', dbKey: 'goblin_base', name: 'Goblin', x: 300, y: 400, w: 25, h: 25, active: true, hp: 15, maxHp: 15, attackCooldown: 0 }, { id: 4, type: 'bank', name: 'Bank Booth', x: 400, y: 50, w: 50, h: 30, active: true } ] }
+            'lumbridge': { id: 'lumbridge', name: 'Cidade Principal', width: 800, height: 600, color: '#4a6b2d', gridX: 0, gridY: 0, entities: [ { id: 1, type: 'tree', name: 'Oak Tree', x: 150, y: 150, w: 40, h: 50, active: true, hp: 3, maxHp: 3 }, { id: 3, type: 'enemy', dbKey: 'goblin_base', name: 'Goblin', x: 300, y: 400, w: 30, h: 30, active: true, hp: 15, maxHp: 15, attackCooldown: 0 }, { id: 4, type: 'bank', name: 'Bank Booth', x: 400, y: 50, w: 50, h: 30, active: true } ] }
         };
         let gameMaps = JSON.parse(JSON.stringify(defaultGameMaps));
         let currentMap = 'lumbridge';
@@ -389,7 +397,7 @@
             }, 100);
         }
 
-        // --- SISTEMAS DE RENDER, SYNC E CONTROLES ---
+        // --- SISTEMAS DE RENDER E SYNC ---
         function resizeCanvas() {
             const container = document.getElementById('game-container');
             if(container) {
@@ -408,6 +416,8 @@
                 const res = await fetch(API_BASE + '/sync', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
                 const data = await res.json();
                 
+                if (data.isHost !== undefined) { isMapHost = data.isHost; }
+
                 if(data.players) {
                     Object.keys(data.players).forEach(u => {
                         if (!otherPlayers[u]) {
@@ -487,12 +497,14 @@
             if (e.code === 'Enter') { const chatInput = document.getElementById('chat-input'); if (document.activeElement !== chatInput) { e.preventDefault(); chatInput.focus(); return; } }
             if(["Space","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].indexOf(e.code) > -1) { if(e.target.tagName !== "INPUT" && e.target.tagName !== "TEXTAREA") e.preventDefault(); }
         }, false);
+        
         document.addEventListener('keydown', (e) => { 
             if(document.getElementById('login-overlay').style.display !== 'none') return;
             if(e.target.tagName === "INPUT" || e.target.tagName === "SELECT" || e.target.tagName === "TEXTAREA") return;
             let k = e.key.toLowerCase(); if(['w','a','s','d','arrowup','arrowleft','arrowdown','arrowright'].includes(k)) keys[k] = true;
             if (e.code === 'Space') { tryPickupOrInteract(); } if (e.key === 'Control') { tryAttack(); } 
         });
+        
         document.addEventListener('keyup', (e) => { 
             if(document.getElementById('login-overlay').style.display !== 'none') return;
             let k = e.key.toLowerCase(); if(['w','a','s','d','arrowup','arrowleft','arrowdown','arrowright'].includes(k)) keys[k] = false;
@@ -515,7 +527,7 @@
             let offset = getCameraOffset(); return { x: rawX - offset.x, y: rawY - offset.y, pageX: pX, pageY: pY };
         }
 
-        // --- SISTEMAS DE INVENTÁRIO, UI E AÇÕES ---
+        // --- SISTEMAS DE INVENTÁRIO E AÇÕES ---
         function getInvCount(iName) { return player.inventory.reduce((acc, i) => acc + (i.name === iName ? (i.qty||1) : 0), 0); }
         function calcTotalWeight() { return player.inventory.reduce((acc, i) => acc + ((i&&i.weight?i.weight:0) * (i&&i.qty?i.qty:1)), 0).toFixed(1); }
         function removeInvItem(iName, amount) { let tr = amount; for(let i = player.inventory.length - 1; i >= 0; i--) { if(player.inventory[i].name === iName) { if(player.inventory[i].stackable) { if(player.inventory[i].qty > tr) { player.inventory[i].qty -= tr; return true; } else { tr -= player.inventory[i].qty; player.inventory.splice(i, 1); } } else { player.inventory.splice(i, 1); tr--; if(tr === 0) return true; } } } return false; }
@@ -527,7 +539,7 @@
             if(isBankOpen) { transferToBank(index); return; } const item = player.inventory[index]; if(!item) return;
             if(item.type === 'equipment') { if(item.stackable && item.slot === 'ammo') { let curAm = player.equipment.ammo; player.equipment.ammo = player.inventory.splice(index, 1)[0]; if(curAm) addInvItem(curAm.name, curAm.qty); } else { player.inventory.splice(index, 1); if(player.equipment[item.slot]) player.inventory.push(player.equipment[item.slot]); player.equipment[item.slot] = item; } } 
             else if(item.type === 'consumable') { if(item.heal > 0) { player.stats.hp = Math.min(player.stats.maxHp, player.stats.hp + item.heal); setActionText(`Curou ${item.heal} HP.`); } if(item.name === 'Bones') { addXP('prayer', 5); addFloatingText(player.x, player.y - 15, "Enterrou", "#bdc3c7"); } removeInvItem(item.name, 1); } 
-            else if(item.name === 'Tinderbox') { if(getInvCount('Logs') >= 1) { removeInvItem('Logs', 1); if(!gameMaps[currentMap].entities) gameMaps[currentMap].entities = []; gameMaps[currentMap].entities.push({ id: Date.now(), type: 'fire', name: 'Fire', x: player.x - 15, y: player.y - 15, w: 30, h: 30, active: true, life: 1000 }); addXP('firemaking', 15); setActionText("Acendeu fogo!"); saveDataLogic(); } else { setActionText("Precisa de Logs.", "#e74c3c"); } } 
+            else if(item.name === 'Tinderbox') { if(getInvCount('Logs') >= 1) { removeInvItem('Logs', 1); let curM = gameMaps[currentMap]; if(curM){ if(!curM.entities) curM.entities = []; curM.entities.push({ id: Date.now(), type: 'fire', name: 'Fire', x: player.x - 15, y: player.y - 15, w: 30, h: 30, active: true, life: 1000 }); } addXP('firemaking', 15); setActionText("Acendeu fogo!"); saveDataLogic(); } else { setActionText("Precisa de Logs.", "#e74c3c"); } } 
             else if(item.name === 'Knife') { setActionText("Use a aba Craft para criar itens.", "#e74c3c"); }
             player.isPerformingAction = false; player.pendingAutoAction = null; player.actionToolItem = null; hideTooltip(); updateUI();
         }
@@ -546,7 +558,7 @@
             if(leveledUp) { setActionText(`${sk.name} Nível ${sk.level}!`, "#f1c40f"); addFloatingText(player.x, player.y - 40, `Level Up!`, '#2ecc71'); } updateUI(); 
         }
 
-        function getTotalDef() { let d = player.stats.skills.combat.level; if(player.equipment.shield) d += player.equipment.shield.defBonus; if(player.equipment.body) d += player.equipment.body.defBonus; return d; }
+        function getTotalDef() { let d = player.stats.skills.combat.level; if(player.equipment && player.equipment.shield) d += player.equipment.shield.defBonus; if(player.equipment && player.equipment.body) d += player.equipment.body.defBonus; return d; }
         function openShop(nData) { document.getElementById('btn-npc').style.display = 'block'; openTab('npc'); document.getElementById('npc-title').innerText = nData.name; document.getElementById('npc-dialog').innerText = `"${nData.dialog || '...'}"`; let sL = document.getElementById('npc-shop-list'); sL.innerHTML = ''; if(nData.shopStr) { nData.shopStr.split('|').forEach(p => { let pt = p.split(','); if(pt.length >= 2) { let iN = pt[0].trim(); let ct = parseInt(pt[1]); let iD = itemDB[iN]; if(iD) { sL.innerHTML += `<div class="shop-item"><span>${iD.icon} ${iD.name}</span><button class="shop-btn" onclick="buyItem('${iN}', ${ct})">Comprar (${ct} 🪙)</button></div>`; } } }); } }
         function buyItem(iN, ct) { if(getInvCount('Coins') >= ct) { if(addInvItem(iN, 1)) { removeInvItem('Coins', ct); setActionText(`Comprou ${iN}!`); updateUI(); } else { setActionText("Inv Cheio!", "#e74c3c"); } } else { setActionText("Coins insuficientes!", "#e74c3c"); } }
         function setActiveSpell(sId) { player.activeSpell = sId; updateUI(); }
@@ -563,7 +575,7 @@
             } catch(e) { }
         }
 
-        // --- DEV MODE E GERENCIAMENTO DE PLAYERS ---
+        // --- SISTEMAS DE DEV E ADMIN ---
         function openModal(htmlContent) { const overlay = document.getElementById('custom-modal-overlay'); const box = document.getElementById('custom-modal-box'); box.innerHTML = htmlContent; overlay.style.display = 'flex'; }
         function closeModal() { document.getElementById('custom-modal-overlay').style.display = 'none'; }
         function openDevSub(tabId, btn) { document.querySelectorAll('.dev-sub-content').forEach(e=>e.classList.remove('active')); document.querySelectorAll('.dev-sub-btn').forEach(e=>e.classList.remove('active')); const t = document.getElementById(tabId); if(t) t.classList.add('active'); if(btn) btn.classList.add('active'); if(tabId==='dev-map') buildDevEntityList(); if(tabId==='dev-items') populateDevItems(); if(tabId==='dev-npcs') populateDevNPCs(); if(tabId==='dev-map-manager') loadDevMapManager(); if(tabId==='dev-import') document.getElementById('dev-import-code').value = ''; if(tabId==='dev-players') loadDevPlayers(); }
@@ -594,18 +606,11 @@
         async function downloadServerBackup() { try { let res = await fetch(API_BASE + '/backup'); let data = await res.json(); let dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data)); let dlAnchorElem = document.createElement('a'); dlAnchorElem.setAttribute("href", dataStr); dlAnchorElem.setAttribute("download", "miniscape_backup.json"); dlAnchorElem.click(); setActionText("Backup baixado!", "#3498db"); } catch(e) { setActionText("Erro no backup.", "#e74c3c"); } }
         async function restoreServerBackup() { let code = document.getElementById('db-restore-code').value.trim(); if(!code) return; try { let parsed = JSON.parse(code); let res = await fetch(API_BASE + '/restore', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ adminUser: currentUser, dbData: parsed }) }); let data = await res.json(); if(data.success) { setActionText("DB Restaurado com Sucesso!"); setTimeout(()=>location.reload(), 1500); } } catch(e) { setActionText("JSON inválido.", "#e74c3c"); } }
 
-        // --- CORREÇÃO ABSOLUTA DA IMPORTAÇÃO DE BASE64 ---
         function importDevCode() {
             const codeInput = document.getElementById('dev-import-code').value.trim(); 
             if (!codeInput) { setActionText("Cole o código!", "#e74c3c"); return; }
             try { 
-                // Remove espaços invisíveis e quebras de linha para o atob não bugar
-                let cleanBase64 = codeInput.replace(/\s+/g, '');
-                
-                // Decodificador seguro para UTF-8 (caracteres especiais)
-                let decoded = decodeURIComponent(escape(atob(cleanBase64))); 
-                let parsed = JSON.parse(decoded); 
-                
+                let cleanBase64 = codeInput.replace(/\s+/g, ''); let decoded = decodeURIComponent(escape(atob(cleanBase64))); let parsed = JSON.parse(decoded); 
                 if(parsed.items) Object.assign(itemDB, parsed.items); if(parsed.npcs) Object.assign(npcDB, parsed.npcs); 
                 if(parsed.maps) { Object.keys(parsed.maps).forEach(mId => { if(gameMaps[mId]) { if(parsed.maps[mId].entities) { gameMaps[mId].entities = gameMaps[mId].entities.concat(parsed.maps[mId].entities); } } else { gameMaps[mId] = parsed.maps[mId]; } }); }
                 saveDataLogic(true); updateUI(); buildDevEntityList(); loadDevMapManager();
@@ -650,101 +655,258 @@
         function createNewMap() { let id = document.getElementById('dm-id').value; let n = document.getElementById('dm-name').value; let w = parseInt(document.getElementById('dm-w').value) || 800; let h = parseInt(document.getElementById('dm-h').value) || 600; let c = document.getElementById('dm-color').value; if(!id || gameMaps[id]) { alert("ID inválido/já existe!"); return; } gameMaps[id] = { id: id, name: n||id, width: w, height: h, color: c, gridX: null, gridY: null, entities: [] }; setActionText("Mapa Criado!"); saveDataLogic(); loadDevMapManager(); }
 
         function switchMap(targetMap, nx, ny) { if(!gameMaps[targetMap]) return; currentMap = targetMap; player.x = nx; player.y = ny; player.destX = nx; player.destY = ny; player.isPerformingAction = false; player.pendingAutoAction = null; player.actionTarget = null; player.actionToolItem = null; projectiles = []; setActionText(`Viajou: ${gameMaps[currentMap].name}`); saveDataLogic(); loadDevMapManager(); }
-        function switchMapByGrid(dx, dy) {
-            let cm = gameMaps[currentMap]; let tgX = cm.gridX !== null ? cm.gridX + dx : null; let tgY = cm.gridY !== null ? cm.gridY + dy : null;
-            if (tgX !== null && tgY !== null) { let targetMapId = Object.keys(gameMaps).find(k => gameMaps[k].gridX === tgX && gameMaps[k].gridY === tgY);
-                if(targetMapId) { 
-                    let tm = gameMaps[targetMapId]; let tmW = tm.width || 800; let tmH = tm.height || 600; let nx = player.x; let ny = player.y;
-                    if (dx !== 0) { let ratio = player.y / (cm.height||600); ny = tmH * ratio; if (dx > 0) nx = 40; if (dx < 0) nx = tmW - 40; }
-                    if (dy !== 0) { let ratio = player.x / (cm.width||800); nx = tmW * ratio; if (dy > 0) ny = 40; if (dy < 0) ny = tmH - 40; }
-                    switchMap(targetMapId, nx, ny); return true;
-                }
-            } return false;
+
+        // --- SISTEMAS DE FÍSICA E AÇÕES DE COMBATE ---
+        
+        function getHitbox(o) {
+            let hw = o.w || 30; let hh = o.h || 30; let hx = o.x; let hy = o.y;
+            if(o.type === 'tree') { hy += hh - 20; hh = 20; hx += hw/2 - 10; hw = 20; }
+            else if(o.type === 'house') { hy += hh - 30; hh = 30; }
+            else if(o.type === 'furnace' || o.type === 'bank') { hy += hh - 20; hh = 20; }
+            return {x: hx, y: hy, w: hw, h: hh};
         }
 
-        function handleInputDown(e) {
-            if(document.getElementById('login-overlay').style.display !== 'none') return;
-            if(e.type === 'touchstart') e.preventDefault(); 
-            const pos = getCoords(e); let curM = gameMaps[currentMap]; if(!curM) return;
+        function tryPickupOrInteract() {
+            if(player.isPerformingAction) { player.isPerformingAction = false; return; }
+            let curM = gameMaps[currentMap]; if(!curM) return;
+            let cur = curM.entities || []; 
+            let cItem = null; let minDItem = 35;
             
-            if (isDevBuildMode && (e.button === 2 || e.which === 3)) {
+            for(let o of cur) {
+                if(o && o.active && o.type === 'ground_item') {
+                    let d = Math.hypot(player.x - (o.x+10), player.y - (o.y+10));
+                    if(d < minDItem) { minDItem = d; cItem = o; }
+                }
+            }
+            if(cItem) {
+                if(addInvItem(cItem.item, cItem.qty)) { 
+                    cItem.active = false; addFloatingText(player.x, player.y - 15, "Pegou", "#f1c40f"); updateUI(); 
+                    saveDataLogic();
+                }
+                return;
+            }
+
+            let cObj = null; let minDObj = 45;
+            for(let o of cur) {
+                if(!o || !o.active || ['ground_item', 'paint'].includes(o.type)) continue; 
+                let d = Math.hypot(player.x - (o.x + (o.w||30)/2), player.y - (o.y + (o.h||30)/2));
+                if (d < minDObj + ((o.w||30)/2)) { minDObj = d; cObj = o; }
+            }
+            if(cObj) {
+                let dx = cObj.x + (cObj.w||30)/2 - player.x; let dy = cObj.y + (cObj.h||30)/2 - player.y; 
+                if(Math.abs(dx) > Math.abs(dy)) { player.facing.x = dx>0?1:-1; player.facing.y = 0; } else { player.facing.x = 0; player.facing.y = dy>0?1:-1; }
+                tryInteract(cObj);
+            }
+        }
+
+        function tryAttack() {
+            if(player.isPerformingAction) { player.isPerformingAction = false; return; }
+            const wp = player.equipment ? player.equipment.weapon : null; 
+            let range = (wp && (wp.tool === 'magic' || wp.tool === 'ranged')) ? 160 : 45;
+            let curM = gameMaps[currentMap]; if(!curM) return;
+            let cur = curM.entities || []; 
+            let cEnemy = null; let minDEnemy = range;
+
+            for(let o of cur) {
+                if(o && o.active && o.type === 'enemy') {
+                    let d = Math.hypot(player.x - (o.x + (o.w||30)/2), player.y - (o.y + (o.h||30)/2));
+                    if(d < minDEnemy) { minDEnemy = d; cEnemy = o; }
+                }
+            }
+            if(cEnemy) {
+                let dx = cEnemy.x + (cEnemy.w||30)/2 - player.x; let dy = cEnemy.y + (cEnemy.h||30)/2 - player.y; 
+                if(Math.abs(dx) > Math.abs(dy)) { player.facing.x = dx>0?1:-1; player.facing.y = 0; } else { player.facing.x = 0; player.facing.y = dy>0?1:-1; }
+                tryInteract(cEnemy);
+            }
+        }
+
+        function tryInteract(tObj) {
+            player.actionAnim = 15; 
+            const wp = player.equipment ? player.equipment.weapon : null; 
+            if (!tObj || !tObj.type || !tObj.active) return;
+
+            if (tObj.type === 'npc') { openShop(npcDB[tObj.dbKey]); return; }
+            if (tObj.type === 'bank') { document.getElementById('btn-bank').style.display='block'; openTab('bank'); setActionText("Banco aberto.", "#3498db"); return; }
+            if (tObj.type === 'portal') { switchMap(tObj.destMap, tObj.destX, tObj.destY); return; }
+
+            if(tObj.type === 'enemy' && player.attackCooldown <= 0) {
+                let d = 1; let sT = 'combat'; player.attackCooldown = 50; 
+                if (wp && wp.tool === 'magic') {
+                    let spell = spellbookDB.find(s => s.id === player.activeSpell);
+                    if(spell && player.stats.skills.magic.level >= spell.lvl) {
+                        let hasRunes = true; Object.keys(spell.req).forEach(rk => { if(getInvCount(rk) < spell.req[rk]) hasRunes = false; });
+                        if(hasRunes) {
+                            Object.keys(spell.req).forEach(rk => removeInvItem(rk, spell.req[rk])); d = spell.dmg + Math.floor(player.stats.skills.magic.level / 2); sT = 'magic';
+                            projectiles.push({ x: player.x, y: player.y, target: tObj, tx: tObj.x + (tObj.w||30)/2, ty: tObj.y + (tObj.h||30)/2, dmg: d, speed: 6, type: 'magic', color: spell.color });
+                            updateUI(); return; 
+                        } else { setActionText("Sem runas!", "#e74c3c"); return; }
+                    } else { setActionText("Spell inválida/Level Baixo", "#e74c3c"); return; }
+                } 
+                else if (wp && wp.tool === 'ranged') {
+                    let ammo = player.equipment ? player.equipment.ammo : null;
+                    if(ammo && ammo.qty >= 1) {
+                        ammo.qty--; 
+                        if(ammo.qty <= 0) { if(player.equipment) player.equipment.ammo = null; }
+                        d = 1 + Math.floor(player.stats.skills.ranged.level / 2) + (wp.bonusDmg || 0) + (ammo.bonusDmg || 0); sT = 'ranged';
+                        projectiles.push({ x: player.x, y: player.y, target: tObj, tx: tObj.x + (tObj.w||30)/2, ty: tObj.y + (tObj.h||30)/2, dmg: d, speed: 8, type: 'ranged' }); 
+                        updateUI(); return;
+                    } else { setActionText("Sem flechas equipadas!", "#e74c3c"); return; }
+                } else { d += Math.floor(player.stats.skills.combat.level / 2); if(wp && wp.bonusDmg) d += wp.bonusDmg; }
+                applyDamage(tObj, Math.floor(Math.random() * (d + 1)), sT);
+            } 
+            else if(tObj.type === 'tree' || (typeof tObj.type === 'string' && tObj.type.startsWith('rock'))) {
+                let nT = tObj.type === 'tree' ? 'axe' : 'pickaxe';
+                let toolItem = (wp && wp.tool === nT) ? wp : player.inventory.find(i => i.tool === nT);
+                if(toolItem) {
+                    player.isPerformingAction = true; player.actionTarget = tObj; player.actionType = tObj.type === 'tree' ? 'chop' : 'mine';
+                    player.actionToolItem = toolItem; player.actionTimer = player.actionDelay = Math.max(30, 150 - (player.stats.skills[tObj.type === 'tree' ? 'woodcutting' : 'mining'].level * 5));
+                } else { setActionText(`Requer ${nT} no inventário.`, "#e74c3c"); }
+            }
+            else if(tObj.type === 'fishing_spot') {
+                let toolItem = player.inventory.find(i => i.name === 'Net');
+                if(toolItem) {
+                    player.isPerformingAction = true; player.actionTarget = tObj; player.actionType = 'fish'; player.actionToolItem = toolItem;
+                    player.actionTimer = player.actionDelay = Math.max(40, 150 - (player.stats.skills.fishing.level * 4));
+                } else { setActionText("Requer uma Net no inventário.", "#e74c3c"); }
+            }
+            else if(tObj.type === 'furnace') {
+                if(getInvCount('Iron Ore')>0){ player.actionType='smelt_iron'; } else if(getInvCount('Copper Ore')>0 && getInvCount('Tin Ore')>0){ player.actionType='smelt_brz'; } else { setActionText("Sem minérios.", "#e74c3c"); return;}
+                player.isPerformingAction = true; player.actionTarget = tObj; player.actionTimer = player.actionDelay = Math.max(30, 100 - (player.stats.skills.smithing.level * 2));
+            }
+            else if(tObj.type === 'fire') {
+                if(getInvCount('Raw Meat') > 0) { player.isPerformingAction = true; player.actionTarget = tObj; player.actionType = 'cook_meat'; player.actionTimer = player.actionDelay = Math.max(20, 80 - (player.stats.skills.cooking.level * 2)); }
+                else if (getInvCount('Raw Fish') > 0) { player.isPerformingAction = true; player.actionTarget = tObj; player.actionType = 'cook_fish'; player.actionTimer = player.actionDelay = Math.max(20, 80 - (player.stats.skills.cooking.level * 2)); }
+                else { setActionText("Precisa de Meat ou Fish.", "#e74c3c"); }
+            } updateUI();
+        }
+
+        function applyDamage(t, dmg, sT) {
+            t.hp -= dmg; t.aggroTarget = currentUser; addFloatingText(t.x + 15, t.y, dmg, dmg>0?"#e74c3c":"#bdc3c7");
+            pendingCombatLogs.push({ id: t.id, dmg: dmg, aggro: currentUser, maxHp: t.maxHp });
+
+            if(t.hp <= 0) { 
+                t.active = false; t.aggroTarget = null; addFloatingText(t.x, t.y, "Morto", "#e74c3c");
+                let bXP = (t.dbKey && npcDB[t.dbKey]) ? npcDB[t.dbKey].xp : 15;
+                let cXP = Math.floor(bXP * 0.3) || 1; let hXP = bXP - cXP;
+                addXP(sT, cXP); addXP('hp', hXP);
+
+                if(t.dbKey && npcDB[t.dbKey] && npcDB[t.dbKey].lootStr){ 
+                    let pts = npcDB[t.dbKey].lootStr.split('|'); 
+                    pts.forEach((p, i) => { 
+                        let d = p.split(','); 
+                        if(d.length >= 3 && Math.random() <= parseFloat(d[1])){ 
+                            let curM = gameMaps[currentMap];
+                            if(curM) {
+                                if(!curM.entities) curM.entities = [];
+                                curM.entities.push({ id: Date.now()+i, type: 'ground_item', item: d[0].trim(), qty: Math.floor(Math.random()*parseInt(d[2]))+1, x: t.x+(Math.random()*20)-10, y: t.y, w: 20, h: 20, active: true, life: 3000 }); 
+                            }
+                        } 
+                    }); 
+                }
+                saveDataLogic(); 
+            }
+        }
+
+        // --- SISTEMA DE CLIQUE COM MOUSE ---
+        canvas.addEventListener('mousedown', function(e) {
+            if(document.getElementById('login-overlay').style.display !== 'none') return;
+            const pos = getCoords(e);
+            let curM = gameMaps[currentMap]; if(!curM) return;
+
+            // MENU OSRS BLINDADO (CLIQUE DIREITO)
+            if (e.button === 2 || e.which === 3) {
+                if (isDevBuildMode) {
+                    let cur = curM.entities || [];
+                    for (let i = cur.length - 1; i >= 0; i--) { 
+                        let o = cur[i]; 
+                        if (pos.x >= o.x && pos.x <= o.x + (o.w||30) && pos.y >= o.y && pos.y <= o.y + (o.h||30)) { cur.splice(i, 1); addFloatingText(pos.x, pos.y, "Deletado", "#e74c3c"); saveDataLogic(); return; } 
+                    } 
+                    e.preventDefault();
+                    return;
+                }
+                
+                try {
+                    let cObj = null; let cur = gameMaps[currentMap] ? gameMaps[currentMap].entities || [] : [];
+                    for (let i = cur.length - 1; i >= 0; i--) { let o = cur[i]; if (o && o.active && o.type !== 'paint' && pos.x >= o.x && pos.x <= o.x + (o.w||30) && pos.y >= o.y && pos.y <= o.y + (o.h||30)) { cObj = o; break; } }
+                    
+                    osrsMenu.innerHTML = "";
+                    if (cObj && cObj.type) { 
+                        if(cObj.type === 'enemy') addMenuOption(`Atacar ${cObj.name}`, () => setPendingAction(cObj));
+                        if(cObj.type === 'npc') addMenuOption(`Falar com ${cObj.name}`, () => setPendingAction(cObj));
+                        if(cObj.type === 'tree') addMenuOption(`Cortar ${cObj.name}`, () => setPendingAction(cObj));
+                        if(cObj.type === 'fishing_spot') addMenuOption(`Pescar`, () => setPendingAction(cObj));
+                        if(typeof cObj.type === 'string' && cObj.type.startsWith('rock')) addMenuOption(`Minerar ${cObj.name}`, () => setPendingAction(cObj));
+                        if(cObj.type === 'furnace' || cObj.type === 'anvil') addMenuOption(`Usar Aba Craft`, () => setActionText("Use a aba Craft (🛠️)", "#f1c40f"));
+                        if(cObj.type === 'fire') addMenuOption(`Cozinhar`, () => setPendingAction(cObj));
+                        if(cObj.type === 'bank') addMenuOption(`Usar Banco`, () => setPendingAction(cObj));
+                        if(cObj.type === 'portal') addMenuOption(`Entrar`, () => setPendingAction(cObj));
+                        if(cObj.type === 'ground_item') addMenuOption(`Pegar ${itemDB[cObj.item]?itemDB[cObj.item].name:cObj.item}`, () => setPendingAction(cObj));
+                    }
+                    addMenuOption("Andar aqui", () => { player.destX = pos.x; player.destY = pos.y; player.isPerformingAction = false; player.pendingAutoAction = null; }); 
+                    addMenuOption("Cancelar", () => {});
+                    
+                    osrsMenu.style.left = pos.pageX + 'px'; 
+                    osrsMenu.style.top = pos.pageY + 'px'; 
+                    osrsMenu.style.display = 'block';
+                } catch(err) { console.error("Erro no ContextMenu:", err); }
+                
+                return;
+            }
+
+            if (e.button === 0) { 
+                if (isDevBuildMode) { 
+                    const val = selectedDevEntity; if(!val) return;
+                    let cW = parseInt(document.getElementById('spawn-w').value) || 40;
+                    let cH = parseInt(document.getElementById('spawn-h').value) || 40;
+                    let cI = document.getElementById('spawn-img').value;
+                    let n = { id: Date.now(), x: pos.x - cW/2, y: pos.y - cH/2, w: cW, h: cH, active: true };
+                    if (cI) n.imgUrl = cI;
+                    if(val.startsWith('e_')) { let k = val.substring(2); let nb = npcDB[k]; n.type = nb.hp>0?'enemy':'npc'; n.dbKey = k; n.name = nb.name; n.hp = nb.hp; n.maxHp = nb.hp; n.w=cW||30; n.h=cH||30; n.attackCooldown = 0; }
+                    else if(val.startsWith('i_')) { let k = val.substring(2); n.type = 'ground_item'; n.item = k; n.qty = 1; n.life = 999999; n.w=20; n.h=20; }
+                    else if (val === 'portal') { openModal(`<h3 style="margin-top:0;">Criar Portal</h3><label>ID Destino:</label><input type="text" id="p-dest" value="lumbridge" class="dev-input" style="margin-bottom:8px;"><div class="dev-row" style="margin-bottom:8px;"><div style="flex:1"><label>Pos X:</label><input type="number" id="p-x" value="400" class="dev-input"></div><div style="flex:1"><label>Pos Y:</label><input type="number" id="p-y" value="300" class="dev-input"></div></div><button class="dev-save-btn" onclick="finalizePortal(${pos.x}, ${pos.y}, ${cW||60}, ${cH||60})">Criar</button><button class="dev-save-btn" style="background:#555;" onclick="closeModal()">Cancelar</button>`); return; }
+                    else if (val === 'tree') { n.type = 'tree'; n.name = 'Tree'; n.hp = 3; n.maxHp = 3; n.h = cH||50; }
+                    else if (val === 'fishing_spot') { n.type = 'fishing_spot'; n.name = 'Fishing Spot'; }
+                    else if (val === 'house') { n.type = 'house'; n.name = 'House'; n.w=cW||100; n.h=cH||100; }
+                    else if (val.startsWith('paint_')) { n.type = 'paint'; n.name = 'Chão'; n.color = val==='paint_dirt'?'#5c4033':val==='paint_stone'?'#7f8c8d':val==='paint_grass'?'#27ae60':'#3498db'; n.w=cW||40; n.h=cH||40; }
+                    else if (typeof val === 'string' && val.startsWith('rock_')) { n.type = val; n.name = val; n.hp = val==='rock_iron'?3:2; n.maxHp = n.hp; n.color = val==='rock_copper'?'#d35400':val==='rock_iron'?'#7f8c8d':'#bdc3c7'; n.h = cH||30; }
+                    else if (val === 'furnace') { n.type = 'furnace'; n.name = 'Furnace'; n.h = cH||45; } else if (val === 'anvil') { n.type = 'anvil'; n.name = 'Anvil'; n.h = cH||25; } else if (val === 'bank') { n.type = 'bank'; n.name = 'Bank Booth'; n.w=cW||50; n.h=cH||30; }
+                    else { n.type = 'unknown'; } 
+                    if(!curM.entities) curM.entities = []; curM.entities.push(n); addFloatingText(pos.x, pos.y, "Spawn", "#2ecc71"); saveDataLogic(); return;
+                }
+
+                // Smart Click (RuneScape Walk)
+                let clickedEntity = null;
                 let cur = curM.entities || [];
                 for (let i = cur.length - 1; i >= 0; i--) { 
                     let o = cur[i]; 
-                    if (pos.x >= o.x && pos.x <= o.x + (o.w||30) && pos.y >= o.y && pos.y <= o.y + (o.h||30)) { cur.splice(i, 1); addFloatingText(pos.x, pos.y, "Deletado", "#e74c3c"); saveDataLogic(); return; } 
-                } 
-                return;
-            }
-            if (e.button !== 0 && e.type === 'mousedown') return;
-            
-            if (isDevBuildMode) { 
-                const val = selectedDevEntity; if(!val) return;
-                let cW = parseInt(document.getElementById('spawn-w') ? document.getElementById('spawn-w').value : 0);
-                let cH = parseInt(document.getElementById('spawn-h') ? document.getElementById('spawn-h').value : 0);
-                let cI = document.getElementById('spawn-img') ? document.getElementById('spawn-img').value : '';
-                let n = { id: Date.now(), x: pos.x - (cW||40)/2, y: pos.y - (cH||40)/2, w: cW||40, h: cH||40, active: true };
-                if (cI) n.imgUrl = cI;
-                if(val.startsWith('e_')) { let k = val.substring(2); let nb = npcDB[k]; n.type = nb.hp>0?'enemy':'npc'; n.dbKey = k; n.name = nb.name; n.hp = nb.hp; n.maxHp = nb.hp; n.w=cW||30; n.h=cH||30; n.attackCooldown = 0; }
-                else if(val.startsWith('i_')) { let k = val.substring(2); n.type = 'ground_item'; n.item = k; n.qty = 1; n.life = 999999; n.w=20; n.h=20; }
-                else if (val === 'portal') { openModal(`<h3 style="margin-top:0;">Criar Portal</h3><label>ID Destino:</label><input type="text" id="p-dest" value="lumbridge" class="dev-input" style="margin-bottom:8px;"><div class="dev-row" style="margin-bottom:8px;"><div style="flex:1"><label>Pos X:</label><input type="number" id="p-x" value="400" class="dev-input"></div><div style="flex:1"><label>Pos Y:</label><input type="number" id="p-y" value="300" class="dev-input"></div></div><button class="dev-save-btn" onclick="finalizePortal(${pos.x}, ${pos.y}, ${cW||60}, ${cH||60})">Criar</button><button class="dev-save-btn" style="background:#555;" onclick="closeModal()">Cancelar</button>`); return; }
-                else if (val === 'tree') { n.type = 'tree'; n.name = 'Tree'; n.hp = 3; n.maxHp = 3; n.h = cH||50; }
-                else if (val === 'fishing_spot') { n.type = 'fishing_spot'; n.name = 'Fishing Spot'; }
-                else if (val === 'house') { n.type = 'house'; n.name = 'House'; n.w=cW||100; n.h=cH||100; }
-                else if (val.startsWith('paint_')) { n.type = 'paint'; n.name = 'Chão'; n.color = val==='paint_dirt'?'#5c4033':val==='paint_stone'?'#7f8c8d':val==='paint_grass'?'#27ae60':'#3498db'; n.w=cW||40; n.h=cH||40; }
-                else if (typeof val === 'string' && val.startsWith('rock_')) { n.type = val; n.name = val; n.hp = val==='rock_iron'?3:2; n.maxHp = n.hp; n.color = val==='rock_copper'?'#d35400':val==='rock_iron'?'#7f8c8d':'#bdc3c7'; n.h = cH||30; }
-                else if (val === 'furnace') { n.type = 'furnace'; n.name = 'Furnace'; n.h = cH||45; } else if (val === 'anvil') { n.type = 'anvil'; n.name = 'Anvil'; n.h = cH||25; } else if (val === 'bank') { n.type = 'bank'; n.name = 'Bank Booth'; n.w=cW||50; n.h=cH||30; }
-                else { n.type = 'unknown'; } 
-                if(!curM.entities) curM.entities = []; curM.entities.push(n); addFloatingText(pos.x, pos.y, "Spawn", "#2ecc71"); saveDataLogic(); return;
-            }
-            
-            if(!osrsMenu.contains(e.target) && !document.getElementById('custom-modal-overlay').contains(e.target) && !document.getElementById('chat-container').contains(e.target)) { 
-                player.destX = pos.x; player.destY = pos.y; 
-                player.isPerformingAction = false; player.pendingAutoAction = null; player.actionToolItem = null; 
-                if(isNPCOpen){closeMenus(); openTab('inv');} 
-                osrsMenu.style.display = 'none'; 
-            }
-        }
+                    if (o && o.active && o.type !== 'paint') { 
+                        let ow = o.w || 30; let oh = o.h || 30;
+                        if (pos.x >= o.x && pos.x <= o.x + ow && pos.y >= o.y && pos.y <= o.y + oh) { clickedEntity = o; break; } 
+                    } 
+                }
 
-        function finalizePortal(px, py, pw, ph) { let dm = document.getElementById('p-dest').value; let dx = parseInt(document.getElementById('p-x').value)||400; let dy = parseInt(document.getElementById('p-y').value)||300; if(!gameMaps[currentMap].entities) gameMaps[currentMap].entities = []; gameMaps[currentMap].entities.push({ id: Date.now(), x: px-pw/2, y: py-ph/2, w: pw, h: ph, active: true, type: 'portal', name: 'Portal', destMap: dm, destX: dx, destY: dy }); addFloatingText(px, py, "Portal", "#8e44ad"); closeModal(); }
-        canvas.addEventListener('mousedown', handleInputDown); canvas.addEventListener('touchstart', handleInputDown, {passive: false});
-
-        canvas.addEventListener('contextmenu', (e) => {
-            if(document.getElementById('login-overlay').style.display !== 'none') return;
-            e.preventDefault(); const pos = getCoords(e);
-            let cObj = null; let cur = gameMaps[currentMap] ? gameMaps[currentMap].entities || [] : [];
-            if (isDevBuildMode) { 
-                for (let i = cur.length - 1; i >= 0; i--) { 
-                    let o = cur[i]; 
-                    if (pos.x >= o.x && pos.x <= o.x + (o.w||30) && pos.y >= o.y && pos.y <= o.y + (o.h||30)) { cur.splice(i, 1); addFloatingText(pos.x, pos.y, "Deletado", "#e74c3c"); saveDataLogic(); return; } 
-                } 
-                return; 
+                if(!osrsMenu.contains(e.target) && !document.getElementById('custom-modal-overlay').contains(e.target) && !document.getElementById('chat-container').contains(e.target)) { 
+                    if (clickedEntity) {
+                        player.pendingAutoAction = clickedEntity; 
+                        player.destX = clickedEntity.x + (clickedEntity.w||30)/2; 
+                        player.destY = clickedEntity.y + (clickedEntity.h||30)/2; 
+                        if(isNPCOpen && clickedEntity.type !== 'npc') { closeMenus(); openTab('inv'); }
+                    } else {
+                        player.destX = pos.x; player.destY = pos.y; 
+                        player.isPerformingAction = false; player.pendingAutoAction = null; player.actionToolItem = null; 
+                    }
+                    if (isBankOpen || isNPCOpen) { closeMenus(); openTab('inv'); } 
+                    osrsMenu.style.display = 'none'; 
+                }
             }
-            for (let i = cur.length - 1; i >= 0; i--) { let o = cur[i]; if (o && o.active && o.type !== 'paint' && pos.x >= o.x && pos.x <= o.x + (o.w||30) && pos.y >= o.y && pos.y <= o.y + (o.h||30)) { cObj = o; break; } }
-            osrsMenu.innerHTML = "";
-            if (cObj && cObj.type) { 
-                if(cObj.type === 'enemy') addMenuOption(`Atacar ${cObj.name}`, () => setPendingAction(cObj));
-                if(cObj.type === 'npc') addMenuOption(`Falar com ${cObj.name}`, () => setPendingAction(cObj));
-                if(cObj.type === 'tree') addMenuOption(`Cortar ${cObj.name}`, () => setPendingAction(cObj));
-                if(cObj.type === 'fishing_spot') addMenuOption(`Pescar`, () => setPendingAction(cObj));
-                if(typeof cObj.type === 'string' && cObj.type.startsWith('rock')) addMenuOption(`Minerar ${cObj.name}`, () => setPendingAction(cObj));
-                if(cObj.type === 'furnace' || cObj.type === 'anvil') addMenuOption(`Usar Aba Craft`, () => setActionText("Use a aba Craft (🛠️)", "#f1c40f"));
-                if(cObj.type === 'fire') addMenuOption(`Cozinhar`, () => setPendingAction(cObj));
-                if(cObj.type === 'bank') addMenuOption(`Usar Banco`, () => setPendingAction(cObj));
-                if(cObj.type === 'portal') addMenuOption(`Entrar`, () => setPendingAction(cObj));
-                if(cObj.type === 'ground_item') addMenuOption(`Pegar ${cObj.item}`, () => setPendingAction(cObj));
-            }
-            addMenuOption("Andar aqui", () => { player.destX = pos.x; player.destY = pos.y; player.isPerformingAction = false; player.pendingAutoAction = null; }); addMenuOption("Cancelar", () => {});
-            osrsMenu.style.left = pos.pageX + 'px'; osrsMenu.style.top = pos.pageY + 'px'; osrsMenu.style.display = 'block';
         });
+        canvas.addEventListener('touchstart', handleInputDown, {passive: false});
 
-        document.addEventListener('click', (e) => { if (!e.target.closest('#osrs-menu') && e.target.id !== 'gameCanvas') osrsMenu.style.display = 'none'; });
-        function addMenuOption(text, callback) { const div = document.createElement('div'); div.className = 'osrs-menu-item'; div.innerText = text; div.onclick = () => { osrsMenu.style.display = 'none'; callback(); }; osrsMenu.appendChild(div); }
-        function setPendingAction(obj) { player.pendingAutoAction = obj; player.destX = obj.x + (obj.w||30)/2; player.destY = obj.y + (obj.h||30)/2; if(isNPCOpen && obj.type !== 'npc') { closeMenus(); openTab('inv'); } osrsMenu.style.display = 'none'; }
-
-        // --- SISTEMAS DE FÍSICA E LOOP (CORREÇÃO DE MOVEMENTO FIX 2) ---
         function update() {
             try {
                 let curM = gameMaps[currentMap]; if(!curM) return; let cur = curM.entities || [];
+                let mapW = curM.width || 800; let mapH = curM.height || 600;
+
                 if(player.attackCooldown > 0) player.attackCooldown--; if(player.actionAnim > 0) player.actionAnim--; 
 
                 if(player.regenTimer > 0) player.regenTimer--;
@@ -779,49 +941,63 @@
                 if(keys.d || keys.arrowright) dxK += 1;
 
                 if (dxK !== 0 || dyK !== 0) {
+                    if (isBankOpen || isNPCOpen) { closeMenus(); openTab('inv'); } 
                     player.destX = player.x; player.destY = player.y; player.pendingAutoAction = null; player.isPerformingAction = false; player.actionToolItem = null;
                     let dK = Math.hypot(dxK, dyK); let mx = (dxK / dK) * player.speed; let my = (dyK / dK) * player.speed; 
                     let nX = player.x + mx; let nY = player.y + my; let colX = false, colY = false; let pw = 10, ph = 10;
                     
                     for(let o of cur) {
-                        if(!o || !o.type || !o.active || ['ground_item','fishing_spot','portal','fire','paint','enemy','npc'].includes(o.type)) continue;
-                        let ow = o.w || 30; let oh = o.h || 30;
-                        if(nX-pw < o.x+ow && nX+pw > o.x && player.y-ph < o.y+oh && player.y+ph > o.y) colX = true;
-                        if(player.x-pw < o.x+ow && player.x+pw > o.x && nY-ph < o.y+oh && nY+ph > o.y) colY = true;
+                        if(!o || !o.type || !o.active || ['ground_item','fishing_spot','portal','fire','paint', 'enemy', 'npc'].includes(o.type)) continue;
+                        let hb = getHitbox(o);
+                        let inside = (player.x-pw < hb.x+hb.w && player.x+pw > hb.x && player.y-ph < hb.y+hb.h && player.y+ph > hb.y);
+                        if (inside && (o.type === 'enemy' || o.type === 'npc')) continue;
+
+                        if(nX-pw < hb.x+hb.w && nX+pw > hb.x && player.y-ph < hb.y+hb.h && player.y+ph > hb.y) colX = true;
+                        if(player.x-pw < hb.x+hb.w && player.x+pw > hb.x && nY-ph < hb.y+hb.h && nY+ph > hb.y) colY = true;
                     }
                     if(!colX) player.x = nX; if(!colY) player.y = nY;
                     if(Math.abs(mx) > Math.abs(my)) { player.facing.x = mx > 0 ? 1 : -1; player.facing.y = 0; } else { player.facing.x = 0; player.facing.y = my > 0 ? 1 : -1; }
                 } else {
                     const dx = player.destX - player.x; const dy = player.destY - player.y; const dist = Math.hypot(dx, dy); 
                     
-                    // CORREÇÃO DO MOUSE: Se não for ação automática, anda livremente até 2px da ponta do mouse.
-                    let sD = player.pendingAutoAction ? 45 : 2; 
+                    let baseSD = player.speed; 
+                    let sD = player.pendingAutoAction ? 45 : baseSD; 
+                    
                     if(player.pendingAutoAction) { 
-                        if (player.pendingAutoAction.type === 'enemy' && player.equipment.weapon && (player.equipment.weapon.tool === 'magic' || player.equipment.weapon.tool === 'ranged')) sD = 140; 
-                        else if (player.pendingAutoAction.type === 'ground_item') sD = 15; 
-                        else if (player.pendingAutoAction.type === 'npc') sD = 50; 
+                        let tW = player.pendingAutoAction.w || 30;
+                        let pType = player.pendingAutoAction.type;
+                        if (pType === 'enemy') {
+                            if (player.equipment && player.equipment.weapon && (player.equipment.weapon.tool === 'magic' || player.equipment.weapon.tool === 'ranged')) { sD = 140; } 
+                            else { sD = (tW / 2) + 12; }
+                        } 
+                        else if (pType === 'ground_item') sD = 10; 
+                        else if (['npc', 'tree', 'rock_copper', 'rock_tin', 'rock_iron', 'furnace', 'anvil', 'bank', 'house'].includes(pType)) { sD = (tW / 2) + 15; }
                     }
 
                     if (dist > sD) {
                         const mx = (dx / dist) * player.speed; const my = (dy / dist) * player.speed; let nX = player.x + mx; let nY = player.y + my; let colX = false, colY = false; let pw = 10, ph = 10;
                         for(let o of cur) {
-                            if(!o || !o.type || !o.active || ['ground_item','fishing_spot','portal','fire','paint','enemy','npc'].includes(o.type)) continue;
-                            let ow = o.w || 30; let oh = o.h || 30;
-                            if(nX-pw < o.x+ow && nX+pw > o.x && player.y-ph < o.y+oh && player.y+ph > o.y) colX = true;
-                            if(player.x-pw < o.x+ow && player.x+pw > o.x && nY-ph < o.y+oh && nY+ph > o.y) colY = true;
+                            if(!o || !o.type || !o.active || ['ground_item','fishing_spot','portal','fire','paint'].includes(o.type)) continue;
+                            let hb = getHitbox(o);
+                            let inside = (player.x-pw < hb.x+hb.w && player.x+pw > hb.x && player.y-ph < hb.y+hb.h && player.y+ph > hb.y);
+                            if (inside && (o.type === 'enemy' || o.type === 'npc')) continue;
+
+                            if(nX-pw < hb.x+hb.w && nX+pw > hb.x && player.y-ph < hb.y+hb.h && player.y+ph > hb.y) colX = true;
+                            if(player.x-pw < hb.x+hb.w && player.x+pw > hb.x && nY-ph < hb.y+hb.h && nY+ph > hb.y) colY = true;
                         }
                         if(!colX) player.x = nX; if(!colY) player.y = nY;
                         if(colX && colY) { player.destX = player.x; player.destY = player.y; player.pendingAutoAction = null; }
                         if(Math.abs(mx) > Math.abs(my)) { player.facing.x = mx > 0 ? 1 : -1; player.facing.y = 0; } else { player.facing.x = 0; player.facing.y = my > 0 ? 1 : -1; }
-                    } else if (player.pendingAutoAction) {
-                        let t = player.pendingAutoAction; player.pendingAutoAction = null;
-                        const d2x = t.x + (t.w||30)/2 - player.x; const d2y = t.y + (t.h||30)/2 - player.y;
-                        if(Math.abs(d2x) > Math.abs(d2y)) { player.facing.x = d2x > 0 ? 1 : -1; player.facing.y = 0; } else { player.facing.x = 0; player.facing.y = d2y > 0 ? 1 : -1; }
-                        tryInteract(t);
+                    } else {
+                        if (!player.pendingAutoAction) { player.x = player.destX; player.y = player.destY; } 
+                        else {
+                            let t = player.pendingAutoAction; player.pendingAutoAction = null;
+                            const d2x = t.x + (t.w||30)/2 - player.x; const d2y = t.y + (t.h||30)/2 - player.y;
+                            if(Math.abs(d2x) > Math.abs(d2y)) { player.facing.x = d2x > 0 ? 1 : -1; player.facing.y = 0; } else { player.facing.x = 0; player.facing.y = d2y > 0 ? 1 : -1; }
+                            tryInteract(t);
+                        }
                     }
                 }
-
-                let mapW = curM.width || 800; let mapH = curM.height || 600;
 
                 function attemptGridTransition(dx, dy) {
                     let cm = gameMaps[currentMap]; if (cm.gridX == null || cm.gridY == null) return false;
@@ -867,6 +1043,7 @@
                     if(o.type === 'ground_item' && o.active) { o.life--; if(o.life <= 0) { cur.splice(i, 1); saveDataLogic(); } }
                     
                     if(o.type === 'enemy' && o.active && (userRole === 'admin' || isOfflineMode || isMapHost)) {
+                        let ow = o.w || 30; let oh = o.h || 30;
                         if (o.aggroTarget) {
                             let targetX, targetY;
                             if (o.aggroTarget === currentUser) { targetX = player.x; targetY = player.y; } 
@@ -876,15 +1053,18 @@
                             }
                             
                             if (targetX !== undefined && targetY !== undefined) {
-                                let ow = o.w || 30; let oh = o.h || 30; let ex = targetX - (o.x + ow/2); let ey = targetY - (o.y + oh/2); let ed = Math.hypot(ex, ey);
+                                let ex = targetX - (o.x + ow/2); let ey = targetY - (o.y + oh/2); let ed = Math.hypot(ex, ey);
                                 if (ed > 20) {
                                     let nx = o.x + (ex/ed)*1.5; let ny = o.y + (ey/ed)*1.5; let cx=false, cy=false;
                                     for(let wo of cur) {
                                         if(!wo || !wo.type || !wo.active || ['ground_item','fishing_spot','portal','paint','enemy','npc'].includes(wo.type) || wo===o) continue;
-                                        let wow = wo.w || 30; let woh = wo.h || 30;
-                                        if(nx < wo.x+wow && nx+ow > wo.x && o.y < wo.y+woh && o.y+oh > wo.y) cx=true;
-                                        if(o.x < wo.x+wow && o.x+ow > wo.x && ny < wo.y+woh && ny+oh > wo.y) cy=true;
+                                        let hb = getHitbox(wo);
+                                        if(nx < hb.x+hb.w && nx+ow > hb.x && o.y < hb.y+hb.h && o.y+oh > hb.y) cx=true;
+                                        if(o.x < hb.x+hb.w && o.x+ow > hb.x && ny < hb.y+hb.h && ny+oh > hb.y) cy=true;
                                     }
+                                    if(nx < 15) cx = true; if(nx > mapW - 15 - ow) cx = true;
+                                    if(ny < 15) cy = true; if(ny > mapH - 15 - oh) cy = true;
+
                                     if(!cx) o.x = nx; if(!cy) o.y = ny;
                                 } else if (o.aggroTarget === currentUser) {
                                     if (o.attackCooldown <= 0) {
@@ -897,7 +1077,22 @@
                             }
                         } else { 
                             if(Math.random() < 0.01) { o.destX = o.x + (Math.random()*60-30); o.destY = o.y + (Math.random()*60-30); }
-                            if(o.destX) { let ex = o.destX - o.x; let ey = o.destY - o.y; let ed = Math.hypot(ex, ey); if(ed > 1) { o.x += (ex/ed)*0.5; o.y += (ey/ed)*0.5; } }
+                            if(o.destX) { 
+                                let ex = o.destX - o.x; let ey = o.destY - o.y; let ed = Math.hypot(ex, ey); 
+                                if(ed > 1) { 
+                                    let nx = o.x + (ex/ed)*0.5; let ny = o.y + (ey/ed)*0.5; 
+                                    let cx = false, cy = false;
+                                    for(let wo of cur) {
+                                        if(!wo || !wo.active || ['ground_item','fishing_spot','portal','paint'].includes(wo.type) || wo===o) continue;
+                                        let hb = getHitbox(wo);
+                                        if(nx < hb.x+hb.w && nx+ow > hb.x && o.y < hb.y+hb.h && o.y+oh > hb.y) cx=true;
+                                        if(o.x < hb.x+hb.w && o.x+ow > hb.x && ny < hb.y+hb.h && ny+oh > hb.y) cy=true;
+                                    }
+                                    if(nx < 15 || nx > mapW - 15 - ow) cx = true;
+                                    if(ny < 15 || ny > mapH - 15 - oh) cy = true;
+                                    if(!cx) o.x = nx; if(!cy) o.y = ny;
+                                } 
+                            }
                         } if(o.attackCooldown > 0) o.attackCooldown--;
                     }
                 });
@@ -905,11 +1100,121 @@
             } catch(e) { console.error("Silenced Update Error", e); }
         }
 
+        // --- SISTEMA DE ARTE DETALHADA E 3D (Y-SORTING) ---
+        function drawMonster(ctx, o) {
+            let ow = o.w || 30; let oh = o.h || 30;
+            let nB = npcDB[o.dbKey]; let key = o.dbKey || '';
+
+            ctx.save(); ctx.translate(o.x, o.y);
+
+            if (key.includes('dragon')) {
+                ctx.fillStyle = '#c0392b'; ctx.beginPath(); ctx.ellipse(ow/2, oh/2 + 5, ow/1.5, oh/2, 0, 0, Math.PI*2); ctx.fill(); 
+                ctx.fillStyle = '#e74c3c'; ctx.beginPath(); ctx.arc(ow/2 + 10, oh/4, oh/3, 0, Math.PI*2); ctx.fill(); 
+                ctx.fillStyle = '#f1c40f'; ctx.beginPath(); ctx.moveTo(ow/2 + 5, 0); ctx.lineTo(ow/2 + 15, -10); ctx.lineTo(ow/2 + 10, oh/4); ctx.fill(); 
+                ctx.fillStyle = 'rgba(231, 76, 60, 0.8)'; ctx.beginPath(); ctx.moveTo(ow/2 - 10, oh/2); ctx.lineTo(ow/2 - 30, -10); ctx.lineTo(ow/2, oh/4); ctx.fill(); 
+                ctx.fillStyle = '#f1c40f'; ctx.fillRect(ow/2 + 15, oh/4 - 2, 3, 3);
+            } 
+            else if (key.includes('goblin')) {
+                ctx.fillStyle = '#27ae60'; ctx.fillRect(5, 10, ow-10, oh-10); 
+                ctx.fillStyle = '#2ecc71'; ctx.beginPath(); ctx.arc(ow/2, 10, 10, 0, Math.PI*2); ctx.fill(); 
+                ctx.beginPath(); ctx.moveTo(ow/2-10, 5); ctx.lineTo(ow/2-20, 0); ctx.lineTo(ow/2-8, 10); ctx.fill(); 
+                ctx.beginPath(); ctx.moveTo(ow/2+10, 5); ctx.lineTo(ow/2+20, 0); ctx.lineTo(ow/2+8, 10); ctx.fill(); 
+                ctx.fillStyle = '#e74c3c'; ctx.fillRect(ow/2-4, 8, 2, 2); ctx.fillRect(ow/2+2, 8, 2, 2); 
+                ctx.fillStyle = '#7f8c8d'; ctx.fillRect(-5, oh/2, 15, 3); 
+            }
+            else {
+                let c1 = nB ? nB.c1 : '#8e44ad'; let c2 = nB ? nB.c2 : '#f1c27d';
+                ctx.fillStyle = c1; ctx.fillRect(5, 10, ow-10, oh-10); 
+                ctx.fillStyle = c2; ctx.beginPath(); ctx.arc(ow/2, 10, 10, 0, Math.PI*2); ctx.fill();
+                if(o.type === 'enemy') { ctx.fillStyle = 'red'; ctx.fillRect(ow/2-4, 8, 3, 3); ctx.fillRect(ow/2+1, 8, 3, 3); }
+            }
+            ctx.restore();
+        }
+
+        function renderEntity(ctx, o, isHologram = false) {
+            let ow = o.w || 30; let oh = o.h || 30;
+            
+            if(o.type !== 'paint' && o.type !== 'ground_item' && o.type !== 'portal') {
+                ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                ctx.beginPath(); ctx.ellipse(o.x + ow/2, o.y + oh, ow/2.5, oh/6, 0, 0, Math.PI*2); ctx.fill();
+            }
+
+            if(o.type === 'paint') {
+                ctx.fillStyle = o.color; ctx.fillRect(o.x, o.y, ow, oh);
+                ctx.fillStyle = 'rgba(0,0,0,0.15)'; let seed = Math.floor(o.x + o.y);
+                for(let i=0; i<3; i++) {
+                    let dx = o.x + ((seed * (i+1) * 17) % ow); let dy = o.y + ((seed * (i+2) * 23) % oh);
+                    if(o.name === 'paint_grass') { ctx.fillRect(dx, dy, 2, 4); }
+                    else if(o.name === 'paint_dirt') { ctx.fillRect(dx, dy, 3, 2); }
+                    else if(o.name === 'paint_stone') { ctx.fillRect(dx, dy, 6, 4); }
+                    else if(o.name === 'paint_water') { ctx.fillStyle='rgba(255,255,255,0.2)'; ctx.fillRect(dx, dy, 8, 2); }
+                }
+            }
+            else if (o.type === 'house') {
+                ctx.fillStyle = '#e67e22'; ctx.fillRect(o.x + 5, o.y + oh*0.4, ow - 10, oh*0.6);
+                ctx.fillStyle = '#8e44ad'; ctx.beginPath(); ctx.moveTo(o.x-5, o.y + oh*0.4); ctx.lineTo(o.x + ow/2, o.y-10); ctx.lineTo(o.x + ow+5, o.y + oh*0.4); ctx.fill();
+                ctx.fillStyle = '#5c3a21'; ctx.fillRect(o.x + ow/2 - 10, o.y + oh - 25, 20, 25);
+                ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(o.x + ow/2 + 5, o.y + oh - 12, 2, 0, Math.PI*2); ctx.fill(); 
+                ctx.fillStyle = '#f1c40f'; ctx.fillRect(o.x + 10, o.y + oh*0.5, 12, 12);
+                ctx.fillStyle = '#8e44ad'; ctx.fillRect(o.x + 15, o.y + oh*0.5, 2, 12); ctx.fillRect(o.x + 10, o.y + oh*0.5 + 5, 12, 2);
+            }
+            else if(o.type === 'tree') { 
+                let tG = ctx.createLinearGradient(o.x, o.y, o.x + ow, o.y); tG.addColorStop(0, '#5c3a21'); tG.addColorStop(1, '#3e2716');
+                ctx.fillStyle = tG; ctx.fillRect(o.x + ow/2 - 6, o.y + oh/2, 12, oh/2); 
+                let lG1 = ctx.createRadialGradient(o.x + ow/2, o.y + oh/2 - 10, 0, o.x + ow/2, o.y + oh/2 - 10, ow/1.5); lG1.addColorStop(0, '#2ecc71'); lG1.addColorStop(1, '#1e8449');
+                ctx.fillStyle = lG1; ctx.beginPath(); ctx.arc(o.x + ow/2, o.y + oh/2 - 10, ow/2, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#1e8449'; ctx.beginPath(); ctx.arc(o.x + ow/4, o.y + oh/2, ow/3, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(o.x + ow*0.75, o.y + oh/2, ow/3, 0, Math.PI*2); ctx.fill();
+            } 
+            else if (o.type === 'fishing_spot') { 
+                let t = Date.now() / 400; let wG = ctx.createRadialGradient(o.x+ow/2, o.y+oh/2, 0, o.x+ow/2, o.y+oh/2, ow/2); wG.addColorStop(0, 'rgba(52, 152, 219, 0.6)'); wG.addColorStop(1, 'rgba(41, 128, 185, 0.2)');
+                ctx.fillStyle = wG; ctx.beginPath(); ctx.ellipse(o.x+ow/2, o.y+oh/2, ow/2, oh/2, 0, 0, Math.PI*2); ctx.fill();
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)'; ctx.lineWidth = 1.5; let bC = Math.max(2, Math.floor((ow * oh) / 800)); for(let b=0; b<bC; b++) { let bx = o.x + ((b * 47) % ow); let by = o.y + ((b * 31) % oh); ctx.beginPath(); ctx.arc(bx, by + Math.sin(t+b)*6, 2+Math.sin(t)*1, 0, Math.PI*2); ctx.stroke(); } 
+            } 
+            else if (typeof o.type === 'string' && o.type.startsWith('rock')) { 
+                let bc = o.type==='rock_copper'?'#d35400':o.type==='rock_iron'?'#7f8c8d':'#bdc3c7'; let rG = ctx.createRadialGradient(o.x+ow/2, o.y+oh/2 - 5, 0, o.x+ow/2, o.y+oh/2, ow/2); rG.addColorStop(0, '#95a5a6'); rG.addColorStop(1, '#34495e');
+                ctx.fillStyle = rG; ctx.beginPath(); ctx.arc(o.x + ow/2, o.y + oh/2, ow/2.2, 0, Math.PI*2); ctx.fill(); 
+                ctx.fillStyle = bc; ctx.beginPath(); ctx.arc(o.x + ow/3, o.y + oh/3, 4, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(o.x + ow*0.7, o.y + oh*0.6, 5, 0, Math.PI*2); ctx.fill(); 
+            } 
+            else if (o.type === 'enemy' || o.type === 'npc') { drawMonster(ctx, o); } 
+            else if (o.type === 'fire') { 
+                ctx.fillStyle = '#5c3a21'; ctx.fillRect(o.x + 5, o.y + oh - 5, ow - 10, 5); 
+                ctx.fillStyle = '#e67e22'; ctx.beginPath(); ctx.moveTo(o.x+ow/2, o.y); ctx.lineTo(o.x+5, o.y+oh-5); ctx.lineTo(o.x+ow-5, o.y+oh-5); ctx.fill(); 
+                ctx.fillStyle = '#f1c40f'; ctx.beginPath(); ctx.moveTo(o.x+ow/2, o.y+oh/3); ctx.lineTo(o.x+10, o.y+oh-5); ctx.lineTo(o.x+ow-10, o.y+oh-5); ctx.fill(); 
+            } 
+            else if (o.type === 'furnace') { 
+                let fG = ctx.createLinearGradient(o.x, o.y, o.x+ow, o.y+oh); fG.addColorStop(0, '#34495e'); fG.addColorStop(1, '#1a252f');
+                ctx.fillStyle = fG; ctx.fillRect(o.x, o.y, ow, oh); 
+                ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(o.x + ow/2, o.y + oh/2 + 5, 12, 0, Math.PI*2); ctx.fill(); 
+                ctx.fillStyle = '#e74c3c'; ctx.beginPath(); ctx.arc(o.x + ow/2, o.y + oh/2 + 7, 8, 0, Math.PI*2); ctx.fill(); 
+            } 
+            else if (o.type === 'anvil') { 
+                ctx.fillStyle = '#7f8c8d'; ctx.fillRect(o.x + 5, o.y + oh/2, ow - 10, oh/2); 
+                ctx.fillStyle = '#bdc3c7'; ctx.fillRect(o.x + 2, o.y + 5, ow - 4, oh/2 - 5); 
+            } 
+            else if (o.type === 'bank') { 
+                let bG = ctx.createLinearGradient(o.x, o.y, o.x, o.y+oh); bG.addColorStop(0, '#8e44ad'); bG.addColorStop(1, '#2c3e50');
+                ctx.fillStyle = bG; ctx.fillRect(o.x, o.y, ow, oh); 
+                ctx.fillStyle = '#f1c40f'; ctx.fillRect(o.x + ow/5, o.y + oh/3, ow*0.6, 5); 
+                ctx.fillStyle = 'white'; ctx.font = 'bold 10px Arial'; ctx.textAlign="center"; ctx.fillText('BANK', o.x + ow/2, o.y - 5); ctx.textAlign="start";
+            } 
+            else if (o.type === 'portal') { 
+                let pG = ctx.createRadialGradient(o.x+ow/2, o.y+oh/2, 0, o.x+ow/2, o.y+oh/2, ow/2); pG.addColorStop(0, '#9b59b6'); pG.addColorStop(1, '#2c3e50');
+                ctx.fillStyle = pG; ctx.beginPath(); ctx.ellipse(o.x + ow/2, o.y + oh/2, ow/2, oh/2, 0, 0, Math.PI*2); ctx.fill(); 
+                ctx.fillStyle = 'white'; ctx.font = 'bold 12px Arial'; ctx.textAlign = "center"; ctx.fillText('Portal', o.x + ow/2, o.y - 10); ctx.textAlign = "start"; 
+            }
+
+            if(!isHologram && o.hp !== undefined && o.type !== 'npc' && o.type !== 'tree') { 
+                ctx.fillStyle = 'red'; ctx.fillRect(o.x, o.y - 10, ow, 4); 
+                ctx.fillStyle = o.type === 'enemy' ? '#2ecc71' : '#f1c40f'; ctx.fillRect(o.x, o.y - 10, ow * (o.hp / o.maxHp), 4); 
+            }
+        }
+
         function drawCharacter(ctx, px, py, facing, anim, equip, name, isMain) {
             const wp = equip ? equip.weapon : null; const sh = equip ? equip.shield : null;
             const tC = (wp && wp.tool === 'magic') ? '#3498db' : (wp && wp.tool === 'ranged') ? '#27ae60' : '#8e44ad'; 
-            ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.arc(px, py+6, 8, 0, Math.PI*2); ctx.fill();
-            ctx.fillStyle = tC; ctx.fillRect(px - 8, py - 6, 16, 12); 
+            ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(px, py+6, 10, 4, 0, 0, Math.PI*2); ctx.fill();
+            let bG = ctx.createLinearGradient(px-8, py-6, px+8, py+6); bG.addColorStop(0, tC); bG.addColorStop(1, '#2c3e50');
+            ctx.fillStyle = bG; ctx.fillRect(px - 8, py - 6, 16, 12); 
             ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(px, py - 10, 8, 0, Math.PI*2); ctx.fill();
             if(facing.y > 0) { ctx.fillStyle = 'white'; ctx.fillRect(px - 4, py - 12, 3, 3); ctx.fillRect(px + 1, py - 12, 3, 3); ctx.fillStyle = 'black'; ctx.fillRect(px - 3, py - 11, 1, 1); ctx.fillRect(px + 2, py - 11, 1, 1); ctx.fillStyle = '#333'; ctx.fillRect(px-8, py+2, 16, 2);
             } else if (facing.y < 0) { ctx.fillStyle = '#6b4c3a'; ctx.beginPath(); ctx.arc(px, py - 10, 8, Math.PI, 0); ctx.fill(); ctx.fillStyle = '#8b4513'; ctx.fillRect(px - 6, py - 4, 12, 8);
@@ -940,44 +1245,81 @@
                 let offset = getCameraOffset();
                 ctx.save(); ctx.translate(offset.x, offset.y); 
                 let mapW = mapObj.width || 800; let mapH = mapObj.height || 600;
+                
                 ctx.fillStyle = mapObj.color || '#4a6b2d'; ctx.fillRect(0,0, mapW, mapH);
                 ctx.strokeStyle = "rgba(0,0,0,0.1)"; 
                 for(let i=0; i<=mapW; i+=40) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,mapH); ctx.stroke(); } 
                 for(let i=0; i<=mapH; i+=40) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(mapW,i); ctx.stroke(); }
 
                 let cur = mapObj.entities || [];
-                cur.forEach(o => { if(!o || !o.type) return; let ow = o.w || 40; let oh = o.h || 40; if(o.type === 'paint') { ctx.fillStyle = o.color; ctx.fillRect(o.x, o.y, ow, oh); } });
-                cur.forEach(o => { if(!o || !o.type) return; let ow = o.w || 30; let oh = o.h || 30; if (o.type === 'ground_item' && o.active) { ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.beginPath(); ctx.arc(o.x+ow/2, o.y+oh/2+5, ow/2, 0, Math.PI*2); ctx.fill(); ctx.font = '16px Arial'; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(itemDB[o.item]?itemDB[o.item].icon:'?', o.x + ow/2, o.y + oh/2); ctx.textAlign="start"; } });
-                cur.forEach(o => {
-                    if (!o || !o.type || !o.active || o.type === 'ground_item' || o.type === 'paint') return;
-                    let ow = o.w || 30; let oh = o.h || 30;
-                    if(o.imgUrl) { if(!imgCache[o.imgUrl]) { imgCache[o.imgUrl] = new Image(); imgCache[o.imgUrl].src = o.imgUrl; } if(imgCache[o.imgUrl].complete) { ctx.drawImage(imgCache[o.imgUrl], o.x, o.y, ow, oh); } return; }
-                    if(o.type === 'tree') { ctx.fillStyle = '#6b4c3a'; ctx.fillRect(o.x + ow/2 - 5, o.y + oh/2, 10, oh/2); ctx.fillStyle = '#27ae60'; ctx.beginPath(); ctx.arc(o.x + ow/2, o.y + oh/2 - 10, ow/2, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#2ecc71'; ctx.beginPath(); ctx.arc(o.x + ow/4, o.y + oh/2, ow/3, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(o.x + ow*0.75, o.y + oh/2, ow/3, 0, Math.PI*2); ctx.fill(); } 
-                    else if (o.type === 'fishing_spot') { let t = Date.now() / 400; ctx.fillStyle = 'rgba(52, 152, 219, 0.5)'; ctx.fillRect(o.x, o.y, ow, oh); ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)'; ctx.lineWidth = 1.5; let bC = Math.max(2, Math.floor((ow * oh) / 800)); for(let b=0; b<bC; b++) { let bx = o.x + ((b * 47) % ow); let by = o.y + ((b * 31) % oh); ctx.beginPath(); ctx.arc(bx, by + Math.sin(t+b)*6, 2+Math.sin(t)*1, 0, Math.PI*2); ctx.stroke(); } } 
-                    else if (o.type === 'house') { ctx.fillStyle = '#8e44ad'; ctx.fillRect(o.x, o.y + oh*0.3, ow, oh*0.7); ctx.fillStyle = '#2c3e50'; ctx.beginPath(); ctx.moveTo(o.x, o.y + oh*0.3); ctx.lineTo(o.x + ow/2, o.y); ctx.lineTo(o.x + ow, o.y + oh*0.3); ctx.fill(); ctx.fillStyle = '#f1c40f'; ctx.fillRect(o.x + ow/2 - 10, o.y + oh - 20, 20, 20); } 
-                    else if (typeof o.type === 'string' && o.type.startsWith('rock')) { ctx.fillStyle = '#7f8c8d'; ctx.beginPath(); ctx.arc(o.x + ow/2, o.y + oh/2, ow/2, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = o.color; ctx.beginPath(); ctx.arc(o.x + ow/3, o.y + oh/3, 4, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(o.x + ow*0.7, o.y + oh*0.6, 5, 0, Math.PI*2); ctx.fill(); } 
-                    else if (o.type === 'enemy' || o.type === 'npc') { let nB = npcDB[o.dbKey]; let c1 = nB ? nB.c1 : '#8e44ad'; let c2 = nB ? nB.c2 : '#f1c27d'; ctx.fillStyle = c1; ctx.fillRect(o.x + 5, o.y + 10, ow-10, oh-10); ctx.fillStyle = c2; ctx.fillRect(o.x + 5, o.y, ow-10, 10); if(o.type === 'enemy') { ctx.fillStyle = 'red'; ctx.fillRect(o.x + 7, o.y + 3, 3, 3); ctx.fillRect(o.x + ow - 10, o.y + 3, 3, 3); } } 
-                    else if (o.type === 'fire') { ctx.fillStyle = '#5c4033'; ctx.fillRect(o.x + 5, o.y + 20, 20, 5); ctx.fillStyle = '#e67e22'; ctx.beginPath(); ctx.moveTo(o.x+15, o.y); ctx.lineTo(o.x+5, o.y+20); ctx.lineTo(o.x+25, o.y+20); ctx.fill(); ctx.fillStyle = '#f1c40f'; ctx.beginPath(); ctx.moveTo(o.x+15, o.y+5); ctx.lineTo(o.x+10, o.y+20); ctx.lineTo(o.x+20, o.y+20); ctx.fill(); } 
-                    else if (o.type === 'furnace') { ctx.fillStyle = '#34495e'; ctx.fillRect(o.x, o.y, ow, oh); ctx.fillStyle = '#e74c3c'; ctx.beginPath(); ctx.arc(o.x + ow/2, o.y + oh/2 + 5, 10, 0, Math.PI*2); ctx.fill(); } 
-                    else if (o.type === 'anvil') { ctx.fillStyle = '#bdc3c7'; ctx.fillRect(o.x + 5, o.y + 5, 25, 10); ctx.fillStyle = '#95a5a6'; ctx.fillRect(o.x + 12, o.y + 15, 10, 10); } 
-                    else if (o.type === 'bank') { ctx.fillStyle = '#8e44ad'; ctx.fillRect(o.x, o.y, ow, oh); ctx.fillStyle = '#f1c40f'; ctx.fillRect(o.x + ow/5, o.y + oh/3, ow*0.6, 5); ctx.fillStyle = 'white'; ctx.font = '10px Arial'; ctx.fillText('BANK', o.x + 5, o.y - 5); } 
-                    else if (o.type === 'portal') { ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(o.x + ow/2, o.y + oh, ow/2, Math.PI, 0); ctx.fill(); ctx.fillStyle = '#34495e'; ctx.beginPath(); ctx.arc(o.x + 10, o.y + oh - 5, 8, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(o.x + ow - 10, o.y + oh - 5, 8, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = 'white'; ctx.font = '12px Arial'; ctx.textAlign = "center"; ctx.fillText('Portal', o.x + ow/2, o.y - 10); ctx.textAlign = "start"; }
-                    if(o.hp !== undefined && o.type !== 'npc') { ctx.fillStyle = 'red'; ctx.fillRect(o.x, o.y - 10, ow, 4); ctx.fillStyle = o.type === 'enemy' ? '#2ecc71' : '#f1c40f'; ctx.fillRect(o.x, o.y - 10, ow * (o.hp / o.maxHp), 4); }
+                
+                // DESENHA PINTURA PRIMEIRO
+                cur.forEach(o => { 
+                    if(!o || !o.type) return; 
+                    if(o.type === 'paint') { renderEntity(ctx, o, false); } 
                 });
 
+                // DESENHA ITENS NO CHÃO
+                cur.forEach(o => { 
+                    if(!o || !o.type) return; let ow = o.w || 30; let oh = o.h || 30; 
+                    if (o.type === 'ground_item' && o.active) { 
+                        ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.beginPath(); ctx.ellipse(o.x+ow/2, o.y+oh/2+5, ow/2, oh/4, 0, 0, Math.PI*2); ctx.fill(); 
+                        ctx.font = '16px Arial'; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(itemDB[o.item]?itemDB[o.item].icon:'?', o.x + ow/2, o.y + oh/2); ctx.textAlign="start"; 
+                    } 
+                });
+                
+                // === Y-SORTING (Profundidade 3D) ===
+                let renderQueue = [];
+                cur.forEach(o => {
+                    if (!o || !o.type || !o.active || o.type === 'ground_item' || o.type === 'paint') return;
+                    renderQueue.push({ type: 'entity', obj: o, sortY: o.y + (o.h || 30) });
+                });
+                
                 if (typeof otherPlayers !== 'undefined') {
                     Object.keys(otherPlayers).forEach(u => {
                         let op = otherPlayers[u]; let px = op.displayX !== undefined ? op.displayX : op.x; let py = op.displayY !== undefined ? op.displayY : op.y;
-                        drawCharacter(ctx, px, py, op.facing || {x: 0, y: 1}, op.actionAnim || 0, op.equipment || null, u, false);
+                        renderQueue.push({ type: 'player', op: op, px: px, py: py, name: u, isMain: false, sortY: py });
                     });
                 }
+                
+                renderQueue.push({ type: 'player', op: player, px: player.x, py: player.y, name: currentUser || 'Player', isMain: true, sortY: player.y });
+                
+                renderQueue.sort((a, b) => a.sortY - b.sortY);
+                
+                renderQueue.forEach(item => {
+                    if (item.type === 'entity') {
+                        renderEntity(ctx, item.obj, false);
+                    } else {
+                        let myWp = (item.isMain && player.isPerformingAction && player.actionToolItem) ? player.actionToolItem : (item.op.equipment ? item.op.equipment.weapon : null); 
+                        let myEquip = { weapon: myWp, shield: item.op.equipment ? item.op.equipment.shield : null };
+                        drawCharacter(ctx, item.px, item.py, item.op.facing || {x:0, y:1}, item.op.actionAnim || 0, myEquip, item.name, item.isMain);
+                    }
+                });
 
-                let myWp = (player.isPerformingAction && player.actionToolItem) ? player.actionToolItem : (player.equipment ? player.equipment.weapon : null); 
-                let myEquip = { weapon: myWp, shield: player.equipment ? player.equipment.shield : null };
-                drawCharacter(ctx, player.x, player.y, player.facing || {x:0, y:1}, player.actionAnim || 0, myEquip, currentUser || 'Player', true);
+                if (Math.hypot(player.destX - player.x, player.destY - player.y) > player.speed && !player.isPerformingAction && !player.pendingAutoAction) { ctx.fillStyle = 'rgba(255, 255, 255, 0.4)'; ctx.beginPath(); ctx.arc(player.destX, player.destY, 5, 0, Math.PI*2); ctx.fill(); }
+                if (player.isPerformingAction) { const prg = 1 - (player.actionTimer / player.actionDelay); ctx.fillStyle = '#222'; ctx.fillRect(player.x - 15, player.y - 25, 30, 6); ctx.fillStyle = '#3498db'; ctx.fillRect(player.x - 14, player.y - 24, 28 * prg, 4); }
 
                 projectiles.forEach(p => { if (p.type === 'ranged') { ctx.fillStyle = '#795548'; ctx.fillRect(p.x-2, p.y-2, 4, 4); } else { ctx.fillStyle = p.color || '#1abc9c'; ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#ecf0f1'; ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI*2); ctx.fill(); } });
                 floatingTexts.forEach((ft, i) => { ctx.fillStyle = ft.color; ctx.font = 'bold 16px Arial'; ctx.fillText(ft.text, ft.x, ft.y); ft.y -= 0.5; ft.life--; if(ft.life <= 0) floatingTexts.splice(i, 1); });
+
+                // HOLOGRAMA DEV
+                if (isDevBuildMode && document.getElementById('tab-dev').classList.contains('active-tab')) {
+                    const val = selectedDevEntity;
+                    if(val) {
+                        let cW = parseInt(document.getElementById('spawn-w').value) || 40; let cH = parseInt(document.getElementById('spawn-h').value) || 40;
+                        ctx.save(); ctx.globalAlpha = 0.5;
+                        
+                        let baseType = val;
+                        if(val.startsWith('e_')) baseType = 'enemy'; else if(val.startsWith('i_')) baseType = 'ground_item';
+                        
+                        let fakeObj = { x: lastWorldX - cW/2, y: lastWorldY - cH/2, w: cW, h: cH, type: baseType, name: val, color: 'rgba(241, 196, 15, 0.5)', dbKey: val.substring(2) };
+                        
+                        if(baseType === 'ground_item') { ctx.fillStyle = '#f1c40f'; ctx.fillRect(fakeObj.x, fakeObj.y, cW, cH); } 
+                        else { renderEntity(ctx, fakeObj, true); }
+                        
+                        ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(fakeObj.x, fakeObj.y, cW, cH); ctx.restore();
+                    }
+                }
 
                 ctx.restore(); 
             } catch (e) { console.error("Ignorado Draw Error", e); }
@@ -1012,7 +1354,6 @@
             } catch(e) {}
         }
 
-        let lastFrameTime = 0; const frameDelay = 1000 / 60; 
         function gameLoop(timestamp) { 
             requestAnimationFrame(gameLoop); 
             if (!timestamp) timestamp = 0; let elapsed = timestamp - lastFrameTime;
