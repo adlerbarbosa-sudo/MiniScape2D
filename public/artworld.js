@@ -454,7 +454,7 @@
         const ow = o.w || 20, oh = o.h || 20, cx = o.x + ow / 2, cy = o.y + oh / 2 + sin(t * 3 + o.x) * 1.6;
         ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(cx, o.y + oh / 2 + 8, 7, 2.4, 0, 0, TAU); ctx.fill();
         glow(ctx, cx, cy, 15, '#ffe27a', 0.35 + 0.15 * sin(t * 4 + o.y));
-        ctx.font = '16px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#fff'; ctx.fillText(icon, cx, cy); ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
+        if (window.Icons && o.item) { try { ctx.drawImage(Icons.canvas(o.item), cx - 13, cy - 14, 26, 26); } catch (e) { } } else { ctx.font = '16px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#fff'; ctx.fillText(icon, cx, cy); ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic'; }
     }
     function drawStation(ctx, o, t) {   // fornalha, bigorna, banco, fogueira, pesca, portal
         const ow = o.w || 30, oh = o.h || 30, x = o.x, y = o.y;

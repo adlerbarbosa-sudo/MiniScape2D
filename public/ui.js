@@ -107,7 +107,7 @@
         }
         if (SMELT[name]) parts.push(`<div class="src"><b>Fundir:</b> ${SMELT[name]}</div>`);
         const cookedFrom = Object.keys(itemDB).filter((k) => itemDB[k].cooksInto === name);
-        if (cookedFrom.length) parts.push(`<div class="src"><b>Cozinhar:</b> jogue ${cookedFrom.map((k) => `${esc(itemDB[k].icon)} ${esc(itemDB[k].name)}`).join(', ')} numa <b>fogueira</b> (use a <b>Tinderbox</b> com Logs para acender uma) e aperte Espaço perto do fogo.</div>`);
+        if (cookedFrom.length) parts.push(`<div class="src"><b>Cozinhar:</b> jogue ${cookedFrom.map((k) => `${Icons.html(k, 18)} ${esc(itemDB[k].name)}`).join(', ')} numa <b>fogueira</b> (use a <b>Tinderbox</b> com Logs para acender uma) e aperte Espaço perto do fogo.</div>`);
         const drops = lootOf(name);
         if (drops.length) parts.push(`<div class="src"><b>Cai de monstros:</b><br>${drops.map((x) => { const w = whereMob(x.key); const bc = behChip(x.d); return `<span class="chip ${bc[0]}">${esc(x.d.name)} · ${bc[1]}</span><span class="chip">${chanceWord(x.chance)}</span>${w.length ? ' <span style="opacity:.8">em ' + w.map(esc).join(', ') + '</span>' : ''}`; }).join('<br>')}</div>`);
         const shops = shopsSelling(name);
@@ -140,7 +140,7 @@
             if (n < 1) return `<div style="margin:3px 0;opacity:.55;font-family:var(--sans);font-size:.82rem">❔ <b>???</b> <span style="opacity:.8">— ainda não encontrado${d.biome ? ' (dica: ' + esc(d.biome) + ')' : ''}</span></div>`;
             const where = whereMob(k).map(esc).join(', ') || esc(d.biome || '—'); const ch = behChip(d);
             let body = `<div style="font-size:.8rem">${esc(d.desc || '')}</div><div style="font-size:.78rem;margin-top:3px">Vida <b>${d.hp}</b> · Dano até <b>${d.maxHit}</b> · XP <b>${d.xp}</b> · <span class="chip ${ch[0]}">${ch[1]}</span></div><div style="font-size:.78rem">Habitat: ${where}</div>`;
-            if (n >= 5 && d.lootStr) body += `<div style="font-size:.78rem">Carrega: ${d.lootStr.split('|').map((s) => { const a = s.split(','); const it = itemDB[a[0].trim()]; return esc((it ? it.icon + ' ' : '') + a[0].trim()) + ' <i>(' + chanceWord(parseFloat(a[1])) + ')</i>'; }).join(', ')}</div>`;
+            if (n >= 5 && d.lootStr) body += `<div style="font-size:.78rem">Carrega: ${d.lootStr.split('|').map((s) => { const a = s.split(','); const it = itemDB[a[0].trim()]; return (it ? Icons.html(a[0].trim(), 18) + ' ' : '') + esc(a[0].trim()) + ' <i>(' + chanceWord(parseFloat(a[1])) + ')</i>'; }).join(', ')}</div>`;
             else if (d.lootStr) body += `<div style="font-size:.74rem;opacity:.65">Derrote mais ${5 - n} para ver o que carrega.</div>`;
             return `<details style="margin:3px 0"><summary style="cursor:pointer;font-family:var(--sans);font-size:.84rem"><b>${esc(d.name)}</b> <span style="opacity:.7">— ${n} abate${n > 1 ? 's' : ''}${d.group === 'chefe' ? ' · CHEFE' : ''}</span></summary>${body}</details>`;
         }).join('');
@@ -152,7 +152,7 @@
         if (!bookSel || !itemDB[bookSel] || !itemDB[bookSel].recipe) bookSel = list.length ? list[0].name : null;
         let h = `<div class="book"><div class="book-tabs"><div class="book-tab ${bookTab === 'recipes' ? 'on' : ''}" data-bt="recipes">Receitas</div><div class="book-tab ${bookTab === 'index' ? 'on' : ''}" data-bt="index">Onde encontrar</div><div class="book-tab ${bookTab === 'bestiary' ? 'on' : ''}" data-bt="bestiary">Bestiário</div></div>`;
         if (bookTab === 'recipes') {
-            h += `<div class="rc-list">` + list.map((it) => { const ok = canCraft(it); return `<div class="rc-item ${it.name === bookSel ? 'sel' : ''} ${ok ? '' : 'lack'}" data-sel="${esc(it.name)}"><span class="em">${esc(it.icon)}</span><div style="flex:1"><div class="nm">${esc(it.name)}</div><div class="sub">${parseRecipe(it.recipe).map((r) => r.qty + '× ' + esc((itemDB[r.name] || {}).icon || r.name)).join(' + ')}</div></div><span class="${ok ? 'rc-ok' : 'rc-no'}">${ok ? 'pronto' : 'falta'}</span></div>`; }).join('') + `</div>`;
+            h += `<div class="rc-list">` + list.map((it) => { const ok = canCraft(it); return `<div class="rc-item ${it.name === bookSel ? 'sel' : ''} ${ok ? '' : 'lack'}" data-sel="${esc(it.name)}"><span class="em">${Icons.html(it.name, 30)}</span><div style="flex:1"><div class="nm">${esc(it.name)}</div><div class="sub">${parseRecipe(it.recipe).map((r) => r.qty + '× ' + (itemDB[r.name] ? Icons.html(r.name, 20) : esc(r.name))).join(' + ')}</div></div><span class="${ok ? 'rc-ok' : 'rc-no'}">${ok ? 'pronto' : 'falta'}</span></div>`; }).join('') + `</div>`;
             const it = itemDB[bookSel];
             if (it) {
                 const ok = canCraft(it);
@@ -165,7 +165,7 @@
         } else {
             const all = Object.values(itemDB).filter((i) => i.name !== 'Coins');
             h += `<div class="book-page"><h3>Onde encontrar cada item</h3><p>Toque em uma linha para ver como conseguir. Itens fabricáveis aparecem no Livro de Receitas.</p>` +
-                all.map((i) => `<details style="margin:4px 0"><summary style="cursor:pointer;font-family:var(--sans);font-size:.82rem"><b>${esc(i.icon)} ${esc(i.name)}</b> <span style="opacity:.7">— ${esc(i.desc || '')}</span></summary>${sourcesHtml(i.name)}</details>`).join('') + `</div>`;
+                all.map((i) => `<details style="margin:4px 0"><summary style="cursor:pointer;font-family:var(--sans);font-size:.82rem"><b>${Icons.html(i.name, 20)} ${esc(i.name)}</b> <span style="opacity:.7">— ${esc(i.desc || '')}</span></summary>${sourcesHtml(i.name)}</details>`).join('') + `</div>`;
         }
         box.innerHTML = h + '</div>';
         box.onclick = (ev) => {

@@ -240,3 +240,9 @@ svg.ic.fill { fill: currentColor; stroke: none; }
 .qcard .qt { font-family: var(--serif); font-weight: 700; font-size: .92rem; color: #5a3a10; } .qcard .qt small { font-family: var(--sans); font-weight: 400; color: #2f6b34; margin-left: 6px; }
 .qcard .qi { font-size: .78rem; line-height: 1.4; margin: 3px 0; font-style: italic; } .qcard .qo { font-size: .8rem; font-weight: 700; margin: 3px 0; } .qcard .qr { font-size: .74rem; color: #4a3520; margin-bottom: 6px; } .qcard .qs { font-size: .72rem; color: #7a5518; }
 .qcard.ready { border-color: #3f8a4a; } .qcard.done { opacity: .6; padding: 5px 11px; }
+
+/* ícones de item desenhados em código */
+.ic-item { width: 1.2em; height: 1.2em; vertical-align: -0.3em; image-rendering: auto; pointer-events: none; user-select: none; filter: drop-shadow(0 1px 1px rgba(0,0,0,.5)); }
+.item-slot .ic-item { width: 82%; height: 82%; vertical-align: middle; }
+.equip-icon .ic-item { width: 40px; height: 40px; }
+.rc-item .em .ic-item { width: 30px; height: 30px; }
