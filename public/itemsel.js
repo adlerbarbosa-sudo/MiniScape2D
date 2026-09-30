@@ -62,7 +62,7 @@
             const sig = [c.item.name, c.item.qty || 1, p ? p.label : '-', c.slot || 'i'].join('|');
             if (bar._sig !== sig || bar.style.display === 'none') {
                 bar._sig = sig; let ic = ''; try { ic = Icons.html(c.item.name, 34); } catch (e) { }
-                const q = c.item.stackable && c.item.qty > 1 ? '×' + c.item.qty : '', inf = info(c.item);
+                const q = c.item.stackable && c.item.qty > 1 ? '×' + (window.fmtNum ? fmtNum(c.item.qty) : c.item.qty) : '', inf = info(c.item);
                 const sub = [q, inf, p ? '' : 'sem uso direto'].filter(Boolean).join(' · ');
                 bar.innerHTML = `<div class="isel-top"><span class="isel-ic">${ic}</span><div class="isel-tx"><b>${esc(c.item.name)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</div></div>` +
                     `<div class="isel-btns">${p ? `<button type="button" class="isel-go" data-a="${c.slot ? 'unequip' : 'use'}">${esc(p.label)}</button>` : ''}${c.slot ? '' : '<button type="button" class="isel-drop" data-a="drop">Jogar fora</button>'}<button type="button" class="isel-x" data-a="cancel">Cancelar</button></div>` +

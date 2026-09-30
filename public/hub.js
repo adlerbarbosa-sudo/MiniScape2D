@@ -15,7 +15,7 @@
         const s = document.createElement('style'); s.textContent = `
         .hub-btn{position:fixed;z-index:60;padding:4px 12px;font:700 .78rem serif;color:#f0e2bd;background:linear-gradient(#5a3d1e,#3a2410);border:2px solid #c9a24a;border-radius:8px;cursor:pointer}
         .hub-btn i{position:absolute;top:-7px;right:-7px;min-width:16px;height:16px;border-radius:8px;background:#d6301f;color:#fff;font:700 .62rem sans-serif;line-height:16px;text-align:center;font-style:normal;border:1px solid #fff5}
-        #hub-box{width:100%;max-height:86vh;overflow:auto;color:#f0e2bd;font-family:sans-serif}
+        #hub-box{width:100%;max-height:88vh;max-height:88dvh;overflow:auto;color:#f0e2bd;font-family:sans-serif}
         #hub-box h3{margin:0 0 6px;font-family:serif;color:#e8c469}
         .hub-tabs{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px}.hub-tabs b{cursor:pointer;padding:4px 9px;border-radius:6px;background:#2a1b0e;border:1px solid #6a4c22;font-size:.76rem;font-weight:600}.hub-tabs b.on{background:#7a5626;border-color:#e8c469;color:#fff}
         .hub-row{display:flex;align-items:center;gap:8px;padding:6px 8px;margin:4px 0;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid rgba(232,196,105,.18);font-size:.8rem}.hub-row.done{border-color:#4caf6a;background:rgba(76,175,106,.12)}.hub-row.lock{opacity:.55}
@@ -24,6 +24,11 @@
         .hub-in{padding:4px 7px;border-radius:6px;border:1px solid #6a4c22;background:#1c1208;color:#f0e2bd;font-size:.8rem;width:100%;box-sizing:border-box}
         .hub-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:6px}.hub-cell{padding:6px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid rgba(232,196,105,.18);text-align:center;font-size:.72rem;cursor:pointer}.hub-cell.on{border-color:#e8c469;background:rgba(232,196,105,.16)}
         .hub-map{display:grid;gap:6px;margin:6px 0}.hub-tile{position:relative;border-radius:8px;border:2px solid #6a4c22;overflow:hidden;cursor:pointer;background:#1c1208;min-height:70px}.hub-tile.cur{border-color:#e8c469;box-shadow:0 0 8px #e8c46988}.hub-tile.sel{border-color:#7bd68f}.hub-tile canvas{width:100%;display:block}.hub-tile span{position:absolute;left:0;right:0;bottom:0;background:#000a;font-size:.68rem;text-align:center;padding:1px 2px}
+        #wm-view{position:relative;overflow:auto;height:clamp(190px,56dvh,600px);border-radius:10px;border:1px solid #6a4c22;background:radial-gradient(ellipse at 50% 40%,#2b2112,#150e07);cursor:grab;touch-action:pan-x pan-y;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}#wm-view.drag{cursor:grabbing;user-select:none}
+        @media(max-height:460px){.wm-hint{display:none}#wm-view{height:max(150px,44dvh)}}
+        #wm-world{position:relative}.wm-lines{position:absolute;left:0;top:0;pointer-events:none}.wm-lines line{stroke:rgba(232,196,105,.32);stroke-width:2;stroke-dasharray:5 4}
+        .wm-tile{position:absolute!important;min-height:0!important;margin:0}.wm-tile img{width:100%;height:100%;object-fit:cover;display:block;-webkit-user-drag:none}.wm-tile span{line-height:1.1;max-height:2.3em;overflow:hidden;display:block;padding:1px 3px 2px!important}
+        .wm-you{position:absolute;right:3px;top:3px;width:9px;height:9px;border-radius:50%;background:#ffe27a;box-shadow:0 0 0 2px #0008,0 0 8px #ffe27a}.wm-bar{display:flex;gap:6px;align-items:center;margin-bottom:5px}.wm-bar .hb{min-width:38px;min-height:30px}
         #wb-hud{position:absolute;left:50%;transform:translateX(-50%);top:76px;z-index:84;padding:4px 14px;border-radius:10px;background:rgba(20,10,4,.82);border:1px solid #ff9d3a;color:#ffd9a8;font:.74rem sans-serif;text-align:center;pointer-events:none;display:none}#wb-hud.soon{border-color:#c9a24a;color:#f0e2bd}
         #wb-hud .wb-bar{position:relative;margin-top:3px;height:12px;min-width:220px;border-radius:6px;background:#3a1208;overflow:hidden}#wb-hud .wb-bar i{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(#ff9d3a,#c4531a)}#wb-hud .wb-bar span{position:relative;font-size:.62rem;line-height:12px;color:#fff}#wb-hud .wb-dead{color:#7bd68f;font-weight:700}`;
         document.head.appendChild(s);
@@ -54,8 +59,7 @@
         const sc = box.querySelector('#hub-box') ? box.querySelector('#hub-box').scrollTop : 0;
         let body = ''; try { body = tab === 'daily' ? dailyHtml() : tab === 'ach' ? achHtml() : tab === 'market' ? marketHtml() : tab === 'rank' ? rankHtml() : tab === 'map' ? mapHtml() : emoteHtml(); } catch (e) { body = '<i>Erro ao montar esta aba.</i>'; console.error(e); }
         openModal(`<div id="hub-box"><h3>Diário do Aventureiro</h3><div class="hub-tabs">${TABS.map((t) => `<b data-t="${t[0]}" class="${tab === t[0] ? 'on' : ''}">${t[1]}${t[0] === 'daily' && claimable() ? ' •' : t[0] === 'market' && mailN ? ' •' : ''}</b>`).join('')}</div><div id="hub-body">${body}</div><div style="text-align:right;margin-top:8px"><button class="hb" data-close="1">Fechar (Esc)</button></div></div>`);
-        const nb = $('custom-modal-box'); nb.dataset.social = '0'; nb.dataset.hub = '1'; nb.style.width = 'min(94vw, 680px)'; nb.style.maxWidth = 'none'; nb.style.boxSizing = 'border-box'; nb.style.padding = '16px'; const el = nb.querySelector('#hub-box'); if (el && soft) el.scrollTop = sc;
-        if (tab === 'map') { try { const cur = nb.querySelector('.hub-tile.cur'), sc2 = cur && cur.closest('div[style*="overflow-x"]'); if (sc2) sc2.scrollLeft = Math.max(0, cur.offsetLeft - sc2.clientWidth / 2 + cur.offsetWidth / 2); } catch (e) { } }   // mapa-múndi largo: centra no lugar atual
+        const nb = $('custom-modal-box'); nb.dataset.social = '0'; nb.dataset.hub = '1'; nb.style.width = tab === 'map' ? 'min(96vw, 1040px)' : 'min(94vw, 680px)'; nb.style.maxWidth = 'none'; nb.style.boxSizing = 'border-box'; nb.style.padding = '16px'; const el = nb.querySelector('#hub-box'); if (el && soft) el.scrollTop = sc;
         nb.onclick = onClick; afterRender();
     }
     function bar(c, n) { return `<div class="hub-bar"><i style="width:${Math.min(100, Math.round(c / n * 100))}%"></i></div>`; }
@@ -65,7 +69,7 @@
     function dailyHtml() {
         const d = Life.daily(); const now = new Date(), reset = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1) - now;
         let h = `<div style="font-size:.78rem;opacity:.85;margin-bottom:4px">Renovam à meia-noite (em ${fmtMs(reset)}). Sequência: <b>${d.streak | 0}</b> dia(s) · melhor: ${d.best | 0}. Complete as três e ganhe um bônus que cresce com a sequência.</div>`;
-        h += d.q.map((q, i) => `<div class="hub-row ${q.done ? 'done' : ''}"><div class="g"><b>${esc(Life.dText(q))}</b><small>Recompensa: ${q.coins} moedas + ${q.xp} XP</small>${bar(q.p, q.need)}<small>${Math.min(q.p, q.need)}/${q.need}</small></div>${q.claimed ? '<span style="color:#7bd68f">✔ recebida</span>' : `<button class="hb go" data-claim="${i}" ${q.done ? '' : 'disabled'}>Receber</button>`}</div>`).join('');
+        h += d.q.map((q, i) => `<div class="hub-row ${q.done ? 'done' : ''}"><div class="g"><b>${esc(Life.dText(q))}</b><small>Recompensa: ${fn(q.coins)} moedas + ${q.xp} XP</small>${bar(q.p, q.need)}<small>${Math.min(q.p, q.need)}/${q.need}</small></div>${q.claimed ? '<span style="color:#7bd68f">✔ recebida</span>' : `<button class="hb go" data-claim="${i}" ${q.done ? '' : 'disabled'}>Receber</button>`}</div>`).join('');
         const b = Life.bossInfo(); h += `<h4 style="margin:12px 0 4px;color:#e8c469">Chefe de mundo</h4><div class="hub-row"><div class="g"><b>Colosso de Pedra</b><small>${b ? (b.open ? 'Está na Vila agora! Chame seus amigos.' : 'Desperta na Vila daqui a ' + fmtMs(b.next) + '.') : 'Indisponível offline.'} Todo dia, toda hora cheia, por 25 minutos.</small></div></div>`;
         return h;
     }
@@ -97,23 +101,23 @@
     let mailN = 0;
     async function mkCall(b) { try { const r = await api('/market', b); if (r && r._status === 404) { noMarket = true; return { error: 'Mercado indisponível neste servidor.', _net: true }; } return r; } catch (e) { return { error: 'Sem conexão.', _net: true }; } }
     async function loadMarket() { if (!online()) return; const r = await mkCall({ a: 'browse', q: mkQ }); if (r && r.ok) { mkData = r; mailN = r.mail | 0; if (open && tab === 'market') render(true); } }
-    const coins = () => getInvCount('Coins');
+    const coins = () => getInvCount('Coins'), fn = (n) => (window.fmtNum ? fmtNum(n) : String(n));
     function marketHtml() {
         const S = [['buy', 'Comprar'], ['sell', 'Vender'], ['mine', 'Meus anúncios']];
-        let h = `<div class="hub-tabs">${S.map((t) => `<b data-sub="${t[0]}" class="${sub === t[0] ? 'on' : ''}">${t[1]}${t[0] === 'mine' && mkData && mkData.mine.length ? ' (' + mkData.mine.length + ')' : ''}</b>`).join('')}<span style="margin-left:auto;font-size:.76rem;align-self:center">Você tem ${ic('Coins', 18)} <b>${coins()}</b></span></div>`;
+        let h = `<div class="hub-tabs">${S.map((t) => `<b data-sub="${t[0]}" class="${sub === t[0] ? 'on' : ''}">${t[1]}${t[0] === 'mine' && mkData && mkData.mine.length ? ' (' + mkData.mine.length + ')' : ''}</b>`).join('')}<span style="margin-left:auto;font-size:.76rem;align-self:center">Você tem ${ic('Coins', 18)} <b>${fn(coins())}</b></span></div>`;
         if (!online()) return h + '<i>O mercado precisa de conexão com o servidor.</i>';
         if (mailN) h += `<div class="hub-row done"><div class="g">📬 Você tem <b>${mailN}</b> item(ns) no correio. Eles chegam à mochila sozinhos (precisa de espaço).</div></div>`;
         if (!mkData) return h + '<i>Carregando...</i>';
         if (sub === 'buy') {
             h += `<input class="hub-in" id="mk-q" placeholder="Buscar item..." value="${esc(mkQ)}" style="margin-bottom:4px">`;
-            h += mkData.listings.length ? mkData.listings.map((l) => `<div class="hub-row">${ic(l.item, 30)}<div class="g"><b>${esc(l.item)}</b> ×${l.qty}<small>${l.qty > 1 ? Math.round(l.price / l.qty * 100) / 100 + ' cada · ' : ''}vendedor: ${esc(l.seller)}</small></div><button class="hb go" data-buy="${esc(l.id)}" data-price="${l.price}" ${l.seller === currentUser || coins() < l.price ? 'disabled' : ''}>${l.price} ${l.seller === currentUser ? '(seu)' : ''}</button></div>`).join('') : '<i>Nenhum anúncio.</i>';
+            h += mkData.listings.length ? mkData.listings.map((l) => `<div class="hub-row">${ic(l.item, 30)}<div class="g"><b>${esc(l.item)}</b> ×${fn(l.qty)}<small>${l.qty > 1 ? fn(Math.round(l.price / l.qty * 100) / 100) + ' cada · ' : ''}vendedor: ${esc(l.seller)}</small></div><button class="hb go" data-buy="${esc(l.id)}" data-price="${l.price}" ${l.seller === currentUser || coins() < l.price ? 'disabled' : ''}>${fn(l.price)} ${l.seller === currentUser ? '(seu)' : ''}</button></div>`).join('') : '<i>Nenhum anúncio.</i>';
         } else if (sub === 'sell') {
             const inv = {}; player.inventory.forEach((i) => { if (i.name !== 'Coins' && Net.tradable(i.name)) inv[i.name] = (inv[i.name] || 0) + (i.qty || 1); });
             const names = Object.keys(inv); if (sellSel && !inv[sellSel.name]) sellSel = null;
-            h += `<div style="font-size:.76rem;margin-bottom:4px">Escolha o item. Taxa de 5% sobre o preço. Anúncios duram 3 dias (depois o item volta pelo correio).</div><div class="hub-grid" style="margin-bottom:6px">${names.map((n) => `<div class="hub-cell ${sellSel && sellSel.name === n ? 'on' : ''}" data-sel="${esc(n)}">${ic(n, 26)}<br>${esc(n)}<br><small>×${inv[n]}</small></div>`).join('') || '<i>Mochila sem itens vendáveis.</i>'}</div>`;
-            if (sellSel) { const mx = inv[sellSel.name]; h += `<div class="hub-row"><div class="g"><b>${esc(sellSel.name)}</b><div style="display:flex;gap:6px;margin-top:4px"><label style="flex:1">Quantidade (máx ${mx})<input class="hub-in" id="mk-qty" type="number" min="1" max="${mx}" value="${Math.min(sellSel.qty || 1, mx)}"></label><label style="flex:1">Preço total<input class="hub-in" id="mk-price" type="number" min="1" max="100000000" value="${sellSel.price || ''}"></label></div><small id="mk-net"></small></div><button class="hb go" data-list="1">Anunciar</button></div>`; }
+            h += `<div style="font-size:.76rem;margin-bottom:4px">Escolha o item. Taxa de 5% sobre o preço. Anúncios duram 3 dias (depois o item volta pelo correio).</div><div class="hub-grid" style="margin-bottom:6px">${names.map((n) => `<div class="hub-cell ${sellSel && sellSel.name === n ? 'on' : ''}" data-sel="${esc(n)}">${ic(n, 26)}<br>${esc(n)}<br><small>×${fn(inv[n])}</small></div>`).join('') || '<i>Mochila sem itens vendáveis.</i>'}</div>`;
+            if (sellSel) { const mx = inv[sellSel.name]; h += `<div class="hub-row"><div class="g"><b>${esc(sellSel.name)}</b><div style="display:flex;gap:6px;margin-top:4px"><label style="flex:1">Quantidade (máx ${fn(mx)})<input class="hub-in" id="mk-qty" type="number" min="1" max="${mx}" value="${Math.min(sellSel.qty || 1, mx)}"></label><label style="flex:1">Preço total<input class="hub-in" id="mk-price" type="number" min="1" max="2147483647" value="${sellSel.price || ''}"></label></div><small id="mk-net"></small></div><button class="hb go" data-list="1">Anunciar</button></div>`; }
         } else {
-            h += mkData.mine.length ? mkData.mine.map((l) => `<div class="hub-row">${ic(l.item, 30)}<div class="g"><b>${esc(l.item)}</b> ×${l.qty}<small>${l.price} moedas · expira em ${fmtMs(l.exp - Date.now())}</small></div><button class="hb" data-cancel="${esc(l.id)}">Retirar</button></div>`).join('') : '<i>Você não tem anúncios.</i>';
+            h += mkData.mine.length ? mkData.mine.map((l) => `<div class="hub-row">${ic(l.item, 30)}<div class="g"><b>${esc(l.item)}</b> ×${fn(l.qty)}<small>${fn(l.price)} moedas · expira em ${fmtMs(l.exp - Date.now())}</small></div><button class="hb" data-cancel="${esc(l.id)}">Retirar</button></div>`).join('') : '<i>Você não tem anúncios.</i>';
         }
         return h;
     }
@@ -121,7 +125,7 @@
     let mkBusy = false;
     async function doList() {
         if (mkBusy) return; const q = Math.floor(Number(($('mk-qty') || {}).value)), pr = Math.floor(Number(($('mk-price') || {}).value)), name = sellSel && sellSel.name;
-        if (!name || !(q >= 1) || !(pr >= 1) || pr > 100000000) return note('Confira quantidade e preço.', '#e74c3c'); if (!Net.tradable(name) || getInvCount(name) < q) return note('Você não tem esse item.', '#e74c3c');
+        if (!name || !(q >= 1) || !(pr >= 1) || pr > 2147483647) return note('Confira quantidade e preço.', '#e74c3c'); if (!Net.tradable(name) || getInvCount(name) < q) return note('Você não tem esse item.', '#e74c3c');
         if (player.mkt && (player.mkt.create || player.mkt.buy)) return note('Aguarde a operação anterior terminar.', '#e74c3c');
         mkBusy = true; try {
             const inv = JSON.stringify(player.inventory); removeInvItem(name, q); player.mkt = { create: { item: name, qty: q, price: pr, nonce: nonce() } }; updateUI();
@@ -190,23 +194,80 @@
             <small>Criaturas: ${Object.keys(mobs).map((k) => esc(k) + ' ×' + mobs[k]).join(', ') || 'nenhuma'}</small><small>NPCs: ${npcs.join(', ') || 'nenhum'}</small>
             <small>Recursos: ${tr} árvores, ${rk} rochas, ${fs} pontos de pesca</small>${ports.length ? `<small>Portais para: ${[...new Set(ports)].map(esc).join(', ')}</small>` : ''}</div></div>`;
     }
-    function mapHtml() {
-        const ids = Object.keys(gameMaps).filter((k) => gameMaps[k] && gameMaps[k].entities && k !== 'casa' && !/^casa_/.test(k)); const grid = ids.filter((k) => gameMaps[k].gridX != null && gameMaps[k].gridY != null), other = ids.filter((k) => !grid.includes(k));
-        if (!mapSel || !gameMaps[mapSel]) mapSel = currentMap;
-        let h = '<div style="font-size:.78rem;margin-bottom:4px">Clique num lugar para ver criaturas, NPCs e recursos. Amarelo = NPC, vermelho = criatura, azul = portal, ponto branco = você.</div>';
-        if (grid.length) {
-            const xs = grid.map((k) => gameMaps[k].gridX), ys = grid.map((k) => gameMaps[k].gridY), x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
-            const ncol = x1 - x0 + 1; h += `<div style="overflow-x:auto;padding-bottom:4px"><div class="hub-map" style="grid-template-columns:repeat(${ncol},minmax(96px,1fr));min-width:${ncol * 102}px">`;   // mapa-múndi largo: rola na horizontal em vez de encolher as miniaturas
-            for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const k = grid.find((q) => gameMaps[q].gridX === x && gameMaps[q].gridY === y); h += k ? `<div class="hub-tile ${k === currentMap ? 'cur' : ''} ${k === mapSel ? 'sel' : ''}" data-map="${esc(k)}"><img src="${thumb(k)}" style="width:100%;display:block"><span>${esc(gameMaps[k].name || k)}</span></div>` : '<div></div>'; }
-            h += '</div></div>';
+    /* Posições do mapa-múndi (x: leste+, y: sul+). Lumbridge no centro; leste = Vila Real/deserto; norte = serra e gelo; oeste = floresta élfica;
+       sul = costa e pântano; sudeste = cemitério, fortaleza, vulcão e dragão. Mapas que não estão aqui usam gridX/gridY (se livres) ou ficam perto de quem se liga a eles. */
+    const WM_POS = {
+        lumbridge: [0, 0], floresta: [-1, 0], trilha_elfica: [-2, 0], silvaluz: [-3, 0], torre_mago: [-4, 0],
+        covil: [0, -1], mina: [1, 0], trilha_serra: [1, -1], pedralta: [1, -2], mina_abandonada: [1, -3], passo_gelado: [2, -2], vale_gelado: [3, -2],
+        campos: [1, 1], estrada_rei: [2, 1], vila_real: [3, 1], estrada_areias: [4, 1], deserto: [5, 1], oasis: [6, 1], ruinas: [7, 1],
+        rio: [0, 1], pantano: [0, 2], covil_goblins: [0, 3], estrada_costa: [-1, 2], porto_mares: [-1, 3], praia_naufragios: [-2, 3],
+        estrada_sombria: [3, 2], cemiterio: [3, 3], cripta_real: [4, 3], fortaleza: [2, 3], vulcao: [1, 3], ninho_dragao: [1, 4]
+    };
+    const WM_W = 120, WM_H = 80, WM_G = 8;
+    let wmZoom = null, wmThumbs = {};
+    function worldIds() { return Object.keys(gameMaps).filter((k) => gameMaps[k] && gameMaps[k].entities && k !== 'casa' && !/^casa_/.test(k)).sort(); }
+    function portalsOf(id) { const r = []; ((gameMaps[id] && gameMaps[id].entities) || []).forEach((o) => { if (o && o.type === 'portal' && o.destMap && o.destMap !== id && gameMaps[o.destMap]) r.push(o.destMap); }); return r; }
+    function worldLayout() {   // determinístico: cada mapa ganha uma célula própria (sem colisão)
+        const ids = worldIds(), cells = {}, used = {}, key = (x, y) => x + ',' + y, isInt = (v) => typeof v === 'number' && isFinite(v) && Math.floor(v) === v && Math.abs(v) < 1000;
+        const put = (id, x, y) => { cells[id] = [x, y]; used[key(x, y)] = id; };
+        const free = (x, y) => !used[key(x, y)];
+        const spiral = (x, y) => { if (free(x, y)) return [x, y]; for (let r = 1; r < 60; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) { if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue; if (free(x + dx, y + dy)) return [x + dx, y + dy]; } return [x, y + 99]; };
+        ids.filter((k) => WM_POS[k]).sort((a, b) => a.localeCompare(b)).forEach((k) => put(k, WM_POS[k][0], WM_POS[k][1]));
+        const rest = ids.filter((k) => !cells[k]);
+        rest.forEach((k) => { const m = gameMaps[k]; if (isInt(m.gridX) && isInt(m.gridY) && free(m.gridX, m.gridY)) put(k, m.gridX, m.gridY); });
+        let pend = rest.filter((k) => !cells[k]), guard = 0;
+        while (pend.length && guard++ < 200) {   // perto de um mapa já colocado que se liga a ele (portais nos dois sentidos)
+            const next = [];
+            pend.forEach((k) => {
+                const nb = portalsOf(k).concat(ids.filter((o) => cells[o] && portalsOf(o).includes(k))).filter((o) => cells[o]);
+                if (nb.length) { const c = cells[nb[0]], p = spiral(c[0], c[1]); put(k, p[0], p[1]); } else next.push(k);
+            });
+            if (next.length === pend.length) break; pend = next;
         }
-        if (other.length) h += `<div style="font-size:.74rem;margin:6px 0 2px">Outros lugares</div><div class="hub-map" style="grid-template-columns:repeat(auto-fill,minmax(120px,1fr))">${other.map((k) => `<div class="hub-tile ${k === currentMap ? 'cur' : ''} ${k === mapSel ? 'sel' : ''}" data-map="${esc(k)}"><img src="${thumb(k)}" style="width:100%;display:block"><span>${esc(gameMaps[k].name || k)}</span></div>`).join('')}</div>`;
-        return h + mapInfo(mapSel);
+        if (pend.length) { let y1 = -Infinity, x0 = Infinity; Object.values(cells).forEach((c) => { y1 = Math.max(y1, c[1]); x0 = Math.min(x0, c[0]); }); if (!isFinite(y1)) { y1 = -1; x0 = 0; } pend.forEach((k, i) => { const p = spiral(x0 + (i % 6), y1 + 1 + Math.floor(i / 6)); put(k, p[0], p[1]); }); }
+        let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity; ids.forEach((k) => { const c = cells[k]; x0 = Math.min(x0, c[0]); x1 = Math.max(x1, c[0]); y0 = Math.min(y0, c[1]); y1 = Math.max(y1, c[1]); });
+        if (!ids.length) { x0 = x1 = y0 = y1 = 0; }
+        return { ids, cells, x0, x1, y0, y1 };
+    }
+    function thumbCached(id) { const m = gameMaps[id], k = id + '|' + ((m.entities || []).length) + '|' + (id === currentMap ? Math.round(player.x / 25) + ',' + Math.round(player.y / 25) : ''); if (!wmThumbs[id] || wmThumbs[id].k !== k) wmThumbs[id] = { k, u: thumb(id) }; return wmThumbs[id].u; }
+    function mapHtml() {
+        if (!mapSel || !gameMaps[mapSel]) mapSel = currentMap;
+        return `<div class="wm-hint" style="font-size:.76rem;margin-bottom:4px">Toque num lugar para ver criaturas, NPCs e recursos. Amarelo = NPC, vermelho = criatura, azul = portal, ponto branco = você. Arraste para mover; use + / − para aproximar.</div>
+        <div class="wm-bar"><button class="hb" data-wz="out" aria-label="Afastar">−</button><button class="hb" data-wz="in" aria-label="Aproximar">+</button><button class="hb" data-wz="fit">Ajustar</button><span id="wm-count" style="margin-left:auto;font-size:.72rem;opacity:.75"></span></div>
+        <div id="wm-view"><div id="wm-world"></div></div><div id="wm-info">${mapInfo(mapSel)}</div>`;
+    }
+    function wmFit(view, L) {
+        const cw = (L.x1 - L.x0 + 1) * (WM_W + WM_G) + WM_G, ch = (L.y1 - L.y0 + 1) * (WM_H + WM_G) + WM_G, vw = Math.max(200, view.clientWidth - 4), vh = Math.max(140, view.clientHeight - 4);
+        return Math.max(0.45, Math.min(1.6, vw / cw, vh / ch));
+    }
+    function wmBuild(keepCenter) {
+        const view = $('wm-view'), world = $('wm-world'); if (!view || !world) return; const L = worldLayout();
+        if (wmZoom == null) wmZoom = wmFit(view, L); wmZoom = Math.max(0.45, Math.min(2.2, wmZoom));
+        const old = keepCenter ? { fx: (view.scrollLeft + view.clientWidth / 2) / Math.max(1, world.offsetWidth), fy: (view.scrollTop + view.clientHeight / 2) / Math.max(1, world.offsetHeight) } : null;
+        const s = wmZoom, tw = Math.round(WM_W * s), th = Math.round(WM_H * s), g = Math.max(4, Math.round(WM_G * s)), ncol = L.x1 - L.x0 + 1, nrow = L.y1 - L.y0 + 1, W = ncol * (tw + g) + g, H = nrow * (th + g) + g;
+        const pos = (id) => ({ x: g + (L.cells[id][0] - L.x0) * (tw + g), y: g + (L.cells[id][1] - L.y0) * (th + g) });
+        let lines = '', seen = {};
+        L.ids.forEach((a) => portalsOf(a).forEach((b) => { const kk = a < b ? a + '|' + b : b + '|' + a; if (seen[kk] || !L.cells[b]) return; seen[kk] = 1; const p = pos(a), q = pos(b); lines += `<line x1="${p.x + tw / 2}" y1="${p.y + th / 2}" x2="${q.x + tw / 2}" y2="${q.y + th / 2}"/>`; }));
+        const fs = Math.max(8, Math.min(13, Math.round(11 * s)));
+        world.style.width = W + 'px'; world.style.height = H + 'px';
+        world.innerHTML = `<svg width="${W}" height="${H}" class="wm-lines">${lines}</svg>` + L.ids.map((id) => { const p = pos(id), m = gameMaps[id];
+            return `<div class="hub-tile wm-tile ${id === currentMap ? 'cur' : ''} ${id === mapSel ? 'sel' : ''}" data-map="${esc(id)}" title="${esc(m.name || id)}" style="left:${p.x}px;top:${p.y}px;width:${tw}px;height:${th}px"><img alt="" draggable="false" src="${thumbCached(id)}"><span style="font-size:${fs}px">${esc(m.name || id)}</span>${id === currentMap ? '<i class="wm-you"></i>' : ''}</div>`; }).join('');
+        const cnt = $('wm-count'); if (cnt) cnt.textContent = L.ids.length + ' lugares';
+        if (old) { view.scrollLeft = old.fx * W - view.clientWidth / 2; view.scrollTop = old.fy * H - view.clientHeight / 2; }
+        else { const cur = world.querySelector('.wm-tile.cur'); if (cur) { view.scrollLeft = Math.max(0, cur.offsetLeft - view.clientWidth / 2 + cur.offsetWidth / 2); view.scrollTop = Math.max(0, cur.offsetTop - view.clientHeight / 2 + cur.offsetHeight / 2); } }
+    }
+    function wmInit() {   // arrastar com o mouse para mover (no toque a rolagem nativa já funciona); Ctrl+roda aproxima
+        const view = $('wm-view'); if (!view || view._wm) return; view._wm = 1; let d = null;
+        view.addEventListener('pointerdown', (e) => { if (e.pointerType !== 'mouse' || e.button !== 0) return; d = { x: e.clientX, y: e.clientY, sl: view.scrollLeft, st: view.scrollTop, moved: false }; });
+        window.addEventListener('pointermove', (e) => { if (!d || !view.isConnected) return; const dx = e.clientX - d.x, dy = e.clientY - d.y; if (!d.moved && Math.hypot(dx, dy) < 5) return; d.moved = true; view.classList.add('drag'); view.scrollLeft = d.sl - dx; view.scrollTop = d.st - dy; });
+        window.addEventListener('pointerup', () => { if (d && d.moved) { view._nc = performance.now() + 250; } d = null; view.classList.remove('drag'); });
+        view.addEventListener('click', (e) => { if (view._nc && performance.now() < view._nc) { e.stopPropagation(); e.preventDefault(); } }, true);
+        view.addEventListener('wheel', (e) => { if (!e.ctrlKey) return; e.preventDefault(); wmZoom = (wmZoom || 1) * (e.deltaY < 0 ? 1.15 : 1 / 1.15); wmBuild(true); }, { passive: false });
     }
 
     /* ============ eventos ============ */
     function onClick(ev) {
-        const t = ev.target.closest('[data-t],[data-sub],[data-claim],[data-title],[data-em],[data-buy],[data-cancel],[data-sel],[data-list],[data-map],[data-close]'); if (!t) return; const d = t.dataset;
+        const t = ev.target.closest('[data-t],[data-sub],[data-claim],[data-title],[data-em],[data-buy],[data-cancel],[data-sel],[data-list],[data-map],[data-wz],[data-close]'); if (!t) return; const d = t.dataset;
         if (d.close) return closeHub();
         if (d.t) { tab = d.t; if (tab === 'market') { loadMarket(); claimMail(); } if (tab === 'rank') loadRank(); return render(); }
         if (d.sub) { sub = d.sub; return render(); }
@@ -217,16 +278,18 @@
         if (d.cancel) return (async () => { const r = await mkCall({ a: 'cancel', id: d.cancel }); note(r.ok ? 'Anúncio retirado. O item volta pelo correio.' : (r.error || 'Erro'), r.ok ? '#2ecc71' : '#e74c3c'); await loadMarket(); await claimMail(); })();
         if (d.sel) { sellSel = { name: d.sel }; return render(); }
         if (d.list) return doList();
-        if (d.map) { mapSel = d.map; return render(); }
+        if (d.map) { mapSel = d.map; document.querySelectorAll('#wm-world .wm-tile').forEach((n) => n.classList.toggle('sel', n.dataset.map === mapSel)); const inf = $('wm-info'); if (inf) inf.innerHTML = mapInfo(mapSel); return; }
+        if (d.wz) { if (d.wz === 'fit') wmZoom = null; else wmZoom = (wmZoom || 1) * (d.wz === 'in' ? 1.25 : 0.8); return wmBuild(d.wz !== 'fit'); }
     }
     function afterRender() {
         const b = $('hub-body'); if (!b) return;
         const q = $('mk-q'); if (q) q.addEventListener('input', () => { clearTimeout(q._t); q._t = setTimeout(async () => { mkQ = q.value; await loadMarket(); const nq = $('mk-q'); if (nq) { nq.focus(); nq.setSelectionRange(nq.value.length, nq.value.length); } }, 350); });
         const rs = $('rk-sel'); if (rs) rs.addEventListener('change', () => { rankK = rs.value; rankData = null; render(); loadRank(); });
-        const upd = () => { const n = $('mk-net'), pr = Math.floor(Number(($('mk-price') || {}).value)); if (n) n.textContent = pr >= 1 ? 'Você recebe ' + (pr - Math.floor(pr * 0.05)) + ' moedas (taxa 5%).' : ''; if (sellSel) { sellSel.qty = Math.floor(Number(($('mk-qty') || {}).value)) || 1; sellSel.price = pr || ''; } };
+        const upd = () => { const n = $('mk-net'), pr = Math.floor(Number(($('mk-price') || {}).value)); if (n) n.textContent = pr >= 1 ? 'Você recebe ' + fn(pr - Math.floor(pr * 0.05)) + ' moedas (taxa 5%).' : ''; if (sellSel) { sellSel.qty = Math.floor(Number(($('mk-qty') || {}).value)) || 1; sellSel.price = pr || ''; } };
         ['mk-qty', 'mk-price'].forEach((id) => { const e = $(id); if (e) e.addEventListener('input', upd); }); upd();
         b.querySelectorAll('canvas[data-emc]').forEach((c) => { const g = c.getContext('2d'); g.scale(1.3, 1.3); try { Emotes.draw(g, 15, 30, { k: c.dataset.emc, until: Date.now() + 999999 }); } catch (e) { } });
         if (tab === 'rank' && !rankData) loadRank();
+        if (tab === 'map') { wmInit(); wmBuild(false); }
     }
 
     /* ============ correio e pendências ============ */

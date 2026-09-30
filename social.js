@@ -48,7 +48,7 @@ module.exports = function createSocial(ctx) {
         if (!Array.isArray(arr)) return null; const out = [], seen = new Set();
         for (const it of arr.slice(0, 8)) {
             if (!Array.isArray(it) || typeof it[0] !== 'string' || !ITEM_RE.test(it[0]) || seen.has(it[0])) continue;
-            const q = Math.floor(Number(it[1])); if (!(q >= 1 && q <= 1000000)) continue; seen.add(it[0]); out.push([it[0], q]);
+            const q = Math.floor(Number(it[1])); if (!(q >= 1 && q <= 2147483647)) continue; seen.add(it[0]); out.push([it[0], q]);
         }
         return out;
     }

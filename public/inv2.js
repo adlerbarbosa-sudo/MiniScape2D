@@ -23,8 +23,8 @@
         if (dropping || !gameOn()) return false;
         const inv = player.inventory, i = inv.indexOf(item); if (i < 0) { say('Esse item não está mais na mochila.'); return false; }
         if (enchanted(item)) { say('Item encantado não pode ser jogado fora.'); return false; }
-        const have = item.stackable ? Math.max(1, item.qty | 0 || 1) : 1;
-        qty = item.stackable ? Math.min(have, Math.floor(Number(qty))) : 1; if (!(qty >= 1)) return false;
+        const have = item.stackable ? Math.max(1, Math.floor(item.qty) || 1) : 1;
+        qty = item.stackable ? Math.min(have, Math.floor(Number(qty))) : 1; if (!(qty >= 1) || !isFinite(qty)) return false;
         dropping = true;
         try {
             const m = gameMaps[currentMap]; if (!m) return false; if (!m.entities) m.entities = [];
@@ -32,7 +32,7 @@
             m.entities.push({ id: newEntId(), type: 'ground_item', item: item.name, qty, x: player.x + (Math.random() * 16 - 8), y: player.y + (Math.random() * 16 - 8), w: 20, h: 20, active: true, life: 18000 });
             if (player.actionToolItem === item) { player.isPerformingAction = false; player.pendingAutoAction = null; player.actionToolItem = null; }
             try { hideTooltip(); } catch (e) { }
-            say('Você jogou ' + (qty > 1 ? qty + 'x ' : '') + item.name + ' no chão. Aperte Espaço ou clique nele para pegar.', '#f1c40f');
+            say('Você jogou ' + (qty > 1 ? (window.fmtNum ? fmtNum(qty) : qty) + 'x ' : '') + item.name + ' no chão. Aperte Espaço ou clique nele para pegar.', '#f1c40f');
             try { updateUI(); } catch (e) { } try { saveDataLogic(); } catch (e) { }
             return true;
         } finally { dropping = false; }
@@ -41,21 +41,21 @@
         const r = blockReason(); if (r) { say(r); return; }
         if (player.inventory.indexOf(item) < 0) return;
         if (enchanted(item)) { say('Item encantado não pode ser jogado fora.'); return; }
-        const max = item.stackable ? Math.max(1, item.qty | 0 || 1) : 1;
+        const max = item.stackable ? Math.max(1, Math.floor(item.qty) || 1) : 1;
         if (max <= 1) { doDrop(item, 1); return; }
         let ic = ''; try { ic = Icons.html(item.name, 34); } catch (e) { }
-        openModal(`<h3 style="margin:0;color:#f1c40f">Jogar fora</h3><div style="display:flex;align-items:center;gap:10px">${ic}<div><b>${esc(item.name)}</b><div style="font-size:.78rem;opacity:.8">Você tem ${max}. Quanto quer jogar fora?</div></div></div>` +
-            `<input id="inv2-q" class="dev-input" type="text" inputmode="numeric" autocomplete="off" maxlength="6" value="1" aria-label="Quantidade">` +
+        openModal(`<h3 style="margin:0;color:#f1c40f">Jogar fora</h3><div style="display:flex;align-items:center;gap:10px">${ic}<div><b>${esc(item.name)}</b><div style="font-size:.78rem;opacity:.8">Você tem ${window.fmtNum ? fmtNum(max) : max}. Quanto quer jogar fora?</div></div></div>` +
+            `<input id="inv2-q" class="dev-input" type="text" inputmode="numeric" autocomplete="off" maxlength="10" value="1" aria-label="Quantidade">` +
             `<div id="inv2-err" style="min-height:1em;font-size:.75rem;color:#ff8a7a"></div>` +
             `<div style="display:flex;gap:8px"><button type="button" id="inv2-half" class="dev-btn" style="flex:1;padding:7px;border-radius:8px;background:#3a291a;color:#e8c469;border:1px solid #6a4c22;cursor:pointer">Metade</button><button type="button" id="inv2-all" class="dev-btn" style="flex:1;padding:7px;border-radius:8px;background:#3a291a;color:#e8c469;border:1px solid #6a4c22;cursor:pointer">Tudo</button></div>` +
             `<div style="display:flex;gap:8px"><button type="button" id="inv2-cancel" class="dev-btn" style="flex:1;padding:9px;border-radius:999px;background:#2b2118;color:#ddd;border:1px solid #6a4c22;cursor:pointer">Cancelar</button><button type="button" id="inv2-ok" class="btn-craft" style="flex:1;margin-top:0">Jogar fora</button></div>`);
         const box = $('custom-modal-box'); box.dataset.social = '0'; box.dataset.hub = ''; box.dataset.trade = ''; box.dataset.inv2 = '1'; box.style.cssText = '';
         const inp = $('inv2-q'), err = $('inv2-err');
-        const curMax = () => (player.inventory.indexOf(item) < 0 ? 0 : item.stackable ? Math.max(1, item.qty | 0 || 1) : 1);
+        const curMax = () => (player.inventory.indexOf(item) < 0 ? 0 : item.stackable ? Math.max(1, Math.floor(item.qty) || 1) : 1);
         const bye = () => { document.removeEventListener('keydown', onKey, true); box.dataset.inv2 = ''; closeModal(); };
         function confirm() {
             const v = inp.value.trim();
-            if (!/^\d+$/.test(v)) { err.textContent = 'Digite um número inteiro, de 1 a ' + curMax() + '.'; inp.focus(); inp.select(); return; }
+            if (!/^\d+$/.test(v)) { err.textContent = 'Digite um número inteiro, de 1 a ' + (window.fmtNum ? fmtNum(curMax()) : curMax()) + '.'; inp.focus(); inp.select(); return; }
             let n = Number(v); if (!(n >= 1)) { err.textContent = 'A quantidade mínima é 1.'; inp.focus(); inp.select(); return; }
             const cm = curMax(); if (!cm) { bye(); say('Esse item não está mais na mochila.'); return; }
             const why = tradeOn() ? blockReason() : ''; if (why) { bye(); say(why); return; }
@@ -157,7 +157,6 @@
         const st = document.createElement('style');
         st.textContent = '#inv-grid .item-slot{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}#inv-grid .item-slot:has(*){touch-action:none}#inv-grid .item-slot.inv2-src{opacity:.35}#inv-grid .item-slot.inv2-over{box-shadow:inset 0 0 0 2px #fff,0 0 10px rgba(232,196,105,.6)}' +
             'body.inv2-dragging,body.inv2-dragging *{cursor:grabbing!important;-webkit-user-select:none;user-select:none}' +
-            '@media(max-width:850px){#game-wrapper{flex-direction:column!important;height:auto!important}#game-container{flex:none!important;width:100%!important}}' +
             '.inv2-ghost{position:fixed;left:0;top:0;width:48px;height:48px;z-index:100000;pointer-events:none;display:flex;align-items:center;justify-content:center;border-radius:10px;background:rgba(30,20,10,.85);border:1px solid #e8c469;box-shadow:0 4px 14px rgba(0,0,0,.6);opacity:.92}.inv2-ghost .ic-item{width:38px;height:38px}.inv2-ghost span{position:absolute;top:100%;left:50%;transform:translateX(-50%);white-space:nowrap;font:700 .65rem sans-serif;color:#f1c40f;text-shadow:0 1px 2px #000;margin-top:2px}';
         document.head.appendChild(st);
         document.addEventListener('pointerdown', (e) => { suppressUntil = 0; lastTouch = e.pointerType === 'touch'; begin(e); }, true);

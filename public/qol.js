@@ -5,9 +5,9 @@
     const ok = () => typeof player !== 'undefined' && player && player.inventory && typeof currentUser !== 'undefined' && currentUser && $('game-wrapper') && $('game-wrapper').style.display !== 'none';
 
     /* ---------- qualidade ---------- */
-    const NAMES = ['Baixo', 'Médio', 'Alto']; let level = 2, auto = true;
+    const NAMES = ['Baixo', 'Médio', 'Alto']; const touchDev = () => !!(window.Mobile && Mobile.on()); let level = touchDev() ? 1 : 2, auto = true;   // celular começa em Médio (o fps decide se desce)
     try { const v = localStorage.getItem('ms_quality'); if (v !== null && +v >= 0 && +v <= 2) { level = +v; auto = false; } } catch (e) { }
-    const Quality = { get level() { return level; }, drops: () => [70, 150, 260][level], fxCap: () => [80, 200, 400][level], names: NAMES, set(v, manual) { level = Math.max(0, Math.min(2, v | 0)); if (manual) { auto = false; try { localStorage.setItem('ms_quality', String(level)); } catch (e) { } } if (window.Env) try { Env._resetDrops && Env._resetDrops(); } catch (e) { } } };
+    const Quality = { get level() { return level; }, drops: () => [70, 150, 260][level], fxCap: () => [80, 200, 400][level], names: NAMES, renderScale: () => (touchDev() && level === 0 ? 0.75 : 1), set(v, manual) { level = Math.max(0, Math.min(2, v | 0)); if (manual) { auto = false; try { localStorage.setItem('ms_quality', String(level)); } catch (e) { } } if (window.Env) try { Env._resetDrops && Env._resetDrops(); } catch (e) { } try { if (window.resizeCanvasSoon) resizeCanvasSoon(); } catch (e) { } } };
     window.Quality = Quality;
     /* mede o fps logo depois de entrar no jogo: abaixo de 40 passa para Médio; se ainda ficar abaixo de 26, para Baixo (só se o jogador nunca escolheu) */
     function watchFps() {
@@ -29,7 +29,7 @@
     }
     function panel() {
         const host = $('tab-cfg'); if (!host || $('qual-panel')) return; const d = document.createElement('div'); d.id = 'qual-panel'; d.className = 'book-page'; d.style.marginBottom = '10px';
-        d.innerHTML = `<h3 style="margin:0 0 6px">Gráficos</h3><label class="aud-row"><span>Qualidade</span><select id="qual-sel" style="flex:1">${NAMES.map((n, i) => `<option value="${i}" ${i === level ? 'selected' : ''}>${n}</option>`).join('')}</select></label><div style="font-size:.7rem;opacity:.7">Baixo desliga partículas do ambiente, luzes suaves, sombras e ondinhas da água. O jogo já escolhe sozinho se ficar lento.</div>`;
+        d.innerHTML = `<h3 style="margin:0 0 6px">Gráficos</h3><label class="aud-row"><span>Qualidade</span><select id="qual-sel" style="flex:1">${NAMES.map((n, i) => `<option value="${i}" ${i === level ? 'selected' : ''}>${n}</option>`).join('')}</select></label><div style="font-size:.7rem;opacity:.7">Baixo desliga partículas do ambiente, luzes suaves, sombras e ondinhas da água (no celular também desenha em 75% da resolução). O jogo já escolhe sozinho se ficar lento.</div>`;
         const a = $('audio-panel'); if (a && a.nextSibling) host.insertBefore(d, a.nextSibling); else host.insertBefore(d, host.firstChild);
         $('qual-sel').addEventListener('change', (e) => Quality.set(+e.target.value, true));
     }
@@ -76,12 +76,12 @@
         bar.innerHTML = player.qb.map((n, i) => {
             if (!n) return `<div class="qb-s empty" data-i="${i}" title="Arraste um item da mochila para cá (tecla ${i + 1})"><b>${i + 1}</b></div>`;
             const c = getInvCount(n), eq = !!equippedSlot(n), gone = c <= 0 && !eq; let ic = ''; try { ic = window.Icons ? Icons.html(n, 30) : ''; } catch (e) { }
-            return `<div class="qb-s${gone ? ' gone' : ''}" data-i="${i}" data-n="${esc2(n)}" title="${esc2(n)} (tecla ${i + 1}) · botão direito limpa · arraste para trocar de lugar"><b>${i + 1}</b>${ic}${c > 0 ? '<u>' + c + '</u>' : ''}${eq ? '<em>E</em>' : ''}</div>`;
+            return `<div class="qb-s${gone ? ' gone' : ''}" data-i="${i}" data-n="${esc2(n)}" title="${esc2(n)} (tecla ${i + 1}) · botão direito limpa · arraste para trocar de lugar"><b>${i + 1}</b>${ic}${c > 0 ? '<u title="' + (window.fmtNum ? fmtNum(c) : c) + '">' + (window.fmtQty ? fmtQty(c) : c) + '</u>' : ''}${eq ? '<em>E</em>' : ''}</div>`;
         }).join('');
     }
     const esc2 = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     function place() {
-        const c = $('gameCanvas'); if (!c || !bar) return; const ch = $('chat-container'); bar.style.visibility = ch && ch.classList.contains('open') ? 'hidden' : '';
+        const c = $('gameCanvas'); if (!c || !bar) return; const ch = $('chat-container'); bar.style.visibility = (ch && ch.classList.contains('open')) || modalOpen() ? 'hidden' : '';
         if (window.innerWidth <= 850) { bar.style.left = window.innerWidth / 2 + 'px'; bar.style.top = Math.max(8, window.innerHeight - 56) + 'px'; return; }   // celular: fixa no rodapé da tela (a página rola)
         const r = c.getBoundingClientRect(); const w = bar.offsetWidth || 240; bar.style.left = Math.max(w / 2 + 6, Math.min(window.innerWidth - w / 2 - 6, r.left + r.width / 2)) + 'px'; bar.style.top = Math.max(8, Math.min(window.innerHeight - 56, r.bottom - 64)) + 'px';
     }

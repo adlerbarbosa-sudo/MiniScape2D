@@ -59,10 +59,10 @@
         renderTradeUI();
         const m = $('custom-modal-box'); if (m && m.dataset.social === '1' && !s.trade) renderSocialModal();
     }
-    let invSeen = {};
+    let invSeen = {}, trQty = '1'; const N = (n) => (window.fmtNum ? fmtNum(n) : n);
 
     /* ---------- troca: lógica ---------- */
-    const INV = () => (typeof INV_SLOTS !== 'undefined' ? INV_SLOTS : 24);
+    const INV = () => (typeof INV_SLOTS !== 'undefined' ? INV_SLOTS : 24), SM = () => window.STACK_MAX || 2147483647;
     function hasEnch(name) { return player.inventory.some((i) => i.name === name && (i.ench || i.enchanted)); }
     function tradable(name) { const d = itemDB[name]; return !!d && name !== 'Untradable' && !hasEnch(name); }
     function invCounts() { const m = {}; player.inventory.forEach((i) => { m[i.name] = (m[i.name] || 0) + (i.qty || 1); }); return m; }
@@ -76,7 +76,7 @@
         let slots = used.length;
         for (const [n, q] of v.theirs) {
             const st = itemDB[n].stackable; let r = q;
-            if (st) { used.forEach((e) => { if (e.n === n && r > 0) { const room = 254 - e.q; const t = Math.min(room, r); e.q += t; r -= t; } }); while (r > 0) { const t = Math.min(254, r); used.push({ n, q: t }); slots++; r -= t; } }
+            if (st) { used.forEach((e) => { if (e.n === n && r > 0) { const room = SM() - e.q; const t = Math.min(room, r); e.q += t; r -= t; } }); while (r > 0) { const t = Math.min(SM(), r); used.push({ n, q: t }); slots++; r -= t; } }
             else { for (let k = 0; k < q; k++) { used.push({ n, q: 1 }); slots++; } }
         }
         return slots <= INV();
@@ -177,18 +177,19 @@
             const y = $('tr-yes'); if (y) y.onclick = () => socialCall('trade_accept'); $('tr-cancel').onclick = () => socialCall('trade_cancel'); return;
         }
         const have = invCounts(); const mineMap = {}; v.mine.forEach((x) => { mineMap[x[0]] = x[1]; });
-        const fmt = (a) => a.length ? a.map((x) => `<span class="soc-it">${Icons.html(x[0], 20)} ${esc(x[0])} ×${x[1]}</span>`).join('') : '<i style="opacity:.6">nada</i>';
-        const mine = v.mine.map((x) => `<span class="soc-it">${Icons.html(x[0], 20)} ${esc(x[0])} ×${x[1]} <a href="#" data-rm="${esc(x[0])}" style="color:#e0523f">✕</a></span>`).join('') || '<i style="opacity:.6">nada</i>';
-        const invHtml = Object.keys(have).filter((n) => tradable(n) && n !== 'Untradable').map((n) => `<button class="soc-b" data-add="${esc(n)}" ${v.st !== 'open' || (mineMap[n] || 0) >= have[n] ? 'disabled' : ''} title="Shift = todos">${Icons.html(n, 20)} ${esc(n)} <small>${have[n] - (mineMap[n] || 0)}</small></button>`).join('');
+        const fmt = (a) => a.length ? a.map((x) => `<span class="soc-it">${Icons.html(x[0], 20)} ${esc(x[0])} ×${N(x[1])}</span>`).join('') : '<i style="opacity:.6">nada</i>';
+        const mine = v.mine.map((x) => `<span class="soc-it">${Icons.html(x[0], 20)} ${esc(x[0])} ×${N(x[1])} <a href="#" data-rm="${esc(x[0])}" style="color:#e0523f">✕</a></span>`).join('') || '<i style="opacity:.6">nada</i>';
+        const invHtml = Object.keys(have).filter((n) => tradable(n) && n !== 'Untradable').map((n) => `<button class="soc-b" data-add="${esc(n)}" ${v.st !== 'open' || (mineMap[n] || 0) >= have[n] ? 'disabled' : ''} title="Shift = todos">${Icons.html(n, 20)} ${esc(n)} <small>${N(have[n] - (mineMap[n] || 0))}</small></button>`).join('');
         openModal(`<h3 style="margin:0 0 6px">Troca com ${esc(v.other)}</h3><div style="display:flex;gap:10px"><div class="soc-col"><b>Você oferece</b><div>${mine}</div>${v.okMine ? '<div style="color:#7bd67b;font-size:.75rem">✔ você confirmou</div>' : ''}</div><div class="soc-col"><b>${esc(v.other)} oferece</b><div>${fmt(v.theirs)}</div>${v.okTheirs ? '<div style="color:#7bd67b;font-size:.75rem">✔ confirmou</div>' : ''}</div></div>
-            <h4 style="margin:8px 0 2px">Sua mochila (clique para oferecer 1, Shift para todos)</h4><div style="max-height:26vh;overflow:auto">${invHtml || '<i>vazia</i>'}</div>
+            <h4 style="margin:8px 0 2px">Sua mochila (clique para oferecer, Shift para todos)</h4><div style="font-size:.74rem;margin-bottom:4px">Quantidade por clique: <input id="tr-q" type="text" inputmode="numeric" autocomplete="off" maxlength="10" value="${trQty}" style="width:96px;padding:2px 6px;border-radius:6px;border:1px solid #6a4c22;background:#1c1208;color:#f0e2bd"></div><div style="max-height:26vh;overflow:auto">${invHtml || '<i>vazia</i>'}</div>
             <div style="text-align:right;margin-top:8px">${v.st === 'commit' ? '<i>Concluindo...</i>' : `<button class="soc-b ${v.okMine ? 'ok' : ''}" id="tr-ok">${v.okMine ? 'Desfazer confirmação' : 'Confirmar'}</button>`}<button class="soc-b" id="tr-cancel" ${v.st === 'commit' ? 'disabled' : ''}>Cancelar</button></div><div style="font-size:.7rem;opacity:.7;margin-top:4px">Ao mudar a oferta, as confirmações são zeradas. Itens encantados não podem ser trocados.</div>`);
         const b = $('custom-modal-box'); b.dataset.trade = '1'; b.dataset.social = '0';
         b.onclick = async (ev) => {
             if (v.st !== 'open') return; const rm = ev.target.closest('[data-rm]'); const ad = ev.target.closest('[data-add]');
             if (rm) { ev.preventDefault(); await socialCall('trade_offer', { items: v.mine.filter((x) => x[0] !== rm.dataset.rm) }); }
-            else if (ad && !ad.disabled) { const n = ad.dataset.add; const cur = mineMap[n] || 0; const q = ev.shiftKey ? have[n] : cur + 1; const items = v.mine.filter((x) => x[0] !== n).concat([[n, Math.min(q, have[n])]]); if (items.length > 8) { note('No máximo 8 tipos de item.', '#e74c3c'); return; } await socialCall('trade_offer', { items }); }
+            else if (ad && !ad.disabled) { const n = ad.dataset.add; const cur = mineMap[n] || 0; const step = Math.max(1, Math.floor(Number(String(trQty).replace(/\D/g, ''))) || 1); const q = ev.shiftKey ? have[n] : cur + step; const items = v.mine.filter((x) => x[0] !== n).concat([[n, Math.min(q, have[n])]]); if (items.length > 8) { note('No máximo 8 tipos de item.', '#e74c3c'); return; } await socialCall('trade_offer', { items }); }
         };
+        const tq = $('tr-q'); if (tq) tq.addEventListener('input', () => { trQty = tq.value.replace(/\D/g, '').slice(0, 10) || '1'; });
         const ok = $('tr-ok'); if (ok) ok.onclick = () => socialCall('trade_ok', { v: !v.okMine }); $('tr-cancel').onclick = () => socialCall('trade_cancel');
     }
 

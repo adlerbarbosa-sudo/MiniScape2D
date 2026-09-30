@@ -38,7 +38,7 @@ module.exports = function createExtras(ctx) {
             }
             case 'create': {
                 const item = b.item, qty = Math.floor(Number(b.qty)), price = Math.floor(Number(b.price));
-                if (typeof item !== 'string' || !ITEM_RE.test(item) || !(qty >= 1 && qty <= 1000000) || !(price >= 1 && price <= 100000000)) return err('Anúncio inválido.');
+                if (typeof item !== 'string' || !ITEM_RE.test(item) || !(qty >= 1 && qty <= 2147483647) || !(price >= 1 && price <= 2147483647)) return err('Anúncio inválido.');
                 if (typeof b.nonce !== 'string' || !NONCE_RE.test(b.nonce)) return err('Pedido inválido.');
                 const id = user + ':' + b.nonce;
                 if (m.listings[id] || m.done['c:' + id]) return { ok: true, id };   // repetido: já publicado

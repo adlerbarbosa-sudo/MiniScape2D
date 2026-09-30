@@ -23,13 +23,16 @@ input, textarea { user-select: auto; -webkit-user-select: auto; }
 svg.ic { width: 1.25em; height: 1.25em; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.28em; flex: none; }
 svg.ic.fill { fill: currentColor; stroke: none; }
 
+/* janela estreita de desktop (sem toque): coluna; aparelhos de toque usam o modo celular (html.touch, mais abaixo) */
 @media (max-width: 850px) {
-    body { flex-direction: column; align-items: center; padding: 6px; overflow-y: auto; height: auto; }
-    #ui-panel { width: 100% !important; max-width: 100%; min-height: 500px; }
-    .mobile-btn { display: flex !important; }
-    #game-container { height: 52vh; min-height: 380px; }
-    #quest-tracker { max-width: 60%; }
-    #key-hints { display: none; }
+    html:not(.touch) body { flex-direction: column; align-items: center; padding: 6px; overflow-y: auto; height: auto; }
+    html:not(.touch) #game-wrapper { flex-direction: column !important; height: auto !important; }
+    html:not(.touch) #game-container { flex: none !important; width: 100% !important; }
+    html:not(.touch) #ui-panel { width: 100% !important; max-width: 100%; min-height: 500px; }
+    html:not(.touch) .mobile-btn { display: flex !important; }
+    html:not(.touch) #game-container { height: 52vh; min-height: 380px; }
+    html:not(.touch) #quest-tracker { max-width: 60%; }
+    html:not(.touch) #key-hints { display: none; }
 }
 
 /* ---------- moldura do jogo ---------- */
@@ -38,7 +41,7 @@ svg.ic.fill { fill: currentColor; stroke: none; }
     border: 3px solid var(--gold-0);
     box-shadow: 0 0 0 2px #000, 0 0 0 4px var(--wood-4), 0 10px 40px rgba(0, 0, 0, .8), inset 0 0 0 1px rgba(255, 224, 140, .25);
 }
-#gameCanvas { display: block; width: 100%; height: 100%; touch-action: none; border: none; padding: 0; margin: 0; cursor: default; will-change: transform; transform: translateZ(0); }
+#gameCanvas { display: block; width: 100%; height: 100%; touch-action: none; border: none; padding: 0; margin: 0; cursor: default; }   /* sem will-change/translateZ: camada extra forçada no canvas = memória de GPU a mais e piscadas no celular */
 
 /* ---------- chat estilo jogo: fechado = pequeno e translúcido, aberto = painel ---------- */
 #chat-container {
@@ -268,3 +271,86 @@ svg.ic.fill { fill: currentColor; stroke: none; }
 .rc-detail .btn-craft { min-height: 46px; }
 .rc-msg { min-height: 1.1em; margin-top: 6px; font-family: var(--sans); font-size: .78rem; font-weight: 700; } .rc-msg.ok { color: #2f6b34; } .rc-msg.no { color: #a83a2c; }
 .rc-src { margin-top: 8px; } .rc-src summary { cursor: pointer; font-family: var(--sans); font-size: .76rem; color: #6b4a1a; }
+
+
+/* ============================================================
+   MODO CELULAR / TABLET (html.touch, ligado por mobile.js): só paisagem, canvas em tela cheia,
+   painel como gaveta, joystick flutuante e botões de ação para o polegar. Desktop não é afetado.
+   ============================================================ */
+html.touch, html.touch body { overscroll-behavior: none; touch-action: pan-x pan-y; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; }
+html.touch body { position: fixed; inset: 0; width: 100%; height: 100vh; height: 100dvh; padding: 0; margin: 0; display: block; overflow: hidden; }
+html.touch #game-wrapper { position: fixed; inset: 0; width: 100% !important; height: 100vh !important; height: 100dvh !important; max-width: none !important; gap: 0 !important; }
+html.touch #game-container { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; flex: none; border: 0; border-radius: 0; box-shadow: none; }
+html.touch #gameCanvas { touch-action: none; }
+/* sem desfoque de fundo sobre o canvas (recompõe a cada quadro e pisca em GPUs de celular) */
+html.touch #custom-modal-overlay, html.touch #chat-container.open, html.touch #cg-overlay { backdrop-filter: none; -webkit-backdrop-filter: none; }
+html.touch #custom-modal-overlay { background: rgba(6, 3, 1, .86); }
+html.touch #custom-modal-box { max-height: 92vh; max-height: 92dvh; overflow-y: auto; max-width: min(94vw, 720px); }
+html.touch #key-hints, html.touch #hover-hint, html.touch #chat-hint { display: none !important; }
+html.touch .mobile-btn { display: flex !important; }
+
+/* gaveta: mochila, equipamento, perícias, loja, banco... */
+html.touch #ui-panel { position: fixed; top: 0; right: 0; bottom: 0; left: auto; height: auto; width: min(420px, 60vw) !important; min-width: 0; max-width: none; z-index: 110; padding: 6px; gap: 6px; border-radius: 14px 0 0 14px; overflow-y: auto; transform: translateX(104%); transition: transform .18s ease-out; padding-right: max(6px, env(safe-area-inset-right)); visibility: hidden; }
+html.touch body.m-drawer #ui-panel { transform: none; visibility: visible; }
+html.touch #minimapCanvas { display: none; }
+html.touch .hud-header { padding: 4px 6px; } html.touch .hud-bar-container { height: 15px; } html.touch .hud-text { font-size: .62rem; line-height: 14px; }
+html.touch #tab-buttons-container { flex: none; } html.touch .tab-btn { padding: 6px 0 4px; min-height: 44px; font-size: .5rem; } html.touch .tab-btn svg.ic { width: 18px; height: 18px; }
+html.touch .tab-content { padding: 8px; min-height: 0; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: pan-y; }
+html.touch .grid-container { grid-template-columns: repeat(auto-fill, minmax(46px, 1fr)); gap: 4px; }
+html.touch .item-qty { font-size: .6rem; left: 3px; } html.touch .rc-list { max-height: 40vh; }
+html.touch #action-text { position: absolute; left: 50%; transform: translateX(-50%); top: max(6px, env(safe-area-inset-top)); z-index: 96; max-width: 46vw; margin: 0; padding: 2px 10px; min-height: 0; font-size: .74rem; line-height: 1.25; border-radius: 999px; background: rgba(12, 8, 4, .6); pointer-events: none; }
+html.touch #action-text:empty { display: none; }
+html.touch .isel { position: fixed; right: max(6px, env(safe-area-inset-right)); left: auto; bottom: 6px; width: calc(min(420px, 60vw) - 12px); margin: 0; z-index: 210; }
+
+/* HUD compacto no canto superior esquerdo */
+#m-hud, #m-top, #m-ctl, #m-joy, #m-rotate { display: none; }
+html.touch #m-hud { display: flex; flex-direction: column; gap: 3px; position: absolute; left: max(8px, env(safe-area-inset-left)); top: max(6px, env(safe-area-inset-top)); z-index: 95; width: 132px; pointer-events: none; }
+.mh-b { position: relative; height: 13px; border-radius: 999px; background: rgba(8, 5, 2, .7); border: 1px solid rgba(232, 196, 105, .45); overflow: hidden; }
+.mh-b i { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; border-radius: 999px; } .mh-b.hp i { background: linear-gradient(#e0584a, #8f2118); } .mh-b.mp i { background: linear-gradient(#5aa4f0, #1f4f94); }
+.mh-b span { position: absolute; inset: 0; text-align: center; font: 700 .58rem/12px var(--sans); color: #fff; text-shadow: 0 1px 2px #000, 0 0 3px #000; }
+html.touch #quest-tracker { top: calc(max(6px, env(safe-area-inset-top)) + 36px); left: max(8px, env(safe-area-inset-left)); width: auto; max-width: 36vw; padding: 4px 10px; z-index: 94; }
+html.touch #quest-tracker .q-hint, html.touch #quest-tracker .q-bar { display: none; } html.touch #quest-tracker .q-title { font-size: .7rem; } html.touch #quest-tracker h4 { font-size: .6rem; margin: 0; }
+
+/* canto superior direito: chat, tela cheia, Diário, menu */
+html.touch #m-top { display: flex; align-items: center; gap: 6px; position: absolute; right: max(8px, env(safe-area-inset-right)); top: max(6px, env(safe-area-inset-top)); z-index: 120; }
+.m-ib { width: 44px; height: 44px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: var(--gold-3); background: rgba(20, 12, 4, .72); border: 1px solid rgba(232, 196, 105, .55); padding: 0; font-size: 1.15rem; }
+.m-ib.big { width: 48px; height: 48px; background: linear-gradient(#6a4a22, #3a2410); border-color: var(--gold-1); } .m-ib:active { filter: brightness(1.3); }
+html.touch #m-top .hub-btn { position: static !important; left: auto !important; top: auto !important; height: 44px; padding: 0 12px; border-radius: 12px; font-size: .8rem; }
+html.touch #env-badge { right: max(8px, env(safe-area-inset-right)); top: calc(max(6px, env(safe-area-inset-top)) + 54px); z-index: 85; }
+
+/* botões de ação: polegar direito */
+html.touch #m-ctl { display: flex; align-items: flex-end; gap: 14px; position: absolute; right: max(14px, env(safe-area-inset-right)); bottom: max(12px, env(safe-area-inset-bottom)); z-index: 120; }
+html.touch #m-ctl .mobile-btn { width: auto; margin: 0; padding: 0; border-radius: 50%; flex-direction: column; gap: 0; font-size: .62rem; letter-spacing: .5px; box-shadow: 0 3px 10px rgba(0, 0, 0, .6), inset 0 2px 0 rgba(255, 255, 255, .25); opacity: .92; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
+html.touch #m-ctl #mobile-action-btn { width: 78px; height: 78px; flex: none; } html.touch #mobile-action-btn svg.ic { width: 30px; height: 30px; }
+html.touch #m-ctl #mobile-atk-btn { width: 58px; height: 58px; flex: none; margin-bottom: 6px !important; } html.touch #mobile-atk-btn svg.ic { width: 26px; height: 26px; }
+html.touch #m-ctl .mobile-btn:active { transform: scale(.94); filter: brightness(1.2); }
+
+/* chat compacto */
+html.touch #chat-container { left: max(8px, env(safe-area-inset-left)); bottom: max(6px, env(safe-area-inset-bottom)); width: min(300px, 34vw); pointer-events: none; background: none; z-index: 97; }
+html.touch #chat-box { font-size: .68rem; max-height: 3.9em; padding: 2px 6px; } html.touch #chat-container.open { width: min(560px, 62vw); pointer-events: auto; bottom: 6px; } html.touch #chat-container.open #chat-box { max-height: 90px; }
+html.touch #chat-input { font-size: 16px; padding: 8px 10px; }
+
+/* barra rápida compacta, no rodapé */
+html.touch #qb { gap: 3px; padding: 3px 4px; z-index: 101; } html.touch .qb-s { width: 38px; height: 38px; }
+
+/* joystick flutuante: só aparece enquanto o dedo está na tela; bem discreto */
+html.touch #m-joy { display: block; position: absolute; z-index: 99; width: 104px; height: 104px; margin: -52px 0 0 -52px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .28); background: rgba(255, 255, 255, .07); pointer-events: none; opacity: 0; transition: opacity .12s; }
+html.touch #m-joy.on { opacity: 1; } html.touch #m-joy i { position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%; background: rgba(255, 255, 255, .26); border: 2px solid rgba(255, 255, 255, .45); will-change: transform; }
+
+/* aviso de retrato: pede para girar (o jogo continua por baixo) */
+html.touch #m-rotate { position: fixed; inset: 0; z-index: 30000; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px; text-align: center; color: var(--text); background: radial-gradient(ellipse at 50% 30%, #2b1d11, #0c0704); }
+html.touch body.m-ingame.m-portrait #m-rotate { display: flex; }
+#m-rotate h2 { margin: 0; font-family: var(--serif); color: var(--gold-2); font-size: 1.35rem; } #m-rotate p { margin: 0; color: var(--muted); font-size: .9rem; line-height: 1.45; }
+.m-rot-ic { color: var(--gold-2); animation: mrot 2.4s ease-in-out infinite; transform-origin: 50% 50%; } @keyframes mrot { 0%, 25% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
+.m-fs { margin-top: 6px; padding: 10px 22px; border-radius: 999px; font: 700 .9rem var(--serif); color: var(--ink); background: linear-gradient(#f0cf7c, #c99a3c); border: 1px solid #000; cursor: pointer; }
+
+/* telas muito baixas (celular na horizontal) */
+@media (max-height: 460px) {
+    html.touch #custom-modal-box { padding: 12px; gap: 8px; }
+    html.touch .tab-content h3 { margin: 0 0 6px; }
+}
+
+html.touch #ui-panel { padding-top: 58px; }
+html.touch .hud-header { display: none; }
+html.touch body.m-drawer #m-ctl, html.touch body.m-drawer #qb, html.touch body.m-drawer #m-hud { display: none !important; }
+html.touch #m-top .soc-btn { position: static !important; left: auto !important; top: auto !important; height: 44px; padding: 0 12px; border-radius: 12px; }

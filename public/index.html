@@ -2,7 +2,10 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#120c07">
     <title>MiniScape 2D</title>
     <link rel="stylesheet" href="ui.css">
 </head>
@@ -171,6 +174,7 @@
     <script src="life.js"></script>
     <script src="fishing.js"></script>
     <script src="hub.js"></script>
+    <script src="mobile.js"></script>
     <script src="qol.js"></script>
     <script src="inv2.js"></script>
     <script src="itemsel.js"></script>
@@ -209,6 +213,28 @@
 
         const API_BASE = (window.location.protocol === 'file:') ? 'http://localhost:3000/api' : '/api';
         let pendingCombatLogs = []; const INV_SLOTS = 30;
+        // Pilhas: um único slot guarda até STACK_MAX (inteiro seguro de 32 bits) de qualquer item empilhável; Coins nunca se divide em várias pilhas.
+        const STACK_MAX = 2147483647; window.STACK_MAX = STACK_MAX;
+        function fmtNum(n) { n = Math.floor(Number(n)); return (isFinite(n) ? n : 0).toLocaleString('pt-BR'); }   // 1.234.567
+        function fmtQty(n) {   // para caber na célula: 99.999 · 100K · 1,2M · 2,1B
+            n = Math.floor(Number(n)); if (!isFinite(n) || n < 0) n = 0; const f = (v, u) => (Math.floor(v * 10) / 10).toString().replace('.', ',').replace(/,0$/, '') + u;
+            if (n < 100000) return n.toLocaleString('pt-BR'); if (n < 1e6) return Math.floor(n / 1000) + 'K'; if (n < 1e9) return f(n / 1e6, 'M'); return f(n / 1e9, 'B');
+        }
+        // junta pilhas repetidas de empilháveis (contas antigas tinham Coins divididos em pilhas de 254) e corrige quantidades inválidas
+        function mergeStacks(list) {
+            if (!Array.isArray(list)) return list; const first = {};
+            for (let i = 0; i < list.length; i++) {
+                const it = list[i]; if (!it || typeof it !== 'object') { list.splice(i--, 1); continue; }
+                const db = itemDB[it.name]; if (!(db && db.stackable) && !it.stackable) continue;
+                let q = Math.floor(Number(it.qty)); if (!isFinite(q) || q < 1) q = 1; if (q > STACK_MAX) q = STACK_MAX; it.qty = q;
+                if (it.ench || it.enchanted) continue;
+                const k = it.name, j = first[k];
+                if (j === undefined) { first[k] = i; continue; }
+                const t = list[j]; const sum = t.qty + q;
+                if (sum <= STACK_MAX) { t.qty = sum; list.splice(i--, 1); for (const n in first) if (first[n] > i) first[n]--; } else { t.qty = STACK_MAX; it.qty = sum - STACK_MAX; }
+            }
+            return list;
+        }
         let _errN = 0; function logErr(e) { if (_errN++ < 5) console.error('[MiniScape]', e); }
         let lastLookStr = '', lookTick = 0; let lastEqStr = ''; let authToken = null; let worldDirty = false; let lastChatVer = 0; let mobPosFromHost = {};
         function esc(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -225,7 +251,8 @@
 
         const canvas = document.getElementById('gameCanvas'); 
         // contexto 2D opaco e com latência baixa (o navegador usa a GPU sozinho quando ela existe; nada aqui a desliga)
-        let ctx = null; try { ctx = canvas.getContext('2d', { alpha: false, desynchronized: true, willReadFrequently: false }); } catch (e) { } if (!ctx) ctx = canvas.getContext('2d');
+        // contexto 2D opaco. SEM 'desynchronized' (causa tearing/piscadas em várias GPUs mobile, principalmente Android/Chrome): o quadro só vai para a tela quando está completo.
+        let ctx = null; try { ctx = canvas.getContext('2d', { alpha: false, willReadFrequently: false }); } catch (e) { } if (!ctx) ctx = canvas.getContext('2d');
         const osrsMenu = document.getElementById('osrs-menu'); 
         const tooltip = document.getElementById('tooltip');
 
@@ -309,7 +336,7 @@
             if (item.bonusDmg) html += `<div class="tt-stat">Dano: +${item.bonusDmg}</div>`; if (item.ench) html += `<div class="tt-stat" style="color:#7a4ab8">Encantado +${item.ench}</div>`; if (item.mp) html += `<div class="tt-stat">MP: +${item.mp}</div>`; 
             if (item.defBonus) html += `<div class="tt-stat">🛡️ Defesa: +${item.defBonus}</div>`; 
             if (item.heal) html += `<div class="tt-stat">❤️ Cura: +${item.heal}</div>`; 
-            html += `<div class="tt-weight">⚖️ Peso: ${Number(item.weight)||0} kg</div>`; 
+            if (item.stackable && item.qty > 1) html += `<div class="tt-stat">Quantidade: ${fmtNum(item.qty)}</div>`; html += `<div class="tt-weight">⚖️ Peso: ${Number(item.weight)||0} kg</div>`; 
             tooltip.innerHTML = html; tooltip.style.left = (mouseX + 15) + 'px'; tooltip.style.top = (mouseY + 15) + 'px'; tooltip.style.display = 'block'; 
         }
         function hideTooltip() { tooltip.style.display = 'none'; }
@@ -632,6 +659,7 @@
             if (!player.facing) player.facing = { x: 0, y: 1 }; if (!player.equipment) player.equipment = { head: null, body: null, weapon: null, shield: null, ammo: null };
             if (!player.inventory) player.inventory = []; if (!player.bank) player.bank = []; player.actionAnim = player.actionAnim || 0;
             try { if (window.Fishing) Fishing.migrate(player); } catch (e) { console.error(e); }
+            try { mergeStacks(player.inventory); mergeStacks(player.bank); } catch (e) { console.error(e); }
             { const _lk = Art.cleanLook(player.look); player.look = _lk || Object.assign({}, Art.defaultLook()); }
             try { if (window.Content) Content.onLogin(); } catch (e) { console.error(e); }
             currentMap = player.currentMap || 'lumbridge'; if(!gameMaps[currentMap]) currentMap = 'lumbridge'; try { ensurePlayerFree(); } catch (e) {}
@@ -640,7 +668,7 @@
             document.getElementById('game-wrapper').style.display = 'flex';
             
             setTimeout(() => {
-                resizeCanvas(); window.addEventListener('resize', resizeCanvas);
+                resizeCanvas(); window.addEventListener('resize', resizeCanvasSoon); window.addEventListener('orientationchange', resizeCanvasSoon); try { if (window.ResizeObserver) new ResizeObserver(resizeCanvasSoon).observe(document.getElementById('game-container')); } catch (e) { }
                 openTab('inv'); updateUI(); 
                 if (window._saveNewChar) { window._saveNewChar = false; try { saveDataLogic(true); } catch (e) { console.error(e); } }   // conta nova: grava a criação já, sem esperar a primeira ação
                 if(userRole === 'admin') { buildDevEntityList(); loadDevMapManager(); loadDevPlayers();
@@ -654,13 +682,19 @@
         }
 
         // --- SISTEMAS DE RENDER E SYNC ---
+        // O tamanho do canvas só muda aqui (eventos de resize/rotação/qualidade, com debounce) e nunca dentro do quadro: redimensionar limpa o canvas e
+        // realoca a textura da GPU, o que no celular (barra de endereço encolhendo, teclado, rotação) aparecia como piscada.
+        // Coordenadas do jogo = pixels CSS (canvas._lw x canvas._lh); o bitmap pode ter menos pixels (escala de render < 1 em Gráficos: Baixo no celular).
         function resizeCanvas() {
-            const container = document.getElementById('game-container');
-            if(container) {
-                if(canvas.width !== container.clientWidth && container.clientWidth > 0) canvas.width = container.clientWidth;
-                if(canvas.height !== container.clientHeight && container.clientHeight > 0) canvas.height = container.clientHeight;
-            }
+            const container = document.getElementById('game-container'); if (!container) return;
+            const cw = container.clientWidth, ch = container.clientHeight; if (!(cw > 0 && ch > 0)) return;
+            const rs = (window.Quality && Quality.renderScale) ? Quality.renderScale() : 1;
+            const w = Math.max(1, Math.round(cw * rs)), h = Math.max(1, Math.round(ch * rs));
+            canvas._lw = cw; canvas._lh = ch;
+            if (canvas.width !== w) canvas.width = w; if (canvas.height !== h) canvas.height = h;
         }
+        let _rzT = 0; function resizeCanvasSoon() { clearTimeout(_rzT); _rzT = setTimeout(resizeCanvas, 140); }
+        window.resizeCanvas = resizeCanvas; window.resizeCanvasSoon = resizeCanvasSoon;
 
         async function syncMultiplayer() {
             if(!currentUser || isOfflineMode || isSyncing || !authToken) return;
@@ -822,14 +856,14 @@
         function getCameraOffset() {
             let mapObj = gameMaps[currentMap]; if (!mapObj) return { x: 0, y: 0 };
             let mapW = mapObj.width || 800; let mapH = mapObj.height || 600;
-            const _cx = renderPX || player.x, _cy = renderPY || player.y; let camX = (canvas.width / 2) - _cx; let camY = (canvas.height / 2) - _cy;
-            if (mapW > canvas.width) { if (camX > 0) camX = 0; if (camX < canvas.width - mapW) camX = canvas.width - mapW; } else { camX = (canvas.width - mapW) / 2; }
-            if (mapH > canvas.height) { if (camY > 0) camY = 0; if (camY < canvas.height - mapH) camY = canvas.height - mapH; } else { camY = (canvas.height - mapH) / 2; }
+            const CW = canvas._lw || canvas.width, CH = canvas._lh || canvas.height; const _cx = renderPX || player.x, _cy = renderPY || player.y; let camX = (CW / 2) - _cx; let camY = (CH / 2) - _cy;
+            if (mapW > CW) { if (camX > 0) camX = 0; if (camX < CW - mapW) camX = CW - mapW; } else { camX = (CW - mapW) / 2; }
+            if (mapH > CH) { if (camY > 0) camY = 0; if (camY < CH - mapH) camY = CH - mapH; } else { camY = (CH - mapH) / 2; }
             return { x: isNaN(camX) ? 0 : camX, y: isNaN(camY) ? 0 : camY };
         }
 
         function getCoords(e) {
-            const rect = canvas.getBoundingClientRect(); const scaleX = rect.width > 0 ? canvas.width / rect.width : 1; const scaleY = rect.height > 0 ? canvas.height / rect.height : 1;
+            const rect = canvas.getBoundingClientRect(); const scaleX = rect.width > 0 ? (canvas._lw || canvas.width) / rect.width : 1; const scaleY = rect.height > 0 ? (canvas._lh || canvas.height) / rect.height : 1;
             let cX = e.clientX, cY = e.clientY, pX = e.pageX, pY = e.pageY;
             if(e.type && e.type.includes('touch')) { cX = e.touches[0].clientX; cY = e.touches[0].clientY; pX = e.touches[0].pageX; pY = e.touches[0].pageY; }
             let rawX = (cX - rect.left) * scaleX; let rawY = (cY - rect.top) * scaleY;
@@ -840,11 +874,25 @@
         function getInvCount(iName) { return player.inventory.reduce((acc, i) => acc + (i.name === iName ? (i.qty||1) : 0), 0); }
         function calcTotalWeight() { return player.inventory.reduce((acc, i) => acc + ((i&&i.weight?i.weight:0) * (i&&i.qty?i.qty:1)), 0).toFixed(1); }
         let _idSeq = 0; function newEntId() { return Date.now() * 100 + (_idSeq++ % 100); }
-        function invSpaceFor(iName, qty) { const b = itemDB[iName]; if (!b) return false; const free = INV_SLOTS - player.inventory.length; if (!b.stackable) return free >= qty; let room = 0; for (const i of player.inventory) if (i.name === iName) room += Math.max(0, 254 - (i.qty || 1)); return room + free * 254 >= qty; }
+        function invSpaceFor(iName, qty) { const b = itemDB[iName]; if (!b) return false; const free = INV_SLOTS - player.inventory.length; if (!b.stackable) return free >= qty; let room = 0; for (const i of player.inventory) if (i.name === iName) room += Math.max(0, STACK_MAX - (i.qty || 1)); return room + free * STACK_MAX >= qty; }
         function removeInvItem(iName, amount) { if(!(amount > 0) || getInvCount(iName) < amount) return false; let tr = amount; for(let i = player.inventory.length - 1; i >= 0 && tr > 0; i--) { const it = player.inventory[i]; if(it.name !== iName) continue; if(it.stackable) { const q = it.qty || 1; if(q > tr) { it.qty = q - tr; tr = 0; } else { tr -= q; player.inventory.splice(i, 1); } } else { player.inventory.splice(i, 1); tr--; } } return tr <= 0; }
-        function addInvItem(iName, qty = 1) { const b = itemDB[iName]; if(!b || !(qty > 0) || !invSpaceFor(iName, qty)) return false; if (b.stackable) { let r = qty; for(let i of player.inventory) { if(i.name === iName && i.qty < 254) { let sp = 254 - i.qty; if(r <= sp) { i.qty += r; return true; } else { i.qty = 254; r -= sp; } } } while(r > 0 && player.inventory.length < INV_SLOTS) { let t = Math.min(r, 254); player.inventory.push({...b, qty: t}); r -= t; } return r <= 0; } else { for(let n = 0; n < qty; n++) player.inventory.push({...b}); return true; } }
-        function transferToBank(invIndex) { const item = player.inventory[invIndex]; if(!item) return; let bankItem = player.bank.find(i => i.name === item.name); if(bankItem && item.stackable) { bankItem.qty += item.qty; } else if (item.stackable) { player.bank.push({...item, qty: item.qty}); } else { player.bank.push({...item, qty: 1}); } player.inventory.splice(invIndex, 1); hideTooltip(); updateUI(); }
-        function withdrawFromBank(bankIndex) { const item = player.bank[bankIndex]; if(!item) return; let wQ = item.stackable ? Math.min(item.qty, 254) : 1; if(addInvItem(item.name, wQ)) { item.qty -= wQ; if(item.qty <= 0) player.bank.splice(bankIndex, 1); hideTooltip(); updateUI(); } else { setActionText("Inventário Cheio!", "#e74c3c"); } }
+        function addInvItem(iName, qty = 1) { const b = itemDB[iName]; qty = Math.floor(Number(qty)); if(!b || !(qty > 0) || !isFinite(qty) || !invSpaceFor(iName, qty)) return false; if (b.stackable) { let r = qty; for(let i of player.inventory) { if(i.name === iName && i.qty < STACK_MAX) { let sp = STACK_MAX - i.qty; if(r <= sp) { i.qty += r; return true; } else { i.qty = STACK_MAX; r -= sp; } } } while(r > 0 && player.inventory.length < INV_SLOTS) { let t = Math.min(r, STACK_MAX); player.inventory.push({...b, qty: t}); r -= t; } return r <= 0; } else { for(let n = 0; n < qty; n++) player.inventory.push({...b}); return true; } }
+        function transferToBank(invIndex) {
+            const item = player.inventory[invIndex]; if(!item) return;
+            if (item.stackable) {   // empilháveis: uma pilha no banco (até STACK_MAX; o que passar disso vira outra pilha)
+                let q = Math.max(1, Math.floor(item.qty) || 1); const same = player.bank.filter(i => i.name === item.name && i.stackable);
+                for (const b of same) { if (q <= 0) break; const room = STACK_MAX - (b.qty || 0); if (room > 0) { const t = Math.min(room, q); b.qty = (b.qty || 0) + t; q -= t; } }
+                if (q > 0) player.bank.push({...item, qty: q});
+            } else { player.bank.push({...item, qty: 1}); }
+            player.inventory.splice(invIndex, 1); hideTooltip(); updateUI();
+        }
+        function withdrawFromBank(bankIndex) {
+            const item = player.bank[bankIndex]; if(!item) return; let wQ = item.stackable ? Math.max(1, Math.floor(item.qty) || 1) : 1;
+            if (item.stackable) {   // tira o que couber (um slot só de Coins; se a pilha da mochila estiver quase cheia, leva a parte que cabe)
+                let room = 0; for (const i of player.inventory) if (i.name === item.name) room += Math.max(0, STACK_MAX - (i.qty || 1)); room += (INV_SLOTS - player.inventory.length) * STACK_MAX; wQ = Math.min(wQ, room);
+            }
+            if(wQ > 0 && addInvItem(item.name, wQ)) { item.qty = (item.stackable ? (Math.floor(item.qty) || 1) : 1) - wQ; if(item.qty <= 0) player.bank.splice(bankIndex, 1); hideTooltip(); updateUI(); } else { setActionText("Inventário Cheio!", "#e74c3c"); }
+        }
 
         function useItem(index) {
             if(isBankOpen) { transferToBank(index); return; } const item = player.inventory[index]; if(!item) return;
@@ -873,7 +921,7 @@
                 for (const r of reqs) { let tr = r.q * k; for (let i = list.length - 1; i >= 0 && tr > 0; i--) { if (list[i].n !== r.n) continue; if (list[i].st && list[i].q > tr) { list[i].q -= tr; tr = 0; } else { tr -= list[i].st ? list[i].q : 1; list.splice(i, 1); } } }
                 const free = INV_SLOTS - list.length, amt = per * k, b = itemDB[iName];
                 if (!b.stackable) return free >= amt;
-                let room = 0; for (const x of list) if (x.n === iName) room += Math.max(0, 254 - x.q); return room + free * 254 >= amt;
+                let room = 0; for (const x of list) if (x.n === iName) room += Math.max(0, STACK_MAX - x.q); return room + free * STACK_MAX >= amt;
             };
             let max = 0; for (let k = maxMat; k >= 1; k--) if (fits(k)) { max = k; break; }
             return { it, reqs, per, bad, maxMat, max, fits: (k) => k >= 1 && k <= maxMat && fits(k), full: maxMat >= 1 && max === 0 };
@@ -929,11 +977,11 @@
             try {
                 document.getElementById('bar-hp').style.width = `${(player.stats.hp / player.stats.maxHp)*100}%`; document.getElementById('text-hp').innerText = `HP ${player.stats.hp}/${player.stats.maxHp}`; document.getElementById('bar-mp').style.width = `${(player.stats.mp / player.stats.maxMp)*100}%`; document.getElementById('text-mp').innerText = `MP ${player.stats.mp}/${player.stats.maxMp}`;
                 const iG = document.getElementById('inv-grid'); const iSig = player.inventory.slice(0, 30).map(x => x.name + '*' + (x.stackable && x.qty > 1 ? x.qty : 1) + (x.ench ? 'e' + x.ench : '')).join('|');
-                if (iG._sig !== iSig || iG.children.length !== 30) { iG._sig = iSig; iG.innerHTML = ''; for(let i = 0; i < 30; i++) { const item = player.inventory[i]; const div = document.createElement('div'); div.className = 'item-slot'; if(item) { div.innerHTML = Icons.html(item.name); if(item.stackable && item.qty > 1) div.innerHTML += `<span class="item-qty">${item.qty}</span>`; div.onclick = () => invClick(i); div.onmouseenter = () => showTooltip(player.inventory[i]); div.onmouseleave = () => hideTooltip(); } iG.appendChild(div); } } document.getElementById('weight-txt').innerText = calcTotalWeight();
-                Object.keys(player.equipment || {}).forEach(sl => { const el = document.getElementById(`eq-${sl}`); if(el && player.equipment[sl]) { el.innerHTML = Icons.html(player.equipment[sl].name); if (sl === 'ammo' && player.equipment.ammo) document.getElementById('ammo-qty').innerText = player.equipment.ammo.qty || ''; el.parentElement.onmouseenter = () => showTooltip(player.equipment[sl]); el.parentElement.onmouseleave = () => hideTooltip(); } else if(el) { el.innerText = ''; if (sl === 'ammo') document.getElementById('ammo-qty').innerText = ''; el.parentElement.onmouseenter = null; } }); document.getElementById('def-stats').innerText = `Bônus de Defesa: ${getTotalDef()}`;
+                if (iG._sig !== iSig || iG.children.length !== 30) { iG._sig = iSig; iG.innerHTML = ''; for(let i = 0; i < 30; i++) { const item = player.inventory[i]; const div = document.createElement('div'); div.className = 'item-slot'; if(item) { div.innerHTML = Icons.html(item.name); if(item.stackable && item.qty > 1) div.innerHTML += `<span class="item-qty">${fmtQty(item.qty)}</span>`; if (item.qty >= 1000) div.title = fmtNum(item.qty); div.onclick = () => invClick(i); div.onmouseenter = () => showTooltip(player.inventory[i]); div.onmouseleave = () => hideTooltip(); } iG.appendChild(div); } } document.getElementById('weight-txt').innerText = calcTotalWeight();
+                Object.keys(player.equipment || {}).forEach(sl => { const el = document.getElementById(`eq-${sl}`); if(el && player.equipment[sl]) { el.innerHTML = Icons.html(player.equipment[sl].name); if (sl === 'ammo' && player.equipment.ammo) document.getElementById('ammo-qty').innerText = player.equipment.ammo.qty ? fmtQty(player.equipment.ammo.qty) : ''; el.parentElement.onmouseenter = () => showTooltip(player.equipment[sl]); el.parentElement.onmouseleave = () => hideTooltip(); } else if(el) { el.innerText = ''; if (sl === 'ammo') document.getElementById('ammo-qty').innerText = ''; el.parentElement.onmouseenter = null; } }); document.getElementById('def-stats').innerText = `Bônus de Defesa: ${getTotalDef()}`;
                 const sL = document.getElementById('skills-list'); sL.innerHTML = ''; let tL = 0; Object.values(player.stats.skills || {}).forEach(s => { tL += s.level; sL.innerHTML += `<div class="skill-line"><span>${s.name}: Lvl ${s.level}</span> <span style="color:#888;">${s.xp}/${s.next} XP</span></div>`; }); document.getElementById('text-xp').innerText = `Nível Geral: ${tL}`;
                 const bG = document.getElementById('bank-grid'); const bSig = player.bank.map(x => x.name + '*' + (x.qty || 1)).join('|');
-                if (bG._sig !== bSig) { bG._sig = bSig; bG.innerHTML = ''; for(let i = 0; i < Math.max(30, player.bank.length + 4); i++) { const item = player.bank[i]; const div = document.createElement('div'); div.className = 'item-slot'; if(item) { div.innerHTML = Icons.html(item.name); if(item.qty > 1) div.innerHTML += `<span class="item-qty">${item.qty}</span>`; div.onclick = () => withdrawFromBank(i); div.onmouseenter = () => showTooltip(player.bank[i]); div.onmouseleave = () => hideTooltip(); } bG.appendChild(div); } }
+                if (bG._sig !== bSig) { bG._sig = bSig; bG.innerHTML = ''; for(let i = 0; i < Math.max(30, player.bank.length + 4); i++) { const item = player.bank[i]; const div = document.createElement('div'); div.className = 'item-slot'; if(item) { div.innerHTML = Icons.html(item.name); if(item.qty > 1) div.innerHTML += `<span class="item-qty">${fmtQty(item.qty)}</span>`; if (item.qty >= 1000) div.title = fmtNum(item.qty); div.onclick = () => withdrawFromBank(i); div.onmouseenter = () => showTooltip(player.bank[i]); div.onmouseleave = () => hideTooltip(); } bG.appendChild(div); } }
                 const mL = document.getElementById('spellbook-list'); if (mL) { mL.onclick = (ev) => { const c = ev.target.closest('[data-spell]'); if(c) setActiveSpell(c.dataset.spell); }; mL.innerHTML = ''; spellbookDB.forEach(sp => { let rT = Object.keys(sp.req).map(k => `${sp.req[k]}x ${itemDB[k]?Icons.html(k,16):'?'}`).join(' '); let iA = player.stats.skills.magic.level >= sp.lvl; let sC = player.activeSpell === sp.id ? 'spell-card spell-active' : 'spell-card'; mL.innerHTML += `<div class="${sC}" data-spell="${esc(sp.id)}" style="opacity:${iA?1:0.5}"><div><strong>${sp.name}</strong> <span style="font-size:0.7rem; color:${sp.color}">Dano: +${sp.dmg}</span><br><span class="spell-runes">Req: Lvl ${sp.lvl} | ${rT}</span></div>${player.activeSpell === sp.id ? '⭐' : ''}</div>`; }); }
                 if (window.renderCraftBook) renderCraftBook();
                 if (window.ItemSel) ItemSel.render();
@@ -1127,7 +1175,7 @@
             const wp = player.equipment ? player.equipment.weapon : null; 
             if (!tObj || !tObj.type || !tObj.active) return;
 
-            if (tObj.type === 'ground_item') { if (Math.hypot(player.x - (tObj.x + 10), player.y - (tObj.y + 10)) < 60) { if (addInvItem(tObj.item, tObj.qty)) { tObj.active = false; addPickupText(cItem.item, cItem.qty); updateUI(); saveDataLogic(); } else setActionText('Inventário cheio!', '#e74c3c'); } return; }
+            if (tObj.type === 'ground_item') { if (Math.hypot(player.x - (tObj.x + 10), player.y - (tObj.y + 10)) < 60) { if (addInvItem(tObj.item, tObj.qty)) { tObj.active = false; addPickupText(tObj.item, tObj.qty); updateUI(); saveDataLogic(); } else setActionText('Inventário cheio!', '#e74c3c'); } return; }
             if (tObj.type === 'npc') { openShop(npcDB[tObj.dbKey]); return; }
             if (tObj.type === 'bank') { document.getElementById('btn-bank').style.display='block'; openTab('bank'); setActionText("Banco aberto.", "#3498db"); return; }
             if (tObj.type === 'portal') { switchMap(tObj.destMap, tObj.destX, tObj.destY); return; }
@@ -1290,6 +1338,7 @@
         canvas.addEventListener('mousedown', onCanvasMouseDown);
         let _lpTimer = null;
         canvas.addEventListener('touchstart', function(e) {
+            if (window.Mobile && Mobile.on()) return;   // celular: mobile.js cuida do toque (joystick + tap)
             if(!e.touches || !e.touches.length) return; e.preventDefault(); onCanvasMouseDown(e);
             const t = e.touches[0]; const fake = { type: 'touchstart', button: 2, which: 3, target: e.target, touches: [{ clientX: t.clientX, clientY: t.clientY, pageX: t.pageX, pageY: t.pageY }], preventDefault() {} };
             clearTimeout(_lpTimer); _lpTimer = setTimeout(() => { player.destX = player.x; player.destY = player.y; onCanvasMouseDown(fake); }, 550);   // segurar = menu (botão direito)
@@ -1402,6 +1451,7 @@
                 if (rangedTarget) rangedTick(cur);
                 let dxK = 0, dyK = 0;
                 if(keys.w || keys.arrowup) dyK -= 1; if(keys.s || keys.arrowdown) dyK += 1; if(keys.a || keys.arrowleft) dxK -= 1; if(keys.d || keys.arrowright) dxK += 1;
+                if (window.JOY && (JOY.x || JOY.y)) { dxK += JOY.x; dyK += JOY.y; }   // joystick do celular (8 direções)
 
                 if (dxK !== 0 || dyK !== 0) {
                     if (isBankOpen || isNPCOpen) { closeMenus(); openTab('inv'); } 
@@ -1600,10 +1650,9 @@
         function draw() {
             ctx.setTransform(1, 0, 0, 1, 0, 0); 
             try {
-                let container = document.getElementById('game-container'); if(!container) return;
-                if(canvas.width !== container.clientWidth && container.clientWidth > 0) canvas.width = container.clientWidth;
-                if(canvas.height !== container.clientHeight && container.clientHeight > 0) canvas.height = container.clientHeight;
-                ctx.clearRect(0, 0, canvas.width, canvas.height); 
+                if (!canvas._lw) resizeCanvas(); const LW = canvas._lw || canvas.width, LH = canvas._lh || canvas.height;
+                ctx.setTransform(canvas.width / LW, 0, 0, canvas.height / LH, 0, 0);
+                ctx.clearRect(0, 0, LW, LH); 
                 let mapObj = gameMaps[currentMap]; if(!mapObj) { currentMap = 'lumbridge'; mapObj = gameMaps['lumbridge']; if (!mapObj) return; }
                 let offset = getCameraOffset();
                 ctx.save(); ctx.translate(offset.x, offset.y); 
@@ -1611,7 +1660,7 @@
                 
                 const T = performance.now() / 1000;
                 if (!mapObj.id) mapObj.id = currentMap;
-                const VW = { x: -offset.x, y: -offset.y, w: canvas.width, h: canvas.height };
+                const VW = { x: -offset.x, y: -offset.y, w: LW, h: LH };
                 const inView = (o, m) => { const w = o.w || 30, h = o.h || 30; m = m || 90; return o.x + w * 1.6 + m >= VW.x && o.x - w * 0.6 - m <= VW.x + VW.w && o.y + h + m >= VW.y && o.y - h * 0.6 - m <= VW.y + VW.h; };
                 Art.cam(offset.x, offset.y);
                 let cur = mapObj.entities || [];
@@ -1697,7 +1746,7 @@
                 }
                 ctx.restore(); 
                 if (window.Env) Env.draw(ctx, canvas, offset, mapObj, VW, { x: player.x, y: player.y, renderX: renderPX, renderY: renderPY }, T);
-                Art.drawAmbient(ctx, canvas.width, canvas.height, mapObj, T);
+                Art.drawAmbient(ctx, LW, LH, mapObj, T);
             } catch (e) { console.error("Ignorado Draw Error", e); }
         }
 

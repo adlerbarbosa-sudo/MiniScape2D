@@ -413,44 +413,58 @@
     function cam(x, y) { _cam.x = x; _cam.y = y; _built = 0; }
     const hiQ = () => !root.Quality || root.Quality.level > 0;
     function paintSig(cur) { let sum = 0, n = 0; for (const o of cur) if (o && o.type === 'paint') { sum += o.x * 3 + o.y * 7 + (o.w || 0) * 5 + (o.h || 0) * 11 + (o.color ? o.color.charCodeAt(1) + o.color.charCodeAt(3) * 3 : 0); n++; } return n + ':' + sum; }
-    function buildBase(m, W, H) {
-        const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d'); const base = m.color || '#4a6b2d';
-        g.fillStyle = base; g.fillRect(0, 0, W, H); g.fillStyle = patternOf(g, 'grass', base); g.fillRect(0, 0, W, H);
-        // manchas suaves de luz/sombra
-        for (let i = 0; i < Math.ceil(W * H / 26000); i++) { const x = hash(i * 1.7 + W) * W, y = hash(i * 2.9 + H) * H, r = 60 + hash(i * 5.3) * 110; g.fillStyle = rg(g, x, y, 0, r, [[0, hash(i) > 0.5 ? 'rgba(255,255,200,0.07)' : 'rgba(0,20,0,0.09)'], [1, 'rgba(0,0,0,0)']]); g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill(); }
-        // detalhes: flores, pedrinhas, folhas
-        for (let i = 0; i < Math.ceil(W * H / 2600); i++) { const x = hash(i * 3.1) * W, y = hash(i * 4.7 + 1) * H, k = hash(i * 9.9); if (k < 0.4) { g.strokeStyle = 'rgba(255,255,255,0.25)'; g.lineWidth = 1; g.beginPath(); g.moveTo(x, y); g.lineTo(x + 1, y - 5); g.moveTo(x, y); g.lineTo(x - 2, y - 4); g.moveTo(x, y); g.lineTo(x + 3, y - 3.4); g.stroke(); } else if (k < 0.62) { const cols = ['#fff4c2', '#ffb0c8', '#d8b0ff', '#ffe27a']; g.fillStyle = cols[Math.floor(hash(i) * 4)]; g.beginPath(); g.arc(x, y, 1.5, 0, TAU); g.fill(); g.fillStyle = 'rgba(255,200,0,0.9)'; g.fillRect(x - 0.4, y - 0.4, 0.8, 0.8); } else if (k < 0.8) { g.fillStyle = 'rgba(0,0,0,0.16)'; g.beginPath(); g.ellipse(x, y + 1, 3.4, 1.7, 0, 0, TAU); g.fill(); g.fillStyle = 'rgba(180,180,180,0.7)'; g.beginPath(); g.ellipse(x, y, 3, 1.8, 0, 0, TAU); g.fill(); } }
+    /* O chão NÃO é mais um canvas do tamanho do mapa (2000x1400 = 11 MB por camada; em celular isso estoura a memória de canvas e faz o navegador
+       descartar/repintar a textura = tela piscando). Agora o mapa é cortado em blocos de TS px (+1 px de sobreposição para não abrir frestas),
+       montados sob demanda só para o que aparece na tela e guardados num cache LRU (TILE_MAX blocos no total, liberados com width=0). */
+    const TS = 512, TILE_MAX = 48, _tiles = new Map();
+    function tileGet(ek, kind, tx, ty, make) {
+        const k = ek + '#' + kind + tx + ',' + ty; let c = _tiles.get(k); if (c) { _tiles.delete(k); _tiles.set(k, c); return c; }
+        c = make(); _tiles.set(k, c);
+        while (_tiles.size > TILE_MAX) { const f = _tiles.keys().next().value; if (f === k) break; const old = _tiles.get(f); _tiles.delete(f); if (old) old.width = old.height = 0; }
         return c;
     }
-    function edgeShade(c) {   // borda escura suave do mapa (por cima de tudo que foi assado)
-        const g = c.getContext('2d'), W = c.width, H = c.height, b = 26;
+    function tilesDrop(prefix) { for (const k of Array.from(_tiles.keys())) if (k.startsWith(prefix)) { const c = _tiles.get(k); _tiles.delete(k); if (c) c.width = c.height = 0; } }
+    function buildBaseTile(m, W, H, tx, ty) {
+        const ox = tx * TS, oy = ty * TS, tw = Math.min(TS + 1, W - ox), th = Math.min(TS + 1, H - oy);
+        const c = document.createElement('canvas'); c.width = tw; c.height = th; const g = c.getContext('2d'); g.translate(-ox, -oy); const base = m.color || '#4a6b2d';
+        g.fillStyle = base; g.fillRect(ox, oy, tw, th); g.fillStyle = patternOf(g, 'grass', base); g.fillRect(ox, oy, tw, th);
+        // manchas suaves de luz/sombra (mesma sequência determinística de antes; só desenha as que tocam este bloco)
+        for (let i = 0; i < Math.ceil(W * H / 26000); i++) { const x = hash(i * 1.7 + W) * W, y = hash(i * 2.9 + H) * H, r = 60 + hash(i * 5.3) * 110; if (x + r < ox || x - r > ox + tw || y + r < oy || y - r > oy + th) continue; g.fillStyle = rg(g, x, y, 0, r, [[0, hash(i) > 0.5 ? 'rgba(255,255,200,0.07)' : 'rgba(0,20,0,0.09)'], [1, 'rgba(0,0,0,0)']]); g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill(); }
+        // detalhes: flores, pedrinhas, folhas
+        for (let i = 0; i < Math.ceil(W * H / 2600); i++) { const x = hash(i * 3.1) * W, y = hash(i * 4.7 + 1) * H, k = hash(i * 9.9); if (x < ox - 8 || x > ox + tw + 8 || y < oy - 8 || y > oy + th + 8) continue; if (k < 0.4) { g.strokeStyle = 'rgba(255,255,255,0.25)'; g.lineWidth = 1; g.beginPath(); g.moveTo(x, y); g.lineTo(x + 1, y - 5); g.moveTo(x, y); g.lineTo(x - 2, y - 4); g.moveTo(x, y); g.lineTo(x + 3, y - 3.4); g.stroke(); } else if (k < 0.62) { const cols = ['#fff4c2', '#ffb0c8', '#d8b0ff', '#ffe27a']; g.fillStyle = cols[Math.floor(hash(i) * 4)]; g.beginPath(); g.arc(x, y, 1.5, 0, TAU); g.fill(); g.fillStyle = 'rgba(255,200,0,0.9)'; g.fillRect(x - 0.4, y - 0.4, 0.8, 0.8); } else if (k < 0.8) { g.fillStyle = 'rgba(0,0,0,0.16)'; g.beginPath(); g.ellipse(x, y + 1, 3.4, 1.7, 0, 0, TAU); g.fill(); g.fillStyle = 'rgba(180,180,180,0.7)'; g.beginPath(); g.ellipse(x, y, 3, 1.8, 0, 0, TAU); g.fill(); } }
+        edgeShade(g, W, H); return c;
+    }
+    function edgeShade(g, W, H) {   // borda escura suave do mapa (coordenadas do mundo; o bloco só recebe a parte que cai nele)
+        const b = 26;
         [[0, 0, W, b, 0, 1], [0, H - b, W, b, 0, -1], [0, 0, b, H, 1, 0], [W - b, 0, b, H, -1, 0]].forEach(s => { const gr = g.createLinearGradient(s[0] + (s[4] < 0 ? s[2] : 0), s[1] + (s[5] < 0 ? s[3] : 0), s[0] + (s[4] < 0 ? s[2] : 0) + s[4] * b, s[1] + (s[5] < 0 ? s[3] : 0) + s[5] * b); gr.addColorStop(0, 'rgba(0,0,0,0.28)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(s[0], s[1], s[2], s[3]); });
     }
-    function bakePaint(e, m, cur, W, H) {   // e.base (chão) -> e.comp (chão + pintura)
-        paintAdjacency(cur);
-        if (!e.comp) { e.comp = document.createElement('canvas'); e.comp.width = W; e.comp.height = H; }
-        const g = e.comp.getContext('2d'); g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W, H); g.drawImage(e.base, 0, 0);
-        e.water = [];
-        for (const o of cur) { if (!o || o.type !== 'paint') continue; try { drawPaint(g, o, 0, true); } catch (er) { } if (PAINT_KIND[o.color] === 'water') e.water.push(o); }
-        edgeShade(e.comp); e.psig = paintSig(cur); e.dirty = 0;
+    function buildCompTile(e, m, cur, W, H, tx, ty, baseTile) {   // chão + pintura de um bloco
+        const ox = tx * TS, oy = ty * TS, c = document.createElement('canvas'); c.width = baseTile.width; c.height = baseTile.height; const g = c.getContext('2d');
+        g.drawImage(baseTile, 0, 0); g.translate(-ox, -oy);
+        for (const o of cur) { if (!o || o.type !== 'paint') continue; const ow = o.w || 40, oh = o.h || 40; if (o.x > ox + c.width + 30 || o.x + ow < ox - 30 || o.y > oy + c.height + 30 || o.y + oh < oy - 30) continue; try { drawPaint(g, o, 0, true); } catch (er) { } }
+        edgeShade(g, W, H); return c;
+    }
+    function prepPaint(e, m, cur, sig, ek) {   // pintura mudou (ou primeira vez): refaz adjacências/lista de água e descarta os blocos "com pintura"
+        paintAdjacency(cur); e.water = []; for (const o of cur) if (o && o.type === 'paint' && PAINT_KIND[o.color] === 'water') e.water.push(o);
+        tilesDrop(ek + '#c'); e.psig = sig; e.dirty = 0;
     }
     function drawGround(ctx, m, t, vw) {
-        const W = m.width || 800, H = m.height || 600, key = (m.id || '') + '|' + m.color + '|' + W + '|' + H; let e = _bg[key]; const cur = m.entities || [];
+        const W = m.width || 800, H = m.height || 600, ek = (m.id || '') + '|' + m.color + '|' + W + '|' + H; let e = _bg[ek]; const cur = m.entities || [];
         if (!e) {
-            Object.keys(_bg).forEach(k => { if (k.split('|')[0] !== (m.id || '')) delete _bg[k]; });   // guarda só o mapa atual (mapas grandes gastam memória)
-            e = _bg[key] = { base: buildBase(m, W, H), comp: null, psig: null, dirty: 0, water: [], big: W * H > 20e6 }; edgeShade(e.base);
-            const ks = Object.keys(_bg); if (ks.length > 8) delete _bg[ks[0]];
+            Object.keys(_bg).forEach(k => { delete _bg[k]; tilesDrop(k + '#'); });   // guarda só o mapa atual
+            e = _bg[ek] = { psig: null, dirty: 0, water: [], sigSeen: null };
         }
-        let src = e.base, baked = false;
-        if (!e.big) {
-            const sig = paintSig(cur);
-            if (e.psig === sig) { src = e.comp; baked = true; }
-            else if (!e.comp) { bakePaint(e, m, cur, W, H); src = e.comp; baked = true; }   // primeira vez neste mapa
-            else { const now = performance.now(); if (e.sigSeen !== sig) { e.sigSeen = sig; e.dirty = now; } else if (now - e.dirty > 350) { bakePaint(e, m, cur, W, H); src = e.comp; baked = true; } }
-        }
+        let baked = false; const sig = paintSig(cur);
+        if (e.psig === sig) baked = true;
+        else if (e.psig === null) { prepPaint(e, m, cur, sig, ek); baked = true; }   // primeira vez neste mapa
+        else { const now = performance.now(); if (e.sigSeen !== sig) { e.sigSeen = sig; e.dirty = now; } else if (now - e.dirty > 350) { prepPaint(e, m, cur, sig, ek); baked = true; } }   // admin editando: pintura ao vivo até assentar
         _groundBaked = baked; _waterList = baked ? e.water : null;
-        if (vw) { const sx = Math.max(0, Math.floor(vw.x)), sy = Math.max(0, Math.floor(vw.y)), sw = Math.min(W - sx, Math.ceil(vw.w) + 2), sh = Math.min(H - sy, Math.ceil(vw.h) + 2); if (sw > 0 && sh > 0) ctx.drawImage(src, sx, sy, sw, sh, sx, sy, sw, sh); }
-        else ctx.drawImage(src, 0, 0);
+        const x0 = vw ? Math.max(0, Math.floor(vw.x)) : 0, y0 = vw ? Math.max(0, Math.floor(vw.y)) : 0, x1 = vw ? Math.min(W, Math.ceil(vw.x + vw.w) + 2) : W, y1 = vw ? Math.min(H, Math.ceil(vw.y + vw.h) + 2) : H;
+        if (x1 > x0 && y1 > y0) for (let ty = Math.floor(y0 / TS); ty <= Math.floor((y1 - 1) / TS); ty++) for (let tx = Math.floor(x0 / TS); tx <= Math.floor((x1 - 1) / TS); tx++) {
+            const bt = tileGet(ek, 'b', tx, ty, () => buildBaseTile(m, W, H, tx, ty));
+            const src = baked ? tileGet(ek, 'c', tx, ty, () => buildCompTile(e, m, cur, W, H, tx, ty, bt)) : bt;
+            if (src.width > 0) ctx.drawImage(src, tx * TS, ty * TS);
+        }
         return baked;
     }
     let _groundBaked = false, _waterList = null;

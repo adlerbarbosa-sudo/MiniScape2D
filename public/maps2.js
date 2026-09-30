@@ -358,7 +358,7 @@
     const lampRow = (b, x0, x1, y, step) => { for (let x = x0; x <= x1; x += step) b.decor('lamp', x, y, { onPath: true, force: true }); };
 
     /* ---------- 1. Campos de Aldeburgo (fazendas, Nv 1-5) ---------- */
-    def('campos', { idx: 1, name: 'Campos de Aldeburgo', lvl: '1-5', w: 2000, h: 1400, color: '#5f8c3a', gx: 1, gy: 2, build(b) {
+    def('campos', { idx: 1, name: 'Campos de Aldeburgo', lvl: '1-5', w: 2000, h: 1400, color: '#5f8c3a', gx: 1, gy: 1, build(b) {
         const H2 = HB(b);
         b.port('w', 190, 700, 'right'); b.port('e', 1810, 700, 'left');
         b.road([[190, 700], [1810, 700]], 110, { amp: 36 }); b.road([[1000, 700], [1000, 1000]], 90);
@@ -385,7 +385,7 @@
     } });
 
     /* ---------- 2. Estrada do Rei (Nv 3-6) ---------- */
-    def('estrada_rei', { idx: 2, name: 'Estrada do Rei', lvl: '3-6', w: 1600, h: 700, color: '#587f36', gx: 2, gy: 2, build(b) {
+    def('estrada_rei', { idx: 2, name: 'Estrada do Rei', lvl: '3-6', w: 1600, h: 700, color: '#587f36', gx: 2, gy: 1, build(b) {
         b.port('w', 190, 350, 'right'); b.port('e', 1410, 350, 'left');
         b.road([[190, 350], [1410, 350]], 100, { amp: 44 });
         // riacho com ponte de pedra
@@ -401,7 +401,7 @@
 
     /* ---------- 3. Vila Real (cidade comercial e sede da Coroa) ---------- */
     const doorPath = (b, x, bottom, toY, w) => b.paint('dirt', x - (w || 70) / 2, bottom, w || 70, toY - bottom, true);
-    def('vila_real', { idx: 3, name: 'Vila Real', lvl: 'cidade', w: 1800, h: 1300, color: '#5b8b3d', gx: 3, gy: 2, build(b) {
+    def('vila_real', { idx: 3, name: 'Vila Real', lvl: 'cidade', w: 1800, h: 1300, color: '#5b8b3d', gx: 3, gy: 1, build(b) {
         const H2 = HB(b); b.wallBorder();
         b.port('w', 150, 700, 'right', { safe: 100 }); b.port('e', 1650, 700, 'left', { safe: 100 }); b.port('s', 900, 1150, 'up', { safe: 100 });
         b.road([[150, 700], [1650, 700]], 120, { kind: 'stone' }); b.paint('stone', 700, 550, 400, 300, true); b.paint('stone', 840, 500, 120, 60, true); b.road([[900, 850], [900, 1170]], 110, { kind: 'stone' });
@@ -434,7 +434,7 @@
     link('l_estrada_vila', 'estrada_rei', 'e', 'vila_real', 'w', 'Vila Real →', '← Estrada do Rei');
 
     /* ============================ OESTE: trilha élfica, Silvaluz, torre do mago ============================ */
-    def('trilha_elfica', { idx: 4, name: 'Trilha Élfica', lvl: '6-10', w: 700, h: 1600, color: '#44814a', gx: -3, gy: 0, build(b) {
+    def('trilha_elfica', { idx: 4, name: 'Trilha Élfica', lvl: '6-10', w: 700, h: 1600, color: '#44814a', gx: -2, gy: 0, build(b) {
         b.port('s', 350, 1380, 'up'); b.port('n', 350, 220, 'down');
         b.road([[350, 1380], [350, 220]], 100, { amp: 50 });
         // cristais élficos iluminam o caminho
@@ -446,7 +446,7 @@
         b.mobs('wolf_base', 3, [60, 300, 640, 900]); b.mobs('spider_base', 3, [60, 900, 640, 1250]); b.mobs('boar_base', 2, [60, 600, 640, 900]); b.mobs('goblin_base', 2, [400, 250, 640, 600]); b.mobs('orc_base', 1, [60, 1000, 300, 1250]); b.mobs('deer_base', 2, [60, 400, 640, 1200]);
     } });
 
-    def('silvaluz', { idx: 5, name: 'Bosque Élfico de Silvaluz', lvl: '12-20', w: 2000, h: 1400, color: '#3d7a4a', gx: -4, gy: 0, build(b) {
+    def('silvaluz', { idx: 5, name: 'Bosque Élfico de Silvaluz', lvl: '12-20', w: 2000, h: 1400, color: '#3d7a4a', gx: -3, gy: 0, build(b) {
         const H2 = HB(b);
         b.port('e', 1810, 1160, 'left'); b.port('w', 190, 560, 'right');
         // clareira central: círculo de pedras, torres e fonte
@@ -466,7 +466,7 @@
     link('l_floresta_trilha', 'floresta', { hint: [120, 720], face: 'right' }, 'trilha_elfica', 's', 'Trilha Élfica →', '← Floresta Sombria');
     link('l_trilha_silva', 'trilha_elfica', 'n', 'silvaluz', 'e', 'Bosque de Silvaluz →', '← Trilha Élfica');
 
-    def('torre_mago', { idx: 6, name: 'Masmorra da Torre do Mago', lvl: '34-65', w: 1600, h: 1400, color: '#15121f', gx: -5, gy: 0, build(b) {
+    def('torre_mago', { idx: 6, name: 'Masmorra da Torre do Mago', lvl: '34-65', w: 1600, h: 1400, color: '#15121f', gx: -4, gy: 0, build(b) {
         const xs = [0, 540, 1060, 1600], ys = [0, 470, 930, 1400];
         b.wallBorder(); floors(b, xs, ys, ['stone', 'stone', 'stone', 'stone', 'stone', 'stone', 'stone', 'stone', 'stone']);
         // salas: (0,0) biblioteca, (1,0) sala do mago, (2,0) laboratório; (0,1) corredor W, (1,1) salão, (2,1) corredor E; (0,2) oficina, (1,2) entrada, (2,2) câmara de cristais
@@ -553,7 +553,7 @@
     } });
     link('l_porto_praia', 'porto_mares', 'w', 'praia_naufragios', 'e', 'Praia dos Naufrágios →', '← Porto de Marés');
 
-    def('pantano', { idx: 10, name: 'Pântano de Brejo Negro', lvl: '10-16', w: 2000, h: 1400, color: '#43502c', gx: 0, gy: 3, build(b) {
+    def('pantano', { idx: 10, name: 'Pântano de Brejo Negro', lvl: '10-16', w: 2000, h: 1400, color: '#43502c', gx: 0, gy: 2, build(b) {
         b.port('n', 1000, 220, 'down'); b.port('se', 1810, 1160, 'left');
         // lama (terra) e poças
         b.road([[1000, 220], [1000, 500], [1450, 500], [1450, 1160], [1810, 1160]], 90, { amp: 0 });
@@ -568,7 +568,7 @@
     } });
     link('l_rio_pantano', 'rio', { hint: [1560, 1250], face: 'up' }, 'pantano', 'n', 'Pântano de Brejo Negro →', '← Vale do Rio');
 
-    def('covil_goblins', { idx: 11, name: 'Covil dos Goblins', lvl: '8-28', w: 1600, h: 1200, color: '#241e14', gx: 0, gy: 4, build(b) {
+    def('covil_goblins', { idx: 11, name: 'Covil dos Goblins', lvl: '8-28', w: 1600, h: 1200, color: '#241e14', gx: 0, gy: 3, build(b) {
         const xs = [0, 560, 1040, 1600], ys = [0, 400, 800, 1200];
         b.wallBorder(); floors(b, xs, ys, ['dirt', 'stone', 'dirt', 'dirt', 'dirt', 'dirt', 'dirt', 'dirt', 'dirt']);
         gridWalls(b, xs, ys, [[1, 1, 'd'], [0, 2, 'r'], [1, 2, 'r'], [0, 1, 'r'], [1, 1, 'r'], [1, 0, 'd'], [0, 0, 'd'], [2, 0, 'd']]);
@@ -592,7 +592,7 @@
     /* ============================ LESTE: estrada das areias, deserto, oásis, ruínas ============================ */
     const SAND = '#cdb57a', SANDD = '#b99d63';
     const sandRoad = (b, pts, w, o) => b.road(pts, w, Object.assign({ kind: SAND }, o || {}));
-    def('estrada_areias', { idx: 12, name: 'Estrada das Areias', lvl: '10-14', w: 1600, h: 700, color: '#d3bf88', gx: 5, gy: 2, build(b) {
+    def('estrada_areias', { idx: 12, name: 'Estrada das Areias', lvl: '10-14', w: 1600, h: 700, color: '#d3bf88', gx: 4, gy: 1, build(b) {
         b.port('w', 190, 350, 'right'); b.port('e', 1410, 350, 'left');
         ring(b, 'boulder', 52, 40, { sides: 'tblr', tone: 'sand' });
         b.paint(SANDD, 380, 120, 420, 120); b.paint(SANDD, 900, 470, 380, 110);
@@ -606,7 +606,7 @@
     } });
     link('l_vila_areias', 'vila_real', 'e', 'estrada_areias', 'w', 'Estrada das Areias →', '← Vila Real');
 
-    def('deserto', { idx: 13, name: 'Deserto de Sahr', lvl: '14-22', w: 2000, h: 1400, color: '#dbc58c', gx: 6, gy: 2, build(b) {
+    def('deserto', { idx: 13, name: 'Deserto de Sahr', lvl: '14-22', w: 2000, h: 1400, color: '#dbc58c', gx: 5, gy: 1, build(b) {
         b.port('w', 190, 700, 'right'); b.port('e', 1810, 700, 'left');
         ring(b, 'boulder', 52, 40, { sides: 'tblr', tone: 'sand' });
         // dunas (manchas de areia mais escura) e uma trilha tortuosa marcada por ossos e cactos
@@ -622,7 +622,7 @@
     } });
     link('l_areias_deserto', 'estrada_areias', 'e', 'deserto', 'w', 'Deserto de Sahr →', '← Estrada das Areias');
 
-    def('oasis', { idx: 14, name: 'Oásis de Lahur', lvl: 'cidade do deserto', w: 1600, h: 1100, color: '#d6c184', gx: 7, gy: 2, build(b) {
+    def('oasis', { idx: 14, name: 'Oásis de Lahur', lvl: 'cidade do deserto', w: 1600, h: 1100, color: '#d6c184', gx: 6, gy: 1, build(b) {
         const H2 = HB(b);
         b.port('w', 190, 550, 'right', { safe: 100 }); b.port('e', 1410, 550, 'left', { safe: 100 });
         ring(b, 'boulder', 52, 40, { sides: 'tblr', tone: 'sand' });
@@ -639,7 +639,7 @@
     } });
     link('l_deserto_oasis', 'deserto', 'e', 'oasis', 'w', 'Oásis de Lahur →', '← Deserto de Sahr');
 
-    def('ruinas', { idx: 15, name: 'Ruínas de Sahr-Kal', lvl: '28-45', w: 2000, h: 1400, color: '#cdb27a', gx: 8, gy: 2, build(b) {
+    def('ruinas', { idx: 15, name: 'Ruínas de Sahr-Kal', lvl: '28-45', w: 2000, h: 1400, color: '#cdb27a', gx: 7, gy: 1, build(b) {
         b.port('w', 190, 700, 'right', { safe: 160 });
         ring(b, 'boulder', 52, 40, { sides: 'tblr', tone: 'sand' });
         b.paint(SANDD, 240, 100, 420, 260); b.paint(SANDD, 1300, 1000, 520, 260);
@@ -660,7 +660,7 @@
 
     /* ============================ NORTE: serra, Pedralta, mina abandonada, passo e vale gelados ============================ */
     const SNOW = '#e3ecf3', SNOWD = '#c9d8e5', ICE = '#b7dcef';
-    def('trilha_serra', { idx: 16, name: 'Trilha da Serra', lvl: '12-18', w: 700, h: 1600, color: '#8d9484', gx: 3, gy: -1, build(b) {
+    def('trilha_serra', { idx: 16, name: 'Trilha da Serra', lvl: '12-18', w: 700, h: 1600, color: '#8d9484', gx: 1, gy: -1, build(b) {
         b.port('s', 350, 1380, 'up'); b.port('n', 350, 220, 'down');
         ring(b, 'boulder', 50, 38, { sides: 'tblr', tone: 'grey' });
         b.paint('#7e8576', 90, 300, 200, 420); b.paint('#7e8576', 420, 880, 190, 420);
@@ -675,7 +675,7 @@
     } });
     link('l_mina_serra', 'mina', { hint: [1660, 700], face: 'left' }, 'trilha_serra', 's', 'Trilha da Serra →', '← Mina de Pedralta');
 
-    def('pedralta', { idx: 17, name: 'Pedralta', lvl: 'cidade mineira', w: 1800, h: 1300, color: '#85897a', gx: 4, gy: -1, build(b) {
+    def('pedralta', { idx: 17, name: 'Pedralta', lvl: 'cidade mineira', w: 1800, h: 1300, color: '#85897a', gx: 1, gy: -2, build(b) {
         const H2 = HB(b); b.wallBorder();
         b.port('s', 900, 1150, 'up', { safe: 100 }); b.port('e', 1650, 650, 'left', { safe: 100 }); b.port('n', 900, 200, 'down', { safe: 100 });
         b.road([[900, 1150], [900, 200]], 110, { kind: 'stone' }); b.road([[250, 650], [1650, 650]], 110, { kind: 'stone' }); b.paint('stone', 740, 530, 320, 240, true);
@@ -692,7 +692,7 @@
     } });
     link('l_serra_pedralta', 'trilha_serra', 'n', 'pedralta', 's', 'Pedralta →', '← Trilha da Serra');
 
-    def('mina_abandonada', { idx: 18, name: 'Mina Abandonada de Pedralta', lvl: '20-45', w: 1600, h: 1200, color: '#1d1a17', gx: 4, gy: -2, build(b) {
+    def('mina_abandonada', { idx: 18, name: 'Mina Abandonada de Pedralta', lvl: '20-45', w: 1600, h: 1200, color: '#1d1a17', gx: 1, gy: -3, build(b) {
         const xs = [0, 560, 1040, 1600], ys = [0, 400, 800, 1200];
         b.wallBorder(); floors(b, xs, ys, ['stone', 'dirt', 'stone', 'dirt', 'dirt', 'dirt', 'dirt', 'stone', 'dirt']);
         gridWalls(b, xs, ys, [[1, 1, 'd'], [0, 2, 'r'], [1, 2, 'r'], [0, 1, 'r'], [1, 1, 'r'], [1, 0, 'd'], [0, 0, 'd'], [2, 0, 'd']]);
@@ -711,7 +711,7 @@
     } });
     link('l_pedralta_mina', 'pedralta', 'n', 'mina_abandonada', 's', 'Mina Abandonada →', '← Pedralta');
 
-    def('passo_gelado', { idx: 19, name: 'Passo Gelado', lvl: '22-32', w: 1800, h: 800, color: SNOW, gx: 5, gy: -1, build(b) {
+    def('passo_gelado', { idx: 19, name: 'Passo Gelado', lvl: '22-32', w: 1800, h: 800, color: SNOW, gx: 2, gy: -2, build(b) {
         b.port('w', 190, 400, 'right'); b.port('e', 1610, 400, 'left');
         ring(b, 'boulder', 50, 38, { sides: 'tblr', tone: 'snow' });
         [[300, 140, 420, 160], [900, 130, 500, 170], [400, 540, 560, 150], [1150, 520, 400, 170]].forEach((p) => b.paint(SNOWD, p[0], p[1], p[2], p[3]));
@@ -725,7 +725,7 @@
     } });
     link('l_pedralta_passo', 'pedralta', 'e', 'passo_gelado', 'w', 'Passo Gelado →', '← Pedralta');
 
-    def('vale_gelado', { idx: 20, name: 'Vale Gelado de Hrimgar', lvl: '32-55', w: 2000, h: 1400, color: '#dde8f1', gx: 6, gy: -1, build(b) {
+    def('vale_gelado', { idx: 20, name: 'Vale Gelado de Hrimgar', lvl: '32-55', w: 2000, h: 1400, color: '#dde8f1', gx: 3, gy: -2, build(b) {
         b.port('w', 190, 700, 'right', { safe: 160 });
         ring(b, 'boulder', 50, 38, { sides: 'tblr', tone: 'snow' });
         [[280, 140, 500, 240], [1000, 160, 520, 220], [240, 980, 560, 240], [1100, 1000, 640, 240]].forEach((p) => b.paint(SNOWD, p[0], p[1], p[2], p[3]));
@@ -742,7 +742,7 @@
     link('l_passo_vale', 'passo_gelado', 'e', 'vale_gelado', 'w', 'Vale Gelado →', '← Passo Gelado');
 
     /* ============================ SUL-LESTE SOMBRIO: estrada, cemitério, cripta, fortaleza, vulcão, ninho ============================ */
-    def('estrada_sombria', { idx: 21, name: 'Estrada Sombria', lvl: '14-20', w: 700, h: 1600, color: '#4c5844', gx: 3, gy: 4, build(b) {
+    def('estrada_sombria', { idx: 21, name: 'Estrada Sombria', lvl: '14-20', w: 700, h: 1600, color: '#4c5844', gx: 3, gy: 2, build(b) {
         b.port('n', 350, 220, 'down'); b.port('s', 350, 1380, 'up');
         b.paint('#3f4a39', 80, 380, 240, 300); b.paint('#3f4a39', 400, 900, 230, 330);
         b.road([[350, 220], [350, 1380]], 100, { amp: 56 });
@@ -753,7 +753,7 @@
     } });
     link('l_vila_sombria', 'vila_real', 's', 'estrada_sombria', 'n', 'Estrada Sombria →', '← Vila Real');
 
-    def('cemiterio', { idx: 22, name: 'Cemitério das Brumas', lvl: '18-28', w: 2000, h: 1400, color: '#414c3e', gx: 3, gy: 5, build(b) {
+    def('cemiterio', { idx: 22, name: 'Cemitério das Brumas', lvl: '18-28', w: 2000, h: 1400, color: '#414c3e', gx: 3, gy: 3, build(b) {
         const H2 = HB(b);
         b.port('n', 1000, 220, 'down'); b.port('e', 1810, 700, 'left'); b.port('w', 190, 700, 'right');
         b.treeBorder({ v: VPINE(b) });
@@ -772,7 +772,7 @@
     } });
     link('l_sombria_cemiterio', 'estrada_sombria', 's', 'cemiterio', 'n', 'Cemitério das Brumas →', '← Estrada Sombria');
 
-    def('cripta_real', { idx: 23, name: 'Catacumba do Rei Esquecido', lvl: '30-70', w: 1600, h: 1400, color: '#14121a', gx: 4, gy: 5, build(b) {
+    def('cripta_real', { idx: 23, name: 'Catacumba do Rei Esquecido', lvl: '30-70', w: 1600, h: 1400, color: '#14121a', gx: 4, gy: 3, build(b) {
         const xs = [0, 540, 1060, 1600], ys = [0, 470, 930, 1400];
         b.wallBorder(); floors(b, xs, ys, ['stone', 'stone', 'stone', 'stone', 'stone', 'stone', 'stone', 'stone', 'stone']);
         gridWalls(b, xs, ys, [[1, 1, 'd'], [0, 2, 'r'], [1, 2, 'r'], [0, 1, 'r'], [1, 1, 'r'], [1, 0, 'd'], [0, 0, 'd'], [2, 0, 'd']], { off: {} });
@@ -789,7 +789,7 @@
     } });
     link('l_cemiterio_cripta', 'cemiterio', 'e', 'cripta_real', 's', 'Catacumba do Rei →', '← Cemitério das Brumas');
 
-    def('fortaleza', { idx: 24, name: 'Fortaleza de Morthak', lvl: '38-60', w: 2000, h: 1400, color: '#5c5c60', gx: 2, gy: 5, build(b) {
+    def('fortaleza', { idx: 24, name: 'Fortaleza de Morthak', lvl: '38-60', w: 2000, h: 1400, color: '#5c5c60', gx: 2, gy: 3, build(b) {
         const H2 = HB(b); b.wallBorder({ tone: 'dark' });
         b.port('e', 1810, 700, 'left', { safe: 120 }); b.port('w', 190, 700, 'right', { safe: 120 });
         b.paint('stone', 100, 100, 1800, 1200, true); b.paint('#4a4a50', 700, 300, 700, 800);
@@ -807,7 +807,7 @@
     } });
     link('l_cemiterio_fortaleza', 'cemiterio', 'w', 'fortaleza', 'e', 'Fortaleza de Morthak →', '← Cemitério das Brumas');
 
-    def('vulcao', { idx: 25, name: 'Vulcão Brasa-Viva', lvl: '45-65', w: 2000, h: 1400, color: '#3c302d', gx: 1, gy: 5, build(b) {
+    def('vulcao', { idx: 25, name: 'Vulcão Brasa-Viva', lvl: '45-65', w: 2000, h: 1400, color: '#3c302d', gx: 1, gy: 3, build(b) {
         b.port('e', 1810, 700, 'left', { safe: 140 }); b.port('s', 1000, 1180, 'up', { safe: 140 });
         ring(b, 'boulder', 50, 38, { sides: 'tblr', tone: 'ash' });
         [[260, 140, 560, 260], [1100, 150, 600, 240], [200, 980, 540, 260], [1260, 980, 560, 240]].forEach((p) => b.paint('#2f2523', p[0], p[1], p[2], p[3]));
@@ -822,7 +822,7 @@
     } });
     link('l_fortaleza_vulcao', 'fortaleza', 'w', 'vulcao', 'e', 'Vulcão Brasa-Viva →', '← Fortaleza de Morthak');
 
-    def('ninho_dragao', { idx: 26, name: 'Ninho do Dragão Negro', lvl: '50-80', w: 1600, h: 1200, color: '#160d0d', gx: 1, gy: 6, build(b) {
+    def('ninho_dragao', { idx: 26, name: 'Ninho do Dragão Negro', lvl: '50-80', w: 1600, h: 1200, color: '#160d0d', gx: 1, gy: 4, build(b) {
         const xs = [0, 560, 1040, 1600], ys = [0, 400, 800, 1200];
         b.wallBorder({ tone: 'ash' }); floors(b, xs, ys, ['stone', 'stone', 'stone', 'stone', 'stone', 'stone', 'stone', 'stone', 'stone']);
         gridWalls(b, xs, ys, [[1, 1, 'd'], [0, 2, 'r'], [1, 2, 'r'], [0, 1, 'r'], [1, 1, 'r'], [1, 0, 'd'], [0, 0, 'd'], [2, 0, 'd']]);

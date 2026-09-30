@@ -49,7 +49,7 @@
 
     /* ---------- desenho principal (espaço da tela, depois do mundo) ---------- */
     function draw(ctx, canvas, offset, mapObj, view, player, T) {
-        const cw = canvas.width, ch = canvas.height, kind = mapKind(mapObj);
+        const cw = canvas._lw || canvas.width, ch = canvas._lh || canvas.height, kind = mapKind(mapObj);
         let d = 1 - daylight();                                           // escuridão externa
         if (kind === 'dark') d = Math.max(d, 0.62); else if (kind === 'dim') d = Math.max(d, 0.38); else if (kind === 'home') d = 0.14;
         const mapKey = (mapObj && mapObj.id) || ''; curKind = kind;
