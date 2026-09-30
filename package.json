@@ -1,10 +1,10 @@
 {
   "name": "miniscape-server",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "version": "1.1.0",
+  "description": "MiniScape 2D - MMO 2D estilo RuneScape (servidor Node + cliente canvas)",
+  "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server.js"
   },
   "keywords": [],
   "author": "",
@@ -13,5 +13,8 @@
   "dependencies": {
     "cors": "^2.8.6",
     "express": "^5.2.1"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }
