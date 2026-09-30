@@ -33,3 +33,17 @@ Abra http://localhost:3000 e entre com usuário `Admin` e a senha definida.
 - `/catalogo.html`: catálogo visual com todos os monstros, animais, NPCs, prédios e itens.
 - Comportamentos: `aggressive` (ataca ao ver), `neutral` (revida), `passive` (foge se atacado), `skittish` (foge ao ver), `npc`.
 - Admin: DEV → Mapas → "Instalar mapas novos" troca os 5 mapas padrão pelo mundo medieval (baixa um backup antes).
+
+## Conteúdo e sistemas (módulos em `public/`)
+- `env.js`: ciclo de dia e noite (20 min reais por dia), clima por mapa (chuva, neblina, tempestade), luzes de lampiões e cristais. Cavernas e catacumbas ficam sempre escuras; a casa tem luz própria.
+- `sfx.js`: sons e música sintetizados por WebAudio (sem arquivos). Volumes na aba Menu.
+- `quests.js`: missões de NPC com marcador `!`/`?`, entrega segura e integração ao diário. Novas missões: `Quests.add({...})`.
+- `content.js`: carvão e mithril, aço e mithril (fornalha), agricultura (canteiros, sementes do Fazendeiro, crescimento em tempo real), alquimia (caldeirão) e encantamento (mesa). Os itens/peças são colocados uma única vez por mapa (`m.c3`), sem sobrescrever o que o admin editou.
+- `world2.js`: Bestiário (aba Ofícios), Casa do Aventureiro e Catacumbas com o Lich Rei Ossian.
+  - A casa é o mapa `casa`: cada jogador decora a sua (guardada em `playerData.house`); os móveis são reconstruídos localmente e nunca vão para o mundo salvo.
+  - Os mapas `casa` e `catacumbas` (e a porta da vila / entrada no Covil) são criados pelo admin no login e salvos no servidor; jogadores comuns os recebem depois disso.
+- `ui.js` e `ui.css`: tema, tela de login, livro de ofícios, guia (H), rastreador de missões.
+
+## Notas de operação
+- Nada disso exige reinstalar mapas: o conteúdo novo entra sozinho no mundo salvo quando o admin entra (o mundo é salvo logo em seguida). Quem já editou os mapas mantém tudo.
+- Dados de jogador (fazenda, buffs, missões, bestiário, casa) ficam em `playerData`, salvo no servidor.
