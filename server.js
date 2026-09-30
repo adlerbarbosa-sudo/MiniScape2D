@@ -34,8 +34,11 @@ app.use((req, res, next) => {
     res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src * data: blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'");
     next();
 });
-app.use('/api/restore', express.json({ limit: '30mb' }));   // restauração pode ser grande
-app.use(express.json({ limit: '8mb' }));
+/* limites de corpo: rotas leves aceitam pouco; save exige login antes de ler corpo grande; restauração só admin */
+app.use(['/api/sync', '/api/chat', '/api/login', '/api/register', '/api/logout'], express.json({ limit: '64kb' }));
+app.use('/api/save', (req, res, next) => auth(req, res, next), express.json({ limit: '8mb' }));
+app.use('/api/restore', (req, res, next) => auth(req, res, () => adminOnly(req, res, next)), express.json({ limit: '30mb' }));
+app.use(express.json({ limit: '1mb' }));
 app.use(express.static(path.join(__dirname, 'public'), { dotfiles: 'ignore' }));
 
 /* ---------------- BANCO DE DADOS (em memória + disco) ---------------- */
@@ -83,6 +86,7 @@ function loadDB() {
         console.error('[DB] database.json ilegível:', e.message);
         try { fs.copyFileSync(DB_FILE, DB_FILE + '.corrompido-' + Date.now()); } catch (_) { }
         try { if (fs.existsSync(DB_FILE + '.bak')) { console.error('[DB] restaurando de database.json.bak'); return normalizeDB(JSON.parse(fs.readFileSync(DB_FILE + '.bak', 'utf8'))); } } catch (e2) { console.error('[DB] .bak também ilegível:', e2.message); }
+        console.error('[DB] NÃO vou iniciar com banco vazio para não apagar suas contas. Restaure um arquivo da pasta backups/ ou corrija database.json.'); process.exit(1);
     }
     return emptyDB();
 }
@@ -125,13 +129,15 @@ async function hashPw(pw) {
 async function checkPw(pw, stored) {
     if (typeof pw !== 'string' || typeof stored !== 'string') return false;
     if (stored.startsWith('scrypt$')) {
-        const [, s, h] = stored.split('$'); const hb = Buffer.from(h, 'hex');
+        const [, s, h] = stored.split('$'); if (!s || !h) return false; const hb = Buffer.from(h, 'hex');
         const calc = await scrypt(pw, Buffer.from(s, 'hex'), hb.length);
         return calc.length === hb.length && crypto.timingSafeEqual(calc, hb);
     }
     const a = Buffer.from(pw), b = Buffer.from(stored);   // contas antigas (texto puro)
     return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
+
+const DUMMY_HASH = 'scrypt$' + '00'.repeat(16) + '$' + '00'.repeat(64);
 
 /* ---------------- ADMIN INICIAL ---------------- */
 const LEAKED_PASSWORDS = ['Adleradm'];   // senha que estava publicada no GitHub
@@ -186,6 +192,7 @@ function adminOnly(req, res, next) {
 
 /* ---------------- LIMITES (anti-abuso simples) ---------------- */
 const hits = new Map();
+const failedLogins = new Map();
 function rateLimit(name, max, windowMs) {
     return (req, res, next) => {
         const key = name + '|' + req.ip; const now = Date.now();
@@ -194,17 +201,20 @@ function rateLimit(name, max, windowMs) {
         next();
     };
 }
-setInterval(() => { const now = Date.now(); for (const [k, e] of hits) if (e.reset < now) hits.delete(k); for (const h of Object.keys(db.sessions)) if (db.sessions[h].exp < now) delete db.sessions[h]; }, 60000).unref();
-const failedLogins = new Map();
+setInterval(() => { const now = Date.now(); for (const [k, e] of failedLogins) if (e.until < now) failedLogins.delete(k); for (const [k, e] of hits) if (e.reset < now) hits.delete(k); for (const h of Object.keys(db.sessions)) if (db.sessions[h].exp < now) delete db.sessions[h]; }, 60000).unref();
 
 /* ---------------- ESTADO EM TEMPO REAL ---------------- */
-const activePlayers = {};   // user -> {x,y,map,facing,actionAnim,equipment,lastSeen}
-const serverMobs = {};      // map -> id -> {hp,maxHp,aggro,isDead,deadTime}
-const mobPos = {};          // map -> id -> {x,y}  (enviado pelo host)
-const hostByMap = {};       // map -> username do host
-const lastChat = {};        // user -> timestamp
+const activePlayers = Object.create(null);   // user -> {x,y,map,facing,actionAnim,equipment,lastSeen}
+const serverMobs = Object.create(null);      // map -> id -> {hp,maxHp,aggro,isDead,deadTime}
+const mobPos = Object.create(null);          // map -> id -> {x,y}  (enviado pelo host)
+const hostByMap = Object.create(null);       // map -> username do host
+const lastChat = Object.create(null);        // user -> timestamp
 
 const num = (v, d = 0) => Number.isFinite(v) ? v : d;
+const RESERVED = new Set(['__proto__', 'constructor', 'prototype', 'hasownproperty', 'tostring', 'valueof', 'sistema']);
+const ID_RE = /^[A-Za-z0-9_\-]{1,30}$/;
+const coord = (v, d) => Math.max(0, Math.min(20000, num(v, d)));
+const dmgBudget = Object.create(null);   // user -> {t,d}
 function cleanupPlayers() {
     const now = Date.now();
     for (const u of Object.keys(activePlayers)) if (now - activePlayers[u].lastSeen > 5000) delete activePlayers[u];
@@ -225,24 +235,31 @@ function electHost(map) {
 app.get('/healthz', (req, res) => res.json({ ok: true, players: Object.keys(activePlayers).length }));
 
 app.post('/api/register', rateLimit('reg', 10, 60000), async (req, res) => {
-    const username = typeof req.body.username === 'string' ? req.body.username.trim() : '';
-    const password = typeof req.body.password === 'string' ? req.body.password : '';
+    const rb = req.body || {};
+    const username = typeof rb.username === 'string' ? rb.username.trim() : '';
+    const password = typeof rb.password === 'string' ? rb.password : '';
+    if (RESERVED.has(username.toLowerCase())) return res.status(400).json({ error: 'Nome não permitido.' });
     if (!NAME_RE.test(username)) return res.status(400).json({ error: 'Nome inválido (2 a 20 letras, números, espaço, _ . -).' });
     if (password.length < 4 || password.length > 100) return res.status(400).json({ error: 'A senha deve ter de 4 a 100 caracteres.' });
     if (Object.keys(db.users).some(n => n.toLowerCase() === username.toLowerCase())) return res.status(400).json({ error: 'Usuário já existe!' });
     if (Object.keys(db.users).length >= 5000) return res.status(400).json({ error: 'Servidor cheio.' });
-    db.users[username] = { password: await hashPw(password), role: 'player', playerData: null };   // nunca cria admin por aqui
+    const pwHash = await hashPw(password);
+    if (Object.keys(db.users).some(n => n.toLowerCase() === username.toLowerCase())) return res.status(400).json({ error: 'Usuário já existe!' });   // rechecagem: outro pedido pode ter criado o nome durante o hash
+    db.users[username] = { password: pwHash, role: 'player', playerData: null };   // nunca cria admin por aqui
     markDirty(); flushDB(); res.json({ success: true });   // conta nova é gravada na hora
 });
 
 app.post('/api/login', rateLimit('login', 20, 60000), async (req, res) => {
-    const username = typeof req.body.username === 'string' ? req.body.username.trim() : '';
-    const password = typeof req.body.password === 'string' ? req.body.password : '';
+    const lb = req.body || {};
+    const username = typeof lb.username === 'string' ? lb.username.trim().slice(0, 40) : '';
+    const password = typeof lb.password === 'string' ? lb.password.slice(0, 200) : '';
     const fk = req.ip + '|' + username.toLowerCase(); const f = failedLogins.get(fk);
+    if (f && f.until < Date.now()) failedLogins.delete(fk);
     if (f && f.n >= 8 && f.until > Date.now()) return res.status(429).json({ error: 'Muitas tentativas erradas. Tente em alguns minutos.' });
     // busca sem diferenciar maiúsculas/minúsculas (contas antigas continuam funcionando)
     const real = hasOwn(db.users, username) ? username : Object.keys(db.users).find(n => n.toLowerCase() === username.toLowerCase());
     const user = real ? db.users[real] : null;
+    if (!user) await checkPw(password, DUMMY_HASH);   // gasta o mesmo tempo: não revela se o usuário existe
     if (!user || !(await checkPw(password, user.password))) {
         const e = failedLogins.get(fk) || { n: 0, until: 0 }; e.n++; e.until = Date.now() + 5 * 60000; failedLogins.set(fk, e);
         return res.status(401).json({ error: 'Usuário ou senha incorretos!' });
@@ -258,9 +275,9 @@ app.post('/api/login', rateLimit('login', 20, 60000), async (req, res) => {
 
 app.post('/api/logout', auth, (req, res) => { delete db.sessions[req.tokenKey]; delete activePlayers[req.user]; markDirty(); res.json({ success: true }); });
 
-app.post('/api/save', auth, (req, res) => {
+app.post('/api/save', rateLimit('save', 90, 60000), (req, res) => {
     const { playerData, worldData, itemDB, npcDB } = req.body || {};
-    const u = db.users[req.user];
+    const u = db.users[req.user]; if (!u) return res.status(401).json({ error: 'Conta não encontrada.', code: 'AUTH' });
     if (playerData !== undefined) {
         if (!playerData || typeof playerData !== 'object' || Array.isArray(playerData) || JSON.stringify(playerData).length > 1500000) return res.status(400).json({ error: 'Dados do jogador inválidos.' });
         u.playerData = playerData;
@@ -283,20 +300,27 @@ app.post('/api/save', auth, (req, res) => {
 
 app.post('/api/sync', auth, (req, res) => {
     const b = req.body || {}; const user = req.user; const now = Date.now();
-    const map = (typeof b.map === 'string' && MAP_RE.test(b.map)) ? b.map : 'lumbridge';
+    let map = (typeof b.map === 'string' && MAP_RE.test(b.map) && !RESERVED.has(b.map.toLowerCase())) ? b.map : 'lumbridge';
+    if (db.worldData && !hasOwn(db.worldData, map)) map = hasOwn(db.worldData, 'lumbridge') ? 'lumbridge' : map;
     const prev = activePlayers[user];
     const eq = (b.equipment && typeof b.equipment === 'object' && JSON.stringify(b.equipment).length < 6000) ? b.equipment : (prev ? prev.equipment : null);
     const fc = (b.facing && typeof b.facing === 'object') ? { x: num(b.facing.x) | 0, y: num(b.facing.y) | 0 } : { x: 0, y: 1 };
-    activePlayers[user] = { x: num(b.x, 400), y: num(b.y, 300), map, facing: fc, actionAnim: num(b.actionAnim) | 0, equipment: eq, lastSeen: now };
+    activePlayers[user] = { x: coord(b.x, 400), y: coord(b.y, 300), map, facing: fc, actionAnim: num(b.actionAnim) | 0, equipment: eq, lastSeen: now };
     const host = electHost(map); const isHost = host === user;
 
-    if (!serverMobs[map]) serverMobs[map] = {};
+    if (!serverMobs[map]) serverMobs[map] = Object.create(null);
     if (Array.isArray(b.combatLogs)) {
         for (const log of b.combatLogs.slice(0, 20)) {
             if (!log || (typeof log.id !== 'number' && typeof log.id !== 'string')) continue;
-            const id = String(log.id).slice(0, 30); const dmg = Math.max(0, Math.min(500, num(log.dmg))); const maxHp = Math.max(1, Math.min(100000, num(log.maxHp, 10)));
+            const id = String(log.id); if (!ID_RE.test(id) || RESERVED.has(id.toLowerCase())) continue;
+            let dmg = Math.max(0, Math.min(500, num(log.dmg))); const maxHp = Math.max(1, Math.min(100000, num(log.maxHp, 10)));
+            if (dmg > 0) { const bd = dmgBudget[user] || (dmgBudget[user] = { t: now, d: 0 }); if (now - bd.t > 1000) { bd.t = now; bd.d = 0; } bd.d += dmg; if (bd.d > 1500) continue; }   // teto de dano por segundo
             let sm = serverMobs[map][id];
-            if (!sm) { sm = { hp: maxHp, maxHp, aggro: null, isDead: false, deadTime: 0 }; serverMobs[map][id] = sm; }
+            if (!sm) {
+                if (Object.keys(serverMobs[map]).length >= 400) continue;
+                if (mobPos[map] && !mobPos[map][id]) continue;   // só existem monstros que o host do mapa reportou
+                sm = { hp: maxHp, maxHp, aggro: null, isDead: false, deadTime: 0 }; serverMobs[map][id] = sm;
+            }
             if (!sm.isDead) {
                 if (dmg === 0 && sm.aggro && sm.aggro !== user && activePlayers[sm.aggro] && activePlayers[sm.aggro].map === map) continue;   // "vi você" (dano 0) não rouba o alvo de outro jogador
                 sm.hp -= dmg; sm.aggro = user;   // o monstro foca em quem bateu por último
@@ -310,8 +334,8 @@ app.post('/api/sync', auth, (req, res) => {
         else if (sm.aggro && (!activePlayers[sm.aggro] || activePlayers[sm.aggro].map !== map)) sm.aggro = null;
     }
     if (isHost && b.mobPos && typeof b.mobPos === 'object') {
-        const mp = {}; let n = 0;
-        for (const id of Object.keys(b.mobPos)) { if (++n > 300) break; const p = b.mobPos[id]; if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) mp[id] = { x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10 }; }
+        const mp = Object.create(null); let n = 0;
+        for (const id of Object.keys(b.mobPos)) { if (++n > 400) break; if (!ID_RE.test(id) || RESERVED.has(id.toLowerCase())) continue; const p = b.mobPos[id]; if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) mp[id] = { x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10 }; }
         mobPos[map] = mp;
     }
     if (mobPos[map]) {   // "leash": o monstro desiste se o alvo ficou muito longe
@@ -332,7 +356,8 @@ app.post('/api/sync', auth, (req, res) => {
 app.get('/api/map', auth, (req, res) => res.json({ worldData: db.worldData, itemDB: db.itemDB, npcDB: db.npcDB, mapVersion: db.mapVersion }));
 
 app.post('/api/chat', auth, (req, res) => {
-    let msg = typeof req.body.msg === 'string' ? req.body.msg.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 200) : '';
+    const cb = req.body || {};
+    let msg = typeof cb.msg === 'string' ? cb.msg.replace(/[\u0000-\u001f\u007f\u200b-\u200f\u202a-\u202e\u2066-\u2069]/g, ' ').trim().slice(0, 200) : '';
     const now = Date.now();
     if (msg && now - (lastChat[req.user] || 0) < 800) return res.status(429).json({ error: 'Devagar!', chat: db.chat, chatVer: db.chatVer });
     if (msg) {
@@ -368,6 +393,7 @@ app.get('/api/backup', auth, adminOnly, (req, res) => {
 app.post('/api/restore', auth, adminOnly, (req, res) => {
     const { dbData } = req.body || {};
     if (!dbData || typeof dbData !== 'object' || !dbData.users) return res.status(400).json({ error: 'Backup inválido.' });
+    try { const dir = path.join(DATA_DIR, 'backups'); fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(path.join(dir, 'antes-do-restore-' + Date.now() + '.json'), JSON.stringify(db), 'utf8'); } catch (e) { console.error('[DB] snapshot pré-restore falhou:', e.message); }
     const restored = normalizeDB(dbData); restored.sessions = db.sessions;
     if (!hasOwn(restored.users, req.user)) restored.users[req.user] = db.users[req.user];   // quem restaura não perde o acesso
     restored.users[req.user].role = 'admin';

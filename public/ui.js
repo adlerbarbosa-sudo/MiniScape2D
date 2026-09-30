@@ -226,7 +226,7 @@
         if (o.type === 'bank') return ['Banco', 'Botão direito: abrir banco'];
         if (o.type === 'fire') return ['Fogueira', 'Espaço: cozinhar carne ou peixe crus'];
         if (o.type === 'portal') return ['Portal', 'Chegue perto para viajar'];
-        if (o.type === 'ground_item') return [o.item && o.item.name || 'Item', 'Espaço: pegar'];
+        if (o.type === 'ground_item') return [(typeof o.item === 'string' ? o.item : (o.item && o.item.name)) || 'Item', 'Espaço: pegar'];
         if (o.type === 'enemy') { const d = npcDB[o.dbKey] || {}; const bc = behChip(d); return [`${o.name || d.name} (${bc[1]})`, 'Ctrl: atacar']; }
         if (o.type === 'npc') return [o.name, 'Botão direito: falar'];
         return null;
@@ -235,7 +235,7 @@
         const h = $('hover-hint'); if (!h) return;
         try {
             if ($('login-overlay').style.display !== 'none' || e.target !== $('gameCanvas')) { h.classList.remove('show'); return; }
-            const m = gameMaps[player.currentMap]; if (!m) return; const x = lastWorldX, y = lastWorldY; let best = null;
+            const m = gameMaps[currentMap]; if (!m) return; const x = lastWorldX, y = lastWorldY; let best = null;
             for (const o of m.entities || []) {
                 if (!o || o.active === false || o.type === 'paint') continue;
                 const w = o.w || 30, hh = o.h || 30; if (x >= o.x && x <= o.x + w && y >= o.y && y <= o.y + hh) { const hf = hintFor(o); if (hf) { best = hf; if (o.type === 'enemy' || o.type === 'npc') break; } }

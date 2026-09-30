@@ -364,7 +364,7 @@
         }
     }
     /* fundo do mapa em cache */
-    function drawGround(ctx, m, t) {
+    function drawGround(ctx, m, t, vw) {
         const W = m.width || 800, H = m.height || 600, key = (m.id || '') + '|' + m.color + '|' + W + '|' + H; let c = _bg[key];
         if (!c) {
             Object.keys(_bg).forEach(k => { if (k.split('|')[0] !== (m.id || '')) delete _bg[k]; });   // guarda só o mapa atual (mapas grandes gastam memória)
@@ -380,7 +380,8 @@
             const b = 26; [[0, 0, W, b, 0, 1], [0, H - b, W, b, 0, -1], [0, 0, b, H, 1, 0], [W - b, 0, b, H, -1, 0]].forEach(s => { const gr = g.createLinearGradient(s[0] + (s[4] < 0 ? s[2] : 0), s[1] + (s[5] < 0 ? s[3] : 0), s[0] + (s[4] < 0 ? s[2] : 0) + s[4] * b, s[1] + (s[5] < 0 ? s[3] : 0) + s[5] * b); gr.addColorStop(0, 'rgba(0,0,0,0.28)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(s[0], s[1], s[2], s[3]); });
             _bg[key] = c; const keys = Object.keys(_bg); if (keys.length > 8) delete _bg[keys[0]];
         }
-        ctx.drawImage(c, 0, 0);
+        if (vw) { const sx = Math.max(0, Math.floor(vw.x)), sy = Math.max(0, Math.floor(vw.y)), sw = Math.min(W - sx, Math.ceil(vw.w) + 2), sh = Math.min(H - sy, Math.ceil(vw.h) + 2); if (sw > 0 && sh > 0) ctx.drawImage(c, sx, sy, sw, sh, sx, sy, sw, sh); }
+        else ctx.drawImage(c, 0, 0);
     }
 
     /* ============================================================

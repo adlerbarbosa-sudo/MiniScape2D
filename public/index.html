@@ -196,7 +196,8 @@
             const opts = { method: method || (body === undefined ? 'GET' : 'POST'), headers: {} };
             if (authToken) opts.headers['Authorization'] = 'Bearer ' + authToken;
             if (body !== undefined) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
-            const res = await fetch(API_BASE + path, opts);
+            const ac = new AbortController(); const to = setTimeout(() => ac.abort(), 8000); opts.signal = ac.signal;
+            let res; try { res = await fetch(API_BASE + path, opts); } finally { clearTimeout(to); }
             let data = {}; try { data = await res.json(); } catch (e) {}
             if (res.status === 401 && data.code === 'AUTH' && authToken) { authToken = null; alert('Sua sessão expirou. Entre novamente.'); location.reload(); }
             data._status = res.status; return data;
@@ -249,11 +250,11 @@
 
         function showTooltip(item) { 
             if(!item) return; 
-            let html = `<div class="tt-title">${item.name}</div><div class="tt-desc">${item.desc||''}</div>`; 
+            let html = `<div class="tt-title">${esc(item.name)}</div><div class="tt-desc">${esc(item.desc||'')}</div>`; 
             if (item.bonusDmg) html += `<div class="tt-stat">Dano: +${item.bonusDmg}</div>`; 
             if (item.defBonus) html += `<div class="tt-stat">🛡️ Defesa: +${item.defBonus}</div>`; 
             if (item.heal) html += `<div class="tt-stat">❤️ Cura: +${item.heal}</div>`; 
-            html += `<div class="tt-weight">⚖️ Peso: ${item.weight||0} kg</div>`; 
+            html += `<div class="tt-weight">⚖️ Peso: ${Number(item.weight)||0} kg</div>`; 
             tooltip.innerHTML = html; tooltip.style.left = (mouseX + 15) + 'px'; tooltip.style.top = (mouseY + 15) + 'px'; tooltip.style.display = 'block'; 
         }
         function hideTooltip() { tooltip.style.display = 'none'; }
@@ -485,7 +486,11 @@
             }
         }
 
+        let _loginBusy = false;
         async function login() {
+            if (_loginBusy) return; _loginBusy = true; try { await loginInner(); } finally { setTimeout(() => { _loginBusy = false; }, 600); }
+        }
+        async function loginInner() {
             const user = document.getElementById('auth-user').value.trim();
             const pass = document.getElementById('auth-pass').value.trim();
             const msg = document.getElementById('login-msg');
@@ -507,13 +512,13 @@
                 if (users[user] && users[user] === pass) {
                     currentUser = user; userRole = 'player'; isOfflineMode = true;
                     localStorage.setItem('miniscape_session', user);
-                    let sv = {}; try { sv = JSON.parse(localStorage.getItem('miniscape_save_v58') || '{}'); } catch(er) {}
+                    let sv = {}; try { sv = JSON.parse((localStorage.getItem('miniscape_save_v58_' + user) || localStorage.getItem('miniscape_save_v58')) || '{}'); } catch(er) {}
                     finishLoginSetup({ playerData: sv.playerData || null });
                 } else { msg.innerText = "Servidor indisponível ou conta offline não encontrada."; }
             }
         }
 
-        async function logOut() { try { await saveDataLogic(); if(authToken) await api('/logout', {}); } catch(e) {} localStorage.removeItem('miniscape_session'); location.reload(); }
+        async function logOut() { try { await saveDataNow(); if(authToken) await api('/logout', {}); } catch(e) {} localStorage.removeItem('miniscape_session'); location.reload(); }
 
         function finishLoginSetup(data) {
             if(userRole === 'admin') {
@@ -535,7 +540,7 @@
             if(data.itemDB) itemDB = data.itemDB; if(data.npcDB) npcDB = data.npcDB; mergeCatalog(); if(data.chat) chatMessages = data.chat; lastChatVer = data.chatVer || 0;
             
             if(data.playerData && Object.keys(data.playerData).length > 0) {
-                player = { ...playerDefault, ...data.playerData };
+                player = { ...playerDefault, ...data.playerData }; player.isPerformingAction = false; player.actionTarget = null; player.actionToolItem = null; player.pendingAutoAction = null;
                 if(data.playerData.stats) player.stats = { ...playerDefault.stats, ...data.playerData.stats };
                 if(data.playerData.stats && data.playerData.stats.skills) player.stats.skills = { ...playerDefault.stats.skills, ...data.playerData.stats.skills };
             } else { player = JSON.parse(JSON.stringify(playerDefault)); giveStarterItems(); const sm = gameMaps['lumbridge']; if (sm && sm.spawn) { player.x = sm.spawn.x; player.y = sm.spawn.y; player.destX = sm.spawn.x; player.destY = sm.spawn.y; } }
@@ -584,7 +589,7 @@
                 }
                 let data;
                 try { data = await api('/sync', payload); } catch(e) { pendingCombatLogs = sentLogs.concat(pendingCombatLogs); lastEqStr = ''; throw e; }
-                if (data.error) { if (data._status !== 401) pendingCombatLogs = sentLogs.concat(pendingCombatLogs); isSyncing = false; return; }
+                if (data.error) { if (data._status !== 401) pendingCombatLogs = sentLogs.concat(pendingCombatLogs); lastEqStr = ''; isSyncing = false; return; }
 
                 if (data.isHost !== undefined) { isMapHost = data.isHost; }
 
@@ -624,37 +629,61 @@
             isSyncing = false;
         }
 
-        async function saveDataLogic(manual = false, worldChanged = false) {
+        // salvar é agrupado: vários pedidos em sequência viram um só (o "manual" e o logout salvam na hora)
+        let _saveTimer = null;
+        function saveDataLogic(manual = false, worldChanged = false) {
             if (worldChanged && userRole === 'admin') worldDirty = true;
-            if (!currentUser) return;
-            let tempMaps = JSON.parse(JSON.stringify(gameMaps));
+            if (manual) { if (_saveTimer) { clearTimeout(_saveTimer); _saveTimer = null; } return saveDataNow(true); }
+            if (!_saveTimer) _saveTimer = setTimeout(() => { _saveTimer = null; saveDataNow(false); }, 2500);
+            return Promise.resolve();
+        }
+        function buildWorldCopy() {
+            const tempMaps = JSON.parse(JSON.stringify(gameMaps));
             for (let map in tempMaps) { if (tempMaps[map] && tempMaps[map].entities) { tempMaps[map].entities.forEach(obj => { if(obj && obj.aggroTarget) obj.aggroTarget = null; }); } }
+            return tempMaps;
+        }
+        async function saveDataNow(manual = false) {
+            if (!currentUser) return;
+            const sendWorldNow = !isOfflineMode && window.location.protocol !== 'file:' && userRole === 'admin' && worldDirty;
+            const needMaps = isOfflineMode || window.location.protocol === 'file:' || sendWorldNow;
+            let tempMaps = needMaps ? buildWorldCopy() : null;
             
-            player.currentMap = currentMap; 
-            let tempTarget = player.actionTarget; let tempTool = player.actionToolItem; let tempAuto = player.pendingAutoAction;
-            player.actionTarget = null; player.actionToolItem = null; player.pendingAutoAction = null;
+            player.currentMap = currentMap;
+            const pd = Object.assign({}, player, { actionTarget: null, actionToolItem: null, pendingAutoAction: null, isPerformingAction: false });
 
             if (isOfflineMode || window.location.protocol === 'file:') {
-                const saveData = { playerData: player, worldData: tempMaps, itemDB: itemDB, npcDB: npcDB }; 
-                localStorage.setItem('miniscape_save_v58', JSON.stringify(saveData));
-                if(manual) setActionText("Salvo Localmente!", "#f1c40f"); 
+                try { localStorage.setItem('miniscape_save_v58_' + currentUser, JSON.stringify({ playerData: pd, worldData: tempMaps, itemDB: itemDB, npcDB: npcDB })); if(manual) setActionText("Salvo Localmente!", "#f1c40f"); }
+                catch (e) { if(manual) setActionText("Não foi possível salvar neste aparelho.", "#e74c3c"); }
             } else {
                 try {
-                    const sendWorld = (userRole === 'admin' && worldDirty);
-                    const body = { playerData: player }; if (sendWorld) { body.worldData = tempMaps; body.itemDB = itemDB; body.npcDB = npcDB; }
+                    const sendWorld = sendWorldNow; if (sendWorld) worldDirty = false;
+                    const body = { playerData: pd }; if (sendWorld) { body.worldData = tempMaps; body.itemDB = itemDB; body.npcDB = npcDB; }
                     let data = await api('/save', body);
-                    if (data.error) throw new Error(data.error);
-                    if (sendWorld) { worldDirty = false; if (data.mapVersion) currentMapVersion = data.mapVersion; }
-                    if(manual) setActionText("Progresso salvo online!", "#3498db");
-                } catch (e) { if(manual) setActionText("Erro ao salvar no servidor.", "#e74c3c"); }
+                    if (data.error) { if (sendWorld) worldDirty = true; throw new Error(data.error); }
+                    if (sendWorld && data.mapVersion) currentMapVersion = data.mapVersion;
+                    _saveFails = 0; if(manual) setActionText("Progresso salvo online!", "#3498db");
+                } catch (e) { if (sendWorldNow) worldDirty = true; if (++_saveFails === 3) setActionText("Sem conexão para salvar. Tentando de novo...", "#e74c3c"); if(manual) setActionText("Erro ao salvar no servidor.", "#e74c3c"); }
             }
-            player.actionTarget = tempTarget; player.actionToolItem = tempTool; player.pendingAutoAction = tempAuto;
         }
+        let _saveFails = 0;
         setInterval(() => { if(currentUser) saveDataLogic(); }, 60000);
+        // ao fechar/minimizar a aba: grava o progresso do jogador (keepalive sobrevive ao fechamento da página)
+        function flushOnHide() {
+            try {
+                if (!currentUser || !authToken || isOfflineMode) return;
+                player.currentMap = currentMap;
+                const pd = Object.assign({}, player, { actionTarget: null, actionToolItem: null, pendingAutoAction: null });
+                fetch(API_BASE + '/save', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, body: JSON.stringify({ playerData: pd }) }).catch(() => {});
+            } catch (e) {}
+        }
+        window.addEventListener('pagehide', flushOnHide);
+        document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushOnHide(); });
 
         // --- CHAT ESTILO JOGO: Enter abre, Enter envia e continua digitando, Esc/clique no jogo fecha; fechado fica pequeno e translúcido ---
         let chatOpen = false, _chatShown = 0;
-        function chatOpenInput() { const c = document.getElementById('chat-container'), i = document.getElementById('chat-input'); c.classList.add('open'); chatOpen = true; i.focus(); const b = document.getElementById('chat-box'); b.scrollTop = b.scrollHeight; }
+        function releaseKeys() { for (const k in keys) keys[k] = false; }
+        window.addEventListener('blur', releaseKeys);
+        function chatOpenInput() { releaseKeys(); const c = document.getElementById('chat-container'), i = document.getElementById('chat-input'); c.classList.add('open'); chatOpen = true; i.focus(); const b = document.getElementById('chat-box'); b.scrollTop = b.scrollHeight; }
         function chatCloseInput() { const c = document.getElementById('chat-container'), i = document.getElementById('chat-input'); c.classList.remove('open'); chatOpen = false; i.blur(); const b = document.getElementById('chat-box'); b.scrollTop = b.scrollHeight; }
         async function sendChat() {
             const input = document.getElementById('chat-input'); const msg = input.value.trim(); if(!msg) { input.focus(); return; }
@@ -689,7 +718,7 @@
             if(document.getElementById('login-overlay').style.display !== 'none') return;
             if(e.target.tagName === "INPUT" || e.target.tagName === "SELECT" || e.target.tagName === "TEXTAREA") return;
             let k = e.key.toLowerCase(); if(['w','a','s','d','arrowup','arrowleft','arrowdown','arrowright'].includes(k)) keys[k] = true;
-            if (e.code === 'Space') { tryPickupOrInteract(); } if (e.key === 'Control') { tryAttack(); } 
+            if (e.code === 'Space') { if (!e.repeat) tryPickupOrInteract(); } if (e.key === 'Control') { tryAttack(); } 
         });
         
         document.addEventListener('keyup', (e) => { 
@@ -717,22 +746,34 @@
         // --- SISTEMAS DE INVENTÁRIO E AÇÕES ---
         function getInvCount(iName) { return player.inventory.reduce((acc, i) => acc + (i.name === iName ? (i.qty||1) : 0), 0); }
         function calcTotalWeight() { return player.inventory.reduce((acc, i) => acc + ((i&&i.weight?i.weight:0) * (i&&i.qty?i.qty:1)), 0).toFixed(1); }
-        function removeInvItem(iName, amount) { if(getInvCount(iName) < amount) return false; let tr = amount; for(let i = player.inventory.length - 1; i >= 0 && tr > 0; i--) { const it = player.inventory[i]; if(it.name !== iName) continue; if(it.stackable) { const q = it.qty || 1; if(q > tr) { it.qty = q - tr; tr = 0; } else { tr -= q; player.inventory.splice(i, 1); } } else { player.inventory.splice(i, 1); tr--; } } return tr <= 0; }
-        function addInvItem(iName, qty = 1) { const b = itemDB[iName]; if(!b) return false; if (b.stackable) { let r = qty; for(let i of player.inventory) { if(i.name === iName && i.qty < 254) { let sp = 254 - i.qty; if(r <= sp) { i.qty += r; return true; } else { i.qty = 254; r -= sp; } } } while(r > 0 && player.inventory.length < INV_SLOTS) { let t = Math.min(r, 254); player.inventory.push({...b, qty: t}); r -= t; } return r <= 0; } else { if(player.inventory.length < INV_SLOTS) { player.inventory.push({...b}); return true; } return false; } }
+        let _idSeq = 0; function newEntId() { return Date.now() * 100 + (_idSeq++ % 100); }
+        function invSpaceFor(iName, qty) { const b = itemDB[iName]; if (!b) return false; const free = INV_SLOTS - player.inventory.length; if (!b.stackable) return free >= qty; let room = 0; for (const i of player.inventory) if (i.name === iName) room += Math.max(0, 254 - (i.qty || 1)); return room + free * 254 >= qty; }
+        function removeInvItem(iName, amount) { if(!(amount > 0) || getInvCount(iName) < amount) return false; let tr = amount; for(let i = player.inventory.length - 1; i >= 0 && tr > 0; i--) { const it = player.inventory[i]; if(it.name !== iName) continue; if(it.stackable) { const q = it.qty || 1; if(q > tr) { it.qty = q - tr; tr = 0; } else { tr -= q; player.inventory.splice(i, 1); } } else { player.inventory.splice(i, 1); tr--; } } return tr <= 0; }
+        function addInvItem(iName, qty = 1) { const b = itemDB[iName]; if(!b || !(qty > 0) || !invSpaceFor(iName, qty)) return false; if (b.stackable) { let r = qty; for(let i of player.inventory) { if(i.name === iName && i.qty < 254) { let sp = 254 - i.qty; if(r <= sp) { i.qty += r; return true; } else { i.qty = 254; r -= sp; } } } while(r > 0 && player.inventory.length < INV_SLOTS) { let t = Math.min(r, 254); player.inventory.push({...b, qty: t}); r -= t; } return r <= 0; } else { if(player.inventory.length < INV_SLOTS) { player.inventory.push({...b}); return true; } return false; } }
         function transferToBank(invIndex) { const item = player.inventory[invIndex]; if(!item) return; let bankItem = player.bank.find(i => i.name === item.name); if(bankItem && item.stackable) { bankItem.qty += item.qty; } else if (item.stackable) { player.bank.push({...item, qty: item.qty}); } else { player.bank.push({...item, qty: 1}); } player.inventory.splice(invIndex, 1); hideTooltip(); updateUI(); }
         function withdrawFromBank(bankIndex) { const item = player.bank[bankIndex]; if(!item) return; let wQ = item.stackable ? Math.min(item.qty, 254) : 1; if(addInvItem(item.name, wQ)) { item.qty -= wQ; if(item.qty <= 0) player.bank.splice(bankIndex, 1); hideTooltip(); updateUI(); } else { setActionText("Inventário Cheio!", "#e74c3c"); } }
 
         function useItem(index) {
             if(isBankOpen) { transferToBank(index); return; } const item = player.inventory[index]; if(!item) return;
-            if(item.type === 'equipment') { if(item.stackable && item.slot === 'ammo') { let curAm = player.equipment.ammo; player.equipment.ammo = player.inventory.splice(index, 1)[0]; if(curAm) addInvItem(curAm.name, curAm.qty); } else { player.inventory.splice(index, 1); if(player.equipment[item.slot]) player.inventory.push(player.equipment[item.slot]); player.equipment[item.slot] = item; } } 
+            if(item.type === 'equipment') { if(!item.slot || !(item.slot in player.equipment)) { setActionText('Este item não pode ser equipado.', '#e74c3c'); return; } if(item.stackable && item.slot === 'ammo') { let curAm = player.equipment.ammo; player.equipment.ammo = player.inventory.splice(index, 1)[0]; if(curAm && !addInvItem(curAm.name, curAm.qty)) player.inventory.push(curAm); } else { player.inventory.splice(index, 1); if(player.equipment[item.slot]) player.inventory.push(player.equipment[item.slot]); player.equipment[item.slot] = item; } } 
             else if(item.type === 'consumable') { if(item.heal > 0) { player.stats.hp = Math.min(player.stats.maxHp, player.stats.hp + item.heal); setActionText(`Curou ${item.heal} HP.`); } if(item.name === 'Bones') { addXP('prayer', 5); addFloatingText(player.x, player.y - 15, "Enterrou", "#bdc3c7"); } removeInvItem(item.name, 1); } 
-            else if(item.name === 'Tinderbox') { if(getInvCount('Logs') >= 1) { removeInvItem('Logs', 1); let curM = gameMaps[currentMap]; if(curM){ if(!curM.entities) curM.entities = []; curM.entities.push({ id: Date.now(), type: 'fire', name: 'Fire', x: player.x - 15, y: player.y - 15, w: 30, h: 30, active: true, life: 1000 }); } addXP('firemaking', 15); setActionText("Acendeu fogo!"); saveDataLogic(); } else { setActionText("Precisa de Logs.", "#e74c3c"); } } 
+            else if(item.name === 'Tinderbox') { if(getInvCount('Logs') >= 1) { removeInvItem('Logs', 1); let curM = gameMaps[currentMap]; if(curM){ if(!curM.entities) curM.entities = []; curM.entities.push({ id: newEntId(), type: 'fire', name: 'Fire', x: player.x - 15, y: player.y - 15, w: 30, h: 30, active: true, life: 1000 }); } addXP('firemaking', 15); setActionText("Acendeu fogo!"); saveDataLogic(); } else { setActionText("Precisa de Logs.", "#e74c3c"); } } 
             else if(item.name === 'Knife') { setActionText("Use a aba Craft para criar itens.", "#e74c3c"); }
             player.isPerformingAction = false; player.pendingAutoAction = null; player.actionToolItem = null; hideTooltip(); updateUI();
         }
 
-        function unequip(slot) { const item = player.equipment[slot]; if(item) { if(item.stackable && slot === 'ammo') { if(addInvItem(item.name, item.qty)) { player.equipment[slot] = null; updateUI(); } else { setActionText("Inv. Cheio!", "#e74c3c"); } } else { if(player.inventory.length >= 28) { setActionText("Inv. Cheio!", "#e74c3c"); return; } player.equipment[slot] = null; player.inventory.push(item); hideTooltip(); updateUI(); } } }
-        function craftItem(iName) { let it = itemDB[iName]; if(!it || !it.recipe) return; let reqs = it.recipe.split('|'); let hasAll = true; reqs.forEach(r => { let p = r.split(','); if(getInvCount(p[0].trim()) < parseInt(p[1])) hasAll = false; }); if(hasAll) { reqs.forEach(r => { let p = r.split(','); removeInvItem(p[0].trim(), parseInt(p[1])); }); if(addInvItem(iName, it.craftQty || 1)) { addXP('crafting', 15); setActionText(`Criou ${iName}!`); } updateUI(); } else { setActionText(`Faltam materiais!`, '#e74c3c'); } }
+        function unequip(slot) { const item = player.equipment[slot]; if(item) { if(item.stackable && slot === 'ammo') { if(addInvItem(item.name, item.qty)) { player.equipment[slot] = null; updateUI(); } else { setActionText("Inv. Cheio!", "#e74c3c"); } } else { if(player.inventory.length >= INV_SLOTS) { setActionText("Inv. Cheio!", "#e74c3c"); return; } player.equipment[slot] = null; player.inventory.push(item); hideTooltip(); updateUI(); } } }
+        function craftItem(iName) {
+            let it = itemDB[iName]; if(!it || !it.recipe) return;
+            const reqs = it.recipe.split('|').map(r => { const p = r.split(','); return { n: (p[0] || '').trim(), q: parseInt(p[1]) }; });
+            if (reqs.some(r => !r.n || !(r.q > 0) || !itemDB[r.n])) { setActionText('Receita inválida.', '#e74c3c'); return; }
+            if (reqs.some(r => getInvCount(r.n) < r.q)) { setActionText('Faltam materiais!', '#e74c3c'); return; }
+            const snap = JSON.stringify(player.inventory);
+            reqs.forEach(r => removeInvItem(r.n, r.q));
+            if (addInvItem(iName, it.craftQty || 1)) { addXP('crafting', 15); setActionText(`Criou ${iName}!`); }
+            else { player.inventory = JSON.parse(snap); setActionText('Inventário cheio!', '#e74c3c'); }
+            updateUI();
+        }
         function closeMenus() { isBankOpen = false; isNPCOpen = false; activeNPCShop = null; document.getElementById('btn-bank').style.display='none'; document.getElementById('btn-npc').style.display='none'; }
         function openTab(tP) { document.querySelectorAll('.tab-content').forEach(e=>e.classList.remove('active-tab')); document.querySelectorAll('.tab-btn').forEach(e=>e.classList.remove('active-btn')); const tb = document.getElementById(`tab-${tP}`); if(tb) tb.classList.add('active-tab'); const bt = document.getElementById(`btn-${tP}`); if(bt) bt.classList.add('active-btn'); isBankOpen = (tP === 'bank'); isNPCOpen = (tP === 'npc'); if (['craft', 'mag', 'inv', 'eq', 'sk', 'bank'].includes(tP)) { updateUI(); } }
         function setActionText(t, c="#2ecc71") { const el = document.getElementById('action-text'); el.innerText = t; el.style.color = c; setTimeout(() => { if(el.innerText === t) el.innerText = ""; }, 3000); }
@@ -741,16 +782,19 @@
         function addXP(sK, a) { 
             let mult = 1; if(userRole === 'vip_light') mult = 2; if(userRole === 'vip_full' || userRole === 'admin') mult = 4; let finalXP = a * mult;
             const sk = player.stats.skills[sK]; if(!sk) return; sk.xp += finalXP; addFloatingText(player.x, player.y - 20, `+${finalXP} XP`, '#f1c40f'); 
-            let leveledUp = false; while (sk.xp >= sk.next) { sk.level++; sk.xp -= sk.next; sk.next = Math.floor(sk.next * 1.5); leveledUp = true; if (sK === 'hp') { player.stats.maxHp += 2; player.stats.hp = player.stats.maxHp; } } 
+            let leveledUp = false; if (!(sk.next > 0)) sk.next = 50; while (sk.xp >= sk.next) { sk.level++; sk.xp -= sk.next; sk.next = Math.floor(sk.next * 1.5); leveledUp = true; if (sK === 'hp') { player.stats.maxHp += 2; player.stats.hp = player.stats.maxHp; } } 
             if(leveledUp) { setActionText(`${sk.name} Nível ${sk.level}!`, "#f1c40f"); addFloatingText(player.x, player.y - 40, `Level Up!`, '#2ecc71'); } updateUI(); 
         }
 
         function getTotalDef() { let d = player.stats.skills.combat.level; if(player.equipment && player.equipment.shield) d += (player.equipment.shield.defBonus || 0); if(player.equipment && player.equipment.body) d += (player.equipment.body.defBonus || 0); return d; }
-        function openShop(nData) { document.getElementById('btn-npc').style.display = 'block'; openTab('npc'); document.getElementById('npc-title').innerText = nData.name; document.getElementById('npc-dialog').innerText = `"${nData.dialog || '...'}"`; let sL = document.getElementById('npc-shop-list'); sL.innerHTML = ''; sL.onclick = (ev) => { const b = ev.target.closest('[data-buy]'); if(b) buyItem(b.dataset.buy, parseInt(b.dataset.cost)); }; if(nData.shopStr) { nData.shopStr.split('|').forEach(p => { let pt = p.split(','); if(pt.length >= 2) { let iN = pt[0].trim(); let ct = parseInt(pt[1]); let iD = itemDB[iN]; if(iD) { sL.innerHTML += `<div class="shop-item"><span>${esc(iD.icon)} ${esc(iD.name)}</span><button class="shop-btn" data-buy="${esc(iN)}" data-cost="${ct}">Comprar (${ct} 🪙)</button></div>`; } } }); } }
-        function buyItem(iN, ct) { if(getInvCount('Coins') >= ct) { if(addInvItem(iN, 1)) { removeInvItem('Coins', ct); setActionText(`Comprou ${iN}!`); updateUI(); } else { setActionText("Inv Cheio!", "#e74c3c"); } } else { setActionText("Coins insuficientes!", "#e74c3c"); } }
+        function openShop(nData) { if (!nData) { setActionText('Esse NPC não tem loja.', '#e74c3c'); return; } document.getElementById('btn-npc').style.display = 'block'; openTab('npc'); document.getElementById('npc-title').innerText = nData.name; document.getElementById('npc-dialog').innerText = `"${nData.dialog || '...'}"`; let sL = document.getElementById('npc-shop-list'); sL.innerHTML = ''; sL.onclick = (ev) => { const b = ev.target.closest('[data-buy]'); if(b) buyItem(b.dataset.buy, parseInt(b.dataset.cost)); }; if(nData.shopStr) { nData.shopStr.split('|').forEach(p => { let pt = p.split(','); if(pt.length >= 2) { let iN = pt[0].trim(); let ct = parseInt(pt[1]); let iD = itemDB[iN]; if(iD) { sL.innerHTML += `<div class="shop-item"><span>${esc(iD.icon)} ${esc(iD.name)}</span><button class="shop-btn" data-buy="${esc(iN)}" data-cost="${ct}">Comprar (${ct} 🪙)</button></div>`; } } }); } }
+        function buyItem(iN, ct) { if (!(ct > 0)) return; if(getInvCount('Coins') >= ct) { if(addInvItem(iN, 1)) { removeInvItem('Coins', ct); setActionText(`Comprou ${iN}!`); updateUI(); } else { setActionText("Inv Cheio!", "#e74c3c"); } } else { setActionText("Coins insuficientes!", "#e74c3c"); } }
         function setActiveSpell(sId) { player.activeSpell = sId; updateUI(); }
 
-        function updateUI() {
+        // o painel só é reconstruído uma vez por quadro, mesmo que várias ações peçam atualização (evita engasgos)
+        let _uiPend = false;
+        function updateUI() { if (_uiPend) return; _uiPend = true; requestAnimationFrame(() => { _uiPend = false; updateUIReal(); }); }
+        function updateUIReal() {
             try {
                 document.getElementById('bar-hp').style.width = `${(player.stats.hp / player.stats.maxHp)*100}%`; document.getElementById('text-hp').innerText = `HP ${player.stats.hp}/${player.stats.maxHp}`; document.getElementById('bar-mp').style.width = `${(player.stats.mp / player.stats.maxMp)*100}%`; document.getElementById('text-mp').innerText = `MP ${player.stats.mp}/${player.stats.maxMp}`;
                 const iG = document.getElementById('inv-grid'); iG.innerHTML = ''; for(let i = 0; i < 30; i++) { const item = player.inventory[i]; const div = document.createElement('div'); div.className = 'item-slot'; if(item) { div.innerText = item.icon || '?'; if(item.stackable && item.qty > 1) div.innerHTML += `<span class="item-qty">${item.qty}</span>`; div.onclick = () => useItem(i); div.onmouseenter = () => showTooltip(item); div.onmouseleave = () => hideTooltip(); } iG.appendChild(div); } document.getElementById('weight-txt').innerText = calcTotalWeight();
@@ -888,7 +932,14 @@
             const sp = m.spawn || { x: W / 2, y: H / 2 }; player.x = sp.x; player.y = sp.y; player.destX = sp.x; player.destY = sp.y;
         }
         function respawnAtVillage() { const m = gameMaps['lumbridge']; const sp = (m && m.spawn) || { x: 400, y: 300 }; switchMap('lumbridge', sp.x, sp.y); }
-        function switchMap(targetMap, nx, ny) { if(!gameMaps[targetMap]) return; currentMap = targetMap; player.x = nx; player.y = ny; player.destX = nx; player.destY = ny; player.isPerformingAction = false; player.pendingAutoAction = null; player.actionTarget = null; player.actionToolItem = null; projectiles = []; setActionText(`Viajou: ${gameMaps[currentMap].name}`); saveDataLogic(); loadDevMapManager(); }
+        function finalizePortal(x, y, w, h) {
+            const d = document.getElementById('p-dest').value.trim(); const dx = parseFloat(document.getElementById('p-x').value), dy = parseFloat(document.getElementById('p-y').value);
+            if (!gameMaps[d]) { setActionText('Mapa de destino não existe.', '#e74c3c'); return; }
+            const cm = gameMaps[currentMap]; if (!cm.entities) cm.entities = [];
+            cm.entities.push({ id: newEntId(), type: 'portal', name: 'Portal', x: x, y: y, w: w, h: h, active: true, destMap: d, destX: isFinite(dx) ? dx : 400, destY: isFinite(dy) ? dy : 300 });
+            closeModal(); saveDataLogic(false, true); setActionText('Portal criado!');
+        }
+        function switchMap(targetMap, nx, ny) { if(!gameMaps[targetMap]) return; currentMap = targetMap; player.x = nx; player.y = ny; player.destX = nx; player.destY = ny; player.isPerformingAction = false; player.pendingAutoAction = null; player.actionTarget = null; player.actionToolItem = null; projectiles = []; try { const mm = gameMaps[currentMap]; player.x = Math.max(20, Math.min((mm.width || 800) - 20, player.x)); player.y = Math.max(20, Math.min((mm.height || 600) - 20, player.y)); player.destX = player.x; player.destY = player.y; ensurePlayerFree(); } catch (e) {} setActionText(`Viajou: ${gameMaps[currentMap].name}`); saveDataLogic(); loadDevMapManager(); }
         
         // --- SISTEMAS DE FÍSICA DE ATAQUE E COLISÃO ---
         function getHitbox(o) {
@@ -907,7 +958,7 @@
             let cur = curM.entities || []; 
             let cItem = null; let minDItem = 35;
             for(let o of cur) { if(o && o.active && o.type === 'ground_item') { let d = Math.hypot(player.x - (o.x+10), player.y - (o.y+10)); if(d < minDItem) { minDItem = d; cItem = o; } } }
-            if(cItem) { if(addInvItem(cItem.item, cItem.qty)) { cItem.active = false; addFloatingText(player.x, player.y - 15, "Pegou", "#f1c40f"); updateUI(); saveDataLogic(); } return; }
+            if(cItem) { if(addInvItem(cItem.item, cItem.qty)) { cItem.active = false; addFloatingText(player.x, player.y - 15, "Pegou", "#f1c40f"); updateUI(); saveDataLogic(); } else setActionText("Inventário cheio!", "#e74c3c"); return; }
 
             let cObj = null; let minDObj = 45;
             for(let o of cur) {
@@ -941,6 +992,7 @@
             const wp = player.equipment ? player.equipment.weapon : null; 
             if (!tObj || !tObj.type || !tObj.active) return;
 
+            if (tObj.type === 'ground_item') { if (Math.hypot(player.x - (tObj.x + 10), player.y - (tObj.y + 10)) < 60) { if (addInvItem(tObj.item, tObj.qty)) { tObj.active = false; addFloatingText(player.x, player.y - 15, "Pegou", "#f1c40f"); updateUI(); saveDataLogic(); } else setActionText('Inventário cheio!', '#e74c3c'); } return; }
             if (tObj.type === 'npc') { openShop(npcDB[tObj.dbKey]); return; }
             if (tObj.type === 'bank') { document.getElementById('btn-bank').style.display='block'; openTab('bank'); setActionText("Banco aberto.", "#3498db"); return; }
             if (tObj.type === 'portal') { switchMap(tObj.destMap, tObj.destX, tObj.destY); return; }
@@ -981,11 +1033,11 @@
 
         function applyDamage(t, dmg, sT) {
             t.hp -= dmg; t.aggroTarget = currentUser; addFloatingText(t.x + (t.w||30)/2, t.y, dmg, dmg>0?"#e74c3c":"#bdc3c7"); if (dmg > 0) Art.burst(t.x + (t.w||30)/2, t.y + (t.h||30)/2, '#d33', 6, 1);
-            pendingCombatLogs.push({ id: t.id, dmg: dmg, aggro: currentUser, maxHp: t.maxHp });
+            if (!isOfflineMode) { pendingCombatLogs.push({ id: t.id, dmg: dmg, aggro: currentUser, maxHp: t.maxHp }); if (pendingCombatLogs.length > 200) pendingCombatLogs.splice(0, pendingCombatLogs.length - 200); }
             if(t.hp <= 0) { 
                 t.active = false; t.aggroTarget = null; addFloatingText(t.x, t.y, "Morto", "#e74c3c"); Art.poof(t.x + (t.w||30)/2, t.y + (t.h||30)/2);
                 let bXP = (t.dbKey && npcDB[t.dbKey]) ? npcDB[t.dbKey].xp : 15; let cXP = Math.floor(bXP * 0.3) || 1; let hXP = bXP - cXP; addXP(sT, cXP); addXP('hp', hXP);
-                if(t.dbKey && npcDB[t.dbKey] && npcDB[t.dbKey].lootStr){ let pts = npcDB[t.dbKey].lootStr.split('|'); pts.forEach((p, i) => { let d = p.split(','); if(d.length >= 3 && Math.random() <= parseFloat(d[1])){ let curM = gameMaps[currentMap]; if(curM) { if(!curM.entities) curM.entities = []; curM.entities.push({ id: Date.now()+i, type: 'ground_item', item: d[0].trim(), qty: Math.floor(Math.random()*parseInt(d[2]))+1, x: t.x+(Math.random()*20)-10, y: t.y, w: 20, h: 20, active: true, life: 3000 }); } } }); } saveDataLogic(); 
+                if(t.dbKey && npcDB[t.dbKey] && npcDB[t.dbKey].lootStr){ let pts = npcDB[t.dbKey].lootStr.split('|'); pts.forEach((p, i) => { let d = p.split(','); if(d.length >= 3 && Math.random() <= parseFloat(d[1])){ let curM = gameMaps[currentMap]; if(curM) { if(!curM.entities) curM.entities = []; curM.entities.push({ id: newEntId(), type: 'ground_item', item: d[0].trim(), qty: Math.floor(Math.random()*parseInt(d[2]))+1, x: t.x+(Math.random()*20)-10, y: t.y, w: 20, h: 20, active: true, life: 3000 }); } } }); } saveDataLogic(); 
             }
         }
 
@@ -1038,7 +1090,7 @@
                     let cW = parseInt(document.getElementById('spawn-w').value) || 40;
                     let cH = parseInt(document.getElementById('spawn-h').value) || 40;
                     let cI = document.getElementById('spawn-img').value;
-                    let n = { id: Date.now(), x: pos.x - cW/2, y: pos.y - cH/2, w: cW, h: cH, active: true };
+                    let n = { id: newEntId(), x: pos.x - cW/2, y: pos.y - cH/2, w: cW, h: cH, active: true };
                     if (cI) n.imgUrl = cI;
                     if(val.startsWith('e_')) { let k = val.substring(2); let nb = npcDB[k]; if(!nb) return; n.type = nb.hp>0?'enemy':'npc'; n.dbKey = k; n.name = nb.name; n.hp = nb.hp; n.maxHp = nb.hp; n.w=cW||nb.w||30; n.h=cH||nb.h||30; n.attackCooldown = 0; }
                     else if(val.startsWith('b_')) { let k = val.substring(2); let bd = window.CATALOG && CATALOG.BUILDINGS[k]; if(!bd) return; n.type = 'house'; n.style = k; n.name = bd.name; n.w = cW||bd.w; n.h = cH||bd.h; }
@@ -1252,23 +1304,23 @@
                     if (player.actionTimer % 30 === 0) player.actionAnim = 10; player.actionTimer--;
                     if(player.actionTimer <= 0) {
                         const obj = player.actionTarget;
-                        if (player.actionType === 'chop') { obj.hp--; if(addInvItem('Logs', 1)) addXP('woodcutting', 15); } 
-                        else if (player.actionType === 'mine') { obj.hp--; let oreType = obj.type === 'rock_copper' ? 'Copper Ore' : obj.type === 'rock_tin' ? 'Tin Ore' : 'Iron Ore'; if(addInvItem(oreType, 1)) addXP('mining', 20); }
-                        else if (player.actionType === 'fish') { if(addInvItem('Raw Fish', 1)) { addXP('fishing', 20); addFloatingText(player.x, player.y - 15, "Pescado", "#3498db"); } }
-                        else if (player.actionType === 'smelt_brz') { removeInvItem('Copper Ore', 1); removeInvItem('Tin Ore', 1); addInvItem('Bronze Bar', 1); addXP('smithing', 15); player.isPerformingAction = false; }
-                        else if (player.actionType === 'smelt_iron') { removeInvItem('Iron Ore', 1); addInvItem('Iron Bar', 1); addXP('smithing', 25); player.isPerformingAction = false; }
-                        else if (player.actionType === 'cook') { const raw = player.inventory.find(i => itemDB[i.name] && itemDB[i.name].cooksInto); if (raw) { const def = itemDB[raw.name]; removeInvItem(raw.name, 1); addInvItem(def.cooksInto, 1); addXP('cooking', def.cookXp || 10); addFloatingText(player.x, player.y - 20, "Cozinhou!", "#f1c40f"); Art.burst(obj.x + (obj.w||30)/2, obj.y + 4, '#ffb03a', 6, 0.8); } if (!player.inventory.find(i => itemDB[i.name] && itemDB[i.name].cooksInto)) { player.isPerformingAction = false; setActionText("Nada mais para cozinhar.", "#bdc3c7"); } }
+                        if (player.actionType === 'chop') { if(addInvItem('Logs', 1)) { obj.hp--; addXP('woodcutting', 15); } else { player.isPerformingAction = false; setActionText('Inventário cheio!', '#e74c3c'); } } 
+                        else if (player.actionType === 'mine') { let oreType = obj.type === 'rock_copper' ? 'Copper Ore' : obj.type === 'rock_tin' ? 'Tin Ore' : 'Iron Ore'; if(addInvItem(oreType, 1)) { obj.hp--; addXP('mining', 20); } else { player.isPerformingAction = false; setActionText('Inventário cheio!', '#e74c3c'); } }
+                        else if (player.actionType === 'fish') { if(addInvItem('Raw Fish', 1)) { addXP('fishing', 20); addFloatingText(player.x, player.y - 15, "Pescado", "#3498db"); } else { player.isPerformingAction = false; setActionText('Inventário cheio!', '#e74c3c'); } }
+                        else if (player.actionType === 'smelt_brz') { if (getInvCount('Copper Ore') > 0 && getInvCount('Tin Ore') > 0) { removeInvItem('Copper Ore', 1); removeInvItem('Tin Ore', 1); if (addInvItem('Bronze Bar', 1)) addXP('smithing', 15); } player.isPerformingAction = false; }
+                        else if (player.actionType === 'smelt_iron') { if (getInvCount('Iron Ore') > 0) { removeInvItem('Iron Ore', 1); if (addInvItem('Iron Bar', 1)) addXP('smithing', 25); } player.isPerformingAction = false; }
+                        else if (player.actionType === 'cook') { const raw = player.inventory.find(i => itemDB[i.name] && itemDB[i.name].cooksInto); if (raw) { const def = itemDB[raw.name]; removeInvItem(raw.name, 1); if (!addInvItem(def.cooksInto, 1)) { addInvItem(raw.name, 1); setActionText('Inventário cheio!', '#e74c3c'); player.isPerformingAction = false; } else addXP('cooking', def.cookXp || 10); addFloatingText(player.x, player.y - 20, "Cozinhou!", "#f1c40f"); Art.burst(obj.x + (obj.w||30)/2, obj.y + 4, '#ffb03a', 6, 0.8); } if (!player.inventory.find(i => itemDB[i.name] && itemDB[i.name].cooksInto)) { player.isPerformingAction = false; setActionText("Nada mais para cozinhar.", "#bdc3c7"); } }
 
                         if(obj.hp !== undefined && obj.hp <= 0) { obj.active = false; player.isPerformingAction = false; player.actionToolItem = null; addFloatingText(obj.x, obj.y, "Vazio", "#bdc3c7"); saveDataLogic(); setTimeout(() => { obj.active = true; obj.hp = obj.maxHp; saveDataLogic(); }, 10000); } 
                         else if (player.isPerformingAction) { player.actionTimer = player.actionDelay; } 
                         updateUI();
                     }
-                } else { player.actionToolItem = null; }
+                } else { player.actionToolItem = null; if (player.isPerformingAction) { player.isPerformingAction = false; player.actionTarget = null; } }
 
                 for (let i = cur.length - 1; i >= 0; i--) { const o = cur[i];
                     if(!o || !o.type) continue; 
-                    if(o.type === 'fire' && o.active) { o.life--; if(o.life <= 0) o.active = false; }
-                    if(o.type === 'ground_item' && o.active) { o.life--; if(o.life <= 0) { cur.splice(i, 1); continue; } }
+                    if(o.type === 'fire') { if(!o.active) { cur.splice(i, 1); continue; } o.life--; if(o.life <= 0) o.active = false; }
+                    if(o.type === 'ground_item') { if(!o.active) { cur.splice(i, 1); continue; } o.life--; if(o.life <= 0) { cur.splice(i, 1); continue; } }
                     
                     if(o.type === 'enemy' && o.active) {
                         const simulate = (isOfflineMode || isMapHost);
@@ -1382,7 +1434,9 @@
                 
                 const T = performance.now() / 1000;
                 if (!mapObj.id) mapObj.id = currentMap;
-                Art.drawGround(ctx, mapObj, T);
+                const VW = { x: -offset.x, y: -offset.y, w: canvas.width, h: canvas.height };
+                const inView = (o, m) => { const w = o.w || 30, h = o.h || 30; m = m || 90; return o.x + w * 1.6 + m >= VW.x && o.x - w * 0.6 - m <= VW.x + VW.w && o.y + h + m >= VW.y && o.y - h * 0.6 - m <= VW.y + VW.h; };
+                Art.drawGround(ctx, mapObj, T, VW);
 
                 let cur = mapObj.entities || [];
                 Art.paintAdjacency(cur);
@@ -1390,18 +1444,19 @@
                 // DESENHA PINTURA PRIMEIRO
                 cur.forEach(o => { 
                     if(!o || !o.type) return; 
-                    if(o.type === 'paint') { renderEntity(ctx, o, false); } 
+                    if(o.type === 'paint' && inView(o, 40)) { renderEntity(ctx, o, false); } 
                 });
 
                 // DESENHA ITENS NO CHÃO
                 cur.forEach(o => { 
-                    if (o && o.type === 'ground_item' && o.active) Art.drawGroundItem(ctx, o, T, itemDB[o.item] ? itemDB[o.item].icon : '?');
+                    if (o && o.type === 'ground_item' && o.active && inView(o, 40)) Art.drawGroundItem(ctx, o, T, itemDB[o.item] ? itemDB[o.item].icon : '?');
                 });
                 
                 // === Y-SORTING ===
                 let renderQueue = [];
                 cur.forEach(o => {
                     if (!o || !o.type || o.type === 'ground_item' || o.type === 'paint') return;
+                    if (!inView(o, (o.type === 'enemy' || o.type === 'npc') ? 120 : 60)) return;
                     if (!o.active && !(o.type === 'tree' || (typeof o.type === 'string' && o.type.startsWith('rock')))) return;   // árvore/rocha esgotada ficam como toco/pedra vazia
                     let sy = o.y + (o.h || 30); if (o.type === 'decor' && (o.kind === 'flowers' || o.kind === 'bones' || o.kind === 'lily' || o.kind === 'mushrooms')) sy -= 1000;   // decoração rasteira fica sempre atrás
                     renderQueue.push({ type: 'entity', obj: o, sortY: sy });
