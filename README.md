@@ -64,3 +64,5 @@ Abra http://localhost:3000 e entre com usuário `Admin` e a senha definida.
 
 ## Deploy automático (Oracle/VPS)
 `deploy/oracle-setup.sh` instala tudo; `deploy/hook.js` é um webhook que o GitHub chama a cada push na `main`. A VM faz `git fetch`, `npm install`, reinicia o jogo e confere `/healthz`; se o jogo não subir, volta sozinha para a versão anterior. O webhook só aceita chamadas com assinatura HMAC (segredo em `/etc/miniscape.hook`). As contas ficam em `/var/lib/miniscape`, fora do código, e nunca são tocadas pelo deploy. Logs: `journalctl -u miniscape-hook -f`.
+
+Servidor de produção: https://miniscape2d.duckdns.org (Oracle Cloud, São Paulo).
