@@ -61,3 +61,6 @@ Abra http://localhost:3000 e entre com usuário `Admin` e a senha definida.
 - `public/qol.js`: barra rápida de poções/comida (teclas 1–5, botão direito troca o item) e qualidade gráfica (Menu; ajusta sozinha se o jogo ficar lento).
 - `public/fx.js`: números de dano (com golpes fortes), morte animada e partículas (poeira, lascas, faíscas, respingos).
 - `public/sfx.js`: chuva em camadas (lençol de água + gotas individuais), vento, pássaros, grilos, coruja, sapos, água e pingos de caverna, tudo gerado por código.
+
+## Deploy automático (Oracle/VPS)
+`deploy/oracle-setup.sh` instala tudo; `deploy/hook.js` é um webhook que o GitHub chama a cada push na `main`. A VM faz `git fetch`, `npm install`, reinicia o jogo e confere `/healthz`; se o jogo não subir, volta sozinha para a versão anterior. O webhook só aceita chamadas com assinatura HMAC (segredo em `/etc/miniscape.hook`). As contas ficam em `/var/lib/miniscape`, fora do código, e nunca são tocadas pelo deploy. Logs: `journalctl -u miniscape-hook -f`.

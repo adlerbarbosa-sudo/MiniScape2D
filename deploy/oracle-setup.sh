@@ -75,6 +75,29 @@ WantedBy=multi-user.target
 UNIT
 sudo systemctl daemon-reload && sudo systemctl enable --now miniscape && sudo systemctl restart miniscape
 
+# ---------- 6b. webhook de deploy automático (GitHub avisa a cada push na main) ----------
+say "Configurando o deploy automático (webhook)"
+HOOKF=/etc/miniscape.hook
+[ -f "$HOOKF" ] || { head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n' | sudo tee "$HOOKF" >/dev/null; }
+sudo chown "$USER_RUN":"$USER_RUN" "$HOOKF" && sudo chmod 600 "$HOOKF"
+echo "$USER_RUN ALL=(root) NOPASSWD: /usr/bin/systemctl restart miniscape, /bin/systemctl restart miniscape" | sudo tee /etc/sudoers.d/miniscape-hook >/dev/null
+sudo chmod 440 /etc/sudoers.d/miniscape-hook && sudo visudo -cf /etc/sudoers.d/miniscape-hook >/dev/null
+sudo tee /etc/systemd/system/miniscape-hook.service >/dev/null <<UNIT
+[Unit]
+Description=MiniScape deploy webhook
+After=network.target
+[Service]
+User=$USER_RUN
+Environment=APP_DIR=$APP
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+ExecStart=$(command -v node) $APP/deploy/hook.js
+Restart=always
+RestartSec=3
+[Install]
+WantedBy=multi-user.target
+UNIT
+sudo systemctl daemon-reload && sudo systemctl enable --now miniscape-hook && sudo systemctl restart miniscape-hook
+
 # ---------- 7. Caddy (porta 80, ou HTTPS se DOMAIN for informado) ----------
 # o domínio fica guardado em /etc/miniscape.domain: rodar de novo sem DOMAIN= mantém o HTTPS
 if [ -n "${DOMAIN:-}" ]; then echo "$DOMAIN" | sudo tee /etc/miniscape.domain >/dev/null; fi
@@ -83,7 +106,12 @@ if [ -n "${DOMAIN:-}" ]; then SITE="$DOMAIN"; else SITE=":80"; fi
 sudo tee /etc/caddy/Caddyfile >/dev/null <<CADDY
 $SITE {
     encode gzip
-    reverse_proxy 127.0.0.1:3000
+    handle /_deploy {
+        reverse_proxy 127.0.0.1:9000
+    }
+    handle {
+        reverse_proxy 127.0.0.1:3000
+    }
 }
 CADDY
 sudo systemctl enable --now caddy && sudo systemctl reload caddy || sudo systemctl restart caddy
@@ -103,4 +131,13 @@ say "Pronto!"
 echo "Jogo:    ${DOMAIN:+https://$DOMAIN}${DOMAIN:-http://$IP}"
 echo "Status:  sudo systemctl status miniscape     Logs: journalctl -u miniscape -f"
 echo "Contas:  $DATA   (backup diário em /var/backups/miniscape)"
-echo "Atualizar o jogo no futuro: bash setup.sh   (não apaga contas)"
+BASEURL="${DOMAIN:+https://$DOMAIN}${DOMAIN:-http://$IP}"
+echo
+echo "Deploy automático (configure UMA vez no GitHub: repositório > Settings > Webhooks > Add webhook):"
+echo "  Payload URL:  $BASEURL/_deploy"
+echo "  Content type: application/json"
+echo "  Secret:       $(cat $HOOKF)"
+echo "  Evento:       Just the push event"
+echo "  Logs do deploy: journalctl -u miniscape-hook -f"
+echo
+echo "Atualizar o jogo à mão no futuro: bash setup.sh   (não apaga contas)"
