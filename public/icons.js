@@ -106,7 +106,7 @@
     D.leg = (raw, tone) => { shadowFloor(); const base = raw ? tone : '#b26a30';
         g.save(); g.translate(32, 32); g.rotate(-0.6); line(2, 6, 2, 28, 7, '#efe6d0'); ell(-1, 4, 5, 5, '#f4ecd8', 2.4, 0); ell(5, 4, 5, 5, '#f4ecd8', 2.4, 0);
         g.beginPath(); g.moveTo(-14, -2); g.quadraticCurveTo(-14, -26, 6, -26); g.quadraticCurveTo(24, -24, 22, -4); g.quadraticCurveTo(20, 10, 4, 10); g.quadraticCurveTo(-14, 10, -14, -2); g.closePath(); fillStroke(grad(-14, -26, 22, 10, base), 3.5); shine(-4, -16, 6, 3, 0.45); g.restore(); };
-    D.fish = (raw) => { shadowFloor(); const body = raw ? '#8fb3c6' : '#c98a3c', belly = raw ? '#e3eef3' : '#efc37a';
+    D.fish = (raw, tint) => { shadowFloor(); const body = tint ? (raw ? tint[0] : shade(tint[0], -0.25)) : (raw ? '#8fb3c6' : '#c98a3c'), belly = tint ? tint[1] : (raw ? '#e3eef3' : '#efc37a');
         poly([48, 32, 62, 18, 60, 46], grad(48, 18, 62, 46, shade(body, -0.1)), 3); g.beginPath(); g.moveTo(6, 32); g.quadraticCurveTo(22, 12, 48, 32); g.quadraticCurveTo(22, 52, 6, 32); g.closePath(); fillStroke(grad(6, 12, 48, 52, body), 3.5);
         g.beginPath(); g.moveTo(10, 34); g.quadraticCurveTo(26, 46, 46, 34); g.quadraticCurveTo(26, 40, 10, 34); g.fillStyle = belly; g.fill(); ell(16, 30, 3.2, 3.2, '#fff', 2); ell(16.6, 30, 1.4, 1.4, OUT, 0);
         if (!raw) { g.strokeStyle = 'rgba(70,35,10,.6)'; g.lineWidth = 2; for (let i = 0; i < 3; i++) { g.beginPath(); g.moveTo(26 + i * 6, 24); g.lineTo(28 + i * 6, 40); g.stroke(); } } else shine(28, 22, 8, 2.2, 0.55); };
@@ -167,6 +167,7 @@
         if (/seed/.test(L)) return ['seed', { n: L }];
         if (/potion/.test(L)) return ['potion'];
         if (/vial/.test(L)) return ['vial'];
+        if (/colossus/.test(L)) return ['gem', '#ff9d3a'];
         if (/core|soul gem/.test(L)) return ['gem', /soul/.test(L) ? '#b07aff' : '#54d6f0'];
         if (/bar\b/.test(L)) return ['bar', m || '#9ea7b1'];
         if (/ore\b|coal/.test(L)) return ['ore', /copper/.test(L) ? MAT.copper : /tin/.test(L) ? MAT.tin : /iron/.test(L) ? '#b0644a' : /mithril/.test(L) ? MAT.mithril : /coal/.test(L) ? '#55555f' : '#c0a060'];
@@ -174,6 +175,7 @@
         if (/bones?\b/.test(L)) return ['bones', /dragon/.test(L) ? '#efe4c0' : MAT.bone];
         if (/^raw (chicken|rabbit)/.test(L)) return ['leg', true, /chicken/.test(L) ? '#f0b8a0' : '#d99a8a'];
         if (/^cooked (chicken|rabbit)/.test(L)) return ['leg', false];
+        if (/^(raw|cooked) /.test(L) && /salmon|eel|moonfish|koi/.test(L)) { const T = /salmon/.test(L) ? ['#f08a72', '#ffd8c8'] : /eel/.test(L) ? ['#5b7a6a', '#b9d6c6'] : /moon/.test(L) ? ['#9fc4ff', '#f0f6ff'] : ['#f2a93a', '#fff0b8']; return ['fish', /^raw/.test(L), T]; }
         if (/^raw /.test(L) && /fish/.test(L)) return ['fish', true];
         if (/^cooked /.test(L) && /fish/.test(L)) return ['fish', false];
         if (/^raw /.test(L)) return ['steak', true, /pork/.test(L) ? '#f0a0a0' : /mutton/.test(L) ? '#e08a8a' : /venison/.test(L) ? '#a84a4a' : '#d24a4a'];
@@ -199,7 +201,7 @@
             const p = pick(it), fn = p[0];
             if (fn === 'sack') D.sack(it);
             else if (fn === 'steak' || fn === 'leg') D[fn](p[1], p[2]);
-            else if (fn === 'fish') D.fish(p[1]);
+            else if (fn === 'fish') D.fish(p[1], p[2]);
             else if (fn === 'potato') D.potato(p[1]);
             else if (fn === 'seed') D.seed(p[1]);
             else if (fn === 'coins' || fn === 'staff' || fn === 'net' || fn === 'tinderbox' || fn === 'egg' || fn === 'wool' || fn === 'paw' || fn === 'wing' || fn === 'web' || fn === 'slime' || fn === 'ecto' || fn === 'scale' || fn === 'vial' || fn === 'herb' || fn === 'wheat' || fn === 'bread' || fn === 'carrot' || fn === 'logs') D[fn](p[1], it);

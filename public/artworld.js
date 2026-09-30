@@ -500,9 +500,10 @@
        EFEITOS E AMBIENTE
        ============================================================ */
     const FX = [];
-    function burst(x, y, col, n, spd) { for (let i = 0; i < (n || 10); i++) { const a = Math.random() * TAU, s = (0.6 + Math.random() * 1.6) * (spd || 1); FX.push({ x, y, vx: cos(a) * s, vy: sin(a) * s - 0.8, life: 30 + Math.random() * 20, max: 50, col: col || '#fff', r: 1.5 + Math.random() * 2.2, g: 0.05 }); } if (FX.length > 400) FX.splice(0, FX.length - 400); }
+    function burst(x, y, col, n, spd) { for (let i = 0; i < (n || 10); i++) { const a = Math.random() * TAU, s = (0.6 + Math.random() * 1.6) * (spd || 1); FX.push({ x, y, vx: cos(a) * s, vy: sin(a) * s - 0.8, life: 30 + Math.random() * 20, max: 50, col: col || '#fff', r: 1.5 + Math.random() * 2.2, g: 0.05 }); } { const cap = window.Quality ? Quality.fxCap() : 400; if (FX.length > cap) FX.splice(0, FX.length - cap); } }
     function poof(x, y) { for (let i = 0; i < 12; i++) { const a = Math.random() * TAU; FX.push({ x, y, vx: cos(a) * 1.2, vy: sin(a) * 0.7 - 0.3, life: 30, max: 30, col: 'rgba(230,230,235,', r: 4 + Math.random() * 5, g: -0.01, soft: true }); } burst(x, y, '#ffd24a', 8, 1.2); }
     function fxStep() { for (let i = FX.length - 1; i >= 0; i--) { const p = FX[i]; p.x += p.vx; p.y += p.vy; p.vy += p.g; p.life--; if (p.life <= 0) FX.splice(i, 1); } }
+    function puff(x, y, col, n, rad, up) { for (let i = 0; i < (n || 2); i++) FX.push({ x: x + (Math.random() - 0.5) * 6, y, vx: (Math.random() - 0.5) * 0.6, vy: -(up || 0.25) - Math.random() * 0.25, life: 22, max: 22, col: col || 'rgba(160,140,110,', r: (rad || 3) * (0.7 + Math.random() * 0.6), g: -0.004, soft: true }); { const cap = window.Quality ? Quality.fxCap() : 400; if (FX.length > cap) FX.splice(0, FX.length - cap); } }
     function fxDraw(ctx) { for (const p of FX) { const a = max(0, p.life / p.max); if (p.soft) { ctx.fillStyle = p.col + (0.5 * a) + ')'; ctx.beginPath(); ctx.arc(p.x, p.y, p.r * (2 - a), 0, TAU); ctx.fill(); } else { ctx.globalAlpha = a; ctx.fillStyle = p.col; ctx.beginPath(); ctx.arc(p.x, p.y, p.r * a + 0.5, 0, TAU); ctx.fill(); ctx.globalAlpha = 1; } } }
 
     let _vig = null, _vigKey = '', _motes = [];
@@ -519,5 +520,5 @@
     }
     function tickAll() { fxStep(); }
 
-    Object.assign(A, { drawBuilding, drawDecor, hitboxFor, drawGround, drawPaint, paintAdjacency, drawTree, drawStump, drawRock, drawGroundItem, drawStation, burst, poof, fxDraw, tickAll, drawAmbient, B, D });
+    Object.assign(A, { drawBuilding, drawDecor, hitboxFor, drawGround, drawPaint, paintAdjacency, drawTree, drawStump, drawRock, drawGroundItem, drawStation, burst, poof, puff, fxDraw, tickAll, drawAmbient, B, D });
 })(typeof window !== 'undefined' ? window : globalThis);

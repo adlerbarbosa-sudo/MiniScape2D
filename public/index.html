@@ -165,6 +165,10 @@
     <script src="net.js"></script>
     <script src="art.js"></script>
     <script src="icons.js"></script>
+<script src="fx.js"></script>
+    <script src="life.js"></script>
+    <script src="hub.js"></script>
+    <script src="qol.js"></script>
     <script src="env.js"></script>
     <script src="sfx.js"></script>
     <script src="quests.js"></script>
@@ -592,7 +596,7 @@
             if(!currentUser || isOfflineMode || isSyncing || !authToken) return;
             isSyncing = true;
             try {
-                let payload = { x: player.x, y: player.y, map: currentMap, facing: player.facing, actionAnim: player.actionAnim, combatLogs: pendingCombatLogs, chatVer: lastChatVer };
+                let payload = { x: player.x, y: player.y, map: currentMap, facing: player.facing, actionAnim: player.actionAnim, combatLogs: pendingCombatLogs, chatVer: lastChatVer, title: player.title || '' }; if (window.Life) { const _em = Life.pendingEmote(); if (_em) payload.emote = _em; }
                 const eqStr = JSON.stringify(player.equipment); if (eqStr !== lastEqStr) { payload.equipment = player.equipment; lastEqStr = eqStr; }
                 const sentLogs = pendingCombatLogs; pendingCombatLogs = [];
                 if (isMapHost) {
@@ -653,7 +657,8 @@
         }
         function buildWorldCopy() {
             const tempMaps = JSON.parse(JSON.stringify(gameMaps));
-            if (tempMaps.casa && tempMaps.casa.entities) tempMaps.casa.entities = tempMaps.casa.entities.filter(o => o && !o.hf);   // móveis são pessoais de cada jogador
+            if (tempMaps.casa && tempMaps.casa.entities) tempMaps.casa.entities = tempMaps.casa.entities.filter(o => o && !o.hf);
+            for (const _k in tempMaps) { const _m = tempMaps[_k]; if (_m && _m.entities) _m.entities = _m.entities.filter(o => o && !o.wb); }   // o chefe de mundo é temporário   // móveis são pessoais de cada jogador
             for (let map in tempMaps) { if (tempMaps[map] && tempMaps[map].entities) { tempMaps[map].entities.forEach(obj => { if(obj && obj.aggroTarget) obj.aggroTarget = null; }); } }
             return tempMaps;
         }
@@ -664,7 +669,7 @@
             let tempMaps = needMaps ? buildWorldCopy() : null;
             
             player.currentMap = currentMap;
-            const pd = Object.assign({}, player, { actionTarget: null, actionToolItem: null, pendingAutoAction: null, isPerformingAction: false });
+            const pd = Object.assign({}, player, { _em: undefined, actionTarget: null, actionToolItem: null, pendingAutoAction: null, isPerformingAction: false });
 
             if (isOfflineMode || window.location.protocol === 'file:') {
                 try { localStorage.setItem('miniscape_save_v58_' + currentUser, JSON.stringify({ playerData: pd, worldData: tempMaps, itemDB: itemDB, npcDB: npcDB })); if(manual) setActionText("Salvo Localmente!", "#f1c40f"); }
@@ -1046,7 +1051,7 @@
                         updateUI(); return;
                     } else { setActionText("Sem flechas equipadas!", "#e74c3c"); return; }
                 } else { d += Math.floor(player.stats.skills.combat.level / 2); if(wp && wp.bonusDmg) d += wp.bonusDmg; d += (window.Content ? Content.buff('dmg') : 0); }
-                applyDamage(tObj, Math.floor(Math.random() * (d + 1)), sT);
+                applyDamage(tObj, Math.floor(Math.random() * (d + 1)), sT, d);
             } 
             else if(tObj.type === 'tree' || (typeof tObj.type === 'string' && tObj.type.startsWith('rock'))) {
                 let nT = tObj.type === 'tree' ? 'axe' : 'pickaxe'; let toolItem = (nT === 'pickaxe' && window.Content) ? Content.bestTool('pickaxe') : ((wp && wp.tool === nT) ? wp : player.inventory.find(i => i.tool === nT));
@@ -1060,11 +1065,11 @@
             updateUI();
         }
 
-        function applyDamage(t, dmg, sT) {
-            t.hp -= dmg; t.aggroTarget = currentUser; addFloatingText(t.x + (t.w||30)/2, t.y, dmg, dmg>0?"#e74c3c":"#bdc3c7"); if (dmg > 0) Art.burst(t.x + (t.w||30)/2, t.y + (t.h||30)/2, '#d33', 6, 1);
+        function applyDamage(t, dmg, sT, maxHit) {
+            t.hp -= dmg; t.aggroTarget = currentUser; const crit = dmg > 0 && maxHit >= 4 && dmg >= maxHit * 0.9; Fx.dmg(floatingTexts, t.x + (t.w||30)/2, t.y + 2, dmg, dmg > 0 ? (crit ? 'crit' : 'hit') : 'miss'); if (dmg > 0) { Art.burst(t.x + (t.w||30)/2, t.y + (t.h||30)/2, '#d33', crit ? 12 : 6, crit ? 1.6 : 1); if (crit) Art.burst(t.x + (t.w||30)/2, t.y + (t.h||30)/2, '#ffe27a', 8, 1.8); }
             if (!isOfflineMode) { pendingCombatLogs.push({ id: t.id, dmg: dmg, aggro: currentUser, maxHp: t.maxHp }); if (pendingCombatLogs.length > 200) pendingCombatLogs.splice(0, pendingCombatLogs.length - 200); }
             if(t.hp <= 0) { 
-                t.active = false; t.aggroTarget = null; addFloatingText(t.x, t.y, "Morto", "#e74c3c"); Art.poof(t.x + (t.w||30)/2, t.y + (t.h||30)/2);
+                Fx.ghost(t); t.active = false; t.aggroTarget = null; Art.poof(t.x + (t.w||30)/2, t.y + (t.h||30)/2);
                 let bXP = (t.dbKey && npcDB[t.dbKey]) ? npcDB[t.dbKey].xp : 15; let cXP = Math.floor(bXP * 0.3) || 1; let hXP = bXP - cXP; addXP(sT, cXP); addXP('hp', hXP);
                 if(t.dbKey && npcDB[t.dbKey] && npcDB[t.dbKey].lootStr){ let pts = npcDB[t.dbKey].lootStr.split('|'); pts.forEach((p, i) => { let d = p.split(','); if(d.length >= 3 && Math.random() <= parseFloat(d[1])){ let curM = gameMaps[currentMap]; if(curM) { if(!curM.entities) curM.entities = []; curM.entities.push({ id: newEntId(), type: 'ground_item', item: d[0].trim(), qty: Math.floor(Math.random()*parseInt(d[2]))+1, x: t.x+(Math.random()*20)-10, y: t.y, w: 20, h: 20, active: true, life: 3000 }); } } }); } saveDataLogic(); 
             }
@@ -1267,7 +1272,7 @@
 
                 if(player.regenTimer > 0) player.regenTimer--;
                 if(player.regenTimer <= 0) {
-                    if(player.stats.hp > 0 && player.stats.hp < player.stats.maxHp) { let heal = 1 + Math.floor(player.stats.skills.hp.level / 10); player.stats.hp = Math.min(player.stats.maxHp, player.stats.hp + heal); addFloatingText(player.x, player.y - 20, `+${heal}`, "#2ecc71"); updateUI(); } player.regenTimer = 300; 
+                    if(player.stats.hp > 0 && player.stats.hp < player.stats.maxHp) { let heal = 1 + Math.floor(player.stats.skills.hp.level / 10); player.stats.hp = Math.min(player.stats.maxHp, player.stats.hp + heal); Fx.dmg(floatingTexts, player.x, player.y - 50, heal, 'heal'); updateUI(); } player.regenTimer = 300; 
                 }
 
                 if (typeof otherPlayers !== 'undefined') { Object.keys(otherPlayers).forEach(u => { let op = otherPlayers[u]; const sp = netSample(op, op.x, op.y); op.displayX = sp.x; op.displayY = sp.y; }); }
@@ -1344,7 +1349,7 @@
                         const obj = player.actionTarget;
                         if (player.actionType === 'chop') { if(addInvItem('Logs', 1)) { obj.hp--; addXP('woodcutting', 15); } else { player.isPerformingAction = false; setActionText('Inventário cheio!', '#e74c3c'); } } 
                         else if (player.actionType === 'mine') { const _rk = (window.Content && Content.ROCKS[obj.type]) || null; let oreType = _rk ? _rk.ore : (obj.type === 'rock_copper' ? 'Copper Ore' : obj.type === 'rock_tin' ? 'Tin Ore' : 'Iron Ore'); if(addInvItem(oreType, 1)) { obj.hp--; addXP('mining', _rk ? _rk.xp : 20); } else { player.isPerformingAction = false; setActionText('Inventário cheio!', '#e74c3c'); } }
-                        else if (player.actionType === 'fish') { if(addInvItem('Raw Fish', 1)) { addXP('fishing', 20); addFloatingText(player.x, player.y - 15, "Pescado", "#3498db"); } else { player.isPerformingAction = false; setActionText('Inventário cheio!', '#e74c3c'); } }
+                        else if (player.actionType === 'fish') { const _fk = window.Life ? Life.rollFish() : 'Raw Fish'; if(addInvItem(_fk, 1)) { addXP('fishing', _fk === 'Raw Fish' ? 20 : 45); if (_fk === 'Raw Fish') addFloatingText(player.x, player.y - 15, "Pescado", "#3498db"); else addPickupText(_fk, 1); } else { player.isPerformingAction = false; setActionText('Inventário cheio!', '#e74c3c'); } }
                         else if (player.actionType === 'smelt') { if (window.Content) Content.finishSmelt(); else player.isPerformingAction = false; }
                         else if (player.actionType === 'smelt_brz') { if (getInvCount('Copper Ore') > 0 && getInvCount('Tin Ore') > 0) { removeInvItem('Copper Ore', 1); removeInvItem('Tin Ore', 1); if (addInvItem('Bronze Bar', 1)) addXP('smithing', 15); } player.isPerformingAction = false; }
                         else if (player.actionType === 'smelt_iron') { if (getInvCount('Iron Ore') > 0) { removeInvItem('Iron Ore', 1); if (addInvItem('Iron Bar', 1)) addXP('smithing', 25); } player.isPerformingAction = false; }
@@ -1390,7 +1395,7 @@
                                 else if (o.aggroTarget === currentUser && o.attackCooldown <= 0) {   // cada jogador sofre o próprio dano
                                     let rD = Math.floor(Math.random() * ((def.maxHit || 2) + 1));
                                     let bl = Math.floor(Math.random() * (getTotalDef() / 2 + 1)); let fD = Math.max(0, rD - bl);
-                                    player.stats.hp -= fD; addFloatingText(player.x, player.y - 20, fD > 0 ? fD : "Block", fD > 0 ? "red" : "#3498db"); o.attackCooldown = 70;
+                                    player.stats.hp -= fD; Fx.dmg(floatingTexts, player.x, player.y - 50, fD, fD > 0 ? 'hurt' : 'block'); o.attackCooldown = 70;
                                     if (fD > 0) Art.burst(player.x, player.y - 8, '#d33', 5, 1);
                                     if(player.stats.hp <= 0) { respawnAtVillage(); player.stats.hp = player.stats.maxHp; addFloatingText(player.x, player.y - 40, "Renasceu", "#f1c40f"); o.aggroTarget = null; closeMenus(); }
                                     updateUI();
@@ -1452,7 +1457,7 @@
             let y = top - 6;
             if (isMob && o.maxHp > 0 && o.hp < o.maxHp) {   // barra de vida aparece depois de levar dano
                 const bw = Math.max(30, Math.min((o.w || 30) * 0.9, 96)), bx = cx - bw / 2;
-                ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.fillRect(bx - 1.5, y - 7, bw + 3, 8); ctx.fillStyle = '#5a1616'; ctx.fillRect(bx, y - 5.5, bw, 5); ctx.fillStyle = '#4fc36a'; ctx.fillRect(bx, y - 5.5, bw * Math.max(0, o.hp / o.maxHp), 5); ctx.fillStyle = 'rgba(255,255,255,0.22)'; ctx.fillRect(bx, y - 5.5, bw * Math.max(0, o.hp / o.maxHp), 1.6);
+                ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.fillRect(bx - 1.5, y - 7, bw + 3, 8); ctx.fillStyle = '#5a1616'; ctx.fillRect(bx, y - 5.5, bw, 5); o._tr = (o._tr == null || o._tr < o.hp) ? o.hp : Math.max(o.hp, o._tr - o.maxHp * 0.01); ctx.fillStyle = '#f4e3b0'; ctx.fillRect(bx, y - 5.5, bw * Math.max(0, o._tr / o.maxHp), 5); ctx.fillStyle = o.hp / o.maxHp > 0.5 ? '#4fc36a' : o.hp / o.maxHp > 0.25 ? '#e0b93a' : '#d8523c'; ctx.fillRect(bx, y - 5.5, bw * Math.max(0, o.hp / o.maxHp), 5); ctx.fillStyle = 'rgba(255,255,255,0.22)'; ctx.fillRect(bx, y - 5.5, bw * Math.max(0, o.hp / o.maxHp), 1.6);
                 y -= 10;
             }
             ctx.save(); ctx.font = 'bold 11px "Trebuchet MS", Verdana, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
@@ -1460,7 +1465,7 @@
             if (o.type === 'npc' && window.Quests) Quests.drawMarker(ctx, o, y);
         }
 
-        function drawCharacter(ctx, px, py, facing, anim, equip, name, isMain) { Art.drawPlayer(ctx, px, py, facing, anim, equip, name, isMain, {}); }
+        function drawCharacter(ctx, px, py, facing, anim, equip, name, isMain, extra) { Art.drawPlayer(ctx, px, py, facing, anim, equip, name, isMain, extra || {}); }
 
         function draw() {
             ctx.setTransform(1, 0, 0, 1, 0, 0); 
@@ -1520,7 +1525,7 @@
                     } else {
                         let myWp = (item.isMain && player.isPerformingAction && player.actionToolItem) ? player.actionToolItem : (item.op.equipment ? item.op.equipment.weapon : null); 
                         let myEquip = { weapon: myWp, shield: item.op.equipment ? item.op.equipment.shield : null, body: item.op.equipment ? item.op.equipment.body : null, head: item.op.equipment ? item.op.equipment.head : null };
-                        drawCharacter(ctx, item.px, item.py, item.op.facing || {x:0, y:1}, item.op.actionAnim || 0, myEquip, item.name, item.isMain);
+                        drawCharacter(ctx, item.px, item.py, item.op.facing || {x:0, y:1}, item.op.actionAnim || 0, myEquip, item.name, item.isMain, { title: item.op.title || '', emote: item.op._em || null });
                     }
                 });
 
@@ -1529,7 +1534,9 @@
                 if (player.isPerformingAction) { const prg = 1 - (player.actionTimer / player.actionDelay); ctx.fillStyle = '#222'; ctx.fillRect(player.x - 15, player.y - 25, 30, 6); ctx.fillStyle = '#3498db'; ctx.fillRect(player.x - 14, player.y - 24, 28 * prg, 4); }
 
                 projectiles.forEach(p => { if (p.type === 'ranged') { ctx.fillStyle = '#795548'; ctx.fillRect(p.x-2, p.y-2, 4, 4); } else { ctx.fillStyle = p.color || '#1abc9c'; ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#ecf0f1'; ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI*2); ctx.fill(); } });
+                Fx.drawGhosts(ctx, drawMonster);
                 floatingTexts.forEach(ft => {
+                    if (ft.dmg) { Fx.drawDmg(ctx, ft); return; }
                     if (ft.item && window.Icons) {   // ganho de item: ícone + quantidade, com contorno
                         ctx.font = 'bold 15px Arial'; const tw = ctx.measureText(ft.text).width, x0 = ft.x - (tw + 26) / 2, a = Math.min(1, ft.life / 25);
                         ctx.globalAlpha = a; try { ctx.drawImage(Icons.canvas(ft.item), x0, ft.y - 17, 22, 22); } catch (e) {}

@@ -10,7 +10,7 @@
     const OUT = 'rgba(18,10,8,0.85)';
 
     /* ---------- utilidades ---------- */
-    function hash(n) { n = Math.sin(n * 127.1 + 311.7) * 43758.5453; return n - Math.floor(n); }
+    function hash(n) { if (typeof n === 'string') { let h = 7; for (let i = 0; i < n.length; i++) h = (h * 31 + n.charCodeAt(i)) % 100003; n = h; } else if (!isFinite(n)) n = 7.7; n = Math.sin(n * 127.1 + 311.7) * 43758.5453; return n - Math.floor(n); }
     function hex(c) {
         if (typeof c !== 'string') return [128, 128, 128];
         if (c[0] === '#') {
@@ -56,9 +56,10 @@
     function tri(g, x0, y0, x1, y1, x2, y2, fill, stroke, lw) { poly(g, [x0, y0, x1, y1, x2, y2], fill, stroke, lw); }
 
     /* ---------- estado de animação por entidade ---------- */
+    function idn(o) { const n = Number(o.id); if (isFinite(n) && n) return n; return hash(String(o.id || 1)) * 977 + 1; }   // ids de texto (catacumbas, chefe) também viram número
     function stepState(o, tx) {
         let a = o._a;
-        if (!a) a = o._a = { x: o.x, y: o.y, face: 1, mv: 0, ph: hash((o.id || 1) * 1.7) * 6, atk: 0, hurt: 0, lastHp: o.hp, seed: hash((o.id || 1) * 3.3) * 50, sinceMove: 0 };
+        if (!a) a = o._a = { x: o.x, y: o.y, face: 1, mv: 0, ph: hash(idn(o) * 1.7) * 6, atk: 0, hurt: 0, lastHp: o.hp, seed: hash(idn(o) * 3.3) * 50, sinceMove: 0 };
         const dx = o.x - a.x, dy = o.y - a.y, sp = Math.hypot(dx, dy);
         if (sp > 60) { a.x = o.x; a.y = o.y; a.lastHp = o.hp; return a; }   // teleporte: não anima
         a.x = o.x; a.y = o.y;
@@ -700,7 +701,7 @@
         ctx.fillStyle = 'rgba(0,0,0,' + (0.28 - min(0.14, fly * 0.006)) + ')'; ctx.beginPath(); ctx.ellipse(fx, fy - 1, sh[0] * s * (1 - fly * 0.008), sh[1] * s, 0, 0, TAU); ctx.fill();
         ctx.save(); ctx.translate(fx, fy); ctx.scale(face * s, s);
         const st = { t: now, mv: a.mv, ph: a.ph, atk: a.atk, hurt: a.hurt, c1: (def && def.c1) || '#8e44ad', c2: (def && def.c2) || '#f1c27d', seed: a.seed, face: face };
-        try { S0.draw(ctx, st); } catch (e) { ctx.restore(); return fallbackBlob(ctx, o, def, a, now); }
+        try { S0.draw(ctx, st); } catch (e) { if (!S0._err) { S0._err = 1; console.error('[art] ' + sp + ': ' + (e && e.message)); } ctx.restore(); return fallbackBlob(ctx, o, def, a, now); }
         ctx.restore();
         ctx.globalCompositeOperation = 'source-over';
     }
@@ -780,6 +781,9 @@
         }
         ctx.restore();
         ctx.font = 'bold 11px Arial'; ctx.textAlign = 'center'; ctx.strokeStyle = 'rgba(0,0,0,0.75)'; ctx.lineWidth = 3; const ny = py - (equip && equip.head ? 47 : 43); ctx.strokeText(name, px, ny); ctx.fillStyle = isMain ? '#f1c40f' : '#ffffff'; ctx.fillText(name, px, ny); ctx.textAlign = 'start';
+        let ty = ny - 4;
+        if (extra.title) { ctx.font = 'italic 10px Georgia, serif'; ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.8)'; ty = ny - 13; const tt = '\u2039' + extra.title + '\u203a'; ctx.strokeText(tt, px, ty); ctx.fillStyle = '#e8c469'; ctx.fillText(tt, px, ty); ctx.textAlign = 'start'; ty -= 6; }
+        if (extra.emote && root.Emotes) root.Emotes.draw(ctx, px, ty - 4, extra.emote);
     }
 
     root.Art = root.Art || {};

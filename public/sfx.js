@@ -2,32 +2,96 @@
    Só inicia depois do primeiro clique/tecla (regra dos navegadores). Volume e mudo ficam salvos neste aparelho. */
 (function () {
     'use strict';
-    let ctx = null, master = null, sfxBus = null, musBus = null, rainGain = null, noiseBuf = null, reverbIn = null;
+    let ctx = null, master = null, sfxBus = null, musBus = null, ambBus = null, noiseBuf = null, reverbIn = null, A = null;
     const S = { master: 0.8, music: 0.45, sfx: 0.8, muted: false };
     try { const v = JSON.parse(localStorage.getItem('ms_audio') || 'null'); if (v && typeof v === 'object') { ['master', 'music', 'sfx'].forEach(k => { if (typeof v[k] === 'number') S[k] = Math.max(0, Math.min(1, v[k])); }); S.muted = !!v.muted; } } catch (e) {}
     function save() { try { localStorage.setItem('ms_audio', JSON.stringify(S)); } catch (e) {} }
-    function applyVol() { if (!ctx) return; const t = ctx.currentTime; master.gain.setTargetAtTime(S.muted ? 0 : S.master, t, 0.03); sfxBus.gain.setTargetAtTime(S.sfx, t, 0.03); musBus.gain.setTargetAtTime(S.music * 0.55, t, 0.05); }
+    function applyVol() { if (!ctx) return; const t = ctx.currentTime; master.gain.setTargetAtTime(S.muted ? 0 : S.master, t, 0.03); sfxBus.gain.setTargetAtTime(S.sfx, t, 0.03); musBus.gain.setTargetAtTime(S.music * 0.55, t, 0.05); ambBus.gain.setTargetAtTime(S.sfx, t, 0.05); }
 
     function init() {
         if (ctx) { if (ctx.state === 'suspended') ctx.resume().catch(() => {}); return ctx; }
         const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null;
         try {
-            ctx = new AC(); master = ctx.createGain(); sfxBus = ctx.createGain(); musBus = ctx.createGain();
+            ctx = new AC(); master = ctx.createGain(); sfxBus = ctx.createGain(); musBus = ctx.createGain(); ambBus = ctx.createGain();
             const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 4;
-            sfxBus.connect(comp); musBus.connect(comp); comp.connect(master); master.connect(ctx.destination);
+            sfxBus.connect(comp); musBus.connect(comp); ambBus.connect(comp); comp.connect(master); master.connect(ctx.destination);
             // ruído branco (1s) reaproveitado por vários efeitos
             noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
             // "reverb" simples: eco curto com realimentação
             reverbIn = ctx.createGain(); const dl = ctx.createDelay(1); dl.delayTime.value = 0.23; const fb = ctx.createGain(); fb.gain.value = 0.42; const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2400;
             reverbIn.connect(dl); dl.connect(lp); lp.connect(fb); fb.connect(dl); lp.connect(musBus);
-            // chuva ambiente (sempre ligada, volume controlado pelo clima)
-            const rs = ctx.createBufferSource(); rs.buffer = noiseBuf; rs.loop = true; const rf = ctx.createBiquadFilter(); rf.type = 'bandpass'; rf.frequency.value = 1800; rf.Q.value = 0.5; rainGain = ctx.createGain(); rainGain.gain.value = 0;
-            rs.connect(rf); rf.connect(rainGain); rainGain.connect(musBus); rs.start();
+            buildAmbience();
             applyVol();
         } catch (e) { ctx = null; return null; }
         return ctx;
     }
     ['pointerdown', 'keydown', 'touchstart'].forEach(ev => window.addEventListener(ev, init, { passive: true }));
+
+
+    /* ---------- ambiente: chuva de verdade (camadas + gotas), vento, pássaros, grilos, água, pingos de caverna ---------- */
+    function makeBuf(kind, sec) {   // ruído rosa/marrom estéreo com canais diferentes (evita o "chiado de rádio" do ruído branco)
+        const n = Math.floor(ctx.sampleRate * sec), b = ctx.createBuffer(2, n, ctx.sampleRate);
+        for (let c = 0; c < 2; c++) {
+            const d = b.getChannelData(c); let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0, last = 0;
+            for (let i = 0; i < n; i++) {
+                const w = Math.random() * 2 - 1;
+                if (kind === 'brown') { last = (last + 0.02 * w) / 1.02; d[i] = last * 3.5; }
+                else { b0 = 0.99886 * b0 + w * 0.0555179; b1 = 0.99332 * b1 + w * 0.0750759; b2 = 0.96900 * b2 + w * 0.1538520; b3 = 0.86650 * b3 + w * 0.3104856; b4 = 0.55000 * b4 + w * 0.5329522; b5 = -0.7616 * b5 - w * 0.0168980; d[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.11; b6 = w * 0.115926; }
+            }
+            // costura suave no fim do loop (some o "tec" de repetição)
+            const f = Math.floor(ctx.sampleRate * 0.15); for (let i = 0; i < f; i++) { const t = i / f; d[i] = d[i] * t + d[n - f + i] * (1 - t); }
+        }
+        return b;
+    }
+    function loopSrc(buf) { const s = ctx.createBufferSource(); s.buffer = buf; s.loop = true; s.loopStart = 0.15; s.loopEnd = buf.duration - 0.01; return s; }
+    function lfo(freq, depth, target, offsetVal) { const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = freq; g.gain.value = depth; o.connect(g); g.connect(target); o.start(); return o; }
+    function buildAmbience() {
+        const pink = makeBuf('pink', 7), brown = makeBuf('brown', 9);
+        A = { rain: 0, wind: 0, water: 0 };
+        // chuva: (1) "lençol" de água caindo (rosa, sem graves nem agudos extremos)
+        let src = loopSrc(pink), hp = ctx.createBiquadFilter(), lp = ctx.createBiquadFilter(), pk = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 500; lp.type = 'lowpass'; lp.frequency.value = 6500; pk.type = 'peaking'; pk.frequency.value = 2600; pk.gain.value = 3; pk.Q.value = 0.6;
+        A.bed = ctx.createGain(); A.bed.gain.value = 0; src.connect(hp); hp.connect(pk); pk.connect(lp); lp.connect(A.bed); A.bed.connect(ambBus); src.start(0, 0.2);
+        lfo(0.11, 0.05, A.bed.gain); lfo(0.29, 0.03, A.bed.gain);       // rajadas leves de intensidade
+        // (2) chuva no chão/telhados: grave abafado
+        src = loopSrc(brown); lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 520; A.roof = ctx.createGain(); A.roof.gain.value = 0; src.connect(lp); lp.connect(A.roof); A.roof.connect(ambBus); src.start(0, 1.3);
+        // (3) chiado das folhas (bem baixo e só nos agudos altos)
+        src = loopSrc(pink); hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 6500; A.hiss = ctx.createGain(); A.hiss.gain.value = 0; src.connect(hp); hp.connect(A.hiss); A.hiss.connect(ambBus); src.start(0, 3.1);
+        // vento: rosa passa-faixa com frequência e volume oscilando devagar
+        src = loopSrc(pink); const wf = ctx.createBiquadFilter(); wf.type = 'bandpass'; wf.frequency.value = 380; wf.Q.value = 0.9; A.windG = ctx.createGain(); A.windG.gain.value = 0; src.connect(wf); wf.connect(A.windG); A.windG.connect(ambBus); src.start(0, 4.4);
+        lfo(0.06, 160, wf.frequency); lfo(0.09, 0.02, A.windG.gain);
+        // água corrente (rios)
+        src = loopSrc(pink); const wl = ctx.createBiquadFilter(); wl.type = 'bandpass'; wl.frequency.value = 1100; wl.Q.value = 0.5; A.waterG = ctx.createGain(); A.waterG.gain.value = 0; src.connect(wl); wl.connect(A.waterG); A.waterG.connect(ambBus); src.start(0, 5.2);
+        lfo(0.7, 250, wl.frequency);
+        // zumbido grave de caverna
+        A.drone = ctx.createGain(); A.drone.gain.value = 0; [55, 82.4].forEach((f, i) => { const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = f; o.detune.value = i * 7; o.connect(A.drone); o.start(); }); A.drone.connect(ambBus);
+    }
+    function drop(vol) {   // uma gota batendo: estalinho curto de ruído filtrado, posição aleatória no estéreo
+        const t = ctx.currentTime + Math.random() * 0.06, s = ctx.createBufferSource(); s.buffer = noiseBuf; const f = ctx.createBiquadFilter(), g = ctx.createGain(), p = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+        f.type = 'bandpass'; f.frequency.value = R(1800, 7500); f.Q.value = R(2, 9); const dur = R(0.008, 0.03);
+        g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + 0.002); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        s.connect(f); f.connect(g); if (p) { p.pan.value = R(-0.9, 0.9); g.connect(p); p.connect(ambBus); } else g.connect(ambBus); s.start(t, Math.random() * 0.8); s.stop(t + dur + 0.02);
+        if (Math.random() < 0.18) { const o = ctx.createOscillator(), og = ctx.createGain(); o.type = 'sine'; const b = R(900, 2200); o.frequency.setValueAtTime(b, t); o.frequency.exponentialRampToValueAtTime(b * 1.7, t + 0.03); og.gain.setValueAtTime(0.0001, t); og.gain.linearRampToValueAtTime(vol * 0.5, t + 0.004); og.gain.exponentialRampToValueAtTime(0.0001, t + 0.05); o.connect(og); og.connect(p || ambBus); if (p) p.connect(ambBus); o.start(t); o.stop(t + 0.07); }
+    }
+    let dropAcc = 0, lastAmb = 0;
+    function ambTick(nowMs) {   // roda a cada ~60 ms
+        if (!A) return; const dt = Math.min(0.2, (nowMs - lastAmb) / 1000); lastAmb = nowMs; const t = ctx.currentTime;
+        const r = mood.rain, open = mood.key !== 'lair' && mood.key !== 'mine';
+        A.bed.gain.setTargetAtTime(r * 0.20 * (mood.key === 'home' ? 0.5 : 1), t, 0.9); A.roof.gain.setTargetAtTime(r * 0.55, t, 0.9); A.hiss.gain.setTargetAtTime(r * 0.012, t, 0.9);
+        dropAcc += dt * r * 34; while (dropAcc >= 1) { dropAcc--; drop(R(0.03, 0.09)); }
+        A.windG.gain.setTargetAtTime(open ? (mood.key === 'forest' ? 0.08 : 0.05) * (mood.night ? 1.3 : 1) * (1 + r * 0.6) : 0, t, 1.2);
+        A.waterG.gain.setTargetAtTime(mood.key === 'river' ? 0.1 : 0, t, 1.5);
+        A.drone.gain.setTargetAtTime(mood.key === 'lair' ? 0.05 : mood.key === 'mine' ? 0.025 : 0, t, 2);
+    }
+    function bird() {   // três "espécies": trinado, assobio de duas notas e chamada descendente
+        const k = Math.floor(Math.random() * 3), b = R(2400, 3600), v = 0.035;
+        if (k === 0) for (let i = 0; i < R(4, 8) | 0; i++) tone(b + (i % 2) * 300, 0.045, 'sine', v, { to: b * 1.25, delay: i * 0.06, bus: ambBus });
+        else if (k === 1) { tone(b, 0.16, 'sine', v, { to: b * 1.35, bus: ambBus }); tone(b * 1.35, 0.2, 'sine', v, { to: b * 0.95, delay: 0.19, bus: ambBus }); }
+        else for (let i = 0; i < 3; i++) tone(b * 1.4 - i * 260, 0.11, 'triangle', v * 0.8, { to: b * 1.2 - i * 260, delay: i * 0.13, bus: ambBus });
+    }
+    function cricket() { const f = R(4100, 4700), n = 3 + (Math.random() * 4 | 0); for (let i = 0; i < n; i++) tone(f, 0.035, 'sine', 0.014, { delay: i * 0.055, bus: ambBus }); }
+    function owl() { tone(420, 0.35, 'sine', 0.05, { to: 350, bus: ambBus }); tone(420, 0.45, 'sine', 0.05, { to: 330, delay: 0.5, bus: ambBus }); }
+    function frog() { for (let i = 0; i < 3; i++) tone(R(180, 230), 0.07, 'square', 0.02, { to: 130, delay: i * 0.11, bus: ambBus, filter: (() => { const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 700; return f; })() }); }
+    function dripCave() { const t = ctx.currentTime, o = ctx.createOscillator(), g = ctx.createGain(), b = R(900, 1600); o.type = 'sine'; o.frequency.setValueAtTime(b * 1.5, t); o.frequency.exponentialRampToValueAtTime(b, t + 0.05); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.05, t + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18); o.connect(g); g.connect(ambBus); g.connect(reverbIn); o.start(t); o.stop(t + 0.2); }
 
     /* ---------- blocos de síntese ---------- */
     function env(g, t, a, d, peak, end) { g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(Math.max(end || 0.0001, 0.0001), t + a + d); }
@@ -100,11 +164,6 @@
         if (padNodes) padNodes.forEach(n => { n.g.gain.cancelScheduledValues(t); n.g.gain.setTargetAtTime(0.0001, t, 1.2); n.o.stop(t + 5); });
         padNodes = notes.map(f => { const o = ctx.createOscillator(), g = ctx.createGain(), fl = ctx.createBiquadFilter(); o.type = 'sine'; o.frequency.value = f; o.detune.value = R(-6, 6); fl.type = 'lowpass'; fl.frequency.value = 900; g.gain.value = 0.0001; g.gain.setTargetAtTime(0.05, t, 2.5); o.connect(fl); fl.connect(g); g.connect(musBus); o.start(t); return { o, g }; });
     }
-    function chirp() {   // pássaro de dia, grilo à noite
-        if (!ctx || S.muted || ctx.state !== 'running') return;
-        if (mood.night) { for (let i = 0; i < 4; i++) tone(4300, 0.04, 'sine', 0.018, { delay: i * 0.07, bus: musBus }); }
-        else { const b = R(2200, 3400); tone(b, 0.09, 'sine', 0.03, { to: b * 1.5, bus: musBus }); tone(b * 1.2, 0.08, 'sine', 0.03, { to: b * 0.9, delay: 0.1, bus: musBus }); }
-    }
     let nextChirp = 0;
     setInterval(() => {
         if (!ctx || ctx.state !== 'running' || S.muted) return; const now = ctx.currentTime;
@@ -117,9 +176,13 @@
             pluck(freqOf(root, deg), (mood.night ? 0.11 : 0.15) * (1 - mood.rain * 0.3));
             if (Math.random() < 0.25) pluck(freqOf(root, deg + 7), 0.06);
         }
-        if (mood.key !== 'lair' && mood.key !== 'mine' && mood.rain < 0.3 && now >= nextChirp) { nextChirp = now + R(4, 11); chirp(); }
-        rainGain.gain.setTargetAtTime(mood.rain * 0.16, now, 0.6);
+        if (now >= nextChirp) {
+            const open = mood.key !== 'lair' && mood.key !== 'mine' && mood.key !== 'home';
+            if (open && mood.rain < 0.3) { nextChirp = now + R(3, 9); if (mood.night) { const q = Math.random(); if (q < 0.7) cricket(); else if (mood.key === 'river') frog(); else if (mood.key === 'forest' || mood.key === 'village') owl(); } else bird(); }
+            else if (!open && mood.key !== 'home') { nextChirp = now + R(2.5, 8); dripCave(); } else nextChirp = now + 6;
+        }
     }, 250);
+    setInterval(() => { if (ctx && ctx.state === 'running' && !S.muted) ambTick(performance.now()); }, 60);
     function setMood(m) {
         const key = kindOf(m.mapId, m.name); const changed = key !== mood.key;
         mood = { key, night: !!m.night, rain: m.rain || 0 };
@@ -161,10 +224,10 @@
                 if (player.stats) { if (lastHp != null && player.stats.hp < lastHp) play('hurt'); lastHp = player.stats.hp; }
                 if (player.isPerformingAction && player.actionAnim === 10 && lastAnim !== 10) { const t = player.actionType; if (t === 'chop') play('chop'); else if (t === 'mine') play('mine'); else if (t === 'smelt_brz' || t === 'smelt_iron') play('smelt'); }
                 lastAnim = player.actionAnim;
-                const m = gameMaps[currentMap]; if (m && window.Env) setMood({ mapId: currentMap, name: m.name, night: Env.isNight(), rain: /Chuva/.test(Env.weatherLabel()) ? 1 : 0 });
+                const m = gameMaps[currentMap]; if (m && window.Env) setMood({ mapId: currentMap, name: m.name, night: Env.isNight(), rain: Env.rainLevel ? Env.rainLevel() : (/Chuva/.test(Env.weatherLabel()) ? 1 : 0) });
             } catch (e) {}
         }, 60);
     }
     window.addEventListener('load', wire);
-    window.Sfx = { play, init, setMood, settings: S, ready: () => !!ctx, state: () => ctx && ctx.state };
+    window.Sfx = { _master: () => master, _ctx: () => ctx, _amb: () => A, _mood: () => mood, play, init, setMood, settings: S, ready: () => !!ctx, state: () => ctx && ctx.state };
 })();

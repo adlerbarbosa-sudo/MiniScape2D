@@ -20,6 +20,7 @@ const crypto = require('crypto');
 const util = require('util');
 const cors = require('cors');
 const createSocial = require('./social');
+const createExtras = require('./extras');
 const wsServer = require('./wsserver');
 
 const scrypt = util.promisify(crypto.scrypt);
@@ -37,7 +38,7 @@ app.use((req, res, next) => {
     next();
 });
 /* limites de corpo: rotas leves aceitam pouco; save exige login antes de ler corpo grande; restauração só admin */
-app.use(['/api/sync', '/api/chat', '/api/login', '/api/register', '/api/logout'], express.json({ limit: '64kb' }));
+app.use(['/api/sync', '/api/chat', '/api/market', '/api/rank', '/api/login', '/api/register', '/api/logout'], express.json({ limit: '64kb' }));
 app.use('/api/save', (req, res, next) => auth(req, res, next), express.json({ limit: '8mb' }));
 app.use('/api/restore', (req, res, next) => auth(req, res, () => adminOnly(req, res, next)), express.json({ limit: '30mb' }));
 app.use(express.json({ limit: '1mb' }));
@@ -77,6 +78,7 @@ function normalizeDB(d) {
     if (Array.isArray(d.chat)) out.chat = d.chat.slice(-50).filter(c => c && typeof c.msg === 'string').map(c => ({ sender: String(c.sender || '?').slice(0, 40), msg: c.msg.slice(0, 200), color: /^#[0-9a-f]{3,8}$/i.test(c.color) ? c.color : '#ecf0f1' }));
     out.trades = Object.create(null);
     if (d.trades && typeof d.trades === 'object') for (const id of Object.keys(d.trades)) { const t = d.trades[id]; if (t && typeof t === 'object' && typeof t.a === 'string' && typeof t.b === 'string' && t.offer && t.ok && t.applied) out.trades[id] = t; }
+    if (d.market && typeof d.market === 'object') out.market = d.market;
     if (Number.isFinite(d.mapVersion)) out.mapVersion = d.mapVersion;
     if (d.sessions && typeof d.sessions === 'object') {
         for (const h of Object.keys(d.sessions)) { const s = d.sessions[h]; if (s && typeof s.user === 'string' && s.exp > Date.now()) out.sessions[h] = { user: s.user, exp: s.exp }; }
@@ -236,6 +238,7 @@ const mobPos = Object.create(null);          // map -> id -> {x,y}  (enviado pel
 const hostByMap = Object.create(null);       // map -> username do host
 const lastChat = Object.create(null);        // user -> timestamp
 const social = createSocial({ db, activePlayers, markDirty });
+const extras = createExtras({ db, activePlayers, markDirty });
 function chatFor(user) { return db.chat.filter(c => social.chatVisible(user, c)).map(c => { if (!c.party) return c; const { sender, msg, color } = c; return { sender, msg, color }; }); }
 
 const num = (v, d = 0) => Number.isFinite(v) ? v : d;
@@ -333,7 +336,9 @@ function doSync(user, b) {
     const prev = activePlayers[user];
     const eq = (b.equipment && typeof b.equipment === 'object' && JSON.stringify(b.equipment).length < 6000) ? b.equipment : (prev ? prev.equipment : null);
     const fc = (b.facing && typeof b.facing === 'object') ? { x: num(b.facing.x) | 0, y: num(b.facing.y) | 0 } : { x: 0, y: 1 };
-    activePlayers[user] = { x: coord(b.x, 400), y: coord(b.y, 300), map, facing: fc, actionAnim: num(b.actionAnim) | 0, equipment: eq, hp: Math.max(0, Math.min(99999, num(b.hp) | 0)), maxHp: Math.max(0, Math.min(99999, num(b.maxHp) | 0)), lastSeen: now };
+    activePlayers[user] = { x: coord(b.x, 400), y: coord(b.y, 300), map, facing: fc, actionAnim: num(b.actionAnim) | 0, equipment: eq, hp: Math.max(0, Math.min(99999, num(b.hp) | 0)), maxHp: Math.max(0, Math.min(99999, num(b.maxHp) | 0)), lastSeen: now,
+        title: typeof b.title === 'string' ? extras.cleanTitle(b.title) : (prev ? prev.title : ''), emote: prev ? prev.emote : null };
+    if (typeof b.emote === 'string' && /^[a-z]{2,10}$/.test(b.emote) && (!prev || !prev.emote || now - prev.emote.t > 1500)) activePlayers[user].emote = { k: b.emote, t: now };
     const host = electHost(map); const isHost = host === user;
 
     if (!serverMobs[map]) serverMobs[map] = Object.create(null);
@@ -358,7 +363,7 @@ function doSync(user, b) {
     }
     for (const id of Object.keys(serverMobs[map])) {   // respawn de 15s
         const sm = serverMobs[map][id];
-        if (sm.isDead && now - sm.deadTime > 15000) { sm.isDead = false; sm.hp = sm.maxHp; sm.aggro = null; }
+        if (sm.isDead && (id === '424242' ? extras.bossHour(now) !== extras.bossHour(sm.deadTime) : now - sm.deadTime > 15000)) { sm.isDead = false; sm.hp = sm.maxHp; sm.aggro = null; }
         else if (sm.aggro && (!activePlayers[sm.aggro] || activePlayers[sm.aggro].map !== map)) sm.aggro = null;
     }
     if (isHost && b.mobPos && typeof b.mobPos === 'object') {
@@ -375,13 +380,16 @@ function doSync(user, b) {
 
     const players = {};
     for (const u of Object.keys(activePlayers)) if (u !== user && activePlayers[u].map === map) players[u] = activePlayers[u];
-    const out = { players, mapVersion: db.mapVersion, serverMobs: serverMobs[map], isHost, chatVer: db.chatVer, social: social.view(user) };
+    const out = { t: now, boss: extras.bossInfo(), players, mapVersion: db.mapVersion, serverMobs: serverMobs[map], isHost, chatVer: db.chatVer, social: social.view(user) };
     if (b.chatVer !== db.chatVer) out.chat = chatFor(user);
     if (!isHost && mobPos[map]) out.mobPos = mobPos[map];
     return out;
 }
 app.post('/api/sync', auth, (req, res) => { res.json(doSync(req.user, req.body)); });
 app.post('/api/social', rateLimit('social', 120, 60000), auth, (req, res) => { const r = social.act(req.user, req.body); res.json(Object.assign({}, r, { social: social.view(req.user) })); });
+
+app.post('/api/market', rateLimit('market', 90, 60000), auth, (req, res) => { res.json(extras.market(req.user, req.body)); });
+app.post('/api/rank', rateLimit('rank', 30, 60000), auth, (req, res) => { res.json(extras.ranking(req.user, req.body || {})); });
 
 app.get('/api/map', auth, (req, res) => res.json({ worldData: db.worldData, itemDB: db.itemDB, npcDB: db.npcDB, mapVersion: db.mapVersion }));
 
@@ -451,7 +459,7 @@ app.post('/api/restore', auth, adminOnly, (req, res) => {
     const restored = normalizeDB(dbData); restored.sessions = db.sessions;
     if (!hasOwn(restored.users, req.user)) restored.users[req.user] = db.users[req.user];   // quem restaura não perde o acesso
     restored.users[req.user].role = 'admin';
-    db = restored; social.rebind(db); worldStr = db.worldData ? JSON.stringify(db.worldData) : ''; dbStr = JSON.stringify([db.itemDB, db.npcDB]);
+    db = restored; social.rebind(db); extras.rebind(db); worldStr = db.worldData ? JSON.stringify(db.worldData) : ''; dbStr = JSON.stringify([db.itemDB, db.npcDB]);
     db.mapVersion = Math.max(Date.now(), db.mapVersion + 1); db.chatVer++; markDirty(); flushDB();
     res.json({ success: true, mapVersion: db.mapVersion });
 });

@@ -47,7 +47,7 @@
     /* ============================ ESTADO SOCIAL ============================ */
     let S = { party: null, invite: null, trade: null }, lastKey = '';
     const busy = {};   // ids de troca que já estão sendo processados neste cliente
-    function onSync(data) { if (data && data.social) onState(data.social); }
+    function onSync(data) { if (data && data.social) onState(data.social); try { if (window.Life) Life.onSync(data); } catch (e) { } }
     function onState(s) {
         S = s;
         const key = JSON.stringify(s);

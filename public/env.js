@@ -33,7 +33,7 @@
         return r < 0.62 ? 'clear' : r < 0.86 ? 'rain' : 'fog';
     }
     let drops = [];
-    function initDrops(w, h) { drops = []; for (let i = 0; i < 260; i++) drops.push({ x: Math.random() * (w + 200), y: Math.random() * h, l: 10 + Math.random() * 14, s: 9 + Math.random() * 7 }); }
+    function initDrops(w, h) { drops = []; for (let i = 0; i < (window.Quality ? Quality.drops() : 260); i++) drops.push({ x: Math.random() * (w + 200), y: Math.random() * h, l: 10 + Math.random() * 14, s: 9 + Math.random() * 7 }); }
     let fogBands = [];
 
     /* ---------- sprites de luz (um por cor) ---------- */
@@ -70,7 +70,7 @@
 
         /* 2) luzes: só aparecem quando está escuro o bastante */
         const lightK = clamp((d - 0.18) / 0.5, 0, 1);
-        if (lightK > 0.02 && mapObj && mapObj.entities) {
+        if (lightK > 0.02 && mapObj && mapObj.entities && (!window.Quality || Quality.level > 0)) {
             ctx.save(); ctx.globalCompositeOperation = 'lighter';
             const flick = (x) => 0.85 + 0.15 * Math.sin(T * 9 + x * 0.13) * Math.sin(T * 5.3 + x);
             for (const o of mapObj.entities) {
@@ -100,10 +100,12 @@
 
         /* 3) chuva / neblina / trovão */
         if (wk > 0.02 && W.cur === 'rain') {
-            if (!drops.length || drops.length && drops.w !== cw + ':' + ch) { initDrops(cw, ch); drops.w = cw + ':' + ch; }
+            if (!drops.length || drops.length && drops.w !== cw + ':' + ch + ':' + (window.Quality ? Quality.level : 2)) { initDrops(cw, ch); drops.w = cw + ':' + ch + ':' + (window.Quality ? Quality.level : 2); }
             ctx.save(); ctx.strokeStyle = 'rgba(190,210,235,' + (0.42 * wk).toFixed(3) + ')'; ctx.lineWidth = 1.2; ctx.beginPath();
+            if (!W.splash) W.splash = []; if ((!window.Quality || Quality.level > 0) && Math.random() < 0.9 * wk) W.splash.push({ x: Math.random() * cw, y: ch * (0.35 + Math.random() * 0.65), a: 0 }); if (W.splash.length > 60) W.splash.shift();
             for (const p of drops) { p.y += p.s; p.x -= p.s * 0.35; if (p.y > ch) { p.y = -20; p.x = Math.random() * (cw + 200); } if (p.x < -20) p.x += cw + 200; ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - p.l * 0.35, p.y + p.l); }
             ctx.stroke();
+            ctx.lineWidth = 1; for (let i = W.splash.length - 1; i >= 0; i--) { const sp = W.splash[i]; sp.a++; if (sp.a > 14) { W.splash.splice(i, 1); continue; } ctx.strokeStyle = 'rgba(200,220,245,' + ((1 - sp.a / 14) * 0.5 * wk).toFixed(3) + ')'; ctx.beginPath(); ctx.ellipse(sp.x, sp.y, 1.5 + sp.a * 0.55, 0.6 + sp.a * 0.2, 0, 0, TAU); ctx.stroke(); }
             ctx.fillStyle = 'rgba(40,55,80,' + (0.12 * wk).toFixed(3) + ')'; ctx.fillRect(0, 0, cw, ch);
             if (W.flash > 0.01) { ctx.fillStyle = 'rgba(235,240,255,' + (W.flash * 0.55).toFixed(3) + ')'; ctx.fillRect(0, 0, cw, ch); W.flash *= 0.9; }
             ctx.restore();
@@ -122,6 +124,7 @@
     function tick(mapObj) {
         if (W.cur === 'rain' && W.k > 0.4 && mapObj && mapObj.entities) for (const o of mapObj.entities) if (o && o.type === 'fire' && o.active) o.life -= 2;   // chuva apaga fogueiras mais rápido
     }
+    function rainLevel() { return W.cur === 'rain' ? W.k : 0; }
     function rangeMul() { return isNight() ? 1.35 : 1; }   // monstros enxergam mais longe à noite
     function weatherLabel() { return W.cur === 'rain' && W.k > 0.3 ? 'Chuva' : W.cur === 'fog' && W.k > 0.3 ? 'Neblina' : 'Céu limpo'; }
 
@@ -169,5 +172,5 @@
     }
     setInterval(updateBadge, 1000);
 
-    window.Env = { draw, tick, rangeMul, isNight, daylight, dayFrac, clockText, weatherLabel, setDebugFrac(f) { debugFrac = f; }, forceWeather(w, k) { W.forced = w !== 'auto'; if (w === 'auto') return; W.cur = w; W.k = k == null ? 1 : k; W.target = W.k; } };
+    window.Env = { rainLevel, draw, tick, rangeMul, isNight, daylight, dayFrac, clockText, weatherLabel, setDebugFrac(f) { debugFrac = f; }, forceWeather(w, k) { W.forced = w !== 'auto'; if (w === 'auto') return; W.cur = w; W.k = k == null ? 1 : k; W.target = W.k; } };
 })();
