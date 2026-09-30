@@ -51,7 +51,7 @@
     function draw(ctx, canvas, offset, mapObj, view, player, T) {
         const cw = canvas.width, ch = canvas.height, kind = mapKind(mapObj);
         let d = 1 - daylight();                                           // escuridão externa
-        if (kind === 'dark') d = Math.max(d, 0.62); else if (kind === 'dim') d = Math.max(d, 0.38);
+        if (kind === 'dark') d = Math.max(d, 0.62); else if (kind === 'dim') d = Math.max(d, 0.38); else if (kind === 'home') d = 0.14;
         const mapKey = (mapObj && mapObj.id) || '';
         const wanted = W.forced ? W.cur : weatherFor(mapKey, kind);
         if (W.mapKey !== mapKey && !W.forced) { W.mapKey = mapKey; W.cur = wanted; W.k = wanted === 'clear' ? 0 : 1; }

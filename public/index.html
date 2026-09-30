@@ -161,6 +161,7 @@
     <!-- SCRIPT GIGANTE E UNIFICADO DO JOGO -->
     <script src="catalog.js"></script>
     <script src="content.js"></script>
+    <script src="world2.js"></script>
     <script src="art.js"></script>
     <script src="env.js"></script>
     <script src="sfx.js"></script>
@@ -649,6 +650,7 @@
         }
         function buildWorldCopy() {
             const tempMaps = JSON.parse(JSON.stringify(gameMaps));
+            if (tempMaps.casa && tempMaps.casa.entities) tempMaps.casa.entities = tempMaps.casa.entities.filter(o => o && !o.hf);   // móveis são pessoais de cada jogador
             for (let map in tempMaps) { if (tempMaps[map] && tempMaps[map].entities) { tempMaps[map].entities.forEach(obj => { if(obj && obj.aggroTarget) obj.aggroTarget = null; }); } }
             return tempMaps;
         }
@@ -1086,6 +1088,8 @@
                             if(cObj.type === 'farm_plot') addMenuOption(`Plantar / Colher`, () => setPendingAction(cObj));
                             if(cObj.type === 'cauldron') addMenuOption(`Preparar poções`, () => setPendingAction(cObj));
                             if(cObj.type === 'enchant_table') addMenuOption(`Encantar equipamento`, () => setPendingAction(cObj));
+                            if(cObj.type === 'house_door') addMenuOption(`Entrar em casa`, () => setPendingAction(cObj));
+                            if(cObj.type === 'furniture') addMenuOption(cObj.fk === 'bed' ? `Descansar` : `Examinar`, () => setPendingAction(cObj));
                             if(cObj.type === 'fire') addMenuOption(`Cozinhar`, () => setPendingAction(cObj));
                             if(cObj.type === 'bank') addMenuOption(`Usar Banco`, () => setPendingAction(cObj));
                             if(cObj.type === 'portal') addMenuOption(`Entrar`, () => setPendingAction(cObj));
@@ -1415,6 +1419,7 @@
             else if (t === 'enemy' || t === 'npc') drawMonster(ctx, o);
             else if (t === 'fire' || t === 'fishing_spot' || t === 'furnace' || t === 'anvil' || t === 'bank' || t === 'portal') Art.drawStation(ctx, o, T);
             else if ((t === 'farm_plot' || t === 'cauldron' || t === 'enchant_table') && window.Content) Content.drawEntity(ctx, o, T);
+            else if ((t === 'furniture' || t === 'house_door') && window.World2) World2.drawEntity(ctx, o, T);
             else { ctx.fillStyle = 'rgba(200,200,200,0.5)'; ctx.fillRect(o.x, o.y, o.w || 30, o.h || 30); }
 
             if (!isHologram && o.active !== false && (t === 'enemy' || t === 'npc')) drawNameplate(ctx, o);

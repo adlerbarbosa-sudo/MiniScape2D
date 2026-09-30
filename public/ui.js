@@ -131,11 +131,26 @@
         return html;
     }
     function canCraft(it) { return parseRecipe(it.recipe).every((r) => getInvCount(r.name) >= r.qty); }
+    function bestiaryHtml() {
+        const W = window.World2; if (!W) return '<div class="book-page"><p>Bestiário indisponível.</p></div>';
+        const list = W.beastList(), p = W.beastProgress();
+        let h = `<div class="book-page"><h3>Bestiário</h3><p>Derrote criaturas para descobri-las. Uma vitória revela o perfil e o habitat; cinco revelam o que elas carregam. <b>${p.seen}/${p.total}</b> descobertas.</p><div class="bar" style="height:8px;background:#0003;border-radius:4px;overflow:hidden;margin:4px 0 8px"><div style="height:100%;width:${p.total ? Math.round(p.seen / p.total * 100) : 0}%;background:linear-gradient(#e0b84a,#a77a1c)"></div></div>`;
+        h += list.map((k) => {
+            const d = npcDB[k], n = W.kills(k);
+            if (n < 1) return `<div style="margin:3px 0;opacity:.55;font-family:var(--sans);font-size:.82rem">❔ <b>???</b> <span style="opacity:.8">— ainda não encontrado${d.biome ? ' (dica: ' + esc(d.biome) + ')' : ''}</span></div>`;
+            const where = whereMob(k).map(esc).join(', ') || esc(d.biome || '—'); const ch = behChip(d);
+            let body = `<div style="font-size:.8rem">${esc(d.desc || '')}</div><div style="font-size:.78rem;margin-top:3px">Vida <b>${d.hp}</b> · Dano até <b>${d.maxHit}</b> · XP <b>${d.xp}</b> · <span class="chip ${ch[0]}">${ch[1]}</span></div><div style="font-size:.78rem">Habitat: ${where}</div>`;
+            if (n >= 5 && d.lootStr) body += `<div style="font-size:.78rem">Carrega: ${d.lootStr.split('|').map((s) => { const a = s.split(','); const it = itemDB[a[0].trim()]; return esc((it ? it.icon + ' ' : '') + a[0].trim()) + ' <i>(' + chanceWord(parseFloat(a[1])) + ')</i>'; }).join(', ')}</div>`;
+            else if (d.lootStr) body += `<div style="font-size:.74rem;opacity:.65">Derrote mais ${5 - n} para ver o que carrega.</div>`;
+            return `<details style="margin:3px 0"><summary style="cursor:pointer;font-family:var(--sans);font-size:.84rem"><b>${esc(d.name)}</b> <span style="opacity:.7">— ${n} abate${n > 1 ? 's' : ''}${d.group === 'chefe' ? ' · CHEFE' : ''}</span></summary>${body}</details>`;
+        }).join('');
+        return h + '</div>';
+    }
     function renderCraftBook() {
         const box = $('craft-list'); if (!box) return;
         const list = Object.values(itemDB).filter((i) => i.recipe);
         if (!bookSel || !itemDB[bookSel] || !itemDB[bookSel].recipe) bookSel = list.length ? list[0].name : null;
-        let h = `<div class="book"><div class="book-tabs"><div class="book-tab ${bookTab === 'recipes' ? 'on' : ''}" data-bt="recipes">Receitas</div><div class="book-tab ${bookTab === 'index' ? 'on' : ''}" data-bt="index">Onde encontrar</div></div>`;
+        let h = `<div class="book"><div class="book-tabs"><div class="book-tab ${bookTab === 'recipes' ? 'on' : ''}" data-bt="recipes">Receitas</div><div class="book-tab ${bookTab === 'index' ? 'on' : ''}" data-bt="index">Onde encontrar</div><div class="book-tab ${bookTab === 'bestiary' ? 'on' : ''}" data-bt="bestiary">Bestiário</div></div>`;
         if (bookTab === 'recipes') {
             h += `<div class="rc-list">` + list.map((it) => { const ok = canCraft(it); return `<div class="rc-item ${it.name === bookSel ? 'sel' : ''} ${ok ? '' : 'lack'}" data-sel="${esc(it.name)}"><span class="em">${esc(it.icon)}</span><div style="flex:1"><div class="nm">${esc(it.name)}</div><div class="sub">${parseRecipe(it.recipe).map((r) => r.qty + '× ' + esc((itemDB[r.name] || {}).icon || r.name)).join(' + ')}</div></div><span class="${ok ? 'rc-ok' : 'rc-no'}">${ok ? 'pronto' : 'falta'}</span></div>`; }).join('') + `</div>`;
             const it = itemDB[bookSel];
@@ -145,6 +160,8 @@
                 h += `<h4>Ingredientes</h4>` + parseRecipe(it.recipe).map((r) => ingredientTree(r.name, r.qty, 0, [it.name])).join('');
                 h += `<button class="btn-craft" data-craft="${esc(it.name)}" ${ok ? '' : 'disabled'}>${ok ? 'Criar ' + esc(it.name) : 'Faltam materiais'}</button></div>`;
             }
+        } else if (bookTab === 'bestiary') {
+            h += bestiaryHtml();
         } else {
             const all = Object.values(itemDB).filter((i) => i.name !== 'Coins');
             h += `<div class="book-page"><h3>Onde encontrar cada item</h3><p>Toque em uma linha para ver como conseguir. Itens fabricáveis aparecem no Livro de Receitas.</p>` +
@@ -174,6 +191,7 @@
         ['star', 'Aço e mithril', `<ul><li><b>Coal</b> (carvão) e <b>Mithril Ore</b> são minerados nas minas e no covil. Carvão pede Mineração 5; mithril pede Mineração 15 e uma <b>Steel Pickaxe</b>.</li><li>Na fornalha: <b>Iron Ore + 2 Coal → Steel Bar</b> (Ferraria 10); <b>Mithril Ore + 3 Coal → Mithril Bar</b> (Ferraria 20).</li><li>Em Ofícios você cria espadas, escudos, armaduras e picaretas de aço e mithril.</li></ul>`],
         ['bag', 'Fazenda e alquimia', `<ul><li>Compre sementes com o <b>Fazendeiro</b> e plante nos <b>canteiros</b> (botão direito). Cada planta cresce em tempo real, mesmo com você longe. Volte e colha!</li><li>No <b>caldeirão</b> (perto da igreja) misture ervas, frascos e drops de monstros para fazer poções de cura, mana, força e guarda.</li><li>Poções de força e guarda duram 3 minutos.</li></ul>`],
         ['spark', 'Encantamento', `<ul><li>Na <b>Mesa de Encantamento</b> (perto do Mago) melhore armas e armaduras <b>equipadas</b>: até +3 níveis. Cada nível dá +2 de dano (armas) ou +1 de defesa.</li><li>Usa drops de monstros (Slime Ball, Spider Silk, Ectoplasm, Dragon Scale…) e moedas.</li></ul>`],
+        ['flag', 'Casa e Catacumbas', `<ul><li>Na Vila há uma <b>porta com a placa CASA</b>: sua casa é só sua. Dentro, use o botão <b>Decorar casa</b> para comprar camas, mesas, estantes, tapetes, e até <b>banco, fornalha, bigorna, caldeirão e mesa de encantamento</b>. A cama restaura vida e mana. Peças removidas devolvem 80% das moedas.</li><li>Derrotar o Dragão ou o Lich libera seus <b>troféus</b> para a casa.</li><li>No Covil do Dragão há uma <b>entrada para as Catacumbas</b>: esqueletos armados, fantasmas, magos e o <b>Lich Rei Ossian</b>. Leve poções, aço e ajuda!</li><li>O <b>Bestiário</b> (aba Ofícios) registra tudo o que você já derrotou.</li></ul>`],
         ['save', 'Progresso', `<ul><li>Tudo é salvo automaticamente no servidor. O botão “Salvar agora” no Menu força um save.</li><li>Atalhos: <b>H</b> abre este guia, <b>I</b> mochila, <b>C</b> ofícios, <b>Enter</b> chat.</li></ul>`],
     ];
     function renderGuide() {
@@ -234,6 +252,8 @@
         if (o.type === 'tree') return ['Árvore', 'Botão direito: cortar (precisa de machado)'];
         if (typeof o.type === 'string' && o.type.startsWith('rock_')) return [NODE_LABEL[o.type] || 'Rocha', 'Botão direito: minerar (precisa de picareta)'];
         if (o.type === 'fishing_spot') return ['Ponto de pesca', 'Botão direito: pescar (precisa de rede)'];
+        if (o.type === 'house_door') return ['Minha Casa', 'Botão direito: entrar. Só você decora a sua'];
+        if (o.type === 'furniture') return [o.name || 'Móvel', o.fk === 'bed' ? 'Botão direito: descansar' : 'Peça da casa'];
         if (o.type === 'farm_plot') return ['Canteiro', 'Botão direito: plantar ou colher'];
         if (o.type === 'cauldron') return ['Caldeirão de Alquimia', 'Botão direito: preparar poções'];
         if (o.type === 'enchant_table') return ['Mesa de Encantamento', 'Botão direito: encantar equipamento'];

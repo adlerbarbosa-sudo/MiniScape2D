@@ -181,9 +181,10 @@
     }
     function put(m, o) { const p = findFree(m, o.x, o.y, o.w, o.h); if (!p) return false; o.x = p.x; o.y = p.y; o.active = true; (m.entities = m.entities || []).push(o); return true; }
     const rockEnt = (k, id, x, y) => ({ id, type: k, name: k, x, y, w: 38, h: 38, hp: ROCKS[k].hp, maxHp: ROCKS[k].hp, color: ROCKS[k].color });
+    let dirty = false;
     function placeInWorld(maps) {
         if (!maps || typeof maps !== 'object') return;
-        const mk = (m, k) => { if (!m.c3 || typeof m.c3 !== 'object') m.c3 = {}; if (m.c3[k]) return false; m.c3[k] = true; return true; };   // cada peça é colocada uma única vez por mapa
+        const mk = (m, k) => { if (!m.c3 || typeof m.c3 !== 'object') m.c3 = {}; if (m.c3[k]) return false; m.c3[k] = true; dirty = true; return true; };   // cada peça é colocada uma única vez por mapa
         const findNpc = (key) => { for (const id of Object.keys(maps)) { const e = (maps[id].entities || []).find((o) => o && o.type === 'npc' && o.dbKey === key); if (e) return { m: maps[id], e }; } return null; };
         const lb = maps.lumbridge;
         const fa = findNpc('farmer_npc');
@@ -201,6 +202,7 @@
             for (let i = 0; i < coals; i++) { const a = irons[i % Math.max(1, irons.length)] || { x: W * 0.3 + i * 80, y: H * 0.4 }; put(m, rockEnt('rock_coal', 'c3_coal_' + i, a.x + 70 + i * 12, a.y + 20)); }
             for (let i = 0; i < mith; i++) put(m, rockEnt('rock_mithril', 'c3_mith_' + i, W * (0.62 + i * 0.1), H * (0.25 + (i % 2) * 0.4)));
         });
+        try { if (window.World2) World2.placeInWorld(maps); } catch (e) { console.error(e); }
     }
 
     /* ============================ DESENHO ============================ */
@@ -240,6 +242,7 @@
 
     /* ============================ LIGAÇÕES COM O JOGO ============================ */
     function merge() {
+        try { if (window.World2) World2.merge(); } catch (e) {}
         Object.keys(ITEMS).forEach((k) => { if (!itemDB[k]) itemDB[k] = Object.assign({}, ITEMS[k]); else if (ITEMS[k].tier && !itemDB[k].tier) itemDB[k].tier = ITEMS[k].tier; });
         if (itemDB['Iron Pickaxe'] && !itemDB['Iron Pickaxe'].tier) itemDB['Iron Pickaxe'].tier = 2; if (itemDB['Bronze Pickaxe'] && !itemDB['Bronze Pickaxe'].tier) itemDB['Bronze Pickaxe'].tier = 1;
         // lojas: sementes e frascos
@@ -256,10 +259,11 @@
         if (t.type === 'enchant_table') { openEnchant(); return true; }
         return false;
     }
-    function onLogin() { try { placeInWorld(gameMaps); } catch (e) { console.error(e); } if (!player.farm) player.farm = {}; if (!player.buffs) player.buffs = {}; }
+    function onLogin() { try { placeInWorld(gameMaps); } catch (e) { console.error(e); } if (!player.farm) player.farm = {}; if (!player.buffs) player.buffs = {}; try { if (window.World2) World2.onLogin(); } catch (e) {} try { if (dirty && userRole === 'admin') { worldDirty = true; dirty = false; setTimeout(() => { try { saveDataLogic(false, true); } catch (e) {} }, 1500); } } catch (e) {} }
+    function mark() { dirty = true; }
     function wire() {
         const oi = window.tryInteract; if (typeof oi === 'function') window.tryInteract = function (t) { if (tryInteractHook(t)) { player.actionAnim = 15; return; } return oi.apply(this, arguments); };
     }
     window.addEventListener('load', wire);
-    window.Content = { ITEMS, ROCKS, SMELT, CROPS, BREW, ENCH, NONSOLID, merge, tierOf, bestTool, startSmelt, finishSmelt, plantSel: plant, brew, enchant, buff, applyBuff, drawEntity, placeInWorld, onLogin, cropState, openCauldron, openEnchant };
+    window.Content = { ITEMS, ROCKS, SMELT, CROPS, BREW, ENCH, NONSOLID, merge, tierOf, bestTool, startSmelt, finishSmelt, plantSel: plant, brew, enchant, buff, applyBuff, drawEntity, placeInWorld, onLogin, mark, findFree, cropState, openCauldron, openEnchant };
 })();
