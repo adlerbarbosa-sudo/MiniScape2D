@@ -287,6 +287,7 @@ app.post('/api/sync', auth, (req, res) => {
             let sm = serverMobs[map][id];
             if (!sm) { sm = { hp: maxHp, maxHp, aggro: null, isDead: false, deadTime: 0 }; serverMobs[map][id] = sm; }
             if (!sm.isDead) {
+                if (dmg === 0 && sm.aggro && sm.aggro !== user && activePlayers[sm.aggro] && activePlayers[sm.aggro].map === map) continue;   // "vi você" (dano 0) não rouba o alvo de outro jogador
                 sm.hp -= dmg; sm.aggro = user;   // o monstro foca em quem bateu por último
                 if (sm.hp <= 0) { sm.hp = 0; sm.isDead = true; sm.deadTime = now; sm.aggro = null; }
             }
@@ -301,6 +302,12 @@ app.post('/api/sync', auth, (req, res) => {
         const mp = {}; let n = 0;
         for (const id of Object.keys(b.mobPos)) { if (++n > 300) break; const p = b.mobPos[id]; if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) mp[id] = { x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10 }; }
         mobPos[map] = mp;
+    }
+    if (mobPos[map]) {   // "leash": o monstro desiste se o alvo ficou muito longe
+        for (const id of Object.keys(serverMobs[map])) {
+            const sm = serverMobs[map][id], mp0 = mobPos[map][id], ap = sm.aggro && activePlayers[sm.aggro];
+            if (sm.aggro && mp0 && ap && Math.hypot(mp0.x - ap.x, mp0.y - ap.y) > 450) sm.aggro = null;
+        }
     }
 
     const players = {};
