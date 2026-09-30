@@ -55,6 +55,7 @@
         let body = ''; try { body = tab === 'daily' ? dailyHtml() : tab === 'ach' ? achHtml() : tab === 'market' ? marketHtml() : tab === 'rank' ? rankHtml() : tab === 'map' ? mapHtml() : emoteHtml(); } catch (e) { body = '<i>Erro ao montar esta aba.</i>'; console.error(e); }
         openModal(`<div id="hub-box"><h3>Diário do Aventureiro</h3><div class="hub-tabs">${TABS.map((t) => `<b data-t="${t[0]}" class="${tab === t[0] ? 'on' : ''}">${t[1]}${t[0] === 'daily' && claimable() ? ' •' : t[0] === 'market' && mailN ? ' •' : ''}</b>`).join('')}</div><div id="hub-body">${body}</div><div style="text-align:right;margin-top:8px"><button class="hb" data-close="1">Fechar (Esc)</button></div></div>`);
         const nb = $('custom-modal-box'); nb.dataset.social = '0'; nb.dataset.hub = '1'; nb.style.width = 'min(94vw, 680px)'; nb.style.maxWidth = 'none'; nb.style.boxSizing = 'border-box'; nb.style.padding = '16px'; const el = nb.querySelector('#hub-box'); if (el && soft) el.scrollTop = sc;
+        if (tab === 'map') { try { const cur = nb.querySelector('.hub-tile.cur'), sc2 = cur && cur.closest('div[style*="overflow-x"]'); if (sc2) sc2.scrollLeft = Math.max(0, cur.offsetLeft - sc2.clientWidth / 2 + cur.offsetWidth / 2); } catch (e) { } }   // mapa-múndi largo: centra no lugar atual
         nb.onclick = onClick; afterRender();
     }
     function bar(c, n) { return `<div class="hub-bar"><i style="width:${Math.min(100, Math.round(c / n * 100))}%"></i></div>`; }
@@ -173,7 +174,7 @@
     /* ---------- mapa-múndi ---------- */
     function thumb(id) {
         const m = gameMaps[id], c = document.createElement('canvas'); c.width = 150; c.height = 100; const g = c.getContext('2d'); const W = m.width || 800, H = m.height || 600, s = Math.min(150 / W, 100 / H); c.style.aspectRatio = '3/2';
-        const nm = ((m.name || id) + '').toLowerCase(); g.fillStyle = /covil|caverna|cave|catacumba|mina|mine/.test(nm) ? '#2c2a30' : /casa|home/.test(nm) ? '#6b5236' : '#4b7a38'; g.fillRect(0, 0, 150, 100);
+        const nm = ((m.name || id) + '').toLowerCase(); g.fillStyle = window.Maps2 && Maps2.MAPS[id] && /^#[0-9a-f]{6}$/i.test(m.color || '') ? m.color : /covil|caverna|cave|catacumba|mina|mine|masmorra|dragão|dragon/.test(nm) ? '#2c2a30' : /casa|home/.test(nm) ? '#6b5236' : '#4b7a38'; g.fillRect(0, 0, 150, 100);
         g.save(); g.translate((150 - W * s) / 2, (100 - H * s) / 2); g.scale(s, s);
         (m.entities || []).forEach((o) => { if (!o || o.active === false) return; const t = o.type, w = o.w || 30, h = o.h || 30;
             if (t === 'paint') { g.fillStyle = 'rgba(190,170,130,.55)'; g.fillRect(o.x, o.y, w, h); } else if (t === 'house') { g.fillStyle = '#8a4a2c'; g.fillRect(o.x, o.y, w, h); } else if (t === 'tree') { g.fillStyle = '#2f5a25'; g.fillRect(o.x, o.y, w, h * 0.8); }
@@ -195,9 +196,9 @@
         let h = '<div style="font-size:.78rem;margin-bottom:4px">Clique num lugar para ver criaturas, NPCs e recursos. Amarelo = NPC, vermelho = criatura, azul = portal, ponto branco = você.</div>';
         if (grid.length) {
             const xs = grid.map((k) => gameMaps[k].gridX), ys = grid.map((k) => gameMaps[k].gridY), x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
-            h += `<div class="hub-map" style="grid-template-columns:repeat(${x1 - x0 + 1},1fr)">`;
+            const ncol = x1 - x0 + 1; h += `<div style="overflow-x:auto;padding-bottom:4px"><div class="hub-map" style="grid-template-columns:repeat(${ncol},minmax(96px,1fr));min-width:${ncol * 102}px">`;   // mapa-múndi largo: rola na horizontal em vez de encolher as miniaturas
             for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const k = grid.find((q) => gameMaps[q].gridX === x && gameMaps[q].gridY === y); h += k ? `<div class="hub-tile ${k === currentMap ? 'cur' : ''} ${k === mapSel ? 'sel' : ''}" data-map="${esc(k)}"><img src="${thumb(k)}" style="width:100%;display:block"><span>${esc(gameMaps[k].name || k)}</span></div>` : '<div></div>'; }
-            h += '</div>';
+            h += '</div></div>';
         }
         if (other.length) h += `<div style="font-size:.74rem;margin:6px 0 2px">Outros lugares</div><div class="hub-map" style="grid-template-columns:repeat(auto-fill,minmax(120px,1fr))">${other.map((k) => `<div class="hub-tile ${k === currentMap ? 'cur' : ''} ${k === mapSel ? 'sel' : ''}" data-map="${esc(k)}"><img src="${thumb(k)}" style="width:100%;display:block"><span>${esc(gameMaps[k].name || k)}</span></div>`).join('')}</div>`;
         return h + mapInfo(mapSel);
@@ -212,7 +213,7 @@
         if (d.claim != null) { Life.claim(+d.claim); return render(); }
         if (d.title != null) { player.title = d.title; try { saveDataLogic(); } catch (e) { } return render(); }
         if (d.em) { if (Life.emote(d.em)) closeHub(); return; }
-        if (d.buy) return doBuy(d.buy, +d.price);
+        if (d.buy) { if (window.ItemSel && !ItemSel.arm('mk:' + d.buy)) { const old = t.textContent; t.textContent = 'Confirmar?'; note('Toque de novo em Confirmar para comprar (' + d.price + ' moedas).', '#f1c40f'); setTimeout(() => { if (t.isConnected && t.textContent === 'Confirmar?') t.textContent = old; }, 4000); return; } return doBuy(d.buy, +d.price); }
         if (d.cancel) return (async () => { const r = await mkCall({ a: 'cancel', id: d.cancel }); note(r.ok ? 'Anúncio retirado. O item volta pelo correio.' : (r.error || 'Erro'), r.ok ? '#2ecc71' : '#e74c3c'); await loadMarket(); await claimMail(); })();
         if (d.sel) { sellSel = { name: d.sel }; return render(); }
         if (d.list) return doList();

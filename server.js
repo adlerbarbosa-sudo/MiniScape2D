@@ -329,6 +329,20 @@ app.post('/api/save', rateLimit('save', 90, 60000), (req, res) => {
     markDirty(); res.json({ success: true, mapVersion: db.mapVersion });
 });
 
+/* aparência do personagem (look): só aceita campos conhecidos com valores válidos; qualquer coisa fora disso é descartada */
+const LOOK_RACES = new Set(['human', 'elf', 'dwarf', 'orc']);
+const LOOK_HEX = /^#[0-9a-fA-F]{6}$/;
+function cleanLook(l) {
+    if (!l || typeof l !== 'object' || Array.isArray(l)) return null;
+    const sex = l.sex, race = l.race, hs = l.hairStyle;
+    if (sex !== 'm' && sex !== 'f') return null;
+    if (typeof race !== 'string' || !LOOK_RACES.has(race)) return null;
+    if (typeof hs !== 'number' || !Number.isInteger(hs) || hs < 0 || hs > 7) return null;
+    for (const k of ['hair', 'skin', 'shirt', 'pants']) if (typeof l[k] !== 'string' || !LOOK_HEX.test(l[k])) return null;
+    return { sex, race, hairStyle: hs, hair: l.hair.toLowerCase(), skin: l.skin.toLowerCase(), shirt: l.shirt.toLowerCase(), pants: l.pants.toLowerCase(), beard: l.beard === 1 ? 1 : 0 };
+}
+
+function savedLook(user) { const u = hasOwn(db.users, user) ? db.users[user] : null; return u && u.playerData && typeof u.playerData === 'object' ? cleanLook(u.playerData.look) : null; }
 function doSync(user, b) {
     b = b || {}; const now = Date.now();
     let map = (typeof b.map === 'string' && MAP_RE.test(b.map) && !RESERVED.has(b.map.toLowerCase())) ? b.map : 'lumbridge';
@@ -337,7 +351,8 @@ function doSync(user, b) {
     const eq = (b.equipment && typeof b.equipment === 'object' && JSON.stringify(b.equipment).length < 6000) ? b.equipment : (prev ? prev.equipment : null);
     const fc = (b.facing && typeof b.facing === 'object') ? { x: num(b.facing.x) | 0, y: num(b.facing.y) | 0 } : { x: 0, y: 1 };
     activePlayers[user] = { x: coord(b.x, 400), y: coord(b.y, 300), map, facing: fc, actionAnim: num(b.actionAnim) | 0, equipment: eq, hp: Math.max(0, Math.min(99999, num(b.hp) | 0)), maxHp: Math.max(0, Math.min(99999, num(b.maxHp) | 0)), lastSeen: now,
-        title: typeof b.title === 'string' ? extras.cleanTitle(b.title) : (prev ? prev.title : ''), emote: prev ? prev.emote : null };
+        title: typeof b.title === 'string' ? extras.cleanTitle(b.title) : (prev ? prev.title : ''), emote: prev ? prev.emote : null,
+        look: (b.look !== undefined && cleanLook(b.look)) || (prev ? prev.look : null) || savedLook(user) };
     if (typeof b.emote === 'string' && /^[a-z]{2,10}$/.test(b.emote) && (!prev || !prev.emote || now - prev.emote.t > 1500)) activePlayers[user].emote = { k: b.emote, t: now };
     const host = electHost(map); const isHost = host === user;
 

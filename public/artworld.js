@@ -59,8 +59,10 @@
         g.restore(); ell(g, x + w * (o.double ? 0.42 : 0.78), y + h * 0.58, 1.6, 1.6, '#e8c04a', OUT, 0.6); if (o.double) ell(g, x + w * 0.58, y + h * 0.58, 1.6, 1.6, '#e8c04a', OUT, 0.6);
         rrect(g, x - 3, y + h - 2, w + 6, 4, 1, '#8a8f96', OUT, 0.9);
     }
-    function smoke(g, x, y, t, seed) { for (let i = 0; i < 6; i++) { const p = ((t * 0.28 + i / 6 + seed) % 1), r = 2.4 + p * 8; g.fillStyle = 'rgba(210,210,215,' + (0.42 * (1 - p)) + ')'; g.beginPath(); g.arc(x + sin(t * 1.2 + i) * 3 * p + p * 10, y - p * 34, r, 0, TAU); g.fill(); } }
+    let _rec = null;   // durante o cache de prédios: fumaça e bandeira são só anotadas (e redesenhadas ao vivo por cima do sprite)
+    function smoke(g, x, y, t, seed) { if (_rec) { _rec.push({ f: smoke, a: [x, y, t, seed], ti: 2, m: g.getTransform() }); return; } for (let i = 0; i < 6; i++) { const p = ((t * 0.28 + i / 6 + seed) % 1), r = 2.4 + p * 8; g.fillStyle = 'rgba(210,210,215,' + (0.42 * (1 - p)) + ')'; g.beginPath(); g.arc(x + sin(t * 1.2 + i) * 3 * p + p * 10, y - p * 34, r, 0, TAU); g.fill(); } }
     function flag(g, x, y, len, h, col, t, seed) {
+        if (_rec) { _rec.push({ f: flag, a: [x, y, len, h, col, t, seed], ti: 5, m: g.getTransform() }); return; }
         limb(g, x, y, x, y - len, 2, '#5a3a20'); ell(g, x, y - len - 1, 2.2, 2.2, '#e8c04a', OUT, 0.6);
         g.beginPath(); g.moveTo(x + 1, y - len + 1); for (let i = 0; i <= 8; i++) g.lineTo(x + 1 + i * 2.6, y - len + 1 + sin(t * 4 + i * 0.7 + (seed || 0)) * (1 + i * 0.25)); for (let i = 8; i >= 0; i--) g.lineTo(x + 1 + i * 2.6, y - len + 1 + h + sin(t * 4 + i * 0.7 + (seed || 0)) * (1 + i * 0.25)); g.closePath(); paint(g, col, OUT, 0.9);
     }
@@ -341,7 +343,7 @@
             if (k === 'water') { const X = o.x, Y = o.y, XR = o.x + w, YB = o.y + h;   // cantos convexos da união de água ficam arredondados
                 o._cr = [!has(X - 3, Y - 3, k) && !has(X - 3, Y + 3, k) && !has(X + 3, Y - 3, k), !has(XR + 3, Y - 3, k) && !has(XR + 3, Y + 3, k) && !has(XR - 3, Y - 3, k), !has(XR + 3, YB + 3, k) && !has(XR + 3, YB - 3, k) && !has(XR - 3, YB + 3, k), !has(X - 3, YB + 3, k) && !has(X - 3, YB - 3, k) && !has(X + 3, YB + 3, k)]; } }
     }
-    function drawPaint(ctx, o, t) {
+    function drawPaint(ctx, o, t, baked) {   // baked = desenho estático para o cache (sem ondinhas animadas; elas são desenhadas ao vivo por cima)
         const ow = o.w || 40, oh = o.h || 40; const kind = PAINT_KIND[o.color]; const e = o._edge || {};
         if (!kind) { ctx.fillStyle = o.color || '#888'; ctx.fillRect(o.x, o.y, ow, oh); return; }
         const x = o.x, y = o.y;
@@ -351,7 +353,7 @@
         else { ctx.fillStyle = patternOf(ctx, kind, PAINT_BASE[kind]); ctx.fillRect(x, y, ow, oh); }
         if (kind === 'water') {
             ctx.save(); if (cr && cr.some(Boolean)) rpath(); else { ctx.beginPath(); ctx.rect(x, y, ow, oh); } ctx.clip();
-            for (let i = 0; i < Math.max(2, ow * oh / 700); i++) { const px = x + hash(i * 3 + x) * ow, py = y + hash(i * 5 + y) * oh, ph = t * 1.2 + i * 1.7; ctx.strokeStyle = 'rgba(255,255,255,' + (0.22 + 0.16 * sin(ph)) + ')'; ctx.lineWidth = 1.3; ctx.beginPath(); ctx.moveTo(px - 6 + sin(ph) * 3, py); ctx.quadraticCurveTo(px, py - 2.4, px + 6 + sin(ph) * 3, py); ctx.stroke(); }
+            if (!baked) for (let i = 0; i < Math.max(2, ow * oh / 700); i++) { const px = x + hash(i * 3 + x) * ow, py = y + hash(i * 5 + y) * oh, ph = t * 1.2 + i * 1.7; ctx.strokeStyle = 'rgba(255,255,255,' + (0.22 + 0.16 * sin(ph)) + ')'; ctx.lineWidth = 1.3; ctx.beginPath(); ctx.moveTo(px - 6 + sin(ph) * 3, py); ctx.quadraticCurveTo(px, py - 2.4, px + 6 + sin(ph) * 3, py); ctx.stroke(); }
             const shore = (x0, y0, x1, y1, nx, ny) => { const g2 = ctx.createLinearGradient(x0, y0, x0 + nx * 12, y0 + ny * 12); g2.addColorStop(0, 'rgba(205,240,255,0.75)'); g2.addColorStop(1, 'rgba(205,240,255,0)'); ctx.fillStyle = g2; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.lineTo(x1 + nx * (8 + sin(t * 2 + x0 * 0.1) * 3), y1 + ny * (8 + sin(t * 2 + x0 * 0.1) * 3)); ctx.lineTo(x0 + nx * (8 + sin(t * 2 + x1 * 0.1) * 3), y0 + ny * (8 + sin(t * 2 + x1 * 0.1) * 3)); ctx.closePath(); ctx.fill(); };
             if (e.t) shore(x, y, x + ow, y, 0, 1); if (e.b) shore(x, y + oh, x + ow, y + oh, 0, -1); if (e.l) shore(x, y, x, y + oh, 1, 0); if (e.r) shore(x + ow, y, x + ow, y + oh, -1, 0);
             ctx.restore();
@@ -372,25 +374,96 @@
             if (kind !== 'grass') { if (e.t) for (let px = x + 3; px < x + ow; px += 9) if (hash(px * 1.3 + y) > 0.45) tuft(px + hash(px) * 3, y + 1); if (e.b) for (let px = x + 3; px < x + ow; px += 9) if (hash(px * 1.7 + y) > 0.55) tuft(px + hash(px) * 3, y + oh + 3); }
         }
     }
-    /* fundo do mapa em cache */
-    function drawGround(ctx, m, t, vw) {
-        const W = m.width || 800, H = m.height || 600, key = (m.id || '') + '|' + m.color + '|' + W + '|' + H; let c = _bg[key];
-        if (!c) {
-            Object.keys(_bg).forEach(k => { if (k.split('|')[0] !== (m.id || '')) delete _bg[k]; });   // guarda só o mapa atual (mapas grandes gastam memória)
-            c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d'); const base = m.color || '#4a6b2d';
-            const dark = /^#([0-4])/.test(base) && false;
-            g.fillStyle = base; g.fillRect(0, 0, W, H); g.fillStyle = patternOf(g, 'grass', base); g.fillRect(0, 0, W, H);
-            // manchas suaves de luz/sombra
-            for (let i = 0; i < Math.ceil(W * H / 26000); i++) { const x = hash(i * 1.7 + W) * W, y = hash(i * 2.9 + H) * H, r = 60 + hash(i * 5.3) * 110; g.fillStyle = rg(g, x, y, 0, r, [[0, hash(i) > 0.5 ? 'rgba(255,255,200,0.07)' : 'rgba(0,20,0,0.09)'], [1, 'rgba(0,0,0,0)']]); g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill(); }
-            // detalhes: flores, pedrinhas, folhas
-            const isRocky = /^#[5-9a-f][0-9a-f][3-7]/i.test(base) && false;
-            for (let i = 0; i < Math.ceil(W * H / 2600); i++) { const x = hash(i * 3.1) * W, y = hash(i * 4.7 + 1) * H, k = hash(i * 9.9); if (k < 0.4) { g.strokeStyle = 'rgba(255,255,255,0.25)'; g.lineWidth = 1; g.beginPath(); g.moveTo(x, y); g.lineTo(x + 1, y - 5); g.moveTo(x, y); g.lineTo(x - 2, y - 4); g.moveTo(x, y); g.lineTo(x + 3, y - 3.4); g.stroke(); } else if (k < 0.62) { const cols = ['#fff4c2', '#ffb0c8', '#d8b0ff', '#ffe27a']; g.fillStyle = cols[Math.floor(hash(i) * 4)]; g.beginPath(); g.arc(x, y, 1.5, 0, TAU); g.fill(); g.fillStyle = 'rgba(255,200,0,0.9)'; g.fillRect(x - 0.4, y - 0.4, 0.8, 0.8); } else if (k < 0.8) { g.fillStyle = 'rgba(0,0,0,0.16)'; g.beginPath(); g.ellipse(x, y + 1, 3.4, 1.7, 0, 0, TAU); g.fill(); g.fillStyle = 'rgba(180,180,180,0.7)'; g.beginPath(); g.ellipse(x, y, 3, 1.8, 0, 0, TAU); g.fill(); } }
-            // borda escura suave
-            const b = 26; [[0, 0, W, b, 0, 1], [0, H - b, W, b, 0, -1], [0, 0, b, H, 1, 0], [W - b, 0, b, H, -1, 0]].forEach(s => { const gr = g.createLinearGradient(s[0] + (s[4] < 0 ? s[2] : 0), s[1] + (s[5] < 0 ? s[3] : 0), s[0] + (s[4] < 0 ? s[2] : 0) + s[4] * b, s[1] + (s[5] < 0 ? s[3] : 0) + s[5] * b); gr.addColorStop(0, 'rgba(0,0,0,0.28)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(s[0], s[1], s[2], s[3]); });
-            _bg[key] = c; const keys = Object.keys(_bg); if (keys.length > 8) delete _bg[keys[0]];
+    /* ============================================================
+       ÁGUA: grade de tiles (colisão dos bichos) e desenho submerso
+       ============================================================ */
+    const WCELL = 10, _wg = { map: null, key: '', t: 0, any: false, cols: 0, rows: 0, g: null };
+    function waterGrid(m) {
+        const now = performance.now(), cur = m.entities || [];
+        if (_wg.map === m && now - _wg.t < 1000) return _wg;
+        let sum = 0, n = 0; for (const o of cur) if (o && o.type === 'paint') { sum += o.x * 3 + o.y * 7 + (o.w || 0) + (o.h || 0) + (PAINT_KIND[o.color] === 'water' ? 1e6 : 0); n++; }
+        const W = m.width || 800, H = m.height || 600, key = (m.id || '') + ':' + n + ':' + sum + ':' + W + 'x' + H; _wg.t = now;
+        if (_wg.map === m && _wg.key === key) return _wg;
+        const cols = Math.ceil(W / WCELL), rows = Math.ceil(H / WCELL), g = new Uint8Array(cols * rows); let any = false;
+        for (const o of cur) {   // na ordem de desenho: a pintura de cima manda (ponte/caminho sobre a água deixa de ser água)
+            if (!o || o.type !== 'paint') continue; const wt = PAINT_KIND[o.color] === 'water' ? 1 : 0; if (wt) any = true;
+            const x0 = max(0, Math.floor(o.x / WCELL)), x1 = min(cols - 1, Math.floor((o.x + (o.w || 40) - 1) / WCELL)), y0 = max(0, Math.floor(o.y / WCELL)), y1 = min(rows - 1, Math.floor((o.y + (o.h || 40) - 1) / WCELL));
+            for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) g[y * cols + x] = wt;
         }
-        if (vw) { const sx = Math.max(0, Math.floor(vw.x)), sy = Math.max(0, Math.floor(vw.y)), sw = Math.min(W - sx, Math.ceil(vw.w) + 2), sh = Math.min(H - sy, Math.ceil(vw.h) + 2); if (sw > 0 && sh > 0) ctx.drawImage(c, sx, sy, sw, sh, sx, sy, sw, sh); }
-        else ctx.drawImage(c, 0, 0);
+        _wg.map = m; _wg.key = key; _wg.any = any; _wg.cols = cols; _wg.rows = rows; _wg.g = g; return _wg;
+    }
+    function isWater(m, x, y) { if (!m) return false; const w = waterGrid(m); if (!w.any) return false; const cx = Math.floor(x / WCELL), cy = Math.floor(y / WCELL); if (cx < 0 || cy < 0 || cx >= w.cols || cy >= w.rows) return false; return w.g[cy * w.cols + cx] === 1; }
+    function nearestLand(m, x, y) {   // ponto seco mais perto (anéis crescentes)
+        for (let r = 16; r <= 480; r += 16) for (let i = 0; i < 16; i++) { const a = i / 16 * TAU, px = x + cos(a) * r, py = y + sin(a) * r; if (px > 24 && py > 24 && px < (m.width || 800) - 24 && py < (m.height || 600) - 24 && !isWater(m, px, py) && !isWater(m, px, py + 6)) return { x: px, y: py }; }
+        return null;
+    }
+    /* desenha de modo que só a parte de cima apareça: linha d'água a 'frac' da altura, parte de baixo bem fraquinha, ondinhas na superfície */
+    function drawSubmerged(ctx, cx, feetY, w, h, frac, T, fn) {
+        const wy = feetY - h * frac, top = feetY - h * 3 - 90, hw = w * 1.6 + 60;
+        ctx.save(); ctx.beginPath(); ctx.rect(cx - hw, top, hw * 2, wy - top); ctx.clip(); fn(); ctx.restore();
+        ctx.save(); ctx.beginPath(); ctx.rect(cx - hw, wy, hw * 2, h * 1.5 + 30); ctx.clip(); ctx.globalAlpha = 0.2; fn(); ctx.restore();
+        ctx.save(); ctx.fillStyle = 'rgba(58,140,210,0.32)'; ctx.beginPath(); ctx.ellipse(cx, wy + 1, w * 0.5 + 3, 3.6, 0, 0, TAU); ctx.fill();
+        for (let i = 0; i < 2; i++) { const p = (T * 0.8 + i * 0.5) % 1; ctx.strokeStyle = 'rgba(235,250,255,' + (0.6 * (1 - p)) + ')'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.ellipse(cx, wy + 1, w * 0.42 + p * 12, 2.6 + p * 4, 0, 0, TAU); ctx.stroke(); }
+        ctx.restore();
+    }
+
+    /* fundo do mapa em cache: chão (grama, manchas, detalhes) + toda a pintura (caminhos, água base, costa) numa imagem só.
+       A pintura é refeita só quando o mapa muda (edição do admin) e, enquanto o admin ainda está editando, desenha ao vivo. */
+    let _cam = { x: 0, y: 0 }, _built = 0;
+    function cam(x, y) { _cam.x = x; _cam.y = y; _built = 0; }
+    const hiQ = () => !root.Quality || root.Quality.level > 0;
+    function paintSig(cur) { let sum = 0, n = 0; for (const o of cur) if (o && o.type === 'paint') { sum += o.x * 3 + o.y * 7 + (o.w || 0) * 5 + (o.h || 0) * 11 + (o.color ? o.color.charCodeAt(1) + o.color.charCodeAt(3) * 3 : 0); n++; } return n + ':' + sum; }
+    function buildBase(m, W, H) {
+        const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d'); const base = m.color || '#4a6b2d';
+        g.fillStyle = base; g.fillRect(0, 0, W, H); g.fillStyle = patternOf(g, 'grass', base); g.fillRect(0, 0, W, H);
+        // manchas suaves de luz/sombra
+        for (let i = 0; i < Math.ceil(W * H / 26000); i++) { const x = hash(i * 1.7 + W) * W, y = hash(i * 2.9 + H) * H, r = 60 + hash(i * 5.3) * 110; g.fillStyle = rg(g, x, y, 0, r, [[0, hash(i) > 0.5 ? 'rgba(255,255,200,0.07)' : 'rgba(0,20,0,0.09)'], [1, 'rgba(0,0,0,0)']]); g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill(); }
+        // detalhes: flores, pedrinhas, folhas
+        for (let i = 0; i < Math.ceil(W * H / 2600); i++) { const x = hash(i * 3.1) * W, y = hash(i * 4.7 + 1) * H, k = hash(i * 9.9); if (k < 0.4) { g.strokeStyle = 'rgba(255,255,255,0.25)'; g.lineWidth = 1; g.beginPath(); g.moveTo(x, y); g.lineTo(x + 1, y - 5); g.moveTo(x, y); g.lineTo(x - 2, y - 4); g.moveTo(x, y); g.lineTo(x + 3, y - 3.4); g.stroke(); } else if (k < 0.62) { const cols = ['#fff4c2', '#ffb0c8', '#d8b0ff', '#ffe27a']; g.fillStyle = cols[Math.floor(hash(i) * 4)]; g.beginPath(); g.arc(x, y, 1.5, 0, TAU); g.fill(); g.fillStyle = 'rgba(255,200,0,0.9)'; g.fillRect(x - 0.4, y - 0.4, 0.8, 0.8); } else if (k < 0.8) { g.fillStyle = 'rgba(0,0,0,0.16)'; g.beginPath(); g.ellipse(x, y + 1, 3.4, 1.7, 0, 0, TAU); g.fill(); g.fillStyle = 'rgba(180,180,180,0.7)'; g.beginPath(); g.ellipse(x, y, 3, 1.8, 0, 0, TAU); g.fill(); } }
+        return c;
+    }
+    function edgeShade(c) {   // borda escura suave do mapa (por cima de tudo que foi assado)
+        const g = c.getContext('2d'), W = c.width, H = c.height, b = 26;
+        [[0, 0, W, b, 0, 1], [0, H - b, W, b, 0, -1], [0, 0, b, H, 1, 0], [W - b, 0, b, H, -1, 0]].forEach(s => { const gr = g.createLinearGradient(s[0] + (s[4] < 0 ? s[2] : 0), s[1] + (s[5] < 0 ? s[3] : 0), s[0] + (s[4] < 0 ? s[2] : 0) + s[4] * b, s[1] + (s[5] < 0 ? s[3] : 0) + s[5] * b); gr.addColorStop(0, 'rgba(0,0,0,0.28)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(s[0], s[1], s[2], s[3]); });
+    }
+    function bakePaint(e, m, cur, W, H) {   // e.base (chão) -> e.comp (chão + pintura)
+        paintAdjacency(cur);
+        if (!e.comp) { e.comp = document.createElement('canvas'); e.comp.width = W; e.comp.height = H; }
+        const g = e.comp.getContext('2d'); g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W, H); g.drawImage(e.base, 0, 0);
+        e.water = [];
+        for (const o of cur) { if (!o || o.type !== 'paint') continue; try { drawPaint(g, o, 0, true); } catch (er) { } if (PAINT_KIND[o.color] === 'water') e.water.push(o); }
+        edgeShade(e.comp); e.psig = paintSig(cur); e.dirty = 0;
+    }
+    function drawGround(ctx, m, t, vw) {
+        const W = m.width || 800, H = m.height || 600, key = (m.id || '') + '|' + m.color + '|' + W + '|' + H; let e = _bg[key]; const cur = m.entities || [];
+        if (!e) {
+            Object.keys(_bg).forEach(k => { if (k.split('|')[0] !== (m.id || '')) delete _bg[k]; });   // guarda só o mapa atual (mapas grandes gastam memória)
+            e = _bg[key] = { base: buildBase(m, W, H), comp: null, psig: null, dirty: 0, water: [], big: W * H > 20e6 }; edgeShade(e.base);
+            const ks = Object.keys(_bg); if (ks.length > 8) delete _bg[ks[0]];
+        }
+        let src = e.base, baked = false;
+        if (!e.big) {
+            const sig = paintSig(cur);
+            if (e.psig === sig) { src = e.comp; baked = true; }
+            else if (!e.comp) { bakePaint(e, m, cur, W, H); src = e.comp; baked = true; }   // primeira vez neste mapa
+            else { const now = performance.now(); if (e.sigSeen !== sig) { e.sigSeen = sig; e.dirty = now; } else if (now - e.dirty > 350) { bakePaint(e, m, cur, W, H); src = e.comp; baked = true; } }
+        }
+        _groundBaked = baked; _waterList = baked ? e.water : null;
+        if (vw) { const sx = Math.max(0, Math.floor(vw.x)), sy = Math.max(0, Math.floor(vw.y)), sw = Math.min(W - sx, Math.ceil(vw.w) + 2), sh = Math.min(H - sy, Math.ceil(vw.h) + 2); if (sw > 0 && sh > 0) ctx.drawImage(src, sx, sy, sw, sh, sx, sy, sw, sh); }
+        else ctx.drawImage(src, 0, 0);
+        return baked;
+    }
+    let _groundBaked = false, _waterList = null;
+    function paintsBaked() { return _groundBaked; }
+    /* ondinhas da água: só linhas claras, só na tela (a base azul e a costa já estão no cache) */
+    function drawWaterAnim(ctx, t, vw) {
+        if (!_waterList || !_waterList.length || !hiQ()) return; const lowQ = root.Quality && root.Quality.level < 2;
+        ctx.lineWidth = 1.3;
+        for (const o of _waterList) {
+            const ow = o.w || 40, oh = o.h || 40, x = o.x, y = o.y; if (x + ow < vw.x || x > vw.x + vw.w || y + oh < vw.y || y > vw.y + vw.h) continue;
+            const n = Math.max(2, ow * oh / 700) * (lowQ ? 0.5 : 1) | 0, iw = max(1, ow - 24), ih = max(1, oh - 12);
+            for (let i = 0; i < n; i++) { const px = x + 12 + hash(i * 3 + x) * iw, py = y + 6 + hash(i * 5 + y) * ih, ph = t * 1.2 + i * 1.7, sw = sin(ph); ctx.strokeStyle = 'rgba(255,255,255,' + (0.22 + 0.16 * sw).toFixed(2) + ')'; ctx.beginPath(); ctx.moveTo(px - 6 + sw * 3, py); ctx.quadraticCurveTo(px, py - 2.4, px + 6 + sw * 3, py); ctx.stroke(); }
+        }
     }
 
     /* ============================================================
@@ -419,7 +492,7 @@
     }
     function drawTree(ctx, o, t) {
         const ow = o.w || 40, oh = o.h || 50, cx = o.x + ow / 2, by = o.y + oh, v = Math.floor(hash((o.id || 1) * 1.37) * 3), sw = sin(t * 1.1 + cx * 0.04) * 1.6, s = ow / 40;
-        ctx.fillStyle = 'rgba(0,0,0,0.26)'; ctx.beginPath(); ctx.ellipse(cx + 6 * s, by - 1, 18 * s, 5 * s, 0, 0, TAU); ctx.fill();
+        if (!o._ns) { ctx.fillStyle = 'rgba(0,0,0,0.26)'; ctx.beginPath(); ctx.ellipse(cx + 6 * s, by - 1, 18 * s, 5 * s, 0, 0, TAU); ctx.fill(); }
         ctx.save(); ctx.translate(cx, by); ctx.scale(s, oh / 50);
         const trunk = (w, col) => { ctx.beginPath(); ctx.moveTo(-w, 0); ctx.quadraticCurveTo(-w + 1, -12, -w * 0.7, -26); ctx.lineTo(w * 0.7, -26); ctx.quadraticCurveTo(w - 1, -12, w, 0); ctx.quadraticCurveTo(0, 3, -w, 0); ctx.closePath(); paint(ctx, lg(ctx, -w, 0, w, 0, [[0, shade(col, 0.15)], [1, shade(col, -0.35)]]), OUT, 1.2); ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 0.8; for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.moveTo(-w * 0.5 + i * w * 0.35, -2); ctx.lineTo(-w * 0.4 + i * w * 0.3, -20); ctx.stroke(); } };
         if (v === 1) {   // pinheiro
@@ -501,7 +574,7 @@
             ctx.save(); ctx.translate(cx, cy); for (let r = 0; r < 3; r++) { ctx.save(); ctx.rotate(t * (r % 2 ? -1 : 1) * (0.9 + r * 0.4)); ctx.strokeStyle = ['#e8c8ff', '#b86bff', '#6a2fd0'][r]; ctx.lineWidth = 3 - r * 0.6; ctx.setLineDash([9 - r * 2, 5]); ctx.beginPath(); ctx.ellipse(0, 0, ow * (0.46 - r * 0.09), oh * (0.46 - r * 0.09), 0, 0, TAU); ctx.stroke(); ctx.restore(); } ctx.setLineDash([]);
             const gr = ctx.createRadialGradient(0, 0, 0, 0, 0, ow * 0.34); gr.addColorStop(0, 'rgba(255,255,255,0.95)'); gr.addColorStop(0.5, 'rgba(190,120,255,0.75)'); gr.addColorStop(1, 'rgba(60,20,120,0.2)'); ctx.fillStyle = gr; ctx.beginPath(); ctx.ellipse(0, 0, ow * 0.34, oh * 0.34, 0, 0, TAU); ctx.fill();
             for (let i = 0; i < 8; i++) { const a = t * 1.5 + i * PI / 4, rr = ow * 0.5 * ((t * 0.5 + i / 8) % 1); ctx.fillStyle = 'rgba(230,200,255,0.9)'; ctx.fillRect(cos(a) * rr - 1, sin(a) * rr - 1, 2, 2); } ctx.restore();
-            ctx.font = 'bold 11px Arial'; ctx.textAlign = 'center'; ctx.strokeStyle = 'rgba(0,0,0,0.8)'; ctx.lineWidth = 3; ctx.strokeText('Portal', cx, y - 6); ctx.fillStyle = '#efdcff'; ctx.fillText('Portal', cx, y - 6); ctx.textAlign = 'start';
+            ctx.font = 'bold 11px Arial'; ctx.textAlign = 'center'; ctx.strokeStyle = 'rgba(0,0,0,0.8)'; ctx.lineWidth = 3; const pl = (o.name && o.name !== 'Chão') ? o.name : 'Portal'; ctx.strokeText(pl, cx, y - 6); ctx.fillStyle = '#efdcff'; ctx.fillText(pl, cx, y - 6); ctx.textAlign = 'start';
         }
     }
 
@@ -509,10 +582,11 @@
        EFEITOS E AMBIENTE
        ============================================================ */
     const FX = [];
-    function burst(x, y, col, n, spd) { for (let i = 0; i < (n || 10); i++) { const a = Math.random() * TAU, s = (0.6 + Math.random() * 1.6) * (spd || 1); FX.push({ x, y, vx: cos(a) * s, vy: sin(a) * s - 0.8, life: 30 + Math.random() * 20, max: 50, col: col || '#fff', r: 1.5 + Math.random() * 2.2, g: 0.05 }); } { const cap = window.Quality ? Quality.fxCap() : 400; if (FX.length > cap) FX.splice(0, FX.length - cap); } }
-    function poof(x, y) { for (let i = 0; i < 12; i++) { const a = Math.random() * TAU; FX.push({ x, y, vx: cos(a) * 1.2, vy: sin(a) * 0.7 - 0.3, life: 30, max: 30, col: 'rgba(230,230,235,', r: 4 + Math.random() * 5, g: -0.01, soft: true }); } burst(x, y, '#ffd24a', 8, 1.2); }
+    const fxFull = () => FX.length > (root.Quality ? root.Quality.fxCap() : 400);   // limite de partículas conforme os gráficos
+    function burst(x, y, col, n, spd) { if (fxFull()) return; for (let i = 0; i < (n || 10); i++) { const a = Math.random() * TAU, s = (0.6 + Math.random() * 1.6) * (spd || 1); FX.push({ x, y, vx: cos(a) * s, vy: sin(a) * s - 0.8, life: 30 + Math.random() * 20, max: 50, col: col || '#fff', r: 1.5 + Math.random() * 2.2, g: 0.05 }); } { const cap = window.Quality ? Quality.fxCap() : 400; if (FX.length > cap) FX.splice(0, FX.length - cap); } }
+    function poof(x, y) { if (fxFull()) return; for (let i = 0; i < 12; i++) { const a = Math.random() * TAU; FX.push({ x, y, vx: cos(a) * 1.2, vy: sin(a) * 0.7 - 0.3, life: 30, max: 30, col: 'rgba(230,230,235,', r: 4 + Math.random() * 5, g: -0.01, soft: true }); } burst(x, y, '#ffd24a', 8, 1.2); }
     function fxStep() { for (let i = FX.length - 1; i >= 0; i--) { const p = FX[i]; p.x += p.vx; p.y += p.vy; p.vy += p.g; p.life--; if (p.life <= 0) FX.splice(i, 1); } }
-    function puff(x, y, col, n, rad, up) { for (let i = 0; i < (n || 2); i++) FX.push({ x: x + (Math.random() - 0.5) * 6, y, vx: (Math.random() - 0.5) * 0.6, vy: -(up || 0.25) - Math.random() * 0.25, life: 22, max: 22, col: col || 'rgba(160,140,110,', r: (rad || 3) * (0.7 + Math.random() * 0.6), g: -0.004, soft: true }); { const cap = window.Quality ? Quality.fxCap() : 400; if (FX.length > cap) FX.splice(0, FX.length - cap); } }
+    function puff(x, y, col, n, rad, up) { if (fxFull()) return; for (let i = 0; i < (n || 2); i++) FX.push({ x: x + (Math.random() - 0.5) * 6, y, vx: (Math.random() - 0.5) * 0.6, vy: -(up || 0.25) - Math.random() * 0.25, life: 22, max: 22, col: col || 'rgba(160,140,110,', r: (rad || 3) * (0.7 + Math.random() * 0.6), g: -0.004, soft: true }); { const cap = window.Quality ? Quality.fxCap() : 400; if (FX.length > cap) FX.splice(0, FX.length - cap); } }
     function fxDraw(ctx) { for (const p of FX) { const a = max(0, p.life / p.max); if (p.soft) { ctx.fillStyle = p.col + (0.5 * a) + ')'; ctx.beginPath(); ctx.arc(p.x, p.y, p.r * (2 - a), 0, TAU); ctx.fill(); } else { ctx.globalAlpha = a; ctx.fillStyle = p.col; ctx.beginPath(); ctx.arc(p.x, p.y, p.r * a + 0.5, 0, TAU); ctx.fill(); ctx.globalAlpha = 1; } } }
 
     let _vig = null, _vigKey = '', _motes = [];
@@ -520,6 +594,7 @@
         const key = W + 'x' + H; if (!_vig || _vigKey !== key) { _vig = ctx.createRadialGradient(W / 2, H / 2, min(W, H) * 0.35, W / 2, H / 2, max(W, H) * 0.75); _vig.addColorStop(0, 'rgba(0,0,0,0)'); _vig.addColorStop(1, 'rgba(0,0,10,0.42)'); _vigKey = key; }
         ctx.fillStyle = _vig; ctx.fillRect(0, 0, W, H);
         const name = ((m && (m.name || m.id)) || '').toLowerCase(); const dark = /covil|caverna|cave|dragon|dragão/.test(name), forest = /floresta|forest|bosque/.test(name);
+        if (root.Quality && root.Quality.level === 0) { if (dark) { ctx.fillStyle = 'rgba(40,0,60,0.14)'; ctx.fillRect(0, 0, W, H); } return; }   // gráficos Baixo: sem partículas ambientes
         if (_motes.length < 26) for (let i = _motes.length; i < 26; i++) _motes.push({ x: Math.random(), y: Math.random(), s: 0.3 + Math.random(), p: Math.random() * 6 });
         for (const q of _motes) { q.y -= (dark ? 0.0016 : forest ? 0.0004 : -0.0004) * q.s; q.x += sin(t * 0.6 + q.p) * 0.0006; if (q.y < -0.02) q.y = 1.02; if (q.y > 1.02) q.y = -0.02; const x = q.x * W, y = q.y * H;
             if (dark) { ctx.fillStyle = 'rgba(255,' + (90 + q.s * 60) + ',40,' + (0.5 * (0.5 + 0.5 * sin(t * 3 + q.p))) + ')'; ctx.fillRect(x, y, 2, 2); }
@@ -527,7 +602,89 @@
             else { ctx.fillStyle = 'rgba(255,255,230,0.35)'; ctx.fillRect(x, y, 1.6, 1.6); } }
         if (dark) { ctx.fillStyle = 'rgba(40,0,60,0.14)'; ctx.fillRect(0, 0, W, H); }
     }
+
+    /* ============================================================
+       CACHE DE SPRITES (árvores, prédios, decoração): desenha uma vez num canvas e depois só drawImage
+       ============================================================ */
+    const SPR = new Map(); let sprPx = 0; const SPR_MAX = 14e6, SPR_N = 900, BUILD_PER_FRAME = 10;
+    function sprTouch(k) { const v = SPR.get(k); if (v) { SPR.delete(k); SPR.set(k, v); } return v; }
+    function sprPut(k, v) { SPR.set(k, v); sprPx += v.px; while ((sprPx > SPR_MAX || SPR.size > SPR_N) && SPR.size > 1) { const k0 = SPR.keys().next().value, v0 = SPR.get(k0); sprPx -= v0.px; SPR.delete(k0); } }
+    function mkCanvas(w, h, read) { const c = document.createElement('canvas'); c.width = Math.max(1, Math.ceil(w)); c.height = Math.max(1, Math.ceil(h)); return [c, c.getContext('2d', read ? { willReadFrequently: true } : undefined)]; }
+    const snapX = (x) => Math.round(x + _cam.x) - _cam.x, snapY = (y) => Math.round(y + _cam.y) - _cam.y;
+    const same = (a, b) => { if (a.length !== b.length) return false; for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false; return true; };
+
+    /* ---- árvore: sprite único por árvore (sem balanço); o balanço ao vivo vira um deslocamento de 1px só na copa ---- */
+    function drawTreeC(ctx, o, t) {
+        const ow = o.w || 40, oh = o.h || 50, s = ow / 40, vs = oh / 50, key = 'T|' + (o.id || 1) + '|' + ow + '|' + oh;
+        let sp = sprTouch(key);
+        if (!sp) {
+            if (_built >= BUILD_PER_FRAME) return drawTree(ctx, o, t);
+            _built++; const W = Math.ceil(92 * s) + 4, top = Math.ceil(80 * vs) + 2, H = top + Math.ceil(10 * s) + 4, [c, g] = mkCanvas(W, H);
+            const fo = { x: W / 2 - ow / 2, y: top - oh, w: ow, h: oh, id: o.id, type: 'tree', _ns: true }; drawTree(g, fo, -(W / 2) * 0.04 / 1.1);   // t escolhido para o balanço ser zero
+            sp = { c, W, H, top, px: W * H, cut: Math.max(1, Math.round(top - 27 * vs)) }; sprPut(key, sp);
+        }
+        const cx = o.x + ow / 2, by = o.y + oh, X = snapX(cx - sp.W / 2), Y = snapY(by - sp.top), sw = Math.round(sin(t * 1.1 + cx * 0.04) * 1.6 * 0.6);
+        if (hiQ()) { ctx.fillStyle = 'rgba(0,0,0,0.26)'; ctx.beginPath(); ctx.ellipse(cx + 6 * s, by - 1, 18 * s, 5 * s, 0, 0, TAU); ctx.fill(); }
+        ctx.drawImage(sp.c, 0, 0, sp.W, sp.cut, X + sw, Y, sp.W, sp.cut);            // copa (balança)
+        ctx.drawImage(sp.c, 0, sp.cut, sp.W, sp.H - sp.cut, X, Y + sp.cut, sp.W, sp.H - sp.cut);   // tronco
+    }
+
+    /* ---- prédios e decoração: detecta se o desenho é estático (mesma imagem em tempos/ids diferentes); fumaça e bandeira viram "overlay" ao vivo ---- */
+    const KIND = {};   // chave do tipo -> { anim, idDep, overlay? }
+    function renderTo(g, fn, t, o) { g.save(); fn(g, t, o); g.restore(); }
+    function pixels(c) { return c.getContext('2d').getImageData(0, 0, c.width, c.height).data; }
+    function classify(kk, W, H, draw) {   // draw(g, t, id) desenha no espaço do sprite
+        const info = { anim: false, idDep: false, rec: null };
+        try {
+            const mk = () => mkCanvas(W, H, true);
+            const [c1, g1] = mk(); _rec = []; draw(g1, 0, 1); const rec1 = _rec; _rec = null;
+            const [c2, g2] = mk(); _rec = []; draw(g2, 0.41, 1); _rec = null;
+            const [c3, g3] = mk(); _rec = []; draw(g3, 0, 2); _rec = null;
+            const p1 = pixels(c1), p2 = pixels(c2), p3 = pixels(c3);
+            let big = 0; for (let i = 0; i < p1.length; i += 4) { if (abs(p1[i] - p2[i]) > 28 || abs(p1[i + 1] - p2[i + 1]) > 28 || abs(p1[i + 2] - p2[i + 2]) > 28 || abs(p1[i + 3] - p2[i + 3]) > 28) big++; }
+            info.anim = big > 420;   // movimentos minúsculos (sino, catavento, franja do toldo) ficam parados no cache; movimento de verdade continua ao vivo
+            info.idDep = !same(p1, p3); info.rec = rec1.length ? rec1 : null;
+        } catch (e) { _rec = null; info.anim = true; }
+        KIND[kk] = info; return info;
+    }
+    function spriteDraw(ctx, o, kk, ox, oy, bw, bh, sx, sy, mL, mT, drawFn, liveFn, id) {
+        // bw/bh = tamanho do sprite em px; (mL,mT) = margem esquerda/superior em unidades locais; drawFn(g,t,fo) desenha em unidades locais
+        let info = KIND[kk];
+        const W = Math.ceil(bw), H = Math.ceil(bh);
+        const local = (g, t, idv) => { g.translate(mL * sx, mT * sy); g.scale(sx, sy); drawFn(g, t, Object.assign({}, o, { x: 0, y: 0, id: idv })); };
+        if (!info) { if (_built >= BUILD_PER_FRAME) return liveFn(); _built++; info = classify(kk, W, H, local); }
+        if (info.anim) return liveFn();
+        const key = 'S|' + kk + '|' + W + 'x' + H + '|' + (info.idDep ? id : 0);
+        let sp = sprTouch(key);
+        if (!sp) {
+            if (_built >= BUILD_PER_FRAME) return liveFn(); _built++;
+            const [c, g] = mkCanvas(W, H); let rec = null; if (info.rec) _rec = []; local(g, 0, id); if (info.rec) { rec = _rec; _rec = null; }
+            sp = { c, px: W * H, rec }; sprPut(key, sp);
+        }
+        ctx.drawImage(sp.c, snapX(ox - mL * sx), snapY(oy - mT * sy));
+        if (sp.rec) {   // fumaça/bandeiras ao vivo, na mesma posição em que foram anotadas
+            const tt = performance.now() / 1000;
+            for (const r of sp.rec) {
+                ctx.save(); ctx.translate(ox - mL * sx, oy - mT * sy);
+                ctx.transform(r.m.a, r.m.b, r.m.c, r.m.d, r.m.e, r.m.f);
+                const a = r.a.slice(); a[r.ti] = tt; r.f(ctx, ...a); ctx.restore();
+            }
+        }
+    }
+    function drawBuildingC(ctx, o, t) {
+        const cat = CAT().BUILDINGS; const style = (o.style && B[o.style]) ? o.style : 'cottage'; const d = cat[style] || { w: 104, h: 96 };
+        const ow = o.w || d.w, oh = o.h || d.h, sx = ow / d.w, sy = oh / d.h, ML = 26, MR = 26, MT = 76, MB = 14;
+        if (ow * oh > 400000) return drawBuilding(ctx, o, t);
+        spriteDraw(ctx, o, 'B|' + style, o.x, o.y, (d.w + ML + MR) * sx, (d.h + MT + MB) * sy, sx, sy, ML, MT, (g, tt, fo) => { try { B[style](g, tt, fo); } catch (e) { console.error('[art] prédio', style, e); } }, () => drawBuilding(ctx, o, t), o.id || 1);
+    }
+    function drawDecorC(ctx, o, t) {
+        const cat = CAT().DECOR; const d = cat[o.kind], fn = D[o.kind]; if (!d || !fn) return drawDecor(ctx, o, t);
+        const ow = o.w || d.w, oh = o.h || d.h, sx = ow / d.w, sy = oh / d.h, ML = 14, MR = 14, MT = 26, MB = 8;
+        if (ow * oh > 200000) return drawDecor(ctx, o, t);
+        spriteDraw(ctx, o, 'D|' + o.kind, o.x, o.y, (d.w + ML + MR) * sx, (d.h + MT + MB) * sy, sx, sy, ML, MT, (g, tt, fo) => { try { fn(g, tt, fo); } catch (e) { console.error('[art] decor', o.kind, e); } }, () => drawDecor(ctx, o, t), o.id || 1);
+    }
+
     function tickAll() { fxStep(); }
 
-    Object.assign(A, { drawBuilding, drawDecor, hitboxFor, drawGround, drawPaint, paintAdjacency, drawTree, drawStump, drawRock, drawGroundItem, drawStation, burst, poof, puff, fxDraw, tickAll, drawAmbient, B, D });
+    Object.assign(A, { _KIND: KIND, isWater, nearestLand, drawSubmerged, cam, paintsBaked, drawWaterAnim, drawBuilding: drawBuildingC, drawDecor: drawDecorC, hitboxFor, drawGround, drawPaint, paintAdjacency, drawTree: drawTreeC, drawStump, drawRock, drawGroundItem, drawStation, burst, poof, puff, fxDraw, tickAll, drawAmbient, B, D });
 })(typeof window !== 'undefined' ? window : globalThis);

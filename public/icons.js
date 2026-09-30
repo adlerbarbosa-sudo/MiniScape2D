@@ -110,6 +110,18 @@
         poly([48, 32, 62, 18, 60, 46], grad(48, 18, 62, 46, shade(body, -0.1)), 3); g.beginPath(); g.moveTo(6, 32); g.quadraticCurveTo(22, 12, 48, 32); g.quadraticCurveTo(22, 52, 6, 32); g.closePath(); fillStroke(grad(6, 12, 48, 52, body), 3.5);
         g.beginPath(); g.moveTo(10, 34); g.quadraticCurveTo(26, 46, 46, 34); g.quadraticCurveTo(26, 40, 10, 34); g.fillStyle = belly; g.fill(); ell(16, 30, 3.2, 3.2, '#fff', 2); ell(16.6, 30, 1.4, 1.4, OUT, 0);
         if (!raw) { g.strokeStyle = 'rgba(70,35,10,.6)'; g.lineWidth = 2; for (let i = 0; i < 3; i++) { g.beginPath(); g.moveTo(26 + i * 6, 24); g.lineTo(28 + i * 6, 40); g.stroke(); } } else shine(28, 22, 8, 2.2, 0.55); };
+    D.rod = () => diag(() => {
+        g.lineCap = 'round'; g.strokeStyle = OUT; g.lineWidth = 6.4; g.beginPath(); g.moveTo(0, 32); g.quadraticCurveTo(2, -4, 14, -30); g.stroke();
+        g.strokeStyle = '#a06a30'; g.lineWidth = 3.2; g.stroke(); g.strokeStyle = '#d2a066'; g.lineWidth = 1; g.beginPath(); g.moveTo(-0.8, 30); g.quadraticCurveTo(1.2, -4, 13.2, -29); g.stroke();
+        ell(-3, 14, 6.5, 6.5, grad(-9, 8, 3, 20, '#8a929c'), 2.6); ell(-3, 14, 2.4, 2.4, '#c8d0d8', 1.4);
+        g.strokeStyle = 'rgba(245,245,245,.95)'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(14, -30); g.quadraticCurveTo(26, -14, 16, 6); g.stroke();
+        ell(16, 9, 3.4, 3.4, '#e8483a', 2); g.strokeStyle = OUT; g.lineWidth = 2; g.beginPath(); g.arc(16, 16, 4, -1.4, 2.2); g.stroke();
+    }, PI / 5.2, 1.0);
+    D.bait = (kind) => { shadowFloor();
+        if (kind === 'worm') { g.lineCap = 'round'; g.lineJoin = 'round'; [[OUT, 12], ['#d98a8a', 7.4]].forEach((p) => { g.strokeStyle = p[0]; g.lineWidth = p[1]; g.beginPath(); g.moveTo(10, 44); g.bezierCurveTo(14, 18, 28, 58, 34, 34); g.bezierCurveTo(38, 14, 52, 40, 54, 22); g.stroke(); }); g.strokeStyle = 'rgba(255,230,230,.6)'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(12, 38); g.bezierCurveTo(16, 20, 26, 50, 34, 30); g.stroke(); ell(54, 22, 2, 2, OUT, 0); }
+        else if (kind === 'shiny') { g.beginPath(); g.moveTo(10, 34); g.quadraticCurveTo(26, 12, 46, 34); g.quadraticCurveTo(26, 56, 10, 34); g.closePath(); fillStroke(grad(10, 12, 46, 56, '#6ad0ff'), 3.4); poly([44, 34, 58, 22, 58, 46], grad(44, 22, 58, 46, '#3a8fd8'), 3); ell(18, 31, 3, 3, '#fff', 2); ell(18.5, 31, 1.3, 1.3, OUT, 0); shine(28, 24, 8, 2.4, 0.8); g.fillStyle = '#fff'; poly([52, 8, 54, 14, 60, 16, 54, 18, 52, 24, 50, 18, 44, 16, 50, 14], '#fff', 1); }
+        else if (kind === 'shrimp') { g.lineCap = 'round'; [[OUT, 15], ['#f08a52', 10]].forEach((p) => { g.strokeStyle = p[0]; g.lineWidth = p[1]; g.beginPath(); g.moveTo(16, 44); g.bezierCurveTo(8, 20, 40, 8, 50, 28); g.quadraticCurveTo(54, 40, 44, 48); g.stroke(); }); g.strokeStyle = '#ffd0a8'; g.lineWidth = 1.6; [[22, 30, 30, 36], [28, 20, 36, 24], [38, 18, 44, 26]].forEach((l) => { g.beginPath(); g.moveTo(l[0], l[1]); g.lineTo(l[2], l[3]); g.stroke(); }); poly([44, 50, 54, 56, 48, 42], '#e8703c', 2.4); ell(18, 38, 2.2, 2.2, OUT, 0); g.strokeStyle = OUT; g.lineWidth = 2; g.beginPath(); g.moveTo(14, 36); g.quadraticCurveTo(6, 26, 10, 14); g.stroke(); }
+        else { g.beginPath(); g.moveTo(10, 34); g.quadraticCurveTo(26, 12, 46, 34); g.quadraticCurveTo(26, 56, 10, 34); g.closePath(); fillStroke(grad(10, 12, 46, 56, '#ffd24a'), 3.4); poly([44, 34, 58, 22, 58, 46], grad(44, 22, 58, 46, '#d99a1e'), 3); ell(18, 31, 3, 3, '#fff', 2); ell(18.5, 31, 1.3, 1.3, OUT, 0); shine(28, 24, 8, 2.4, 0.8); g.fillStyle = '#fff6c8'; poly([50, 6, 52, 13, 59, 15, 52, 17, 50, 24, 48, 17, 41, 15, 48, 13], '#fff6c8', 1); } };
     D.egg = () => { shadowFloor(); g.beginPath(); g.moveTo(32, 8); g.bezierCurveTo(50, 10, 54, 46, 32, 56); g.bezierCurveTo(10, 46, 14, 10, 32, 8); g.closePath(); fillStroke(grad(14, 8, 52, 56, '#f2e6c8'), 3.5); shine(25, 22, 5, 8, 0.6); };
     D.hide = (c) => { g.beginPath(); g.moveTo(10, 14); g.lineTo(24, 10); g.lineTo(32, 16); g.lineTo(40, 10); g.lineTo(54, 14); g.lineTo(58, 28); g.lineTo(50, 34); g.lineTo(56, 48); g.lineTo(42, 56); g.lineTo(32, 50); g.lineTo(22, 56); g.lineTo(8, 48); g.lineTo(14, 34); g.lineTo(6, 28); g.closePath(); fillStroke(grad(6, 10, 58, 56, c), 3.5);
         g.fillStyle = 'rgba(0,0,0,.18)'; [[24, 28], [38, 24], [30, 40], [42, 40]].forEach((s) => { g.beginPath(); g.ellipse(s[0], s[1], 4, 3, 0.4, 0, TAU); g.fill(); }); };
@@ -160,7 +172,10 @@
         if (it.tool === 'axe' || /\baxe\b/.test(L)) return ['axe', m || '#9ea7b1'];
         if (it.tool === 'ranged' || /bow\b/.test(L)) return ['bow'];
         if (it.tool === 'magic' || /staff|wand/.test(L)) return ['staff'];
-        if (it.tool === 'net' || /net\b/.test(L)) return ['net'];
+        if (it.tool === 'net' || /net\b|^rede\b/.test(L)) return ['net'];
+        if (it.tool === 'rod' || /^vara\b/.test(L)) return ['rod'];
+        if (/^minhoca/.test(L)) return ['bait', 'worm']; if (/^isca brilhante/.test(L)) return ['bait', 'shiny']; if (/^isca de cam/.test(L)) return ['bait', 'shrimp']; if (/^isca dourada/.test(L)) return ['bait', 'gold'];
+        if (/^(truta|robalo)/.test(L)) { const raw = /crua|cru$/.test(L), T = /truta/.test(L) ? ['#8fb878', '#f3e3c8'] : ['#6f8aa0', '#e4edf2']; return ['fish', raw, T]; }
         if (/sword|blade|dagger|scimitar/.test(L)) return ['sword', m || (/bone/.test(L) ? MAT.bone : '#9ea7b1')];
         if (/tinderbox/.test(L)) return ['tinderbox'];
         if (/rune\b/.test(L)) return ['rune'];
@@ -204,6 +219,8 @@
             else if (fn === 'fish') D.fish(p[1], p[2]);
             else if (fn === 'potato') D.potato(p[1]);
             else if (fn === 'seed') D.seed(p[1]);
+            else if (fn === 'bait') D.bait(p[1]);
+            else if (fn === 'rod') D.rod();
             else if (fn === 'coins' || fn === 'staff' || fn === 'net' || fn === 'tinderbox' || fn === 'egg' || fn === 'wool' || fn === 'paw' || fn === 'wing' || fn === 'web' || fn === 'slime' || fn === 'ecto' || fn === 'scale' || fn === 'vial' || fn === 'herb' || fn === 'wheat' || fn === 'bread' || fn === 'carrot' || fn === 'logs') D[fn](p[1], it);
             else D[fn](p[1], it);
         } catch (e) { g.clearRect(0, 0, SZ, SZ); D.sack(it); }

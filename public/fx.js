@@ -18,7 +18,7 @@
         const sh = big && age < 12 ? (Math.random() - 0.5) * 2.2 : 0;
         ctx.save(); ctx.globalAlpha = a; ctx.translate(ft.x + ft.vx * age + sh, ft.y - rise); ctx.scale(pop, pop);
         ctx.font = 'bold ' + k.size + 'px "Trebuchet MS", Arial, sans-serif'; ctx.textAlign = 'center'; ctx.lineJoin = 'round'; ctx.lineWidth = 4.5; ctx.strokeStyle = k.line; ctx.strokeText(ft.text, 0, 0);
-        if (big) { ctx.shadowColor = '#ff8a00'; ctx.shadowBlur = 10; }
+        if (big) { ctx.strokeStyle = 'rgba(255,138,0,0.35)'; ctx.lineWidth = 8; ctx.strokeText(ft.text, 0, 0); }   // brilho do golpe forte (sem shadowBlur, que é lento)
         ctx.fillStyle = k.fill; ctx.fillText(ft.text, 0, 0); ctx.restore(); ft.life--;
     }
     // morte: o bicho encolhe, escurece e some (em vez de sumir de uma vez)
@@ -28,8 +28,7 @@
             const g = ghosts[i], t = g.age++, N = 26; if (t >= N) { ghosts.splice(i, 1); continue; }
             const o = g.o, cx = o.x + (o.w || 30) / 2, fy = o.y + (o.h || 30), p = t / N;
             ctx.save(); ctx.globalAlpha = 1 - p * p; ctx.translate(cx, fy); ctx.scale(1 + p * 0.25, 1 - p * 0.55); ctx.translate(-cx, -fy);
-            if (t < 4) ctx.filter = 'brightness(2.2)';
-            try { drawFn(ctx, o); } catch (e) { ghosts.splice(i, 1); }
+            try { drawFn(ctx, o); if (t < 4) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha *= 0.6; drawFn(ctx, o); } } catch (e) { ghosts.splice(i, 1); }   // clarão do golpe final (sem ctx.filter, que tira o canvas da GPU)
             ctx.restore();
         }
     }

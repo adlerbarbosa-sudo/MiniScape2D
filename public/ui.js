@@ -62,9 +62,9 @@
     window._loginScene = scene;
 
     /* ================= DADOS DE ONDE CADA COISA VEM ================= */
-    const NODE_DROPS = { tree: ['Logs'], rock_copper: ['Copper Ore'], rock_tin: ['Tin Ore'], rock_iron: ['Iron Ore'], rock_coal: ['Coal'], rock_mithril: ['Mithril Ore'], fishing_spot: ['Raw Fish'] };
+    const NODE_DROPS = { tree: ['Logs'], rock_copper: ['Copper Ore'], rock_tin: ['Tin Ore'], rock_iron: ['Iron Ore'], rock_coal: ['Coal'], rock_mithril: ['Mithril Ore'], fishing_spot: ['Raw Fish', 'Truta Crua', 'Robalo Cru', 'Isca de Camarão'] };
     const NODE_LABEL = { tree: 'Árvore', rock_copper: 'Rocha de cobre', rock_tin: 'Rocha de estanho', rock_iron: 'Rocha de ferro', rock_coal: 'Veio de carvão', rock_mithril: 'Veio de mithril', fishing_spot: 'Ponto de pesca' };
-    const NODE_HOW = { tree: 'Precisa de um <b>Machado</b> equipado (ou na mochila). Botão direito na árvore, ou chegue perto e aperte <b>Espaço</b>.', rock_copper: 'Precisa de uma <b>Picareta</b>. Botão direito na rocha, ou <b>Espaço</b> perto dela.', rock_tin: 'Precisa de uma <b>Picareta</b>.', rock_iron: 'Precisa de uma <b>Picareta</b>.', rock_coal: 'Precisa de uma <b>Picareta</b> e Mineração nível 5.', rock_mithril: 'Precisa de uma <b>Steel Pickaxe</b> (ou melhor) e Mineração nível 15.', fishing_spot: 'Precisa de uma <b>Rede</b> (Net), vendida pelo Mercador e pelo Pescador.' };
+    const NODE_HOW = { tree: 'Precisa de um <b>Machado</b> equipado (ou na mochila). Botão direito na árvore, ou chegue perto e aperte <b>Espaço</b>.', rock_copper: 'Precisa de uma <b>Picareta</b>. Botão direito na rocha, ou <b>Espaço</b> perto dela.', rock_tin: 'Precisa de uma <b>Picareta</b>.', rock_iron: 'Precisa de uma <b>Picareta</b>.', rock_coal: 'Precisa de uma <b>Picareta</b> e Mineração nível 5.', rock_mithril: 'Precisa de uma <b>Steel Pickaxe</b> (ou melhor) e Mineração nível 15.', fishing_spot: 'A <b>Rede de Pesca</b> pega peixes comuns rápido, sem isca. A <b>Vara de Pesca</b> é mais lenta, gasta 1 <b>isca</b> por tentativa e pega peixes maiores e raros (Minhoca no Pescador; selecione uma isca na mochila e use Escolher isca).' };
     const SMELT = { 'Bronze Bar': 'Leve <b>1 Copper Ore + 1 Tin Ore</b> até uma <b>Fornalha</b> e aperte Espaço.', 'Iron Bar': 'Leve <b>1 Iron Ore</b> até uma <b>Fornalha</b> e aperte Espaço.', 'Steel Bar': 'Leve <b>1 Iron Ore + 2 Coal</b> à <b>Fornalha</b> (Ferraria nível 10).', 'Mithril Bar': 'Leve <b>1 Mithril Ore + 3 Coal</b> à <b>Fornalha</b> (Ferraria nível 20).' };
 
     function mapNameOf(id) { const m = (typeof gameMaps !== 'undefined') && gameMaps[id]; return (m && m.name) || id; }
@@ -146,20 +146,47 @@
         }).join('');
         return h + '</div>';
     }
+    /* Livro de receitas: clicar numa receita só a SELECIONA (detalhes no topo). Quem fabrica é o botão "Criar" (ou Enter no campo de quantidade). */
+    let bookQty = 1, bookMsg = null, bookSig = '';
+    function bookSigNow() {
+        const tab = $('tab-craft'); if (!tab || !tab.classList.contains('active-tab')) return null;   // aba fechada: não reconstrói
+        let s = bookTab + '|' + bookSel + '|' + bookQty + '|' + (bookMsg ? bookMsg.t : '');
+        if (bookTab === 'recipes') { s += '|' + (INV_SLOTS - player.inventory.length); Object.values(itemDB).forEach((i) => { if (i.recipe) parseRecipe(i.recipe).forEach((r) => { s += ',' + getInvCount(r.name); }); }); s += '|' + Object.values(itemDB).filter((i) => i.recipe).length; }
+        else if (bookTab === 'bestiary' && window.World2) { const W = window.World2; s += '|' + W.beastList().reduce((a, k) => a + W.kills(k), 0); }
+        else if (bookTab === 'index') s += '|' + Object.keys(itemDB).length;
+        return s;
+    }
+    function paintQty() {   // atualiza só os números (sem reconstruir o painel, para não perder o foco do campo)
+        const it = itemDB[bookSel], inf = it && typeof craftInfo === 'function' ? craftInfo(bookSel) : null; if (!inf) return;
+        document.querySelectorAll('#craft-list .have[data-per]').forEach((el) => { const need = +el.dataset.per * bookQty, have = +el.dataset.have; el.textContent = have + '/' + need; el.className = 'have ' + (have >= need ? 'ok' : 'no'); });
+        const go = document.querySelector('#craft-list .btn-craft'); if (go) { const ok = inf.max >= 1; go.disabled = !ok; go.textContent = ok ? 'Criar' + (bookQty > 1 ? ' ×' + bookQty : '') : (inf.maxMat >= bookQty ? 'Mochila cheia' : 'Faltam materiais'); }
+        const out = document.querySelector('#craft-list .rc-out b'); if (out) out.textContent = (inf.per * bookQty) + '× ' + it.name;
+    }
+    function bookDo() {
+        if (!bookSel || typeof craftItem !== 'function') return;
+        const r = craftItem(bookSel, bookQty); bookMsg = { t: r.msg, ok: r.ok }; const i2 = craftInfo(bookSel); bookQty = Math.max(1, Math.min(bookQty, i2 && i2.max ? i2.max : 1)); renderCraftBook();
+    }
     function renderCraftBook() {
-        const box = $('craft-list'); if (!box) return;
+        const box = $('craft-list'); if (!box || typeof player === 'undefined' || !player.inventory) return;
+        const sig = bookSigNow(); if (sig === null || (sig === bookSig && box.firstChild)) return; bookSig = sig;
         const list = Object.values(itemDB).filter((i) => i.recipe);
-        if (!bookSel || !itemDB[bookSel] || !itemDB[bookSel].recipe) bookSel = list.length ? list[0].name : null;
+        if (bookSel && (!itemDB[bookSel] || !itemDB[bookSel].recipe)) bookSel = null;
+        const keepScroll = (box.querySelector('.rc-list') || {}).scrollTop || 0;
         let h = `<div class="book"><div class="book-tabs"><div class="book-tab ${bookTab === 'recipes' ? 'on' : ''}" data-bt="recipes">Receitas</div><div class="book-tab ${bookTab === 'index' ? 'on' : ''}" data-bt="index">Onde encontrar</div><div class="book-tab ${bookTab === 'bestiary' ? 'on' : ''}" data-bt="bestiary">Bestiário</div></div>`;
         if (bookTab === 'recipes') {
-            h += `<div class="rc-list">` + list.map((it) => { const ok = canCraft(it); return `<div class="rc-item ${it.name === bookSel ? 'sel' : ''} ${ok ? '' : 'lack'}" data-sel="${esc(it.name)}"><span class="em">${Icons.html(it.name, 30)}</span><div style="flex:1"><div class="nm">${esc(it.name)}</div><div class="sub">${parseRecipe(it.recipe).map((r) => r.qty + '× ' + (itemDB[r.name] ? Icons.html(r.name, 20) : esc(r.name))).join(' + ')}</div></div><span class="${ok ? 'rc-ok' : 'rc-no'}">${ok ? 'pronto' : 'falta'}</span></div>`; }).join('') + `</div>`;
-            const it = itemDB[bookSel];
-            if (it) {
-                const ok = canCraft(it);
-                h += `<div class="book-page"><h3>${esc(it.icon)} ${esc(it.name)}${(it.craftQty || 1) > 1 ? ` <small>(faz ${it.craftQty})</small>` : ''}</h3><p>${esc(it.desc || '')}</p>`;
-                h += `<h4>Ingredientes</h4>` + parseRecipe(it.recipe).map((r) => ingredientTree(r.name, r.qty, 0, [it.name])).join('');
-                h += `<button class="btn-craft" data-craft="${esc(it.name)}" ${ok ? '' : 'disabled'}>${ok ? 'Criar ' + esc(it.name) : 'Faltam materiais'}</button></div>`;
-            }
+            const it = bookSel ? itemDB[bookSel] : null, inf = it ? craftInfo(bookSel) : null;
+            if (it && inf) {
+                if (bookQty > Math.max(1, inf.max)) bookQty = Math.max(1, inf.max); if (bookQty < 1) bookQty = 1;
+                const ok = inf.fits(bookQty);
+                h += `<div class="book-page rc-detail"><h3>${Icons.html(it.name, 26)} ${esc(it.name)}${inf.per > 1 ? ` <small>(faz ${inf.per})</small>` : ''}</h3><p>${esc(it.desc || '')}</p>`;
+                h += `<div class="rc-need">` + inf.reqs.map((r) => `<div class="ing"><span class="em">${Icons.html(r.n, 22)}</span><div style="flex:1" class="nm">${esc(r.n)}</div><span class="have ${r.have >= r.q * bookQty ? 'ok' : 'no'}" data-per="${r.q}" data-have="${r.have}">${r.have}/${r.q * bookQty}</span></div>`).join('') + `</div>`;
+                h += `<div class="rc-out">Resultado: <b>${inf.per * bookQty}× ${esc(it.name)}</b></div>`;
+                h += `<div class="rc-qty"><button type="button" class="rc-q" data-q="-1" aria-label="Menos">−</button><input id="rc-q" type="text" inputmode="numeric" maxlength="2" autocomplete="off" value="${bookQty}" aria-label="Quantidade"><button type="button" class="rc-q" data-q="1" aria-label="Mais">+</button><button type="button" class="rc-q rc-max" data-q="max">Máx</button><span class="rc-mx">máx. ${inf.max}</span></div>`;
+                h += `<button type="button" class="btn-craft" data-craft="${esc(it.name)}" ${ok ? '' : 'disabled'}>${ok ? 'Criar' + (bookQty > 1 ? ' ×' + bookQty : '') : (inf.maxMat >= bookQty ? 'Mochila cheia' : 'Faltam materiais')}</button>`;
+                h += `<div class="rc-msg ${bookMsg ? (bookMsg.ok ? 'ok' : 'no') : ''}" role="status">${bookMsg ? esc(bookMsg.t) : ''}</div>`;
+                h += `<details class="rc-src"><summary>De onde vêm os ingredientes</summary>${inf.reqs.map((r) => ingredientTree(r.n, r.q, 0, [it.name])).join('')}</details></div>`;
+            } else h += `<div class="book-page rc-detail"><h3>Receitas</h3><p>Toque numa receita para ver os ingredientes. Nada é criado ao tocar: use o botão <b>Criar</b>.</p></div>`;
+            h += `<div class="rc-list">` + list.map((i) => { const c = craftInfo(i.name), okr = c && c.max >= 1; return `<div class="rc-item ${i.name === bookSel ? 'sel' : ''} ${okr ? '' : 'lack'}" data-sel="${esc(i.name)}" tabindex="0" role="button" aria-pressed="${i.name === bookSel}"><span class="em">${Icons.html(i.name, 30)}</span><div style="flex:1"><div class="nm">${esc(i.name)}</div><div class="sub">${parseRecipe(i.recipe).map((r) => r.qty + '× ' + (itemDB[r.name] ? Icons.html(r.name, 20) : esc(r.name))).join(' + ')}</div></div><span class="${okr ? 'rc-ok' : 'rc-no'}">${okr ? 'pronto' : 'falta'}</span></div>`; }).join('') + `</div>`;
         } else if (bookTab === 'bestiary') {
             h += bestiaryHtml();
         } else {
@@ -168,21 +195,34 @@
                 all.map((i) => `<details style="margin:4px 0"><summary style="cursor:pointer;font-family:var(--sans);font-size:.82rem"><b>${Icons.html(i.name, 20)} ${esc(i.name)}</b> <span style="opacity:.7">— ${esc(i.desc || '')}</span></summary>${sourcesHtml(i.name)}</details>`).join('') + `</div>`;
         }
         box.innerHTML = h + '</div>';
+        const rl = box.querySelector('.rc-list'); if (rl) rl.scrollTop = keepScroll;
         box.onclick = (ev) => {
-            const c = ev.target.closest('[data-craft]'); if (c && !c.disabled) { craftItem(c.dataset.craft); return; }
-            const s = ev.target.closest('[data-sel]'); if (s) { bookSel = s.dataset.sel; renderCraftBook(); return; }
-            const b = ev.target.closest('[data-bt]'); if (b) { bookTab = b.dataset.bt; renderCraftBook(); }
+            const c = ev.target.closest('[data-craft]'); if (c) { if (!c.disabled) bookDo(); return; }
+            const q = ev.target.closest('[data-q]');
+            if (q) { const inf = craftInfo(bookSel); if (!inf) return; const mx = Math.max(1, inf.max); bookQty = q.dataset.q === 'max' ? mx : Math.max(1, Math.min(mx, bookQty + (+q.dataset.q))); bookMsg = null; bookSig = ''; renderCraftBook(); return; }
+            const s = ev.target.closest('[data-sel]');
+            if (s) { if (bookSel !== s.dataset.sel) { bookSel = s.dataset.sel; bookQty = 1; bookMsg = null; } bookSig = ''; renderCraftBook(); const r = box.querySelector('.rc-item.sel'); try { if (r) r.focus({ preventScroll: true }); const d = box.querySelector('.rc-detail'); if (d && d.scrollIntoView) d.scrollIntoView({ block: 'nearest' }); } catch (e) { } return; }
+            const b = ev.target.closest('[data-bt]'); if (b) { bookTab = b.dataset.bt; bookSig = ''; renderCraftBook(); }
         };
+        const qi = $('rc-q');
+        if (qi) { qi.oninput = () => { const v = qi.value.replace(/\D/g, ''); const inf = craftInfo(bookSel); const mx = Math.max(1, inf ? inf.max : 1); bookQty = Math.max(1, Math.min(mx, parseInt(v) || 1)); bookMsg = null; paintQty(); }; qi.onblur = () => { qi.value = String(bookQty); }; }
     }
+    // Enter: fabrica só quando o foco está no campo de quantidade ou na receita selecionada (não rouba o Enter do chat); sem mexer no resto do teclado
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter' || e.repeat) return; const t = e.target; if (!t || !t.closest || !t.closest('#craft-list')) return;
+        if (t.id === 'rc-q' || (t.classList.contains('rc-item') && t.dataset.sel === bookSel)) { e.preventDefault(); e.stopPropagation(); const inf = bookSel ? craftInfo(bookSel) : null; if (inf && inf.max >= 1) bookDo(); else if (bookSel) { const r = craftItem(bookSel, 1); bookMsg = { t: r.msg, ok: r.ok }; bookSig = ''; renderCraftBook(); } }
+        else if (t.classList.contains('rc-item')) { e.preventDefault(); e.stopPropagation(); t.click(); }
+        else e.stopPropagation();
+    }, true);
     window.renderCraftBook = renderCraftBook;
 
     /* ================= GUIA DO AVENTUREIRO ================= */
     const GUIDE = [
         ['compass', 'Como se mover', `<ul><li><b>WASD</b> ou setas para andar; no celular, toque no chão.</li><li>Clique/toque num ponto para o herói ir sozinho até lá (ele contorna obstáculos).</li><li>Nas bordas do mapa há saídas para o mapa vizinho. A vila fica no centro; floresta a oeste, mina a leste, rio ao sul, covil ao norte.</li></ul>`],
-        ['hand', 'Interagir', `<ul><li><b>Espaço</b> age no objeto mais próximo: cortar árvore, minerar, pescar, pegar item, falar com NPC, usar fornalha ou fogueira.</li><li><b>Botão direito</b> (ou segurar no celular) abre o menu com todas as ações do que está sob o cursor.</li><li>Passe o mouse sobre árvores, rochas, NPCs e monstros para ver a dica de ação embaixo da tela.</li></ul>`],
-        ['sword', 'Combate', `<ul><li><b>Ctrl</b> ou o botão Atacar bate no inimigo mais próximo.</li><li>O nome sobre cada criatura mostra o tipo: <b style="color:#ff6a5a">vermelho</b> = agressivo (ataca ao ver você), <b style="color:#ffd24a">amarelo</b> = neutro (só revida), <b style="color:#7be08a">verde</b> = pacífico (foge). Ao lado do nome fica o nível (Lv).</li><li>A barra de vida só aparece depois que o monstro apanha.</li><li>Se sua vida chegar a 0 você renasce na vila. Coma comida cozida (clique nela na mochila) para curar.</li><li>Armas: espada (corpo a corpo), arco + flechas (à distância) e cajado + runas (magia).</li></ul>`],
-        ['bag', 'Coleta e ferramentas', `<ul><li><b>Árvore</b> → Logs (precisa de Machado). <b>Rocha</b> → minério (precisa de Picareta). <b>Ponto de pesca</b> → peixe cru (precisa de Rede).</li><li>Machado e Picareta são vendidos pelo Ferreiro; a Rede pelo Mercador e Pescador.</li><li>Recursos esgotados voltam depois de alguns segundos.</li></ul>`],
-        ['book', 'Fabricar e cozinhar', `<ul><li><b>Fornalha:</b> Copper Ore + Tin Ore → Bronze Bar; Iron Ore → Iron Bar.</li><li><b>Fogueira:</b> use a Tinderbox com Logs, depois aperte Espaço perto do fogo com carne ou peixe crus.</li><li>Abra a aba <b>Ofícios</b>: é um livro que mostra a receita de cada item, de onde vem cada ingrediente (mapa, monstro ou loja) e quanto você já tem.</li></ul>`],
+        ['hand', 'Interagir', `<ul><li><b>Espaço</b> age no objeto mais próximo: cortar árvore, minerar, pescar, pegar item, falar com NPC, usar fornalha ou fogueira.</li><li><b>Botão direito</b> (ou segurar no celular) abre o menu com todas as ações do que está sob o cursor.</li><li>Passe o mouse sobre árvores, rochas, NPCs e monstros para ver a dica de ação embaixo da tela.</li><li><b>Mochila:</b> arraste um item para trocar de lugar, para um slot da barra rápida (<b>1–5</b>) ou para fora do painel para jogá-lo no chão (itens em pilha perguntam quanto). Botão direito num slot da barra o limpa.</li><li><b>Usar itens:</b> um clique só <b>seleciona</b> o item e mostra os botões Usar/Equipar, Jogar fora e Cancelar; clique duplo (ou toque duplo) usa direto; Esc cancela. Dá para desligar em Menu &gt; Confirmar uso de itens.</li></ul>`],
+        ['sword', 'Combate', `<ul><li><b>Ctrl</b> ou o botão Atacar bate no inimigo mais próximo.</li><li>O nome sobre cada criatura mostra o tipo: <b style="color:#ff6a5a">vermelho</b> = agressivo (ataca ao ver você), <b style="color:#ffd24a">amarelo</b> = neutro (só revida), <b style="color:#7be08a">verde</b> = pacífico (foge). Ao lado do nome fica o nível (Lv).</li><li>A barra de vida só aparece depois que o monstro apanha.</li><li>Se sua vida chegar a 0 você renasce na vila. Coma comida cozida para curar: na mochila, toque no item e use o botão <b>Comer</b> (ou clique duas vezes).</li><li>Armas: espada (corpo a corpo), arco + flechas (à distância) e cajado + runas (magia).</li></ul>`],
+        ['bag', 'Coleta e ferramentas', `<ul><li><b>Árvore</b> → Logs (precisa de Machado). <b>Rocha</b> → minério (precisa de Picareta). <b>Ponto de pesca</b> → peixe cru (Rede de Pesca ou Vara de Pesca).</li><li>Machado e Picareta são vendidos pelo Ferreiro; a Rede, a Vara e as Minhocas pelo Pescador.</li><li><b>Pesca:</b> a Rede é rápida e pega peixes comuns. A Vara é mais lenta, gasta 1 isca por tentativa e pega peixes maiores e raros; selecione uma isca na mochila e use <b>Escolher isca</b> (ou clique duas vezes); escolher a mesma de novo volta ao automático. Iscas especiais vêm de baús do tesouro, peixes raros e da rede.</li><li>Recursos esgotados voltam depois de alguns segundos.</li></ul>`],
+        ['book', 'Fabricar e cozinhar', `<ul><li><b>Fornalha:</b> Copper Ore + Tin Ore → Bronze Bar; Iron Ore → Iron Bar.</li><li><b>Fogueira:</b> use a Tinderbox com Logs, depois aperte Espaço perto do fogo com carne ou peixe crus.</li><li>Abra a aba <b>Ofícios</b>: toque numa receita para ver ingredientes e quanto você já tem, escolha a quantidade e aperte <b>Criar</b> (tocar na lista nunca cria nada sozinho).</li></ul>`],
         ['star', 'Perícias', `<ul><li>Cada ação treina uma perícia (Woodcut, Mining, Cooking…) e ao subir de nível você fica melhor.</li><li>A aba Perícias mostra o progresso de cada uma.</li></ul>`],
         ['chat', 'Chat e amigos', `<ul><li><b>Enter</b> abre o chat; digite e aperte Enter para enviar — o campo continua aberto para você seguir escrevendo. <b>Esc</b> ou Enter com o campo vazio fecha.</li><li>Fechado, o chat fica pequeno e transparente no canto para não atrapalhar.</li><li>Outros jogadores aparecem no mesmo mapa com o nome sobre a cabeça.</li></ul>`],
         ['chest', 'Vila, lojas e banco', `<ul><li>Fale com os NPCs (Espaço ou botão direito → Falar): lojas vendem ferramentas, comida e runas por moedas.</li><li>Moedas caem dos monstros. O <b>Banco</b> guarda itens além do limite da mochila (peso máximo 50 kg).</li></ul>`],
@@ -210,9 +250,9 @@
         { t: 'Corte uma árvore', h: 'Botão direito numa árvore → <b>Cortar</b>, ou chegue perto e aperte <b>Espaço</b>. Você ganha Logs.', done: () => sk('woodcutting') > 0 },
         { t: 'Consiga uma Picareta e minere', h: 'Compre uma <b>Bronze Pickaxe</b> e minere rochas de cobre e estanho na mina, a leste.', done: () => sk('mining') > 0 },
         { t: 'Funda uma barra', h: 'Leve Copper Ore + Tin Ore a uma <b>Fornalha</b> e aperte Espaço para fazer um Bronze Bar.', done: () => sk('smithing') > 0 },
-        { t: 'Fabrique algo', h: 'Abra a aba <b>Ofícios</b> (livro) e crie uma arma ou armadura.', done: () => sk('crafting') > 0 },
-        { t: 'Enfrente um monstro', h: 'Equipe uma arma e aperte <b>Ctrl</b> perto de um monstro. Cuidado com os de nome vermelho!', done: () => sk('combat') > 0 || sk('ranged') > 0 || sk('magic') > 0 },
-        { t: 'Cozinhe uma refeição', h: 'Use a <b>Tinderbox</b> com Logs para acender uma fogueira e cozinhe carne ou peixe cru.', done: () => sk('cooking') > 0 },
+        { t: 'Fabrique algo', h: 'Abra a aba <b>Ofícios</b> (livro), toque numa receita de arma ou armadura e aperte <b>Criar</b>.', done: () => sk('crafting') > 0 },
+        { t: 'Enfrente um monstro', h: 'Na mochila, selecione uma arma e use <b>Equipar</b>; depois aperte <b>Ctrl</b> perto de um monstro. Cuidado com os de nome vermelho!', done: () => sk('combat') > 0 || sk('ranged') > 0 || sk('magic') > 0 },
+        { t: 'Cozinhe uma refeição', h: 'Na mochila, selecione a <b>Tinderbox</b> e use <b>Acender fogueira</b> (precisa de Logs) para acender uma fogueira e cozinhe carne ou peixe cru.', done: () => sk('cooking') > 0 },
     ];
     let qStep = 0, qMin = false, qAllDone = false;
     function qKey() { return 'ms_quest_' + (window.currentUser || 'anon'); }
@@ -252,7 +292,7 @@
         if (!o || o.active === false) return null;
         if (o.type === 'tree') return ['Árvore', 'Botão direito: cortar (precisa de machado)'];
         if (typeof o.type === 'string' && o.type.startsWith('rock_')) return [NODE_LABEL[o.type] || 'Rocha', 'Botão direito: minerar (precisa de picareta)'];
-        if (o.type === 'fishing_spot') return ['Ponto de pesca', 'Botão direito: pescar (precisa de rede)'];
+        if (o.type === 'fishing_spot') return ['Ponto de pesca', 'Botão direito: pescar (Rede ou Vara de Pesca)'];
         if (o.type === 'house_door') return ['Minha Casa', 'Botão direito: entrar. Só você decora a sua'];
         if (o.type === 'furniture') return [o.name || 'Móvel', o.fk === 'bed' ? 'Botão direito: descansar' : 'Peça da casa'];
         if (o.type === 'farm_plot') return ['Canteiro', 'Botão direito: plantar ou colher'];
@@ -262,7 +302,7 @@
         if (o.type === 'anvil') return ['Bigorna', 'Estação de ferreiro'];
         if (o.type === 'bank') return ['Banco', 'Botão direito: abrir banco'];
         if (o.type === 'fire') return ['Fogueira', 'Espaço: cozinhar carne ou peixe crus'];
-        if (o.type === 'portal') return ['Portal', 'Chegue perto para viajar'];
+        if (o.type === 'portal') return [o.name || 'Portal', 'Chegue perto para viajar'];
         if (o.type === 'ground_item') return [(typeof o.item === 'string' ? o.item : (o.item && o.item.name)) || 'Item', 'Espaço: pegar'];
         if (o.type === 'enemy') { const d = npcDB[o.dbKey] || {}; const bc = behChip(d); return [`${o.name || d.name} (${bc[1]})`, 'Ctrl: atacar']; }
         if (o.type === 'npc') return [o.name, 'Botão direito: falar'];

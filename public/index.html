@@ -109,7 +109,7 @@
             </div>
 
             <div id="tab-inv" class="tab-content active-tab"><div id="inv-grid" class="grid-container"></div><div style="font-size: 0.65rem; color: #888; margin-top: 10px; text-align: right;">Peso: <span id="weight-txt" style="color:#bdc3c7;">0</span> / 50 kg</div></div>
-            <div id="tab-eq" class="tab-content"><div id="equip-grid"><div class="equip-slot-box" onclick="unequip('head')"><span class="slot-name">Cabeça</span><span id="eq-head" class="equip-icon"></span></div><div class="equip-slot-box" onclick="unequip('body')"><span class="slot-name">Tronco</span><span id="eq-body" class="equip-icon"></span></div><div class="equip-slot-box" onclick="unequip('ammo')"><span class="slot-name">Munição</span><span id="eq-ammo" class="equip-icon"></span><span id="ammo-qty" class="item-qty" style="top:auto; bottom:2px;"></span></div><div class="equip-slot-box" onclick="unequip('weapon')"><span class="slot-name">Arma</span><span id="eq-weapon" class="equip-icon"></span></div><div class="equip-slot-box" onclick="unequip('shield')"><span class="slot-name">Escudo</span><span id="eq-shield" class="equip-icon"></span></div><div class="equip-slot-box"></div></div><div style="margin-top:10px; font-size:0.75rem; color:#f1c40f; text-align: center;" id="def-stats">Bônus de Defesa: 0</div></div>
+            <div id="tab-eq" class="tab-content"><div id="equip-grid"><div class="equip-slot-box" onclick="eqClick('head')"><span class="slot-name">Cabeça</span><span id="eq-head" class="equip-icon"></span></div><div class="equip-slot-box" onclick="eqClick('body')"><span class="slot-name">Tronco</span><span id="eq-body" class="equip-icon"></span></div><div class="equip-slot-box" onclick="eqClick('ammo')"><span class="slot-name">Munição</span><span id="eq-ammo" class="equip-icon"></span><span id="ammo-qty" class="item-qty" style="top:auto; bottom:2px;"></span></div><div class="equip-slot-box" onclick="eqClick('weapon')"><span class="slot-name">Arma</span><span id="eq-weapon" class="equip-icon"></span></div><div class="equip-slot-box" onclick="eqClick('shield')"><span class="slot-name">Escudo</span><span id="eq-shield" class="equip-icon"></span></div><div class="equip-slot-box"></div></div><div style="margin-top:10px; font-size:0.75rem; color:#f1c40f; text-align: center;" id="def-stats">Bônus de Defesa: 0</div></div>
             <div id="tab-sk" class="tab-content"><div id="skills-list"></div></div>
             <div id="tab-craft" class="tab-content"><div id="craft-list"></div></div>
             <div id="tab-mag" class="tab-content"><div class="tab-note">Equipe um <b>Cajado</b> e clique na magia para prepará-la; depois use <b>Ctrl</b> perto de um inimigo. Cada lançamento gasta runas e MP.</div><div id="spellbook-list"></div></div>
@@ -162,13 +162,18 @@
     <script src="catalog.js"></script>
     <script src="content.js"></script>
     <script src="world2.js"></script>
+    <script src="maps2.js"></script>
     <script src="net.js"></script>
     <script src="art.js"></script>
+    <script src="chargen.js"></script>
     <script src="icons.js"></script>
 <script src="fx.js"></script>
     <script src="life.js"></script>
+    <script src="fishing.js"></script>
     <script src="hub.js"></script>
     <script src="qol.js"></script>
+    <script src="inv2.js"></script>
+    <script src="itemsel.js"></script>
     <script src="env.js"></script>
     <script src="sfx.js"></script>
     <script src="quests.js"></script>
@@ -205,7 +210,7 @@
         const API_BASE = (window.location.protocol === 'file:') ? 'http://localhost:3000/api' : '/api';
         let pendingCombatLogs = []; const INV_SLOTS = 30;
         let _errN = 0; function logErr(e) { if (_errN++ < 5) console.error('[MiniScape]', e); }
-        let lastEqStr = ''; let authToken = null; let worldDirty = false; let lastChatVer = 0; let mobPosFromHost = {};
+        let lastLookStr = '', lookTick = 0; let lastEqStr = ''; let authToken = null; let worldDirty = false; let lastChatVer = 0; let mobPosFromHost = {};
         function esc(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
         async function api(path, body, method) {
             const opts = { method: method || (body === undefined ? 'GET' : 'POST'), headers: {} };
@@ -219,7 +224,8 @@
         }
 
         const canvas = document.getElementById('gameCanvas'); 
-        const ctx = canvas.getContext('2d');
+        // contexto 2D opaco e com latência baixa (o navegador usa a GPU sozinho quando ela existe; nada aqui a desliga)
+        let ctx = null; try { ctx = canvas.getContext('2d', { alpha: false, desynchronized: true, willReadFrequently: false }); } catch (e) { } if (!ctx) ctx = canvas.getContext('2d');
         const osrsMenu = document.getElementById('osrs-menu'); 
         const tooltip = document.getElementById('tooltip');
 
@@ -233,7 +239,41 @@
             osrsMenu.appendChild(div); 
         }
 
+        // --- ATAQUE À DISTÂNCIA NO CLIQUE: arco/cajado param no alcance, viram para o alvo e atacam sozinhos; fora do alcance perseguem só até entrar ---
+        const RANGED_RANGE = 220, MAGIC_RANGE = 200;
+        let rangedTarget = null, _rtLx = 0, _rtLy = 0, _rtN = 0;
+        function rangedWeapon() { const w = player.equipment && player.equipment.weapon; return (w && (w.tool === 'ranged' || w.tool === 'magic')) ? w : null; }
+        function attackRange(w) { return w && w.tool === 'ranged' ? RANGED_RANGE : MAGIC_RANGE; }
+        function beginAttack(obj) {   // true = o clique virou ataque à distância
+            if (!obj || obj.type !== 'enemy' || !obj.active || !rangedWeapon()) return false;
+            rangedTarget = obj; _rtLx = _rtLy = -1e9; _rtN = 0; player.pendingAutoAction = null; player.isPerformingAction = false; player.actionToolItem = null; player.destX = player.x; player.destY = player.y;
+            if (isNPCOpen && obj.type !== 'npc') { closeMenus(); openTab('inv'); } osrsMenu.style.display = 'none'; return true;
+        }
+        function lineClear(ax, ay, bx, by, cur) {   // linha de visão simples: nada sólido no caminho do tiro
+            const n = Math.max(1, Math.ceil(Math.hypot(bx - ax, by - ay) / 12));
+            for (const o of cur) {
+                if (!o || !o.type || !o.active || PF_SKIP.includes(o.type) || o.type === 'npc') continue;
+                const hb = getHitbox(o); if (!hb) continue;
+                for (let i = 1; i < n; i++) { const x = ax + (bx - ax) * i / n, y = ay + (by - ay) * i / n; if (x > hb.x && x < hb.x + hb.w && y > hb.y && y < hb.y + hb.h) return false; }
+            }
+            return true;
+        }
+        function rangedTick(cur) {
+            const t = rangedTarget; if (!t) return;
+            const w = rangedWeapon();
+            if (!w || !t.active || !(t.hp > 0) || t.type !== 'enemy' || cur.indexOf(t) < 0 || player.stats.hp <= 0) { rangedTarget = null; return; }
+            const tx = t.x + (t.w || 30) / 2, ty = t.y + (t.h || 30) / 2, d = Math.hypot(tx - player.x, ty - player.y), R = attackRange(w);
+            if (d <= R && lineClear(player.x, player.y - 12, tx, ty, cur)) {
+                player.destX = player.x; player.destY = player.y; player.pendingAutoAction = null; _rtLx = -1e9;
+                if (Math.abs(tx - player.x) > Math.abs(ty - player.y)) { player.facing.x = tx > player.x ? 1 : -1; player.facing.y = 0; } else { player.facing.x = 0; player.facing.y = ty > player.y ? 1 : -1; }
+                if (player.attackCooldown <= 0) { const pn = projectiles.length; tryInteract(t); if (projectiles.length === pn) rangedTarget = null; }   // sem flechas/runas: a mensagem já apareceu; para de insistir
+            } else if (Math.hypot(tx - _rtLx, ty - _rtLy) > 24 || ++_rtN > 20) {   // persegue só até entrar no alcance (destino atualizado de vez em quando, para não refazer o caminho a cada quadro)
+                _rtN = 0; _rtLx = tx; _rtLy = ty; const ux = (tx - player.x) / (d || 1), uy = (ty - player.y) / (d || 1), k = d > R ? Math.max(0, d - (R - 50)) : d;
+                player.destX = player.x + ux * k; player.destY = player.y + uy * k; player.pendingAutoAction = null;
+            }
+        }
         function setPendingAction(obj) { 
+            if (beginAttack(obj)) return;
             player.pendingAutoAction = obj; 
             player.destX = obj.x + (obj.w||30)/2; 
             player.destY = obj.y + (obj.h||30)/2; 
@@ -277,8 +317,24 @@
         function giveStarterItems() { 
             addInvItem('Bronze Sword', 1); addInvItem('Shortbow', 1); addInvItem('Staff', 1); 
             addInvItem('Bronze Pickaxe', 1); addInvItem('Bronze Axe', 1); addInvItem('Tinderbox', 1); 
-            addInvItem('Net', 1); addInvItem('Coins', 100); addInvItem('Air Rune', 50); 
+            addInvItem('Rede de Pesca', 1); addInvItem('Coins', 100); addInvItem('Air Rune', 50); 
             addInvItem('Mind Rune', 50); addInvItem('Bronze Arrow', 50); 
+        }
+        // conta nova criada pelo painel de criação: classe, raça e aparência (consumido uma única vez)
+        function applyNewChar() {
+            const c = window._newChar; window._newChar = null;
+            if (!c || !currentUser || String(c.name).toLowerCase() !== String(currentUser).toLowerCase()) return false;
+            const lk = Art.cleanLook(c.look) || Art.defaultLook(), cls = (c.cls === 'archer' || c.cls === 'mage') ? c.cls : 'warrior';
+            player.look = Object.assign({}, lk); player.cls = cls; player.race = lk.race;
+            const equipNew = (n, qty) => { if (!addInvItem(n, qty || 1)) return; const i = player.inventory.findIndex(x => x && x.name === n); if (i < 0) return; const it = player.inventory[i]; if (it.slot && it.slot in player.equipment && !player.equipment[it.slot]) { player.inventory.splice(i, 1); player.equipment[it.slot] = it; } };
+            if (cls === 'warrior') { equipNew('Bronze Sword'); equipNew('Bronze Shield'); }
+            else if (cls === 'archer') { equipNew('Shortbow'); equipNew('Bronze Arrow', 50); }
+            else { equipNew('Staff'); addInvItem('Air Rune', 50); addInvItem('Mind Rune', 50); }
+            addInvItem('Bronze Pickaxe', 1); addInvItem('Bronze Axe', 1); addInvItem('Tinderbox', 1); addInvItem('Rede de Pesca', 1); addInvItem('Coins', 100);
+            let hpB = 0, mpB = 0; if (cls === 'warrior') hpB += 3; if (cls === 'mage') mpB += 8;
+            if (lk.race === 'elf') mpB += 4; else if (lk.race === 'dwarf') hpB += 4; else if (lk.race === 'orc') { hpB += 2; mpB -= 2; }
+            player.stats.maxHp += hpB; player.stats.hp = player.stats.maxHp; player.stats.maxMp = Math.max(6, player.stats.maxMp + mpB); player.stats.mp = player.stats.maxMp; window._saveNewChar = true;
+            return true;
         }
 
         let itemDB = {
@@ -293,7 +349,7 @@
             'Bronze Arrow': { name: 'Bronze Arrow', icon: '↗️', type: 'equipment', slot: 'ammo', bonusDmg: 1, stackable: true, weight: 0.01, desc: 'Munição arco.', recipe: 'Logs,1|Copper Ore,1', craftQty: 10 },
             'Iron Arrow': { name: 'Iron Arrow', icon: '➵', type: 'equipment', slot: 'ammo', bonusDmg: 3, stackable: true, weight: 0.01, desc: 'Munição forte.', recipe: 'Logs,1|Iron Ore,1', craftQty: 10 },
             'Tinderbox': { name: 'Tinderbox', icon: '🧯', type: 'tool', stackable: false, weight: 0.5, desc: 'Cria fogo usando Logs.' },
-            'Net': { name: 'Fishing Net', icon: '🕸️', type: 'tool', tool: 'net', stackable: false, weight: 0.5, desc: 'Usada em lagos.' },
+            'Rede de Pesca': { name: 'Rede de Pesca', icon: '🕸️', type: 'tool', tool: 'net', stackable: false, weight: 0.5, desc: 'Pesca rápida de peixes comuns, sem isca. Use no ponto de pesca.' },
             'Copper Ore': { name: 'Copper Ore', icon: '🪨', type: 'resource', stackable: true, weight: 2.2, desc: 'Cobre bruto.' },
             'Tin Ore': { name: 'Tin Ore', icon: '🪨', type: 'resource', stackable: true, weight: 2.2, desc: 'Estanho bruto.' },
             'Iron Ore': { name: 'Iron Ore', icon: '🪨', type: 'resource', stackable: true, weight: 2.2, desc: 'Ferro bruto.' },
@@ -314,12 +370,12 @@
         let npcDB = {
             'goblin_base': { name: 'Goblin', hp: 15, maxHit: 2, xp: 15, c1: '#16a085', c2: '#1abc9c', lootStr: 'Bones,1,1|Raw Meat,0.5,1|Coins,0.3,15', dialog: '', shopStr: '' },
             'orc_base': { name: 'Orc', hp: 30, maxHit: 5, xp: 40, c1: '#2c3e50', c2: '#34495e', lootStr: 'Bones,1,1|Coins,1,30', dialog: '', shopStr: '' },
-            'merchant_base': { name: 'Merchant', hp: 0, maxHit: 0, xp: 0, c1: '#8e44ad', c2: '#f1c27d', lootStr: '', dialog: 'Bem-vindo à minha loja!', shopStr: 'Net,20|Water Rune,10|Tinderbox,50' },
+            'merchant_base': { name: 'Merchant', hp: 0, maxHit: 0, xp: 0, c1: '#8e44ad', c2: '#f1c27d', lootStr: '', dialog: 'Bem-vindo à minha loja!', shopStr: 'Rede de Pesca,20|Water Rune,10|Tinderbox,50' },
             'wolf_base': { name: 'Lobo', hp: 22, maxHit: 3, xp: 25, c1: '#7f8c8d', c2: '#bdc3c7', lootStr: 'Bones,1,1|Raw Meat,0.8,2', dialog: '', shopStr: '' },
             'skeleton_base': { name: 'Esqueleto', hp: 35, maxHit: 6, xp: 55, c1: '#bdc3c7', c2: '#ecf0f1', lootStr: 'Bones,1,1|Coins,0.8,40|Iron Ore,0.2,1', dialog: '', shopStr: '' },
             'guide_npc': { name: 'Guia Aldeão', hp: 0, maxHit: 0, xp: 0, c1: '#2980b9', c2: '#f1c27d', lootStr: '', dialog: 'Bem-vindo! Corte árvores, minere pedras, pesque e lute com goblins. A floresta fica a oeste, a mina a leste, o rio ao sul e o covil ao norte.', shopStr: '' },
             'smith_npc': { name: 'Ferreiro', hp: 0, maxHit: 0, xp: 0, c1: '#d35400', c2: '#f1c27d', lootStr: '', dialog: 'Ferramentas e armaduras de primeira!', shopStr: 'Bronze Pickaxe,100|Bronze Axe,80|Bronze Sword,150|Bronze Shield,120|Bronze Body,200|Bronze Arrow,2' },
-            'fisher_npc': { name: 'Pescador', hp: 0, maxHit: 0, xp: 0, c1: '#16a085', c2: '#f1c27d', lootStr: '', dialog: 'Use a rede nos pontos de pesca do rio. Peixe cozido cura bem!', shopStr: 'Net,20|Tinderbox,50' },
+            'fisher_npc': { name: 'Pescador', hp: 0, maxHit: 0, xp: 0, c1: '#16a085', c2: '#f1c27d', lootStr: '', dialog: 'Use a rede nos pontos de pesca do rio. Peixe cozido cura bem!', shopStr: 'Rede de Pesca,20|Tinderbox,50' },
             'dragon_boss': { name: 'Dragon', hp: 200, maxHit: 15, xp: 500, c1: '#c0392b', c2: '#e74c3c', lootStr: 'Coins,1,500|Bronze Sword,0.5,1', dialog: '', shopStr: '' }
         };
 
@@ -331,6 +387,7 @@
             if (itemDB['Raw Meat'] && !itemDB['Raw Meat'].cooksInto) { itemDB['Raw Meat'].cooksInto = 'Cooked Meat'; itemDB['Raw Meat'].cookXp = 10; }
             if (itemDB['Raw Fish'] && !itemDB['Raw Fish'].cooksInto) { itemDB['Raw Fish'].cooksInto = 'Cooked Fish'; itemDB['Raw Fish'].cookXp = 20; }
             if (window.Content) Content.merge();
+            if (window.Fishing) Fishing.merge();
         }
         mergeCatalog();
 
@@ -490,16 +547,26 @@
             const pass = document.getElementById('auth-pass').value.trim();
             const msg = document.getElementById('login-msg');
             if(!user || !pass) { msg.innerText = "Preencha usuário e senha!"; return; }
-            msg.innerText = "Conectando...";
-            try {
-                const data = await api('/register', { username: user, password: pass });
-                if(data.error) msg.innerText = data.error; else msg.innerText = "Conta criada com sucesso! Faça login.";
-            } catch(e) { 
-                let users = JSON.parse(localStorage.getItem('miniscape_users') || '{}');
-                if(users[user]) { msg.innerText = "Usuário já existe localmente."; return; }
-                users[user] = pass; localStorage.setItem('miniscape_users', JSON.stringify(users));
-                msg.innerText = "Conta offline criada. Faça login.";
-            }
+            if(pass.length < 4 || pass.length > 100) { msg.innerText = "A senha deve ter de 4 a 100 caracteres."; return; }
+            if(window.Chargen && !Chargen.NAME_RE.test(user)) { msg.innerText = Chargen.NAME_ERR; return; }
+            msg.innerText = "";
+            if(!window.Chargen) { msg.innerText = "Tela de criação indisponível. Recarregue a página."; return; }
+            // painel de criação: nick, sexo, raça, classe e aparência; só depois a conta é criada
+            Chargen.open({ mode: 'create', name: user, onConfirm: async (c) => {
+                try {
+                    const data = await api('/register', { username: c.name, password: pass });
+                    if(data.error) return data.error;
+                } catch(e) {
+                    let users = JSON.parse(localStorage.getItem('miniscape_users') || '{}');
+                    if(users[c.name]) return "Usuário já existe localmente.";
+                    users[c.name] = pass; localStorage.setItem('miniscape_users', JSON.stringify(users));
+                }
+                window._newChar = { name: c.name, look: c.look, cls: c.cls };
+                document.getElementById('auth-user').value = c.name; document.getElementById('auth-pass').value = pass;
+                msg.innerText = "Conta criada! Entrando...";
+                setTimeout(login, 0);
+                return null;
+            } });
         }
 
         let _loginBusy = false;
@@ -559,11 +626,13 @@
                 player = { ...playerDefault, ...data.playerData }; player.isPerformingAction = false; player.actionTarget = null; player.actionToolItem = null; player.pendingAutoAction = null;
                 if(data.playerData.stats) player.stats = { ...playerDefault.stats, ...data.playerData.stats };
                 if(data.playerData.stats && data.playerData.stats.skills) player.stats.skills = { ...playerDefault.stats.skills, ...data.playerData.stats.skills };
-            } else { player = JSON.parse(JSON.stringify(playerDefault)); giveStarterItems(); const sm = gameMaps['lumbridge']; if (sm && sm.spawn) { player.x = sm.spawn.x; player.y = sm.spawn.y; player.destX = sm.spawn.x; player.destY = sm.spawn.y; } }
+            } else { player = JSON.parse(JSON.stringify(playerDefault)); if (!applyNewChar()) giveStarterItems(); const sm = gameMaps['lumbridge']; if (sm && sm.spawn) { player.x = sm.spawn.x; player.y = sm.spawn.y; player.destX = sm.spawn.x; player.destY = sm.spawn.y; } }
 
             if (typeof player.x !== 'number' || isNaN(player.x)) player.x = 400; if (typeof player.y !== 'number' || isNaN(player.y)) player.y = 300;
             if (!player.facing) player.facing = { x: 0, y: 1 }; if (!player.equipment) player.equipment = { head: null, body: null, weapon: null, shield: null, ammo: null };
             if (!player.inventory) player.inventory = []; if (!player.bank) player.bank = []; player.actionAnim = player.actionAnim || 0;
+            try { if (window.Fishing) Fishing.migrate(player); } catch (e) { console.error(e); }
+            { const _lk = Art.cleanLook(player.look); player.look = _lk || Object.assign({}, Art.defaultLook()); }
             try { if (window.Content) Content.onLogin(); } catch (e) { console.error(e); }
             currentMap = player.currentMap || 'lumbridge'; if(!gameMaps[currentMap]) currentMap = 'lumbridge'; try { ensurePlayerFree(); } catch (e) {}
             
@@ -573,6 +642,7 @@
             setTimeout(() => {
                 resizeCanvas(); window.addEventListener('resize', resizeCanvas);
                 openTab('inv'); updateUI(); 
+                if (window._saveNewChar) { window._saveNewChar = false; try { saveDataLogic(true); } catch (e) { console.error(e); } }   // conta nova: grava a criação já, sem esperar a primeira ação
                 if(userRole === 'admin') { buildDevEntityList(); loadDevMapManager(); loadDevPlayers();
                     try { const lm = gameMaps['lumbridge']; if (lm && (lm.catalogV || 0) < 2 && !localStorage.getItem('ms_catalog_declined2')) { setTimeout(async () => { const ok = await installCatalogWorld(); if (ok === false) localStorage.setItem('ms_catalog_declined2', '1'); }, 600); } } catch (e) {}
                 }
@@ -598,6 +668,7 @@
             try {
                 let payload = { x: player.x, y: player.y, map: (currentMap === 'casa' && window.World2 && World2.houseKey && World2.houseKey()) || currentMap, facing: player.facing, actionAnim: player.actionAnim, combatLogs: pendingCombatLogs, chatVer: lastChatVer, title: player.title || '' }; if (window.Life) { const _em = Life.pendingEmote(); if (_em) payload.emote = _em; }
                 const eqStr = JSON.stringify(player.equipment); if (eqStr !== lastEqStr) { payload.equipment = player.equipment; lastEqStr = eqStr; }
+                if (player.look) { const lkStr = JSON.stringify(player.look); if (lkStr !== lastLookStr || ++lookTick >= 100) { payload.look = player.look; lastLookStr = lkStr; lookTick = 0; } }
                 const sentLogs = pendingCombatLogs; pendingCombatLogs = [];
                 if (isMapHost) {
                     const mp = {}; const cm = gameMaps[currentMap];
@@ -605,8 +676,8 @@
                     payload.mobPos = mp;
                 }
                 let data;
-                try { data = await (window.Net ? Net.sync(payload) : api('/sync', payload)); } catch(e) { pendingCombatLogs = sentLogs.concat(pendingCombatLogs); lastEqStr = ''; throw e; }
-                if (data.error) { if (data._status !== 401) pendingCombatLogs = sentLogs.concat(pendingCombatLogs); lastEqStr = ''; isSyncing = false; return; }
+                try { data = await (window.Net ? Net.sync(payload) : api('/sync', payload)); } catch(e) { pendingCombatLogs = sentLogs.concat(pendingCombatLogs); lastEqStr = ''; lastLookStr = ''; throw e; }
+                if (data.error) { if (data._status !== 401) pendingCombatLogs = sentLogs.concat(pendingCombatLogs); lastEqStr = ''; lastLookStr = ''; isSyncing = false; return; }
 
                 if (data.isHost !== undefined) { isMapHost = data.isHost; }
                 try { if (window.Net) Net.onSync(data); } catch (e) { console.error(e); }
@@ -617,7 +688,7 @@
                             otherPlayers[u] = data.players[u]; otherPlayers[u].displayX = data.players[u].x; otherPlayers[u].displayY = data.players[u].y; netPush(otherPlayers[u], data.players[u].x, data.players[u].y);
                         } else {
                             netPush(otherPlayers[u], data.players[u].x, data.players[u].y); otherPlayers[u].x = data.players[u].x; otherPlayers[u].y = data.players[u].y; otherPlayers[u].map = data.players[u].map;
-                            otherPlayers[u].facing = data.players[u].facing; otherPlayers[u].actionAnim = data.players[u].actionAnim; otherPlayers[u].equipment = data.players[u].equipment;
+                            otherPlayers[u].facing = data.players[u].facing; otherPlayers[u].actionAnim = data.players[u].actionAnim; otherPlayers[u].equipment = data.players[u].equipment; if (data.players[u].look) otherPlayers[u].look = data.players[u].look;
                         }
                     });
                     Object.keys(otherPlayers).forEach(u => { if(!data.players[u]) delete otherPlayers[u]; });
@@ -771,7 +842,7 @@
         let _idSeq = 0; function newEntId() { return Date.now() * 100 + (_idSeq++ % 100); }
         function invSpaceFor(iName, qty) { const b = itemDB[iName]; if (!b) return false; const free = INV_SLOTS - player.inventory.length; if (!b.stackable) return free >= qty; let room = 0; for (const i of player.inventory) if (i.name === iName) room += Math.max(0, 254 - (i.qty || 1)); return room + free * 254 >= qty; }
         function removeInvItem(iName, amount) { if(!(amount > 0) || getInvCount(iName) < amount) return false; let tr = amount; for(let i = player.inventory.length - 1; i >= 0 && tr > 0; i--) { const it = player.inventory[i]; if(it.name !== iName) continue; if(it.stackable) { const q = it.qty || 1; if(q > tr) { it.qty = q - tr; tr = 0; } else { tr -= q; player.inventory.splice(i, 1); } } else { player.inventory.splice(i, 1); tr--; } } return tr <= 0; }
-        function addInvItem(iName, qty = 1) { const b = itemDB[iName]; if(!b || !(qty > 0) || !invSpaceFor(iName, qty)) return false; if (b.stackable) { let r = qty; for(let i of player.inventory) { if(i.name === iName && i.qty < 254) { let sp = 254 - i.qty; if(r <= sp) { i.qty += r; return true; } else { i.qty = 254; r -= sp; } } } while(r > 0 && player.inventory.length < INV_SLOTS) { let t = Math.min(r, 254); player.inventory.push({...b, qty: t}); r -= t; } return r <= 0; } else { if(player.inventory.length < INV_SLOTS) { player.inventory.push({...b}); return true; } return false; } }
+        function addInvItem(iName, qty = 1) { const b = itemDB[iName]; if(!b || !(qty > 0) || !invSpaceFor(iName, qty)) return false; if (b.stackable) { let r = qty; for(let i of player.inventory) { if(i.name === iName && i.qty < 254) { let sp = 254 - i.qty; if(r <= sp) { i.qty += r; return true; } else { i.qty = 254; r -= sp; } } } while(r > 0 && player.inventory.length < INV_SLOTS) { let t = Math.min(r, 254); player.inventory.push({...b, qty: t}); r -= t; } return r <= 0; } else { for(let n = 0; n < qty; n++) player.inventory.push({...b}); return true; } }
         function transferToBank(invIndex) { const item = player.inventory[invIndex]; if(!item) return; let bankItem = player.bank.find(i => i.name === item.name); if(bankItem && item.stackable) { bankItem.qty += item.qty; } else if (item.stackable) { player.bank.push({...item, qty: item.qty}); } else { player.bank.push({...item, qty: 1}); } player.inventory.splice(invIndex, 1); hideTooltip(); updateUI(); }
         function withdrawFromBank(bankIndex) { const item = player.bank[bankIndex]; if(!item) return; let wQ = item.stackable ? Math.min(item.qty, 254) : 1; if(addInvItem(item.name, wQ)) { item.qty -= wQ; if(item.qty <= 0) player.bank.splice(bankIndex, 1); hideTooltip(); updateUI(); } else { setActionText("Inventário Cheio!", "#e74c3c"); } }
 
@@ -780,21 +851,49 @@
             if(item.type === 'equipment') { if(!item.slot || !(item.slot in player.equipment)) { setActionText('Este item não pode ser equipado.', '#e74c3c'); return; } if(item.stackable && item.slot === 'ammo') { let curAm = player.equipment.ammo; player.equipment.ammo = player.inventory.splice(index, 1)[0]; if(curAm && !addInvItem(curAm.name, curAm.qty)) player.inventory.push(curAm); } else { player.inventory.splice(index, 1); if(player.equipment[item.slot]) player.inventory.push(player.equipment[item.slot]); player.equipment[item.slot] = item; } } 
             else if(item.type === 'consumable') { if(item.mp > 0) { player.stats.mp = Math.min(player.stats.maxMp, player.stats.mp + item.mp); setActionText(`Restaurou ${item.mp} MP.`, '#3498db'); } if(item.buff && window.Content) Content.applyBuff(item.buff); if(item.heal > 0) { player.stats.hp = Math.min(player.stats.maxHp, player.stats.hp + item.heal); setActionText(`Curou ${item.heal} HP.`); } if(item.name === 'Bones') { addXP('prayer', 5); addFloatingText(player.x, player.y - 15, "Enterrou", "#bdc3c7"); } removeInvItem(item.name, 1); } 
             else if(item.name === 'Tinderbox') { if(getInvCount('Logs') >= 1) { removeInvItem('Logs', 1); let curM = gameMaps[currentMap]; if(curM){ if(!curM.entities) curM.entities = []; curM.entities.push({ id: newEntId(), type: 'fire', name: 'Fire', x: player.x - 15, y: player.y - 15, w: 30, h: 30, active: true, life: 1000 }); } addXP('firemaking', 15); setActionText("Acendeu fogo!"); saveDataLogic(); } else { setActionText("Precisa de Logs.", "#e74c3c"); } } 
+            else if(item.bait && window.Fishing) { Fishing.selectBait(item.name); hideTooltip(); updateUI(); return; }
             else if(item.name === 'Knife') { setActionText("Use a aba Craft para criar itens.", "#e74c3c"); }
             player.isPerformingAction = false; player.pendingAutoAction = null; player.actionToolItem = null; hideTooltip(); updateUI();
         }
 
+        // clique na mochila: com "Confirmar uso de itens" ligado (padrão) só seleciona (ItemSel); duplo clique usa direto
+        function invClick(i) { if (isBankOpen) { transferToBank(i); return; } if (window.ItemSel && ItemSel.on()) ItemSel.click(i); else useItem(i); }
+        function eqClick(slot) { if (window.ItemSel && ItemSel.on()) ItemSel.clickEq(slot); else unequip(slot); }
         function unequip(slot) { const item = player.equipment[slot]; if(item) { if(item.stackable && slot === 'ammo') { if(addInvItem(item.name, item.qty)) { player.equipment[slot] = null; updateUI(); } else { setActionText("Inv. Cheio!", "#e74c3c"); } } else { if(player.inventory.length >= INV_SLOTS) { setActionText("Inv. Cheio!", "#e74c3c"); return; } player.equipment[slot] = null; player.inventory.push(item); hideTooltip(); updateUI(); } } }
-        function craftItem(iName) {
-            let it = itemDB[iName]; if(!it || !it.recipe) return;
-            const reqs = it.recipe.split('|').map(r => { const p = r.split(','); return { n: (p[0] || '').trim(), q: parseInt(p[1]) }; });
-            if (reqs.some(r => !r.n || !(r.q > 0) || !itemDB[r.n])) { setActionText('Receita inválida.', '#e74c3c'); return; }
-            if (reqs.some(r => getInvCount(r.n) < r.q)) { setActionText('Faltam materiais!', '#e74c3c'); return; }
+        // plano de fabricação (sem mexer na mochila): ingredientes, quanto dá para fazer e se cabe na mochila
+        function craftInfo(iName) {
+            const it = itemDB[iName]; if (!it || !it.recipe) return null;
+            const reqs = it.recipe.split('|').map(r => { const p = r.split(','); return { n: (p[0] || '').trim(), q: parseInt(p[1]), have: 0 }; });
+            const bad = reqs.some(r => !r.n || !(r.q > 0) || !itemDB[r.n]);
+            reqs.forEach(r => { r.have = bad ? 0 : getInvCount(r.n); });
+            const per = Math.max(1, parseInt(it.craftQty) || 1);
+            const maxMat = bad ? 0 : Math.min(99, ...reqs.map(r => Math.floor(r.have / r.q)));
+            const fits = (k) => {   // simula a mochila depois de gastar os ingredientes de k fabricações
+                const list = player.inventory.map(x => ({ n: x.name, q: x.stackable ? (x.qty || 1) : 1, st: !!x.stackable }));
+                for (const r of reqs) { let tr = r.q * k; for (let i = list.length - 1; i >= 0 && tr > 0; i--) { if (list[i].n !== r.n) continue; if (list[i].st && list[i].q > tr) { list[i].q -= tr; tr = 0; } else { tr -= list[i].st ? list[i].q : 1; list.splice(i, 1); } } }
+                const free = INV_SLOTS - list.length, amt = per * k, b = itemDB[iName];
+                if (!b.stackable) return free >= amt;
+                let room = 0; for (const x of list) if (x.n === iName) room += Math.max(0, 254 - x.q); return room + free * 254 >= amt;
+            };
+            let max = 0; for (let k = maxMat; k >= 1; k--) if (fits(k)) { max = k; break; }
+            return { it, reqs, per, bad, maxMat, max, fits: (k) => k >= 1 && k <= maxMat && fits(k), full: maxMat >= 1 && max === 0 };
+        }
+        // fabrica 'times' vezes (limitado ao que os materiais e a mochila permitem); devolve {ok, n, made, msg}
+        function craftItem(iName, times) {
+            const inf = craftInfo(iName); if (!inf) { const m = 'Essa receita não existe.'; setActionText(m, '#e74c3c'); return { ok: false, n: 0, made: 0, msg: m }; }
+            const fail = (m) => { setActionText(m, '#e74c3c'); return { ok: false, n: 0, made: 0, msg: m }; };
+            if (inf.bad) return fail('Receita inválida.');
+            if (inf.maxMat < 1) { const f = inf.reqs.find(r => r.have < r.q); return fail(`Faltam materiais: precisa de ${f.q}× ${f.n} (você tem ${f.have}).`); }
+            if (inf.max < 1) return fail(`Inventário cheio: libere espaço para criar ${iName}.`);
+            let k = Math.max(1, Math.min(Math.floor(Number(times)) || 1, inf.maxMat)); while (k >= 1 && !inf.fits(k)) k--;
+            if (k < 1) return fail(`Inventário cheio: libere espaço para criar ${iName}.`);
             const snap = JSON.stringify(player.inventory);
-            reqs.forEach(r => removeInvItem(r.n, r.q));
-            if (addInvItem(iName, it.craftQty || 1)) { addXP('crafting', 15); setActionText(`Criou ${iName}!`); }
-            else { player.inventory = JSON.parse(snap); setActionText('Inventário cheio!', '#e74c3c'); }
-            updateUI();
+            inf.reqs.forEach(r => removeInvItem(r.n, r.q * k));
+            if (!addInvItem(iName, inf.per * k)) { const back = JSON.parse(snap); player.inventory.length = 0; back.forEach(x => player.inventory.push(x)); return fail('Inventário cheio!'); }
+            const made = inf.per * k, xp = 15 * k; addXP('crafting', xp);
+            const msg = `Criou ${made > 1 ? made + '× ' : ''}${iName}! (+${xp} XP)`; setActionText(msg);
+            try { saveDataLogic(); } catch (e) { } updateUI();
+            return { ok: true, n: k, made, msg };
         }
         function closeMenus() { isBankOpen = false; isNPCOpen = false; activeNPCShop = null; document.getElementById('btn-bank').style.display='none'; document.getElementById('btn-npc').style.display='none'; }
         function openTab(tP) { document.querySelectorAll('.tab-content').forEach(e=>e.classList.remove('active-tab')); document.querySelectorAll('.tab-btn').forEach(e=>e.classList.remove('active-btn')); const tb = document.getElementById(`tab-${tP}`); if(tb) tb.classList.add('active-tab'); const bt = document.getElementById(`btn-${tP}`); if(bt) bt.classList.add('active-btn'); isBankOpen = (tP === 'bank'); isNPCOpen = (tP === 'npc'); if (['craft', 'mag', 'inv', 'eq', 'sk', 'bank'].includes(tP)) { updateUI(); } }
@@ -812,15 +911,15 @@
         }
         
         function addXP(sK, a) { 
-            let mult = 1; if(userRole === 'vip_light') mult = 2; if(userRole === 'vip_full' || userRole === 'admin') mult = 4; let finalXP = a * mult;
+            let mult = 1; if(userRole === 'vip_light') mult = 2; if(userRole === 'vip_full' || userRole === 'admin') mult = 4; let finalXP = a * mult; if (player.race === 'human') finalXP = Math.max(0, Math.round(finalXP * 1.05));
             const sk = player.stats.skills[sK]; if(!sk) return; sk.xp += finalXP; addFloatingText(player.x, player.y - 20, `+${finalXP} XP`, '#f1c40f'); 
             let leveledUp = false; if (!(sk.next > 0)) sk.next = 50; while (sk.xp >= sk.next) { sk.level++; sk.xp -= sk.next; sk.next = Math.floor(sk.next * 1.5); leveledUp = true; if (sK === 'hp') { player.stats.maxHp += 2; player.stats.hp = player.stats.maxHp; } } 
             if(leveledUp) { setActionText(`${sk.name} Nível ${sk.level}!`, "#f1c40f"); addFloatingText(player.x, player.y - 40, `Level Up!`, '#2ecc71'); } updateUI(); 
         }
 
         function getTotalDef() { let d = player.stats.skills.combat.level + (window.Content ? Content.buff('def') : 0); if(player.equipment && player.equipment.shield) d += (player.equipment.shield.defBonus || 0); if(player.equipment && player.equipment.body) d += (player.equipment.body.defBonus || 0); return d; }
-        function openShop(nData) { if (!nData) { setActionText('Esse NPC não tem loja.', '#e74c3c'); return; } document.getElementById('btn-npc').style.display = 'block'; openTab('npc'); document.getElementById('npc-title').innerText = nData.name; document.getElementById('npc-dialog').innerText = `"${nData.dialog || '...'}"`; let sL = document.getElementById('npc-shop-list'); sL.innerHTML = ''; sL.onclick = (ev) => { const b = ev.target.closest('[data-buy]'); if(b) buyItem(b.dataset.buy, parseInt(b.dataset.cost)); }; if(nData.shopStr) { nData.shopStr.split('|').forEach(p => { let pt = p.split(','); if(pt.length >= 2) { let iN = pt[0].trim(); let ct = parseInt(pt[1]); let iD = itemDB[iN]; if(iD) { sL.innerHTML += `<div class="shop-item"><span>${Icons.html(iD.name, 24)} ${esc(iD.name)}</span><button class="shop-btn" data-buy="${esc(iN)}" data-cost="${ct}">Comprar (${ct} 🪙)</button></div>`; } } }); } }
-        function buyItem(iN, ct) { if (!(ct > 0)) return; if(getInvCount('Coins') >= ct) { if(addInvItem(iN, 1)) { removeInvItem('Coins', ct); setActionText(`Comprou ${iN}!`); updateUI(); } else { setActionText("Inv Cheio!", "#e74c3c"); } } else { setActionText("Coins insuficientes!", "#e74c3c"); } }
+        function openShop(nData) { if (!nData) { setActionText('Esse NPC não tem loja.', '#e74c3c'); return; } document.getElementById('btn-npc').style.display = 'block'; openTab('npc'); document.getElementById('npc-title').innerText = nData.name; document.getElementById('npc-dialog').innerText = `"${nData.dialog || '...'}"`; let sL = document.getElementById('npc-shop-list'); sL.innerHTML = ''; sL.onclick = (ev) => { const b = ev.target.closest('[data-buy]'); if(!b) return; const ct = parseInt(b.dataset.cost); if (ct >= 100 && window.ItemSel && !ItemSel.arm('shop:' + b.dataset.buy)) { const old = b.textContent; b.textContent = 'Confirmar ' + ct + ' 🪙?'; setTimeout(() => { if (b.isConnected) b.textContent = old; }, 4000); return; } buyItem(b.dataset.buy, ct); }; if(nData.shopStr) { nData.shopStr.split('|').forEach(p => { let pt = p.split(','); if(pt.length >= 2) { let iN = pt[0].trim(); let ct = parseInt(pt[1]); let iD = itemDB[iN]; if(iD) { sL.innerHTML += `<div class="shop-item"><span>${Icons.html(iD.name, 24)} ${esc(iD.name)}${iD.shopQty > 1 ? ' ×' + iD.shopQty : ''}</span><button class="shop-btn" data-buy="${esc(iN)}" data-cost="${ct}">Comprar (${ct} 🪙)</button></div>`; } } }); } }
+        function buyItem(iN, ct) { if (!(ct > 0)) return; const _q = (itemDB[iN] && itemDB[iN].shopQty > 1) ? itemDB[iN].shopQty : 1; if(getInvCount('Coins') >= ct) { if(addInvItem(iN, _q)) { removeInvItem('Coins', ct); setActionText(`Comprou ${_q > 1 ? _q + '× ' : ''}${iN}!`); updateUI(); } else { setActionText("Inv Cheio!", "#e74c3c"); } } else { setActionText("Coins insuficientes!", "#e74c3c"); } }
         function setActiveSpell(sId) { player.activeSpell = sId; updateUI(); }
 
         // o painel só é reconstruído uma vez por quadro, mesmo que várias ações peçam atualização (evita engasgos)
@@ -829,12 +928,15 @@
         function updateUIReal() {
             try {
                 document.getElementById('bar-hp').style.width = `${(player.stats.hp / player.stats.maxHp)*100}%`; document.getElementById('text-hp').innerText = `HP ${player.stats.hp}/${player.stats.maxHp}`; document.getElementById('bar-mp').style.width = `${(player.stats.mp / player.stats.maxMp)*100}%`; document.getElementById('text-mp').innerText = `MP ${player.stats.mp}/${player.stats.maxMp}`;
-                const iG = document.getElementById('inv-grid'); iG.innerHTML = ''; for(let i = 0; i < 30; i++) { const item = player.inventory[i]; const div = document.createElement('div'); div.className = 'item-slot'; if(item) { div.innerHTML = Icons.html(item.name); if(item.stackable && item.qty > 1) div.innerHTML += `<span class="item-qty">${item.qty}</span>`; div.onclick = () => useItem(i); div.onmouseenter = () => showTooltip(item); div.onmouseleave = () => hideTooltip(); } iG.appendChild(div); } document.getElementById('weight-txt').innerText = calcTotalWeight();
+                const iG = document.getElementById('inv-grid'); const iSig = player.inventory.slice(0, 30).map(x => x.name + '*' + (x.stackable && x.qty > 1 ? x.qty : 1) + (x.ench ? 'e' + x.ench : '')).join('|');
+                if (iG._sig !== iSig || iG.children.length !== 30) { iG._sig = iSig; iG.innerHTML = ''; for(let i = 0; i < 30; i++) { const item = player.inventory[i]; const div = document.createElement('div'); div.className = 'item-slot'; if(item) { div.innerHTML = Icons.html(item.name); if(item.stackable && item.qty > 1) div.innerHTML += `<span class="item-qty">${item.qty}</span>`; div.onclick = () => invClick(i); div.onmouseenter = () => showTooltip(player.inventory[i]); div.onmouseleave = () => hideTooltip(); } iG.appendChild(div); } } document.getElementById('weight-txt').innerText = calcTotalWeight();
                 Object.keys(player.equipment || {}).forEach(sl => { const el = document.getElementById(`eq-${sl}`); if(el && player.equipment[sl]) { el.innerHTML = Icons.html(player.equipment[sl].name); if (sl === 'ammo' && player.equipment.ammo) document.getElementById('ammo-qty').innerText = player.equipment.ammo.qty || ''; el.parentElement.onmouseenter = () => showTooltip(player.equipment[sl]); el.parentElement.onmouseleave = () => hideTooltip(); } else if(el) { el.innerText = ''; if (sl === 'ammo') document.getElementById('ammo-qty').innerText = ''; el.parentElement.onmouseenter = null; } }); document.getElementById('def-stats').innerText = `Bônus de Defesa: ${getTotalDef()}`;
                 const sL = document.getElementById('skills-list'); sL.innerHTML = ''; let tL = 0; Object.values(player.stats.skills || {}).forEach(s => { tL += s.level; sL.innerHTML += `<div class="skill-line"><span>${s.name}: Lvl ${s.level}</span> <span style="color:#888;">${s.xp}/${s.next} XP</span></div>`; }); document.getElementById('text-xp').innerText = `Nível Geral: ${tL}`;
-                const bG = document.getElementById('bank-grid'); bG.innerHTML = ''; for(let i = 0; i < Math.max(30, player.bank.length + 4); i++) { const item = player.bank[i]; const div = document.createElement('div'); div.className = 'item-slot'; if(item) { div.innerHTML = Icons.html(item.name); if(item.qty > 1) div.innerHTML += `<span class="item-qty">${item.qty}</span>`; div.onclick = () => withdrawFromBank(i); div.onmouseenter = () => showTooltip(item); div.onmouseleave = () => hideTooltip(); } bG.appendChild(div); }
+                const bG = document.getElementById('bank-grid'); const bSig = player.bank.map(x => x.name + '*' + (x.qty || 1)).join('|');
+                if (bG._sig !== bSig) { bG._sig = bSig; bG.innerHTML = ''; for(let i = 0; i < Math.max(30, player.bank.length + 4); i++) { const item = player.bank[i]; const div = document.createElement('div'); div.className = 'item-slot'; if(item) { div.innerHTML = Icons.html(item.name); if(item.qty > 1) div.innerHTML += `<span class="item-qty">${item.qty}</span>`; div.onclick = () => withdrawFromBank(i); div.onmouseenter = () => showTooltip(player.bank[i]); div.onmouseleave = () => hideTooltip(); } bG.appendChild(div); } }
                 const mL = document.getElementById('spellbook-list'); if (mL) { mL.onclick = (ev) => { const c = ev.target.closest('[data-spell]'); if(c) setActiveSpell(c.dataset.spell); }; mL.innerHTML = ''; spellbookDB.forEach(sp => { let rT = Object.keys(sp.req).map(k => `${sp.req[k]}x ${itemDB[k]?Icons.html(k,16):'?'}`).join(' '); let iA = player.stats.skills.magic.level >= sp.lvl; let sC = player.activeSpell === sp.id ? 'spell-card spell-active' : 'spell-card'; mL.innerHTML += `<div class="${sC}" data-spell="${esc(sp.id)}" style="opacity:${iA?1:0.5}"><div><strong>${sp.name}</strong> <span style="font-size:0.7rem; color:${sp.color}">Dano: +${sp.dmg}</span><br><span class="spell-runes">Req: Lvl ${sp.lvl} | ${rT}</span></div>${player.activeSpell === sp.id ? '⭐' : ''}</div>`; }); }
                 if (window.renderCraftBook) renderCraftBook();
+                if (window.ItemSel) ItemSel.render();
             } catch(e) { }
         }
 
@@ -971,7 +1073,7 @@
             cm.entities.push({ id: newEntId(), type: 'portal', name: 'Portal', x: x, y: y, w: w, h: h, active: true, destMap: d, destX: isFinite(dx) ? dx : 400, destY: isFinite(dy) ? dy : 300 });
             closeModal(); saveDataLogic(false, true); setActionText('Portal criado!');
         }
-        function switchMap(targetMap, nx, ny) { if(!gameMaps[targetMap]) return; currentMap = targetMap; player.x = nx; player.y = ny; player.destX = nx; player.destY = ny; player.isPerformingAction = false; player.pendingAutoAction = null; player.actionTarget = null; player.actionToolItem = null; projectiles = []; try { const mm = gameMaps[currentMap]; player.x = Math.max(20, Math.min((mm.width || 800) - 20, player.x)); player.y = Math.max(20, Math.min((mm.height || 600) - 20, player.y)); player.destX = player.x; player.destY = player.y; ensurePlayerFree(); } catch (e) {} setActionText(`Viajou: ${gameMaps[currentMap].name}`); saveDataLogic(); loadDevMapManager(); }
+        function switchMap(targetMap, nx, ny) { if(!gameMaps[targetMap]) return; rangedTarget = null; currentMap = targetMap; player.x = nx; player.y = ny; player.destX = nx; player.destY = ny; player.isPerformingAction = false; player.pendingAutoAction = null; player.actionTarget = null; player.actionToolItem = null; projectiles = []; try { const mm = gameMaps[currentMap]; player.x = Math.max(20, Math.min((mm.width || 800) - 20, player.x)); player.y = Math.max(20, Math.min((mm.height || 600) - 20, player.y)); player.destX = player.x; player.destY = player.y; ensurePlayerFree(); } catch (e) {} setActionText(`Viajou: ${gameMaps[currentMap].name}`); saveDataLogic(); loadDevMapManager(); }
         
         // --- SISTEMAS DE FÍSICA DE ATAQUE E COLISÃO ---
         function getHitbox(o) {
@@ -1009,7 +1111,7 @@
         function tryAttack() {
             if(player.isPerformingAction) { player.isPerformingAction = false; return; }
             const wp = player.equipment ? player.equipment.weapon : null; 
-            let range = (wp && (wp.tool === 'magic' || wp.tool === 'ranged')) ? 160 : 45;
+            let range = (wp && (wp.tool === 'magic' || wp.tool === 'ranged')) ? attackRange(wp) : 45;
             let curM = gameMaps[currentMap]; if(!curM) return;
             let cur = curM.entities || []; let cEnemy = null; let minDEnemy = range;
             for(let o of cur) { if(o && o.active && o.type === 'enemy') { let d = Math.hypot(player.x - (o.x + (o.w||30)/2), player.y - (o.y + (o.h||30)/2)); if(d < minDEnemy) { minDEnemy = d; cEnemy = o; } } }
@@ -1060,7 +1162,7 @@
                 if (toolItem && _rk) { if (player.stats.skills.mining.level < _rk.lvl) { setActionText(`Requer Mineração nível ${_rk.lvl} (${_rk.label}).`, '#e74c3c'); return; } if (Content.tierOf(toolItem) < _rk.tier) { setActionText(`Requer uma picareta melhor: ${_rk.toolName || 'Iron Pickaxe'}.`, '#e74c3c'); return; } }
                 if(toolItem) { player.isPerformingAction = true; player.actionTarget = tObj; player.actionType = tObj.type === 'tree' ? 'chop' : 'mine'; player.actionToolItem = toolItem; player.actionTimer = player.actionDelay = Math.max(30, 150 - (player.stats.skills[tObj.type === 'tree' ? 'woodcutting' : 'mining'].level * 5)); } else { setActionText(`Requer ${nT} no inventário.`, "#e74c3c"); }
             }
-            else if(tObj.type === 'fishing_spot') { let toolItem = player.inventory.find(i => i.name === 'Net'); if(toolItem) { player.isPerformingAction = true; player.actionTarget = tObj; player.actionType = 'fish'; player.actionToolItem = toolItem; player.actionTimer = player.actionDelay = Math.max(40, 150 - (player.stats.skills.fishing.level * 4)); } else { setActionText("Requer uma Net no inventário.", "#e74c3c"); } }
+            else if(tObj.type === 'fishing_spot') { if (window.Fishing) Fishing.start(tObj); }
             else if(tObj.type === 'furnace') { if (window.Content) Content.startSmelt(tObj); }
             else if(tObj.type === 'fire') { if (player.inventory.find(i => itemDB[i.name] && itemDB[i.name].cooksInto)) { player.isPerformingAction = true; player.actionTarget = tObj; player.actionType = 'cook'; player.actionTimer = player.actionDelay = Math.max(20, 80 - (player.stats.skills.cooking.level * 2)); } else { setActionText("Você não tem nada cru para cozinhar.", "#e74c3c"); } } 
             updateUI();
@@ -1101,7 +1203,7 @@
                             if(cObj.type === 'enemy') addMenuOption(`${(npcDB[cObj.dbKey] && npcDB[cObj.dbKey].behavior === 'passive' || npcDB[cObj.dbKey] && npcDB[cObj.dbKey].behavior === 'skittish') ? 'Caçar' : 'Atacar'} ${cObj.name}`, () => setPendingAction(cObj));
                             if(cObj.type === 'npc') addMenuOption(`Falar com ${cObj.name}`, () => setPendingAction(cObj));
                             if(cObj.type === 'tree') addMenuOption(`Cortar ${cObj.name}`, () => setPendingAction(cObj));
-                            if(cObj.type === 'fishing_spot') addMenuOption(`Pescar`, () => setPendingAction(cObj));
+                            if(cObj.type === 'fishing_spot') { if (window.Fishing) Fishing.menu(cObj, addMenuOption, setPendingAction); else addMenuOption(`Pescar`, () => setPendingAction(cObj)); }
                             if(typeof cObj.type === 'string' && cObj.type.startsWith('rock')) addMenuOption(`Minerar ${cObj.name}`, () => setPendingAction(cObj));
                             if(cObj.type === 'furnace') addMenuOption(`Fundir minérios`, () => setPendingAction(cObj));
                             if(cObj.type === 'anvil') addMenuOption(`Fabricar (aba Ofícios)`, () => openTab('craft'));
@@ -1115,7 +1217,7 @@
                             if(cObj.type === 'portal') addMenuOption(`Entrar`, () => setPendingAction(cObj));
                             if(cObj.type === 'ground_item') addMenuOption(`Pegar ${itemDB[cObj.item]?itemDB[cObj.item].name:cObj.item}`, () => setPendingAction(cObj));
                         }
-                        addMenuOption("Andar aqui", () => { player.destX = pos.x; player.destY = pos.y; player.isPerformingAction = false; player.pendingAutoAction = null; }); 
+                        addMenuOption("Andar aqui", () => { rangedTarget = null; player.destX = pos.x; player.destY = pos.y; player.isPerformingAction = false; player.pendingAutoAction = null; }); 
                         addMenuOption("Cancelar", () => {});
                         
                         osrsMenu.style.left = pos.pageX + 'px'; osrsMenu.style.top = pos.pageY + 'px'; osrsMenu.style.display = 'block';
@@ -1168,12 +1270,15 @@
                 }
 
                 if(!osrsMenu.contains(e.target) && !document.getElementById('custom-modal-overlay').contains(e.target) && !document.getElementById('chat-container').contains(e.target)) { 
-                    if (clickedEntity) {
+                    if (clickedEntity && beginAttack(clickedEntity)) { /* arco/cajado: ataca de longe */ }
+                    else if (clickedEntity) {
+                        rangedTarget = null;
                         player.pendingAutoAction = clickedEntity; 
                         player.destX = clickedEntity.x + (clickedEntity.w||30)/2; 
                         player.destY = clickedEntity.y + (clickedEntity.h||30)/2; 
                         if(isNPCOpen && clickedEntity.type !== 'npc') { closeMenus(); openTab('inv'); }
                     } else {
+                        rangedTarget = null;
                         player.destX = pos.x; player.destY = pos.y; 
                         player.isPerformingAction = false; player.pendingAutoAction = null; player.actionToolItem = null; 
                     }
@@ -1254,6 +1359,11 @@
             return pfPath.length ? pfPath[0] : null;
         }
 
+        const SWIMMERS = ['snake'];
+        function mobMedium(o) {   // 'fly' (voa), 'swim' (nada) ou 'land' (terrestre: evita a água)
+            if (o._medK === o.dbKey && o._med) return o._med; const def = npcDB[o.dbKey] || {}; const sp = window.Art ? Art.speciesOf(o.dbKey, def) : ''; const S0 = window.Art && Art.S && Art.S[sp];
+            o._medK = o.dbKey; o._med = (S0 && S0.fly > 0) || def.fly ? 'fly' : (def.aquatic || SWIMMERS.includes(sp)) ? 'swim' : 'land'; return o._med;
+        }
         function mobStep(o, cur, ex, ey, ed, spd, ow, oh) {
             let nx = o.x + (ex/ed)*spd; let ny = o.y + (ey/ed)*spd; let cx = false, cy = false;
             for (let wo of cur) {
@@ -1266,6 +1376,10 @@
                 if (ov(o.x, ny)) cy = true;
             }
             const cm = gameMaps[currentMap]; const mW = (cm && cm.width) || 800, mH = (cm && cm.height) || 600;
+            if (mobMedium(o) === 'land' && window.Art && Art.isWater) {   // bicho terrestre não entra na água (se já está dentro, pode sair)
+                const wet = (px, py) => Art.isWater(cm, px + ow / 2, py + oh - 3) || Art.isWater(cm, px + ow * 0.2, py + oh - 3) || Art.isWater(cm, px + ow * 0.8, py + oh - 3);
+                if (!wet(o.x, o.y)) { if (wet(nx, o.y)) cx = true; if (wet(o.x, ny)) cy = true; }
+            }
             if(nx < 15 || nx > mW - 15 - ow) cx = true; if(ny < 15 || ny > mH - 15 - oh) cy = true;
             if(!cx) o.x = nx; if(!cy) o.y = ny;
             return !(cx && cy);
@@ -1285,12 +1399,13 @@
 
                 for(let i = projectiles.length - 1; i >= 0; i--) { let p = projectiles[i]; if (p.target && p.target.active) { p.tx = p.target.x + (p.target.w||30) / 2; p.ty = p.target.y + (p.target.h||30) / 2; } let dx = p.tx - p.x; let dy = p.ty - p.y; let dist = Math.hypot(dx, dy); if (dist < p.speed) { if(p.target && p.target.active) applyDamage(p.target, p.dmg, p.type); projectiles.splice(i, 1); } else { p.x += (dx/dist)*p.speed; p.y += (dy/dist)*p.speed; } }
 
+                if (rangedTarget) rangedTick(cur);
                 let dxK = 0, dyK = 0;
                 if(keys.w || keys.arrowup) dyK -= 1; if(keys.s || keys.arrowdown) dyK += 1; if(keys.a || keys.arrowleft) dxK -= 1; if(keys.d || keys.arrowright) dxK += 1;
 
                 if (dxK !== 0 || dyK !== 0) {
                     if (isBankOpen || isNPCOpen) { closeMenus(); openTab('inv'); } 
-                    player.destX = player.x; player.destY = player.y; player.pendingAutoAction = null; player.isPerformingAction = false; player.actionToolItem = null;
+                    player.destX = player.x; player.destY = player.y; player.pendingAutoAction = null; player.isPerformingAction = false; player.actionToolItem = null; rangedTarget = null;
                     let dK = Math.hypot(dxK, dyK); let mx = (dxK / dK) * player.speed; let my = (dyK / dK) * player.speed; 
                     let nX = player.x + mx; let nY = player.y + my; let colX = false, colY = false; let pw = 10, ph = 10;
                     
@@ -1310,7 +1425,7 @@
                     
                     if(player.pendingAutoAction) { 
                         let tW = player.pendingAutoAction.w || 30; let pType = player.pendingAutoAction.type;
-                        if (pType === 'enemy') { if (player.equipment && player.equipment.weapon && (player.equipment.weapon.tool === 'magic' || player.equipment.weapon.tool === 'ranged')) { sD = 140; } else { sD = (tW / 2) + 12; } } 
+                        if (pType === 'enemy') { if (player.equipment && player.equipment.weapon && (player.equipment.weapon.tool === 'magic' || player.equipment.weapon.tool === 'ranged')) { sD = attackRange(player.equipment.weapon) - 40; } else { sD = (tW / 2) + 12; } } 
                         else if (pType === 'ground_item') sD = 10; else if (['npc', 'tree', 'rock_copper', 'rock_tin', 'rock_iron', 'furnace', 'anvil', 'bank', 'house'].includes(pType)) { sD = (tW / 2) + 15; }
                     }
 
@@ -1346,6 +1461,7 @@
                     } return false;
                 }
 
+                if (gameMaps[currentMap] && gameMaps[currentMap] !== curM) { curM = gameMaps[currentMap]; mapW = curM.width || 800; mapH = curM.height || 600; }   // portal usado neste frame: não testar a borda com o tamanho do mapa ANTIGO (bug: chegar em x>largura antiga voltava ao mapa vizinho)
                 if (player.x <= 15) { if (!attemptGridTransition(-1, 0)) { player.x = 15; player.destX = 15; } } else if (player.x >= mapW - 15) { if (!attemptGridTransition(1, 0)) { player.x = mapW - 15; player.destX = mapW - 15; } }
                 if (player.y <= 15) { if (!attemptGridTransition(0, -1)) { player.y = 15; player.destY = 15; } } else if (player.y >= mapH - 15) { if (!attemptGridTransition(0, 1)) { player.y = mapH - 15; player.destY = mapH - 15; } }
 
@@ -1355,7 +1471,7 @@
                         const obj = player.actionTarget;
                         if (player.actionType === 'chop') { if(addInvItem('Logs', 1)) { obj.hp--; addXP('woodcutting', 15); } else { player.isPerformingAction = false; setActionText('Inventário cheio!', '#e74c3c'); } } 
                         else if (player.actionType === 'mine') { const _rk = (window.Content && Content.ROCKS[obj.type]) || null; let oreType = _rk ? _rk.ore : (obj.type === 'rock_copper' ? 'Copper Ore' : obj.type === 'rock_tin' ? 'Tin Ore' : 'Iron Ore'); if(addInvItem(oreType, 1)) { obj.hp--; addXP('mining', _rk ? _rk.xp : 20); } else { player.isPerformingAction = false; setActionText('Inventário cheio!', '#e74c3c'); } }
-                        else if (player.actionType === 'fish') { const _fk = window.Life ? Life.rollFish() : 'Raw Fish'; if(addInvItem(_fk, 1)) { addXP('fishing', _fk === 'Raw Fish' ? 20 : 45); if (_fk === 'Raw Fish') addFloatingText(player.x, player.y - 15, "Pescado", "#3498db"); else addPickupText(_fk, 1); } else { player.isPerformingAction = false; setActionText('Inventário cheio!', '#e74c3c'); } }
+                        else if (player.actionType === 'fish') { if (!(window.Fishing && Fishing.finish(obj))) { player.isPerformingAction = false; player.actionToolItem = null; } }
                         else if (player.actionType === 'smelt') { if (window.Content) Content.finishSmelt(); else player.isPerformingAction = false; }
                         else if (player.actionType === 'smelt_brz') { if (getInvCount('Copper Ore') > 0 && getInvCount('Tin Ore') > 0) { removeInvItem('Copper Ore', 1); removeInvItem('Tin Ore', 1); if (addInvItem('Bronze Bar', 1)) addXP('smithing', 15); } player.isPerformingAction = false; }
                         else if (player.actionType === 'smelt_iron') { if (getInvCount('Iron Ore') > 0) { removeInvItem('Iron Ore', 1); if (addInvItem('Iron Bar', 1)) addXP('smithing', 25); } player.isPerformingAction = false; }
@@ -1380,6 +1496,12 @@
                         if (!simulate) {   // quem não é host só suaviza a posição vinda do servidor
                             if (o._nb && o._nb.length) { const sp = netSample(o, o.netX, o.netY); o.x = sp.x; o.y = sp.y; }
                         }
+ 
+                        if (simulate && window.Art && Art.isWater && mobMedium(o) === 'land' && Art.isWater(curM, o.x + ow / 2, o.y + oh - 3)) {   // nasceu/foi parar na água: sai para a margem mais próxima
+                            if (!o._ex) o._ex = Art.nearestLand(curM, o.x + ow / 2, o.y + oh - 3) || { x: o.homeX + ow / 2, y: o.homeY + oh };
+                            const exx = o._ex.x - (o.x + ow / 2), eyy = o._ex.y - (o.y + oh - 3), edd = Math.hypot(exx, eyy) || 1; mobStep(o, cur, exx, eyy, edd, Math.min(spd, 1.2), ow, oh); o.homeX = o._ex.x - ow / 2; o.homeY = o._ex.y - oh; o._wt = 0;
+                            if (o.attackCooldown > 0) o.attackCooldown--; continue;
+                        } else if (o._ex) o._ex = null;
                         const cxm = o.x + ow/2, cym = o.y + oh/2;
                         // monstro agressivo "vê" o jogador: manda um golpe de dano 0 para o servidor marcar o alvo (sem roubar alvo de outro jogador)
                         if (o._seen > 0) o._seen--;
@@ -1431,7 +1553,9 @@
         function drawMonster(ctx, o) {
             const def = npcDB[o.dbKey];
             let tx; if (o.aggroTarget === currentUser) tx = player.x; else if (o.aggroTarget && otherPlayers[o.aggroTarget]) tx = otherPlayers[o.aggroTarget].x; else tx = player.x;
-            Art.drawCreature(ctx, o, def, tx);
+            if (o.type === 'enemy' && window.Art && Art.isWater && mobMedium(o) !== 'fly' && Art.isWater(gameMaps[currentMap], o.x + (o.w || 30) / 2, o.y + (o.h || 30) - 3)) {   // dentro da água: só a parte de cima aparece
+                Art.drawSubmerged(ctx, o.x + (o.w || 30) / 2, o.y + (o.h || 30), o.w || 30, o.h || 30, mobMedium(o) === 'swim' ? 0.72 : 0.58, performance.now() / 1000, () => Art.drawCreature(ctx, o, def, tx));
+            } else Art.drawCreature(ctx, o, def, tx);
         }
 
         function renderEntity(ctx, o, isHologram = false) {
@@ -1489,16 +1613,17 @@
                 if (!mapObj.id) mapObj.id = currentMap;
                 const VW = { x: -offset.x, y: -offset.y, w: canvas.width, h: canvas.height };
                 const inView = (o, m) => { const w = o.w || 30, h = o.h || 30; m = m || 90; return o.x + w * 1.6 + m >= VW.x && o.x - w * 0.6 - m <= VW.x + VW.w && o.y + h + m >= VW.y && o.y - h * 0.6 - m <= VW.y + VW.h; };
-                Art.drawGround(ctx, mapObj, T, VW);
-
+                Art.cam(offset.x, offset.y);
                 let cur = mapObj.entities || [];
-                Art.paintAdjacency(cur);
-                
-                // DESENHA PINTURA PRIMEIRO
-                cur.forEach(o => { 
-                    if(!o || !o.type) return; 
-                    if(o.type === 'paint' && inView(o, 40)) { renderEntity(ctx, o, false); } 
-                });
+                // chão + pintura ficam num cache (refeito só quando o mapa muda); enquanto o admin edita, a pintura é desenhada ao vivo
+                if (Art.drawGround(ctx, mapObj, T, VW)) Art.drawWaterAnim(ctx, T, VW);
+                else {
+                    Art.paintAdjacency(cur);
+                    cur.forEach(o => { 
+                        if(!o || !o.type) return; 
+                        if(o.type === 'paint' && inView(o, 40)) { renderEntity(ctx, o, false); } 
+                    });
+                }
 
                 // DESENHA ITENS NO CHÃO
                 cur.forEach(o => { 
@@ -1531,11 +1656,13 @@
                     } else {
                         let myWp = (item.isMain && player.isPerformingAction && player.actionToolItem) ? player.actionToolItem : (item.op.equipment ? item.op.equipment.weapon : null); 
                         let myEquip = { weapon: myWp, shield: item.op.equipment ? item.op.equipment.shield : null, body: item.op.equipment ? item.op.equipment.body : null, head: item.op.equipment ? item.op.equipment.head : null };
-                        drawCharacter(ctx, item.px, item.py, item.op.facing || {x:0, y:1}, item.op.actionAnim || 0, myEquip, item.name, item.isMain, { title: item.op.title || '', emote: item.op._em || null });
+                        const _pf = () => drawCharacter(ctx, item.px, item.py, item.op.facing || {x:0, y:1}, item.op.actionAnim || 0, myEquip, item.name, item.isMain, { title: item.op.title || '', emote: item.op._em || null, look: item.op.look || null });
+                        if (Art.isWater(mapObj, item.px, item.py)) Art.drawSubmerged(ctx, item.px, item.py, 26, 50, 0.4, T, _pf); else _pf();
                     }
                 });
 
-                Art.fxDraw(ctx);
+                Art.fxDraw(ctx); if (window.Fishing) Fishing.draw(ctx, T);
+                if (rangedTarget && rangedTarget.active) { const _rt = rangedTarget, _cx = _rt.x + (_rt.w || 30) / 2, _by = _rt.y + (_rt.h || 30); ctx.strokeStyle = 'rgba(255,90,70,0.85)'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.ellipse(_cx, _by - 1, Math.max(12, (_rt.w || 30) * 0.42) + Math.sin(T * 6) * 1.2, Math.max(4, (_rt.w || 30) * 0.14), 0, 0, 6.283); ctx.stroke(); }
                 if (Math.hypot(player.destX - player.x, player.destY - player.y) > player.speed && !player.isPerformingAction && !player.pendingAutoAction) { ctx.fillStyle = 'rgba(255, 255, 255, 0.4)'; ctx.beginPath(); ctx.arc(player.destX, player.destY, 5, 0, Math.PI*2); ctx.fill(); }
                 if (player.isPerformingAction) { const prg = 1 - (player.actionTimer / player.actionDelay); ctx.fillStyle = '#222'; ctx.fillRect(player.x - 15, player.y - 25, 30, 6); ctx.fillStyle = '#3498db'; ctx.fillRect(player.x - 14, player.y - 24, 28 * prg, 4); }
 

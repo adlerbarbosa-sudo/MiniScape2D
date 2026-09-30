@@ -212,6 +212,7 @@
             if (p) { (cv.entities = cv.entities || []).push({ id: 'c5_cata_in', type: 'portal', name: 'Entrada das Catacumbas', x: p.x, y: p.y, w: 60, h: 60, active: true, destMap: 'catacumbas', destX: 780, destY: 1040 }); const ex = maps.catacumbas.entities.find((o) => o.id === 'c5_exit'); if (ex) { ex.destX = p.x; ex.destY = p.y + 90; } }
             else delete cv.c5.cataportal;
         }
+        try { if (window.Maps2) window.Maps2.place(maps); } catch (e) { console.error(e); }   // maps2.js: 26 mapas novos + portais
     }
     function merge() {
         Object.keys(ITEMS).forEach((k) => { if (!itemDB[k]) itemDB[k] = Object.assign({}, ITEMS[k]); });
