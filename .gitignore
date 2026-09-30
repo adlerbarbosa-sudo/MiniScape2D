@@ -3,3 +3,6 @@ database.json
 database.json.tmp
 *.corrompido-*
 .env
+database.json.bak
+database.sqlite*
+backups/
