@@ -78,8 +78,15 @@ svg.ic.fill { fill: currentColor; stroke: none; }
 #quest-tracker .q-x { margin-left: auto; opacity: .6; font-size: .66rem; text-transform: none; letter-spacing: 0; font-family: var(--sans); }
 #quest-tracker.min { width: auto; padding: 6px 12px; }
 #quest-tracker.min .q-hint, #quest-tracker.min .q-bar, #quest-tracker.min .q-title { display: none; }
-#env-badge { position: absolute; right: 12px; top: 12px; z-index: 85; display: flex; align-items: center; gap: 7px; padding: 5px 12px; border-radius: 999px; font-size: .78rem; color: var(--gold-3); background: rgba(12, 8, 4, .72); border: 1px solid rgba(232, 196, 105, .45); text-shadow: 0 1px 2px #000; pointer-events: none; }
-#env-badge b { font-family: var(--serif); letter-spacing: .5px; } #env-badge span { color: #cfc39f; }
+#env-badge { position: absolute; right: 12px; top: 12px; z-index: 85; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; font-size: .78rem; color: var(--gold-3); text-shadow: 0 1px 2px #000; pointer-events: none; }
+#env-badge .eb-main { pointer-events: auto; cursor: pointer; display: flex; align-items: center; gap: 7px; padding: 4px 12px 4px 8px; border-radius: 999px; background: rgba(12, 8, 4, .72); border: 1px solid rgba(232, 196, 105, .45); }
+#env-badge .eb-main:hover { border-color: rgba(232, 196, 105, .8); }
+#env-badge b { font-family: var(--serif); letter-spacing: .5px; } #env-badge span { color: #cfc39f; } #env-badge .eb-car { font-style: normal; font-size: .65rem; opacity: .7; }
+#env-badge .wic { flex: none; filter: drop-shadow(0 1px 1px #000); }
+#env-badge .eb-fc { pointer-events: auto; padding: 8px 10px; border-radius: 10px; background: rgba(12, 8, 4, .88); border: 1px solid rgba(232, 196, 105, .45); max-width: min(92vw, 470px); }
+#env-badge .fc-t { font-family: var(--serif); font-size: .74rem; margin-bottom: 6px; color: var(--gold-3); } .fc-none { color: #cfc39f; font-size: .72rem; }
+#env-badge .fc-row { display: flex; gap: 6px; } #env-badge .fc-c { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 62px; padding: 5px 4px; border-radius: 8px; background: rgba(255, 255, 255, .04); }
+#env-badge .fc-c.now { background: rgba(232, 196, 105, .16); border: 1px solid rgba(232, 196, 105, .4); } #env-badge .fc-c b { font-size: .68rem; font-weight: 600; color: #f0e6c4; } #env-badge .fc-c small { font-size: .62rem; color: #a99f80; }
 #key-hints { position: absolute; left: 50%; transform: translateX(-50%); top: 12px; max-width: calc(100% - 560px); z-index: 80; font-size: .72rem; color: #eadfc4; text-shadow: 0 1px 2px #000; background: rgba(12, 8, 4, .6); border: 1px solid rgba(232, 196, 105, .3); border-radius: 10px; padding: 6px 10px; line-height: 1.55; transition: opacity 1s; pointer-events: none; }
 #key-hints b { color: var(--gold-2); font-family: var(--serif); }
 #key-hints.hide { opacity: 0; }

@@ -52,7 +52,7 @@
         const cw = canvas.width, ch = canvas.height, kind = mapKind(mapObj);
         let d = 1 - daylight();                                           // escuridão externa
         if (kind === 'dark') d = Math.max(d, 0.62); else if (kind === 'dim') d = Math.max(d, 0.38); else if (kind === 'home') d = 0.14;
-        const mapKey = (mapObj && mapObj.id) || '';
+        const mapKey = (mapObj && mapObj.id) || ''; curKind = kind;
         const wanted = W.forced ? W.cur : weatherFor(mapKey, kind);
         if (W.mapKey !== mapKey && !W.forced) { W.mapKey = mapKey; W.cur = wanted; W.k = wanted === 'clear' ? 0 : 1; }
         if (wanted !== W.cur) { W.target = 0; if (W.k <= 0.02) { W.cur = wanted; } } else W.target = wanted === 'clear' ? 0 : 1;
@@ -125,13 +125,47 @@
     function rangeMul() { return isNight() ? 1.35 : 1; }   // monstros enxergam mais longe à noite
     function weatherLabel() { return W.cur === 'rain' && W.k > 0.3 ? 'Chuva' : W.cur === 'fog' && W.k > 0.3 ? 'Neblina' : 'Céu limpo'; }
 
-    /* ---------- selo de hora/clima no canto da tela ---------- */
+    /* ---------- selo de hora/clima + previsão no canto da tela ---------- */
+    let curKind = 'open', open = false;
+    const WNAME = { clear: 'Céu limpo', rain: 'Chuva', fog: 'Neblina' };
+    const SUN = '<circle cx="16" cy="16" r="6" fill="#ffd45a" stroke="#a8721c" stroke-width="1.4"/><g stroke="#ffd45a" stroke-width="2" stroke-linecap="round"><path d="M16 3v4M16 25v4M3 16h4M25 16h4M7 7l2.800 2.800M22.200 22.200 25 25M25 7l-2.800 2.800M9.800 22.200 7 25"/></g>';
+    const MOON = '<path d="M25 19.500A10 10 0 0 1 12.500 7a10 10 0 1 0 12.500 12.500z" fill="#e9e3c3" stroke="#8b855f" stroke-width="1.4"/><circle cx="16" cy="18" r="1.300" fill="#c8c19a"/><circle cx="20" cy="22" r="1" fill="#c8c19a"/>';
+    const CLOUD = (f) => '<path d="M9 23a5 5 0 0 1-.6-9.960A7 7 0 0 1 22 12a5.500 5.500 0 0 1 1 11z" fill="' + f + '" stroke="#5b6675" stroke-width="1.400" stroke-linejoin="round"/>';
+    const RAIN = CLOUD('#9aa7b8') + '<g stroke="#5aa8ff" stroke-width="2" stroke-linecap="round"><path d="M11 26l-1.400 3M17 26l-1.400 3M23 26l-1.400 3"/></g>';
+    const FOG = CLOUD('#c9cfd6') + '<g stroke="#aeb6bf" stroke-width="2" stroke-linecap="round"><path d="M6 26h20M9 29.500h14"/></g>';
+    const PARTLY = '<circle cx="12" cy="12" r="5" fill="#ffd45a"/><g stroke="#ffd45a" stroke-width="1.800" stroke-linecap="round"><path d="M12 2v2.500M2 12h2.500M5 5l1.800 1.800M19 5l-1.800 1.800"/></g>' + CLOUD('#f2f4f7').replace('M9 23', 'M11 27').replace('a5 5 0 0 1-.6-9.960A7 7 0 0 1 22 12a5.500 5.500 0 0 1 1 11z', 'a4 4 0 0 1-.5-7.960A6 6 0 0 1 23 16a4.500 4.500 0 0 1 .5 9z');
+    function wIcon(w, night, px) {
+        const body = w === 'rain' ? RAIN : w === 'fog' ? FOG : (night ? MOON : SUN);
+        return '<svg class="wic" width="' + (px || 22) + '" height="' + (px || 22) + '" viewBox="0 0 32 32">' + body + '</svg>';
+    }
+    function forecast(mapKey, n) {   // o clima é sorteado por janela de 8 min, então dá para prever
+        const out = [], base = Math.floor(Date.now() / WEATHER_MS);
+        for (let i = 0; i < n; i++) { const r = hash(mapKey + ':' + (base + i)); out.push(r < 0.62 ? 'clear' : r < 0.86 ? 'rain' : 'fog'); }
+        return out;
+    }
+    function fcHtml() {
+        if (curKind !== 'open') return '<div class="fc-t">Previsão</div><div class="fc-none">Aqui dentro o tempo não muda.</div>';
+        const list = forecast(W.mapKey, 6), msLeft = WEATHER_MS - (Date.now() % WEATHER_MS);
+        let h = '<div class="fc-t">Previsão do tempo</div><div class="fc-row">';
+        list.forEach((w, i) => {
+            const t = Date.now() + msLeft + (i - 1) * WEATHER_MS, dfrac = debugFrac != null ? debugFrac : (((t % CYCLE_MS) / CYCLE_MS + 0.35) % 1);
+            const night = Math.sin(TAU * (dfrac - 0.25)) * 1.6 + 0.5 < 0.3;
+            const lab = i === 0 ? 'Agora' : 'em ' + Math.max(1, Math.round((msLeft + (i - 1) * WEATHER_MS) / 60000)) + ' min';
+            h += '<div class="fc-c' + (i === 0 ? ' now' : '') + '">' + wIcon(w, night, 26) + '<b>' + WNAME[w] + '</b><small>' + lab + '</small></div>';
+        });
+        return h + '</div>';
+    }
     function updateBadge() {
         const el = document.getElementById('env-badge'); if (!el) return;
-        const night = isNight(), dl = daylight();
-        const icon = night ? 'moon' : (dl < 0.75 ? 'sunrise' : 'sun');
-        const html = `<svg class="ic"><use href="#i-${icon}"/></svg><b>${clockText()}</b><span>${weatherLabel()}</span>`;
-        if (el.dataset.h !== html) { el.dataset.h = html; el.innerHTML = html; }
+        if (!el.dataset.init) {
+            el.dataset.init = 1; el.innerHTML = '<div class="eb-main" role="button" title="Previsão do tempo"></div><div class="eb-fc"></div>';
+            el.querySelector('.eb-main').addEventListener('click', () => { open = !open; updateBadge(); });
+        }
+        const night = isNight(), w = W.k > 0.3 ? W.cur : 'clear';
+        const main = `${wIcon(w, night, 22)}<b>${clockText()}</b><span>${weatherLabel()}</span><i class="eb-car">${open ? '▴' : '▾'}</i>`;
+        const m = el.querySelector('.eb-main'); if (m.dataset.h !== main) { m.dataset.h = main; m.innerHTML = main; }
+        const f = el.querySelector('.eb-fc'); f.style.display = open ? 'block' : 'none';
+        if (open) { const h = fcHtml(); if (f.dataset.h !== h) { f.dataset.h = h; f.innerHTML = h; } }
     }
     setInterval(updateBadge, 1000);
 
