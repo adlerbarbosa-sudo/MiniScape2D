@@ -163,6 +163,7 @@
     <script src="art.js"></script>
     <script src="env.js"></script>
     <script src="sfx.js"></script>
+    <script src="quests.js"></script>
     <script src="artworld.js"></script>
     <script>
         // === 1. DECLARAÇÕES GLOBAIS ÚNICAS ===
@@ -1410,7 +1411,7 @@
         function mobLevel(def) { if (!def) return 1; if (def.level > 0) return def.level; return Math.max(1, Math.round(((def.hp || 0) + (def.maxHit || 0) * 4) / 8)); }
         function mobBehavior(def) { return (def && def.behavior) || ((def && def.hp > 0) ? 'neutral' : 'npc'); }
         function drawNameplate(ctx, o) {
-            const def = npcDB[o.dbKey]; if (def && def.showName === false) return;
+            const def = npcDB[o.dbKey]; const _top0 = (window.Art && Art.creatureTop) ? Art.creatureTop(o, def) : o.y; if (def && def.showName === false) { if (o.type === 'npc' && window.Quests) Quests.drawMarker(ctx, o, _top0 - 6); return; }
             const beh = mobBehavior(def); const col = (def && def.nameColor) || BEH_COLOR[beh] || '#fff';
             const top = (window.Art && Art.creatureTop) ? Art.creatureTop(o, def) : o.y; const cx = o.x + (o.w || 30) / 2;
             const isMob = o.type === 'enemy'; const label = (o.name || (def && def.name) || '?') + (isMob ? '  Lv ' + mobLevel(def) : '');
@@ -1422,6 +1423,7 @@
             }
             ctx.save(); ctx.font = 'bold 11px "Trebuchet MS", Verdana, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
             ctx.lineWidth = 3.4; ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(10,6,2,0.92)'; ctx.strokeText(label, cx, y); ctx.fillStyle = col; ctx.fillText(label, cx, y); ctx.restore();
+            if (o.type === 'npc' && window.Quests) Quests.drawMarker(ctx, o, y);
         }
 
         function drawCharacter(ctx, px, py, facing, anim, equip, name, isMain) { Art.drawPlayer(ctx, px, py, facing, anim, equip, name, isMain, {}); }

@@ -165,6 +165,8 @@
         ['star', 'Perícias', `<ul><li>Cada ação treina uma perícia (Woodcut, Mining, Cooking…) e ao subir de nível você fica melhor.</li><li>A aba Perícias mostra o progresso de cada uma.</li></ul>`],
         ['chat', 'Chat e amigos', `<ul><li><b>Enter</b> abre o chat; digite e aperte Enter para enviar — o campo continua aberto para você seguir escrevendo. <b>Esc</b> ou Enter com o campo vazio fecha.</li><li>Fechado, o chat fica pequeno e transparente no canto para não atrapalhar.</li><li>Outros jogadores aparecem no mesmo mapa com o nome sobre a cabeça.</li></ul>`],
         ['chest', 'Vila, lojas e banco', `<ul><li>Fale com os NPCs (Espaço ou botão direito → Falar): lojas vendem ferramentas, comida e runas por moedas.</li><li>Moedas caem dos monstros. O <b>Banco</b> guarda itens além do limite da mochila (peso máximo 50 kg).</li></ul>`],
+        ['flag', 'Missões de NPC', `<ul><li>NPC com <b style="color:#b07a1a">!</b> na cabeça tem missão nova; com <b style="color:#3f8a4a">?</b> você pode entregar uma missão pronta.</li><li>Fale com o NPC (botão direito → Falar) e escolha <b>Aceitar missão</b>. O progresso aparece no quadro do canto da tela.</li><li>Recompensas: moedas, experiência e itens. As missões do Guarda Real formam uma sequência até o dragão.</li></ul>`],
+        ['star', 'Dia, noite e clima', `<ul><li>Um dia dura 20 minutos reais. À noite tudo escurece, as janelas e lampiões acendem, e monstros enxergam mais longe.</li><li>Chuva apaga fogueiras mais rápido. O selo no canto superior direito mostra hora e clima.</li><li>Ajuste música e efeitos na aba <b>Menu</b>.</li></ul>`],
         ['save', 'Progresso', `<ul><li>Tudo é salvo automaticamente no servidor. O botão “Salvar agora” no Menu força um save.</li><li>Atalhos: <b>H</b> abre este guia, <b>I</b> mochila, <b>C</b> ofícios, <b>Enter</b> chat.</li></ul>`],
     ];
     function renderGuide() {
@@ -194,14 +196,18 @@
         qAllDone = qStep >= STEPS.length;
         el.classList.toggle('done', qAllDone); el.classList.toggle('min', qMin);
         const pct = Math.round((qStep / STEPS.length) * 100);
-        el.innerHTML = qAllDone
-            ? `<h4>${IC('flag')} Diário do Aventureiro <span class="q-x">ocultar</span></h4><div class="q-title">Você aprendeu o básico!</div><div class="q-hint">Explore os covis, derrote o dragão e consulte o Guia (tecla H) sempre que precisar.</div><div class="q-bar"><i style="width:100%"></i></div>`
+        const nq = (qAllDone && window.Quests) ? window.Quests.summary() : [];
+        el.innerHTML = qAllDone && nq.length
+            ? `<h4>${IC('flag')} Missões de NPC (${nq.length}) <span class="q-x">${qMin ? 'expandir' : 'minimizar'}</span></h4><div class="q-title">${esc(nq[0].title)}</div><div class="q-hint">${nq[0].ready ? 'Pronta! Volte ao ' + esc(nq[0].giverName) + ' para entregar.' : esc(nq[0].text) + ' <b>(' + nq[0].cur + '/' + nq[0].need + ')</b>'}</div><div class="q-bar"><i style="width:${Math.round(nq[0].cur / nq[0].need * 100)}%"></i></div>`
+            : qAllDone
+            ? `<h4>${IC('flag')} Diário do Aventureiro <span class="q-x">ocultar</span></h4><div class="q-title">Você aprendeu o básico!</div><div class="q-hint">Fale com os NPCs da vila: quem tem um <b style="color:#b07a1a">!</b> sobre a cabeça oferece uma missão. Consulte o Guia (tecla H) quando precisar.</div><div class="q-bar"><i style="width:100%"></i></div>`
             : `<h4>${IC('flag')} Missão ${qStep + 1}/${STEPS.length} <span class="q-x">${qMin ? 'expandir' : 'minimizar'}</span></h4><div class="q-title">${esc(STEPS[qStep].t)}</div><div class="q-hint">${STEPS[qStep].h}</div><div class="q-bar"><i style="width:${pct}%"></i></div>`;
     }
+    window.refreshQuestTracker = function () { renderQuest(); };
     window.resetQuestTracker = function () { qStep = 0; qMin = false; $('quest-tracker').style.display = ''; renderQuest(); };
     document.addEventListener('DOMContentLoaded', () => {
         const el = $('quest-tracker');
-        if (el) el.addEventListener('click', (e) => { if (e.target.classList.contains('q-x')) { if (qAllDone) el.style.display = 'none'; else { qMin = !qMin; renderQuest(); } } else openTab('guide'); });
+        if (el) el.addEventListener('click', (e) => { if (e.target.classList.contains('q-x')) { if (qAllDone && !(window.Quests && window.Quests.summary().length)) el.style.display = 'none'; else { qMin = !qMin; renderQuest(); } } else openTab('guide'); });
     });
     ['keydown', 'mousedown', 'touchstart'].forEach((ev) => document.addEventListener(ev, () => { if (ev !== 'keydown') return; }, { passive: true }));
     setInterval(() => {
