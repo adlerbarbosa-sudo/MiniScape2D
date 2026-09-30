@@ -197,6 +197,16 @@
         let otherPlayers = {}; 
         let currentMapVersion = 0; 
         let isSyncing = false; 
+        // --- interpolação de rede: mostramos os outros jogadores/monstros ~200ms no passado, deslizando entre dois pacotes reais (sem "teleporte") ---
+        const NET_DELAY = 200;
+        function netPush(o, x, y) { const now = performance.now(); const b = o._nb || (o._nb = []); const l = b[b.length - 1]; if (l && Math.hypot(x - l.x, y - l.y) > 220) b.length = 0; b.push({ t: now, x, y }); if (b.length > 14) b.shift(); }
+        function netSample(o, fx, fy) {
+            const b = o._nb; if (!b || !b.length) return { x: fx, y: fy }; const rt = performance.now() - NET_DELAY;
+            if (b.length === 1 || rt <= b[0].t) return b[0];
+            for (let i = b.length - 1; i >= 0; i--) { if (b[i].t <= rt) { const a = b[i], c = b[i + 1]; if (!c) return a; const f = (rt - a.t) / Math.max(1, c.t - a.t); return { x: a.x + (c.x - a.x) * f, y: a.y + (c.y - a.y) * f }; } }
+            return b[0];
+        }
+
         let isMapHost = false; 
         
         let floatingTexts = []; let projectiles = []; let isBankOpen = false; let isNPCOpen = false; let isDevBuildMode = false; let activeNPCShop = null;
@@ -535,7 +545,7 @@
                 }
                 updateChatUI();
                 
-                if(!isOfflineMode && !window._syncTimer) window._syncTimer = setInterval(syncMultiplayer, 200);
+                if(!isOfflineMode && !window._syncTimer) window._syncTimer = setInterval(syncMultiplayer, 100);
                 if(!gameLoopStarted) { gameLoopStarted = true; requestAnimationFrame(gameLoop); }
             }, 100);
         }
@@ -570,9 +580,9 @@
                 if(data.players) {
                     Object.keys(data.players).forEach(u => {
                         if (!otherPlayers[u]) {
-                            otherPlayers[u] = data.players[u]; otherPlayers[u].displayX = data.players[u].x; otherPlayers[u].displayY = data.players[u].y;
+                            otherPlayers[u] = data.players[u]; otherPlayers[u].displayX = data.players[u].x; otherPlayers[u].displayY = data.players[u].y; netPush(otherPlayers[u], data.players[u].x, data.players[u].y);
                         } else {
-                            otherPlayers[u].x = data.players[u].x; otherPlayers[u].y = data.players[u].y; otherPlayers[u].map = data.players[u].map;
+                            netPush(otherPlayers[u], data.players[u].x, data.players[u].y); otherPlayers[u].x = data.players[u].x; otherPlayers[u].y = data.players[u].y; otherPlayers[u].map = data.players[u].map;
                             otherPlayers[u].facing = data.players[u].facing; otherPlayers[u].actionAnim = data.players[u].actionAnim; otherPlayers[u].equipment = data.players[u].equipment;
                         }
                     });
@@ -589,7 +599,7 @@
                             if (o.type === 'enemy' || o.type === 'npc') {
                                 let sm = data.serverMobs[o.id];
                                 if (sm) { o.hp = sm.hp; o.active = !sm.isDead; o.aggroTarget = sm.aggro; }
-                                if (!isMapHost && o.type === 'enemy' && mobPosFromHost[o.id]) { o.netX = mobPosFromHost[o.id].x; o.netY = mobPosFromHost[o.id].y; if (Math.hypot(o.netX - o.x, o.netY - o.y) > 150) { o.x = o.netX; o.y = o.netY; } }
+                                if (!isMapHost && o.type === 'enemy' && mobPosFromHost[o.id]) { if (o.netX !== mobPosFromHost[o.id].x || o.netY !== mobPosFromHost[o.id].y || !o._nb) { o.netX = mobPosFromHost[o.id].x; o.netY = mobPosFromHost[o.id].y; netPush(o, o.netX, o.netY); } }
                             }
                         });
                     }
@@ -1129,7 +1139,7 @@
                     if(player.stats.hp > 0 && player.stats.hp < player.stats.maxHp) { let heal = 1 + Math.floor(player.stats.skills.hp.level / 10); player.stats.hp = Math.min(player.stats.maxHp, player.stats.hp + heal); addFloatingText(player.x, player.y - 20, `+${heal}`, "#2ecc71"); updateUI(); } player.regenTimer = 300; 
                 }
 
-                if (typeof otherPlayers !== 'undefined') { Object.keys(otherPlayers).forEach(u => { let op = otherPlayers[u]; if (op.displayX !== undefined && op.displayY !== undefined) { op.displayX += (op.x - op.displayX) * 0.3; op.displayY += (op.y - op.displayY) * 0.3; } }); }
+                if (typeof otherPlayers !== 'undefined') { Object.keys(otherPlayers).forEach(u => { let op = otherPlayers[u]; const sp = netSample(op, op.x, op.y); op.displayX = sp.x; op.displayY = sp.y; }); }
 
                 for(let i = projectiles.length - 1; i >= 0; i--) { let p = projectiles[i]; if (p.target && p.target.active) { p.tx = p.target.x + (p.target.w||30) / 2; p.ty = p.target.y + (p.target.h||30) / 2; } let dx = p.tx - p.x; let dy = p.ty - p.y; let dist = Math.hypot(dx, dy); if (dist < p.speed) { if(p.target && p.target.active) applyDamage(p.target, p.dmg, p.type); projectiles.splice(i, 1); } else { p.x += (dx/dist)*p.speed; p.y += (dy/dist)*p.speed; } }
 
@@ -1225,7 +1235,7 @@
                         const beh = def.behavior || 'neutral', spd = def.speed || 1, harmless = (beh === 'passive' || beh === 'skittish' || !(def.maxHit > 0));
                         if (o.homeX === undefined) { o.homeX = o.x; o.homeY = o.y; }
                         if (!simulate) {   // quem não é host só suaviza a posição vinda do servidor
-                            if (o.netX !== undefined) { o.x += (o.netX - o.x) * 0.3; o.y += (o.netY - o.y) * 0.3; }
+                            if (o._nb && o._nb.length) { const sp = netSample(o, o.netX, o.netY); o.x = sp.x; o.y = sp.y; }
                         }
                         const cxm = o.x + ow/2, cym = o.y + oh/2;
                         // monstro agressivo "vê" o jogador: manda um golpe de dano 0 para o servidor marcar o alvo (sem roubar alvo de outro jogador)
@@ -1241,10 +1251,10 @@
                         if (threat) {
                             let ex = threat.x - cxm; let ey = threat.y - cym; let ed = Math.hypot(ex, ey) || 1;
                             if (harmless) {   // bicho manso: só foge de quem bateu nele
-                                if (simulate && ed < 240) mobStep(o, cur, -ex, -ey, ed, spd * 2, ow, oh);
+                                if (simulate && ed < 240) mobStep(o, cur, -ex, -ey, ed, Math.min(spd * 1.6, 2.2), ow, oh);
                             } else {
                                 const reach = def.reach || Math.max(22, ow * 0.45 + 10);
-                                if (ed > reach) { if (simulate) mobStep(o, cur, ex, ey, ed, spd * 1.5, ow, oh); }
+                                if (ed > reach) { if (simulate) mobStep(o, cur, ex, ey, ed, Math.min(spd * 0.95, 1.4), ow, oh); }
                                 else if (o.aggroTarget === currentUser && o.attackCooldown <= 0) {   // cada jogador sofre o próprio dano
                                     let rD = Math.floor(Math.random() * ((def.maxHit || 2) + 1));
                                     let bl = Math.floor(Math.random() * (getTotalDef() / 2 + 1)); let fD = Math.max(0, rD - bl);
@@ -1260,10 +1270,10 @@
                                 let best = null, bd = def.range || 100;
                                 const chk = (x, y) => { const d = Math.hypot(x - cxm, y - cym); if (d < bd) { bd = d; best = { x, y, d }; } };
                                 chk(player.x, player.y); Object.keys(otherPlayers).forEach(u => { const op = otherPlayers[u]; chk(op.displayX !== undefined ? op.displayX : op.x, op.displayY !== undefined ? op.displayY : op.y); });
-                                if (best) { mobStep(o, cur, cxm - best.x, cym - best.y, best.d || 1, spd * 2, ow, oh); fled = true; o._wt = 0; }
+                                if (best) { mobStep(o, cur, cxm - best.x, cym - best.y, best.d || 1, Math.min(spd * 1.6, 2.2), ow, oh); fled = true; o._wt = 0; }
                             }
                             if (!fled) {   // passeia perto do ponto de origem, com pausas
-                                if (o._wt > 0) { o._wt--; const ex = o.destX - o.x, ey = o.destY - o.y, ed = Math.hypot(ex, ey); if (ed > 2) mobStep(o, cur, ex, ey, ed, spd * 0.5, ow, oh); else o._wt = 0; }
+                                if (o._wt > 0) { o._wt--; const ex = o.destX - o.x, ey = o.destY - o.y, ed = Math.hypot(ex, ey); if (ed > 2) mobStep(o, cur, ex, ey, ed, spd * 0.35, ow, oh); else o._wt = 0; }
                                 else { o._idle = (o._idle === undefined ? Math.random() * 200 : o._idle) - 1; if (o._idle <= 0) { const R = (beh === 'passive' || beh === 'skittish') ? 110 : 70, a = Math.random() * 6.283, r = 20 + Math.random() * R; o.destX = Math.max(20, Math.min(mapW - ow - 20, o.homeX + Math.cos(a) * r)); o.destY = Math.max(20, Math.min(mapH - oh - 20, o.homeY + Math.sin(a) * r)); o._wt = 320; o._idle = 90 + Math.random() * 260; } }
                             }
                         }
