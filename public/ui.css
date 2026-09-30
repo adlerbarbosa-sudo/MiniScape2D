@@ -29,6 +29,7 @@ svg.ic.fill { fill: currentColor; stroke: none; }
     .mobile-btn { display: flex !important; }
     #game-container { height: 52vh; min-height: 380px; }
     #quest-tracker { max-width: 60%; }
+    #key-hints { display: none; }
 }
 
 /* ---------- moldura do jogo ---------- */
@@ -77,7 +78,9 @@ svg.ic.fill { fill: currentColor; stroke: none; }
 #quest-tracker .q-x { margin-left: auto; opacity: .6; font-size: .66rem; text-transform: none; letter-spacing: 0; font-family: var(--sans); }
 #quest-tracker.min { width: auto; padding: 6px 12px; }
 #quest-tracker.min .q-hint, #quest-tracker.min .q-bar, #quest-tracker.min .q-title { display: none; }
-#key-hints { position: absolute; right: 12px; top: 12px; z-index: 80; font-size: .72rem; color: #eadfc4; text-shadow: 0 1px 2px #000; background: rgba(12, 8, 4, .6); border: 1px solid rgba(232, 196, 105, .3); border-radius: 10px; padding: 6px 10px; line-height: 1.55; transition: opacity 1s; pointer-events: none; }
+#env-badge { position: absolute; right: 12px; top: 12px; z-index: 85; display: flex; align-items: center; gap: 7px; padding: 5px 12px; border-radius: 999px; font-size: .78rem; color: var(--gold-3); background: rgba(12, 8, 4, .72); border: 1px solid rgba(232, 196, 105, .45); text-shadow: 0 1px 2px #000; pointer-events: none; }
+#env-badge b { font-family: var(--serif); letter-spacing: .5px; } #env-badge span { color: #cfc39f; }
+#key-hints { position: absolute; left: 50%; transform: translateX(-50%); top: 12px; max-width: calc(100% - 560px); z-index: 80; font-size: .72rem; color: #eadfc4; text-shadow: 0 1px 2px #000; background: rgba(12, 8, 4, .6); border: 1px solid rgba(232, 196, 105, .3); border-radius: 10px; padding: 6px 10px; line-height: 1.55; transition: opacity 1s; pointer-events: none; }
 #key-hints b { color: var(--gold-2); font-family: var(--serif); }
 #key-hints.hide { opacity: 0; }
 

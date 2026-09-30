@@ -34,6 +34,9 @@
 <symbol id="i-grid" viewBox="0 0 24 24"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/></symbol>
 <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></symbol>
 <symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18h.01"/></symbol>
+<symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.500A8 8 0 0 1 9.500 4a8 8 0 1 0 10.500 10.500z"/></symbol>
+<symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.900 4.900l2.100 2.100M17 17l2.100 2.100M19.100 4.900L17 7M7 17l-2.100 2.100"/></symbol>
+<symbol id="i-sunrise" viewBox="0 0 24 24"><path d="M5 18a7 7 0 0 1 14 0M2 18h20M12 5v4M4.500 9.500l2 2M19.500 9.500l-2 2"/></symbol>
 <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21V4M5 5h12l-2 4 2 4H5"/></symbol>
 </defs></svg>
 
@@ -65,6 +68,7 @@
                         <canvas id="gameCanvas"></canvas>
             <div id="quest-tracker" title="Clique para abrir o Guia do Aventureiro"></div>
             <div id="hover-hint"></div>
+            <div id="env-badge"></div>
             <div id="key-hints"><b>WASD</b>/setas andar · <b>Espaço</b> agir · <b>Ctrl</b> atacar · <b>Enter</b> chat · <b>H</b> guia · clique direito: menu</div>
             <div id="chat-container">
                 <div id="chat-hint">Enter para falar</div>
@@ -157,6 +161,7 @@
     <!-- SCRIPT GIGANTE E UNIFICADO DO JOGO -->
     <script src="catalog.js"></script>
     <script src="art.js"></script>
+    <script src="env.js"></script>
     <script src="artworld.js"></script>
     <script>
         // === 1. DECLARAÇÕES GLOBAIS ÚNICAS ===
@@ -1225,7 +1230,7 @@
         function update() {
             try {
                 let curM = gameMaps[currentMap]; if(!curM) return; let cur = curM.entities || []; let mapW = curM.width || 800; let mapH = curM.height || 600;
-                if(player.attackCooldown > 0) player.attackCooldown--; if(player.actionAnim > 0) player.actionAnim--; if (window.Art) Art.tickAll();
+                if(player.attackCooldown > 0) player.attackCooldown--; if(player.actionAnim > 0) player.actionAnim--; if (window.Art) Art.tickAll(); if (window.Env) Env.tick(curM);
 
                 if(player.regenTimer > 0) player.regenTimer--;
                 if(player.regenTimer <= 0) {
@@ -1333,7 +1338,7 @@
                         const cxm = o.x + ow/2, cym = o.y + oh/2;
                         // monstro agressivo "vê" o jogador: manda um golpe de dano 0 para o servidor marcar o alvo (sem roubar alvo de outro jogador)
                         if (o._seen > 0) o._seen--;
-                        if (beh === 'aggressive' && !o.aggroTarget && !(o._seen > 0) && player.stats.hp > 0 && Math.hypot(player.x - cxm, player.y - cym) < (def.range || 100)) {
+                        if (beh === 'aggressive' && !o.aggroTarget && !(o._seen > 0) && player.stats.hp > 0 && Math.hypot(player.x - cxm, player.y - cym) < ((def.range || 100) * (window.Env ? Env.rangeMul() : 1))) {
                             o._seen = 90; o.aggroTarget = currentUser; pendingCombatLogs.push({ id: o.id, dmg: 0, aggro: currentUser, maxHp: o.maxHp });
                         }
                         let threat = null;   // quem está atacando este monstro
@@ -1507,6 +1512,7 @@
                     }
                 }
                 ctx.restore(); 
+                if (window.Env) Env.draw(ctx, canvas, offset, mapObj, VW, { x: player.x, y: player.y, renderX: renderPX, renderY: renderPY }, T);
                 Art.drawAmbient(ctx, canvas.width, canvas.height, mapObj, T);
             } catch (e) { console.error("Ignorado Draw Error", e); }
         }
