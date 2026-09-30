@@ -160,6 +160,7 @@
 
     <!-- SCRIPT GIGANTE E UNIFICADO DO JOGO -->
     <script src="catalog.js"></script>
+    <script src="content.js"></script>
     <script src="art.js"></script>
     <script src="env.js"></script>
     <script src="sfx.js"></script>
@@ -258,7 +259,7 @@
         function showTooltip(item) { 
             if(!item) return; 
             let html = `<div class="tt-title">${esc(item.name)}</div><div class="tt-desc">${esc(item.desc||'')}</div>`; 
-            if (item.bonusDmg) html += `<div class="tt-stat">Dano: +${item.bonusDmg}</div>`; 
+            if (item.bonusDmg) html += `<div class="tt-stat">Dano: +${item.bonusDmg}</div>`; if (item.ench) html += `<div class="tt-stat" style="color:#7a4ab8">Encantado +${item.ench}</div>`; if (item.mp) html += `<div class="tt-stat">MP: +${item.mp}</div>`; 
             if (item.defBonus) html += `<div class="tt-stat">🛡️ Defesa: +${item.defBonus}</div>`; 
             if (item.heal) html += `<div class="tt-stat">❤️ Cura: +${item.heal}</div>`; 
             html += `<div class="tt-weight">⚖️ Peso: ${Number(item.weight)||0} kg</div>`; 
@@ -322,6 +323,7 @@
             Object.keys(C.ITEMS).forEach(k => { if (!itemDB[k]) itemDB[k] = Object.assign({}, C.ITEMS[k]); });
             if (itemDB['Raw Meat'] && !itemDB['Raw Meat'].cooksInto) { itemDB['Raw Meat'].cooksInto = 'Cooked Meat'; itemDB['Raw Meat'].cookXp = 10; }
             if (itemDB['Raw Fish'] && !itemDB['Raw Fish'].cooksInto) { itemDB['Raw Fish'].cooksInto = 'Cooked Fish'; itemDB['Raw Fish'].cookXp = 20; }
+            if (window.Content) Content.merge();
         }
         mergeCatalog();
 
@@ -335,7 +337,7 @@
             isPerformingAction: false, actionTarget: null, actionType: null, actionTimer: 0, actionDelay: 100, attackCooldown: 0, pendingAutoAction: null, actionAnim: 0, actionToolItem: null,
             activeSpell: 'wind_strike', regenTimer: 300, currentMap: 'lumbridge',
             equipment: { head: null, body: null, weapon: null, shield: null, ammo: null }, inventory: [], bank: [],
-            stats: { hp: 15, maxHp: 15, mp: 10, maxMp: 10, skills: { hp: { level: 10, xp: 0, next: 100, name: 'Health' }, combat: { level: 1, xp: 0, next: 100, name: 'Combat' }, ranged: { level: 1, xp: 0, next: 100, name: 'Ranged' }, magic: { level: 1, xp: 0, next: 100, name: 'Magic' }, prayer: { level: 1, xp: 0, next: 50, name: 'Prayer' }, woodcutting: { level: 1, xp: 0, next: 50, name: 'Woodcut' }, mining: { level: 1, xp: 0, next: 50, name: 'Mining' }, smithing: { level: 1, xp: 0, next: 50, name: 'Smithing' }, firemaking: { level: 1, xp: 0, next: 50, name: 'Firemk' }, cooking: { level: 1, xp: 0, next: 50, name: 'Cooking' }, crafting: { level: 1, xp: 0, next: 50, name: 'Crafting' }, fishing: { level: 1, xp: 0, next: 50, name: 'Fishing' } } }
+            stats: { hp: 15, maxHp: 15, mp: 10, maxMp: 10, skills: { hp: { level: 10, xp: 0, next: 100, name: 'Health' }, combat: { level: 1, xp: 0, next: 100, name: 'Combat' }, ranged: { level: 1, xp: 0, next: 100, name: 'Ranged' }, magic: { level: 1, xp: 0, next: 100, name: 'Magic' }, prayer: { level: 1, xp: 0, next: 50, name: 'Prayer' }, woodcutting: { level: 1, xp: 0, next: 50, name: 'Woodcut' }, mining: { level: 1, xp: 0, next: 50, name: 'Mining' }, smithing: { level: 1, xp: 0, next: 50, name: 'Smithing' }, firemaking: { level: 1, xp: 0, next: 50, name: 'Firemk' }, cooking: { level: 1, xp: 0, next: 50, name: 'Cooking' }, crafting: { level: 1, xp: 0, next: 50, name: 'Crafting' }, fishing: { level: 1, xp: 0, next: 50, name: 'Fishing' }, farming: { level: 1, xp: 0, next: 50, name: 'Farming' }, alchemy: { level: 1, xp: 0, next: 50, name: 'Alchemy' }, enchanting: { level: 1, xp: 0, next: 50, name: 'Enchant' } } }
         };
         let player = JSON.parse(JSON.stringify(playerDefault));
 
@@ -555,6 +557,7 @@
             if (typeof player.x !== 'number' || isNaN(player.x)) player.x = 400; if (typeof player.y !== 'number' || isNaN(player.y)) player.y = 300;
             if (!player.facing) player.facing = { x: 0, y: 1 }; if (!player.equipment) player.equipment = { head: null, body: null, weapon: null, shield: null, ammo: null };
             if (!player.inventory) player.inventory = []; if (!player.bank) player.bank = []; player.actionAnim = player.actionAnim || 0;
+            try { if (window.Content) Content.onLogin(); } catch (e) { console.error(e); }
             currentMap = player.currentMap || 'lumbridge'; if(!gameMaps[currentMap]) currentMap = 'lumbridge'; try { ensurePlayerFree(); } catch (e) {}
             
             document.getElementById('login-overlay').style.display = 'none';
@@ -763,7 +766,7 @@
         function useItem(index) {
             if(isBankOpen) { transferToBank(index); return; } const item = player.inventory[index]; if(!item) return;
             if(item.type === 'equipment') { if(!item.slot || !(item.slot in player.equipment)) { setActionText('Este item não pode ser equipado.', '#e74c3c'); return; } if(item.stackable && item.slot === 'ammo') { let curAm = player.equipment.ammo; player.equipment.ammo = player.inventory.splice(index, 1)[0]; if(curAm && !addInvItem(curAm.name, curAm.qty)) player.inventory.push(curAm); } else { player.inventory.splice(index, 1); if(player.equipment[item.slot]) player.inventory.push(player.equipment[item.slot]); player.equipment[item.slot] = item; } } 
-            else if(item.type === 'consumable') { if(item.heal > 0) { player.stats.hp = Math.min(player.stats.maxHp, player.stats.hp + item.heal); setActionText(`Curou ${item.heal} HP.`); } if(item.name === 'Bones') { addXP('prayer', 5); addFloatingText(player.x, player.y - 15, "Enterrou", "#bdc3c7"); } removeInvItem(item.name, 1); } 
+            else if(item.type === 'consumable') { if(item.mp > 0) { player.stats.mp = Math.min(player.stats.maxMp, player.stats.mp + item.mp); setActionText(`Restaurou ${item.mp} MP.`, '#3498db'); } if(item.buff && window.Content) Content.applyBuff(item.buff); if(item.heal > 0) { player.stats.hp = Math.min(player.stats.maxHp, player.stats.hp + item.heal); setActionText(`Curou ${item.heal} HP.`); } if(item.name === 'Bones') { addXP('prayer', 5); addFloatingText(player.x, player.y - 15, "Enterrou", "#bdc3c7"); } removeInvItem(item.name, 1); } 
             else if(item.name === 'Tinderbox') { if(getInvCount('Logs') >= 1) { removeInvItem('Logs', 1); let curM = gameMaps[currentMap]; if(curM){ if(!curM.entities) curM.entities = []; curM.entities.push({ id: newEntId(), type: 'fire', name: 'Fire', x: player.x - 15, y: player.y - 15, w: 30, h: 30, active: true, life: 1000 }); } addXP('firemaking', 15); setActionText("Acendeu fogo!"); saveDataLogic(); } else { setActionText("Precisa de Logs.", "#e74c3c"); } } 
             else if(item.name === 'Knife') { setActionText("Use a aba Craft para criar itens.", "#e74c3c"); }
             player.isPerformingAction = false; player.pendingAutoAction = null; player.actionToolItem = null; hideTooltip(); updateUI();
@@ -793,7 +796,7 @@
             if(leveledUp) { setActionText(`${sk.name} Nível ${sk.level}!`, "#f1c40f"); addFloatingText(player.x, player.y - 40, `Level Up!`, '#2ecc71'); } updateUI(); 
         }
 
-        function getTotalDef() { let d = player.stats.skills.combat.level; if(player.equipment && player.equipment.shield) d += (player.equipment.shield.defBonus || 0); if(player.equipment && player.equipment.body) d += (player.equipment.body.defBonus || 0); return d; }
+        function getTotalDef() { let d = player.stats.skills.combat.level + (window.Content ? Content.buff('def') : 0); if(player.equipment && player.equipment.shield) d += (player.equipment.shield.defBonus || 0); if(player.equipment && player.equipment.body) d += (player.equipment.body.defBonus || 0); return d; }
         function openShop(nData) { if (!nData) { setActionText('Esse NPC não tem loja.', '#e74c3c'); return; } document.getElementById('btn-npc').style.display = 'block'; openTab('npc'); document.getElementById('npc-title').innerText = nData.name; document.getElementById('npc-dialog').innerText = `"${nData.dialog || '...'}"`; let sL = document.getElementById('npc-shop-list'); sL.innerHTML = ''; sL.onclick = (ev) => { const b = ev.target.closest('[data-buy]'); if(b) buyItem(b.dataset.buy, parseInt(b.dataset.cost)); }; if(nData.shopStr) { nData.shopStr.split('|').forEach(p => { let pt = p.split(','); if(pt.length >= 2) { let iN = pt[0].trim(); let ct = parseInt(pt[1]); let iD = itemDB[iN]; if(iD) { sL.innerHTML += `<div class="shop-item"><span>${esc(iD.icon)} ${esc(iD.name)}</span><button class="shop-btn" data-buy="${esc(iN)}" data-cost="${ct}">Comprar (${ct} 🪙)</button></div>`; } } }); } }
         function buyItem(iN, ct) { if (!(ct > 0)) return; if(getInvCount('Coins') >= ct) { if(addInvItem(iN, 1)) { removeInvItem('Coins', ct); setActionText(`Comprou ${iN}!`); updateUI(); } else { setActionText("Inv Cheio!", "#e74c3c"); } } else { setActionText("Coins insuficientes!", "#e74c3c"); } }
         function setActiveSpell(sId) { player.activeSpell = sId; updateUI(); }
@@ -885,7 +888,7 @@
             if (val.startsWith('b_') && C.BUILDINGS && C.BUILDINGS[val.substring(2)]) { w = Math.round(C.BUILDINGS[val.substring(2)].w * SCALE_BUILD); h = Math.round(C.BUILDINGS[val.substring(2)].h * SCALE_BUILD); }
             else if (val.startsWith('d_') && C.DECOR && C.DECOR[val.substring(2)]) { w = Math.round(C.DECOR[val.substring(2)].w * SCALE_DECOR); h = Math.round(C.DECOR[val.substring(2)].h * SCALE_DECOR); }
             else if (val.startsWith('e_') && npcDB[val.substring(2)]) { const n = npcDB[val.substring(2)]; w = n.w || 30; h = n.h || 30; }
-            else if (val === 'tree') { w = TREE_W; h = TREE_H; } else if (val === 'house') { w = Math.round(104 * SCALE_BUILD); h = Math.round(96 * SCALE_BUILD); } else if (val.startsWith('rock_')) { w = 38; h = 38; }
+            else if (val === 'tree') { w = TREE_W; h = TREE_H; } else if (val === 'house') { w = Math.round(104 * SCALE_BUILD); h = Math.round(96 * SCALE_BUILD); } else if (val.startsWith('rock_')) { w = 38; h = 38; } else if (val === 'farm_plot') { w = 56; h = 46; } else if (val === 'cauldron') { w = 44; h = 44; } else if (val === 'enchant_table') { w = 54; h = 46; }
             else if (val === 'furnace') { w = 48; h = 72; } else if (val === 'anvil') { w = 46; h = 39; } else if (val === 'bank') { w = 80; h = 48; } else if (val === 'fishing_spot') { w = 46; h = 46; }
             else if (val.startsWith('paint_')) { w = 40; h = 40; } else if (val === 'portal') { w = 60; h = 60; }
             return w ? { w, h } : null;
@@ -896,7 +899,7 @@
         function buildDevEntityList() { 
             let cont = document.getElementById('dev-entity-list'); if(!cont) return; let html = ''; 
             let list = [ 
-                { cat: '🌲 Ambiente', items: [ { v: 'tree', n: 'Árvore', ic: '🌲' }, { v: 'fishing_spot', n: 'Lagos', ic: '🐟' }, { v: 'rock_copper', n: 'Minério (Copper)', ic: '🪨' }, { v: 'rock_tin', n: 'Minério (Tin)', ic: '🪨' }, { v: 'rock_iron', n: 'Minério (Iron)', ic: '🪨' } ]}, 
+                { cat: '🌲 Ambiente', items: [ { v: 'tree', n: 'Árvore', ic: '🌲' }, { v: 'fishing_spot', n: 'Lagos', ic: '🐟' }, { v: 'rock_copper', n: 'Minério (Copper)', ic: '🪨' }, { v: 'rock_coal', n: 'Carvão', ic: '⚫' }, { v: 'rock_mithril', n: 'Mithril', ic: '🔷' }, { v: 'farm_plot', n: 'Canteiro', ic: '🌱' }, { v: 'cauldron', n: 'Caldeirão', ic: '🧪' }, { v: 'enchant_table', n: 'Mesa de Encantamento', ic: '✨' }, { v: 'rock_tin', n: 'Minério (Tin)', ic: '🪨' }, { v: 'rock_iron', n: 'Minério (Iron)', ic: '🪨' } ]}, 
                 { cat: '🏠 Estações', items: [ { v: 'furnace', n: 'Fornalha', ic: '♨️' }, { v: 'anvil', n: 'Bigorna', ic: '🔨' }, { v: 'bank', n: 'Bank', ic: '🏦' }, { v: 'portal', n: 'Portal', ic: '🚪' }, { v: 'house', n: 'Casa (Sapê)', ic: '🏠' } ]}, 
                 { cat: '🏰 Construções Medievais', items: Object.keys((window.CATALOG && CATALOG.BUILDINGS) || {}).map(k => ({ v: 'b_'+k, n: CATALOG.BUILDINGS[k].name, ic: '🏰' })) }, 
                 { cat: '🪑 Decoração', items: Object.keys((window.CATALOG && CATALOG.DECOR) || {}).map(k => ({ v: 'd_'+k, n: CATALOG.DECOR[k].name, ic: '🪑' })) }, 
@@ -932,7 +935,7 @@
         // se o mundo mudou e o jogador ficou "dentro" de uma construção, tira ele de lá (procura o ponto livre mais próximo)
         function ensurePlayerFree() {
             const m = gameMaps[currentMap]; if (!m || !m.entities) return; const W = m.width || 800, H = m.height || 600;
-            const solid = m.entities.filter(o => o && o.active && !['ground_item','fishing_spot','portal','fire','paint','enemy','npc'].includes(o.type));
+            const solid = m.entities.filter(o => o && o.active && !['ground_item','fishing_spot','farm_plot','portal','fire','paint','enemy','npc'].includes(o.type));
             const hits = (x, y) => solid.some(o => { const h = getHitbox(o); return h && x - 10 < h.x + h.w && x + 10 > h.x && y - 10 < h.y + h.h && y + 10 > h.y; });
             if (!hits(player.x, player.y)) return;
             for (let r = 20; r < 600; r += 20) for (let a = 0; a < 16; a++) { const x = player.x + Math.cos(a / 16 * 6.283) * r, y = player.y + Math.sin(a / 16 * 6.283) * r; if (x > 20 && y > 20 && x < W - 20 && y < H - 20 && !hits(x, y)) { player.x = x; player.y = y; player.destX = x; player.destY = y; return; } }
@@ -956,6 +959,7 @@
             if(o.type === 'tree') { const tw = Math.max(16, hw * 0.24), th = Math.max(12, hh * 0.17); hy += hh - th; hh = th; hx += hw/2 - tw/2; hw = tw; }
             else if(o.type === 'house') { hy += hh - 30; hh = 30; }
             else if(o.type === 'furnace' || o.type === 'bank') { hy += hh - 20; hh = 20; }
+            else if(o.type === 'cauldron' || o.type === 'enchant_table') { hy += hh * 0.45; hh = hh * 0.55; }
             return {x: hx, y: hy, w: hw, h: hh};
         }
 
@@ -1021,19 +1025,21 @@
                     let ammo = player.equipment ? player.equipment.ammo : null;
                     if(ammo && ammo.qty >= 1) {
                         ammo.qty--; if(ammo.qty <= 0) { if(player.equipment) player.equipment.ammo = null; }
-                        d = 1 + Math.floor(player.stats.skills.ranged.level / 2) + (wp.bonusDmg || 0) + (ammo.bonusDmg || 0); sT = 'ranged';
+                        d = 1 + Math.floor(player.stats.skills.ranged.level / 2) + (wp.bonusDmg || 0) + (ammo.bonusDmg || 0) + (window.Content ? Content.buff('dmg') : 0); sT = 'ranged';
                         projectiles.push({ x: player.x, y: player.y, target: tObj, tx: tObj.x + (tObj.w||30)/2, ty: tObj.y + (tObj.h||30)/2, dmg: d, speed: 8, type: 'ranged' }); 
                         updateUI(); return;
                     } else { setActionText("Sem flechas equipadas!", "#e74c3c"); return; }
-                } else { d += Math.floor(player.stats.skills.combat.level / 2); if(wp && wp.bonusDmg) d += wp.bonusDmg; }
+                } else { d += Math.floor(player.stats.skills.combat.level / 2); if(wp && wp.bonusDmg) d += wp.bonusDmg; d += (window.Content ? Content.buff('dmg') : 0); }
                 applyDamage(tObj, Math.floor(Math.random() * (d + 1)), sT);
             } 
             else if(tObj.type === 'tree' || (typeof tObj.type === 'string' && tObj.type.startsWith('rock'))) {
-                let nT = tObj.type === 'tree' ? 'axe' : 'pickaxe'; let toolItem = (wp && wp.tool === nT) ? wp : player.inventory.find(i => i.tool === nT);
+                let nT = tObj.type === 'tree' ? 'axe' : 'pickaxe'; let toolItem = (nT === 'pickaxe' && window.Content) ? Content.bestTool('pickaxe') : ((wp && wp.tool === nT) ? wp : player.inventory.find(i => i.tool === nT));
+                const _rk = window.Content && Content.ROCKS[tObj.type];
+                if (toolItem && _rk) { if (player.stats.skills.mining.level < _rk.lvl) { setActionText(`Requer Mineração nível ${_rk.lvl} (${_rk.label}).`, '#e74c3c'); return; } if (Content.tierOf(toolItem) < _rk.tier) { setActionText(`Requer uma picareta melhor: ${_rk.toolName || 'Iron Pickaxe'}.`, '#e74c3c'); return; } }
                 if(toolItem) { player.isPerformingAction = true; player.actionTarget = tObj; player.actionType = tObj.type === 'tree' ? 'chop' : 'mine'; player.actionToolItem = toolItem; player.actionTimer = player.actionDelay = Math.max(30, 150 - (player.stats.skills[tObj.type === 'tree' ? 'woodcutting' : 'mining'].level * 5)); } else { setActionText(`Requer ${nT} no inventário.`, "#e74c3c"); }
             }
             else if(tObj.type === 'fishing_spot') { let toolItem = player.inventory.find(i => i.name === 'Net'); if(toolItem) { player.isPerformingAction = true; player.actionTarget = tObj; player.actionType = 'fish'; player.actionToolItem = toolItem; player.actionTimer = player.actionDelay = Math.max(40, 150 - (player.stats.skills.fishing.level * 4)); } else { setActionText("Requer uma Net no inventário.", "#e74c3c"); } }
-            else if(tObj.type === 'furnace') { if(getInvCount('Iron Ore')>0){ player.actionType='smelt_iron'; } else if(getInvCount('Copper Ore')>0 && getInvCount('Tin Ore')>0){ player.actionType='smelt_brz'; } else { setActionText("Sem minérios.", "#e74c3c"); return;} player.isPerformingAction = true; player.actionTarget = tObj; player.actionTimer = player.actionDelay = Math.max(30, 100 - (player.stats.skills.smithing.level * 2)); }
+            else if(tObj.type === 'furnace') { if (window.Content) Content.startSmelt(tObj); }
             else if(tObj.type === 'fire') { if (player.inventory.find(i => itemDB[i.name] && itemDB[i.name].cooksInto)) { player.isPerformingAction = true; player.actionTarget = tObj; player.actionType = 'cook'; player.actionTimer = player.actionDelay = Math.max(20, 80 - (player.stats.skills.cooking.level * 2)); } else { setActionText("Você não tem nada cru para cozinhar.", "#e74c3c"); } } 
             updateUI();
         }
@@ -1075,7 +1081,11 @@
                             if(cObj.type === 'tree') addMenuOption(`Cortar ${cObj.name}`, () => setPendingAction(cObj));
                             if(cObj.type === 'fishing_spot') addMenuOption(`Pescar`, () => setPendingAction(cObj));
                             if(typeof cObj.type === 'string' && cObj.type.startsWith('rock')) addMenuOption(`Minerar ${cObj.name}`, () => setPendingAction(cObj));
-                            if(cObj.type === 'furnace' || cObj.type === 'anvil') addMenuOption(`Usar Aba Craft`, () => setActionText("Use a aba Craft (🛠️)", "#f1c40f"));
+                            if(cObj.type === 'furnace') addMenuOption(`Fundir minérios`, () => setPendingAction(cObj));
+                            if(cObj.type === 'anvil') addMenuOption(`Fabricar (aba Ofícios)`, () => openTab('craft'));
+                            if(cObj.type === 'farm_plot') addMenuOption(`Plantar / Colher`, () => setPendingAction(cObj));
+                            if(cObj.type === 'cauldron') addMenuOption(`Preparar poções`, () => setPendingAction(cObj));
+                            if(cObj.type === 'enchant_table') addMenuOption(`Encantar equipamento`, () => setPendingAction(cObj));
                             if(cObj.type === 'fire') addMenuOption(`Cozinhar`, () => setPendingAction(cObj));
                             if(cObj.type === 'bank') addMenuOption(`Usar Banco`, () => setPendingAction(cObj));
                             if(cObj.type === 'portal') addMenuOption(`Entrar`, () => setPendingAction(cObj));
@@ -1108,7 +1118,10 @@
                     else if (val === 'fishing_spot') { n.type = 'fishing_spot'; n.name = 'Fishing Spot'; }
                     else if (val === 'house') { n.type = 'house'; n.name = 'House'; n.w=cW||100; n.h=cH||100; }
                     else if (val.startsWith('paint_')) { n.type = 'paint'; n.name = 'Chão'; n.color = val==='paint_dirt'?'#5c4033':val==='paint_stone'?'#7f8c8d':val==='paint_grass'?'#27ae60':'#3498db'; n.w=cW||40; n.h=cH||40; }
-                    else if (typeof val === 'string' && val.startsWith('rock_')) { n.type = val; n.name = val; n.hp = val==='rock_iron'?3:2; n.maxHp = n.hp; n.color = val==='rock_copper'?'#d35400':val==='rock_iron'?'#7f8c8d':'#bdc3c7'; n.h = cH||30; }
+                    else if (typeof val === 'string' && val.startsWith('rock_')) { n.type = val; n.name = val; const _rk = (window.Content && Content.ROCKS[val]) || {}; n.hp = _rk.hp || (val==='rock_iron'?3:2); n.maxHp = n.hp; n.color = _rk.color || (val==='rock_copper'?'#d35400':val==='rock_iron'?'#7f8c8d':'#bdc3c7'); n.h = cH||30; }
+                    else if (val === 'farm_plot') { n.type = 'farm_plot'; n.name = 'Canteiro'; n.w = cW||56; n.h = cH||46; n.id = 'plot_' + newEntId(); }
+                    else if (val === 'cauldron') { n.type = 'cauldron'; n.name = 'Caldeirão'; n.w = cW||44; n.h = cH||44; }
+                    else if (val === 'enchant_table') { n.type = 'enchant_table'; n.name = 'Mesa de Encantamento'; n.w = cW||54; n.h = cH||46; }
                     else if (val === 'furnace') { n.type = 'furnace'; n.name = 'Furnace'; n.h = cH||45; } else if (val === 'anvil') { n.type = 'anvil'; n.name = 'Anvil'; n.h = cH||25; } else if (val === 'bank') { n.type = 'bank'; n.name = 'Bank Booth'; n.w=cW||50; n.h=cH||30; }
                     else { n.type = 'unknown'; } 
                     if(!curM.entities) curM.entities = []; curM.entities.push(n); addFloatingText(pos.x, pos.y, "Spawn", "#2ecc71"); saveDataLogic(false, true); return;
@@ -1153,7 +1166,7 @@
 
         // --- PATHFINDING (A*) : o personagem contorna casas, árvores e paredes em vez de travar ---
         const PF_CELL = 16; let pfKey = ''; let pfPath = [];
-        const PF_SKIP = ['ground_item','fishing_spot','portal','fire','paint','enemy'];
+        const PF_SKIP = ['ground_item','fishing_spot','farm_plot','portal','fire','paint','enemy'];
         function pfBlockedFn(cur, mapW, mapH) {
             const cols = Math.ceil(mapW / PF_CELL), rows = Math.ceil(mapH / PF_CELL); const grid = new Uint8Array(cols * rows); const m = 11;
             for (const o of cur) {
@@ -1215,7 +1228,7 @@
         function mobStep(o, cur, ex, ey, ed, spd, ow, oh) {
             let nx = o.x + (ex/ed)*spd; let ny = o.y + (ey/ed)*spd; let cx = false, cy = false;
             for (let wo of cur) {
-                if(!wo || !wo.active || ['ground_item','fishing_spot','portal','paint','enemy','npc'].includes(wo.type) || wo === o) continue;
+                if(!wo || !wo.active || ['ground_item','fishing_spot','farm_plot','portal','paint','enemy','npc'].includes(wo.type) || wo === o) continue;
                 let hb = getHitbox(wo); if (!hb) continue;
                 const bw = Math.max(10, ow * 0.7), bh = Math.max(8, oh * 0.4);   // colisão pelos "pés" do bicho, não pela imagem toda
                 const ov = (px, py) => { const bx = px + (ow - bw) / 2, by = py + oh - bh; return bx < hb.x + hb.w && bx + bw > hb.x && by < hb.y + hb.h && by + bh > hb.y; };
@@ -1253,7 +1266,7 @@
                     let nX = player.x + mx; let nY = player.y + my; let colX = false, colY = false; let pw = 10, ph = 10;
                     
                     for(let o of cur) {
-                        if(!o || !o.type || !o.active || ['ground_item','fishing_spot','portal','fire','paint'].includes(o.type)) continue;
+                        if(!o || !o.type || !o.active || ['ground_item','fishing_spot','farm_plot','portal','fire','paint'].includes(o.type)) continue;
                         let hb = getHitbox(o); if (!hb) continue;
                         let wasInside = (player.x-pw < hb.x+hb.w && player.x+pw > hb.x && player.y-ph < hb.y+hb.h && player.y+ph > hb.y);
                         if (wasInside && (o.type === 'enemy' || o.type === 'npc')) continue;
@@ -1276,7 +1289,7 @@
                         let sdx = dx, sdy = dy, sdist = dist; const wp = getSteerPoint(cur, mapW, mapH); if (wp) { sdx = wp.x - player.x; sdy = wp.y - player.y; sdist = Math.hypot(sdx, sdy) || 1; }
                         const mx = (sdx / sdist) * player.speed; const my = (sdy / sdist) * player.speed; let nX = player.x + mx; let nY = player.y + my; let colX = false, colY = false; let pw = 10, ph = 10;
                         for(let o of cur) {
-                            if(!o || !o.type || !o.active || ['ground_item','fishing_spot','portal','fire','paint'].includes(o.type)) continue;
+                            if(!o || !o.type || !o.active || ['ground_item','fishing_spot','farm_plot','portal','fire','paint'].includes(o.type)) continue;
                             let hb = getHitbox(o); if (!hb) continue;
                             let wasInside = (player.x-pw < hb.x+hb.w && player.x+pw > hb.x && player.y-ph < hb.y+hb.h && player.y+ph > hb.y);
                             if (wasInside && (o.type === 'enemy' || o.type === 'npc')) continue;
@@ -1312,8 +1325,9 @@
                     if(player.actionTimer <= 0) {
                         const obj = player.actionTarget;
                         if (player.actionType === 'chop') { if(addInvItem('Logs', 1)) { obj.hp--; addXP('woodcutting', 15); } else { player.isPerformingAction = false; setActionText('Inventário cheio!', '#e74c3c'); } } 
-                        else if (player.actionType === 'mine') { let oreType = obj.type === 'rock_copper' ? 'Copper Ore' : obj.type === 'rock_tin' ? 'Tin Ore' : 'Iron Ore'; if(addInvItem(oreType, 1)) { obj.hp--; addXP('mining', 20); } else { player.isPerformingAction = false; setActionText('Inventário cheio!', '#e74c3c'); } }
+                        else if (player.actionType === 'mine') { const _rk = (window.Content && Content.ROCKS[obj.type]) || null; let oreType = _rk ? _rk.ore : (obj.type === 'rock_copper' ? 'Copper Ore' : obj.type === 'rock_tin' ? 'Tin Ore' : 'Iron Ore'); if(addInvItem(oreType, 1)) { obj.hp--; addXP('mining', _rk ? _rk.xp : 20); } else { player.isPerformingAction = false; setActionText('Inventário cheio!', '#e74c3c'); } }
                         else if (player.actionType === 'fish') { if(addInvItem('Raw Fish', 1)) { addXP('fishing', 20); addFloatingText(player.x, player.y - 15, "Pescado", "#3498db"); } else { player.isPerformingAction = false; setActionText('Inventário cheio!', '#e74c3c'); } }
+                        else if (player.actionType === 'smelt') { if (window.Content) Content.finishSmelt(); else player.isPerformingAction = false; }
                         else if (player.actionType === 'smelt_brz') { if (getInvCount('Copper Ore') > 0 && getInvCount('Tin Ore') > 0) { removeInvItem('Copper Ore', 1); removeInvItem('Tin Ore', 1); if (addInvItem('Bronze Bar', 1)) addXP('smithing', 15); } player.isPerformingAction = false; }
                         else if (player.actionType === 'smelt_iron') { if (getInvCount('Iron Ore') > 0) { removeInvItem('Iron Ore', 1); if (addInvItem('Iron Bar', 1)) addXP('smithing', 25); } player.isPerformingAction = false; }
                         else if (player.actionType === 'cook') { const raw = player.inventory.find(i => itemDB[i.name] && itemDB[i.name].cooksInto); if (raw) { const def = itemDB[raw.name]; removeInvItem(raw.name, 1); if (!addInvItem(def.cooksInto, 1)) { addInvItem(raw.name, 1); setActionText('Inventário cheio!', '#e74c3c'); player.isPerformingAction = false; } else addXP('cooking', def.cookXp || 10); addFloatingText(player.x, player.y - 20, "Cozinhou!", "#f1c40f"); Art.burst(obj.x + (obj.w||30)/2, obj.y + 4, '#ffb03a', 6, 0.8); } if (!player.inventory.find(i => itemDB[i.name] && itemDB[i.name].cooksInto)) { player.isPerformingAction = false; setActionText("Nada mais para cozinhar.", "#bdc3c7"); } }
@@ -1400,6 +1414,7 @@
             else if (typeof t === 'string' && t.startsWith('rock')) Art.drawRock(ctx, o, T);
             else if (t === 'enemy' || t === 'npc') drawMonster(ctx, o);
             else if (t === 'fire' || t === 'fishing_spot' || t === 'furnace' || t === 'anvil' || t === 'bank' || t === 'portal') Art.drawStation(ctx, o, T);
+            else if ((t === 'farm_plot' || t === 'cauldron' || t === 'enchant_table') && window.Content) Content.drawEntity(ctx, o, T);
             else { ctx.fillStyle = 'rgba(200,200,200,0.5)'; ctx.fillRect(o.x, o.y, o.w || 30, o.h || 30); }
 
             if (!isHologram && o.active !== false && (t === 'enemy' || t === 'npc')) drawNameplate(ctx, o);

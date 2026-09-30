@@ -62,10 +62,10 @@
     window._loginScene = scene;
 
     /* ================= DADOS DE ONDE CADA COISA VEM ================= */
-    const NODE_DROPS = { tree: ['Logs'], rock_copper: ['Copper Ore'], rock_tin: ['Tin Ore'], rock_iron: ['Iron Ore'], fishing_spot: ['Raw Fish'] };
-    const NODE_LABEL = { tree: 'Árvore', rock_copper: 'Rocha de cobre', rock_tin: 'Rocha de estanho', rock_iron: 'Rocha de ferro', fishing_spot: 'Ponto de pesca' };
-    const NODE_HOW = { tree: 'Precisa de um <b>Machado</b> equipado (ou na mochila). Botão direito na árvore, ou chegue perto e aperte <b>Espaço</b>.', rock_copper: 'Precisa de uma <b>Picareta</b>. Botão direito na rocha, ou <b>Espaço</b> perto dela.', rock_tin: 'Precisa de uma <b>Picareta</b>.', rock_iron: 'Precisa de uma <b>Picareta</b>.', fishing_spot: 'Precisa de uma <b>Rede</b> (Net), vendida pelo Mercador e pelo Pescador.' };
-    const SMELT = { 'Bronze Bar': 'Leve <b>1 Copper Ore + 1 Tin Ore</b> até uma <b>Fornalha</b> e aperte Espaço.', 'Iron Bar': 'Leve <b>1 Iron Ore</b> até uma <b>Fornalha</b> e aperte Espaço.' };
+    const NODE_DROPS = { tree: ['Logs'], rock_copper: ['Copper Ore'], rock_tin: ['Tin Ore'], rock_iron: ['Iron Ore'], rock_coal: ['Coal'], rock_mithril: ['Mithril Ore'], fishing_spot: ['Raw Fish'] };
+    const NODE_LABEL = { tree: 'Árvore', rock_copper: 'Rocha de cobre', rock_tin: 'Rocha de estanho', rock_iron: 'Rocha de ferro', rock_coal: 'Veio de carvão', rock_mithril: 'Veio de mithril', fishing_spot: 'Ponto de pesca' };
+    const NODE_HOW = { tree: 'Precisa de um <b>Machado</b> equipado (ou na mochila). Botão direito na árvore, ou chegue perto e aperte <b>Espaço</b>.', rock_copper: 'Precisa de uma <b>Picareta</b>. Botão direito na rocha, ou <b>Espaço</b> perto dela.', rock_tin: 'Precisa de uma <b>Picareta</b>.', rock_iron: 'Precisa de uma <b>Picareta</b>.', rock_coal: 'Precisa de uma <b>Picareta</b> e Mineração nível 5.', rock_mithril: 'Precisa de uma <b>Steel Pickaxe</b> (ou melhor) e Mineração nível 15.', fishing_spot: 'Precisa de uma <b>Rede</b> (Net), vendida pelo Mercador e pelo Pescador.' };
+    const SMELT = { 'Bronze Bar': 'Leve <b>1 Copper Ore + 1 Tin Ore</b> até uma <b>Fornalha</b> e aperte Espaço.', 'Iron Bar': 'Leve <b>1 Iron Ore</b> até uma <b>Fornalha</b> e aperte Espaço.', 'Steel Bar': 'Leve <b>1 Iron Ore + 2 Coal</b> à <b>Fornalha</b> (Ferraria nível 10).', 'Mithril Bar': 'Leve <b>1 Mithril Ore + 3 Coal</b> à <b>Fornalha</b> (Ferraria nível 20).' };
 
     function mapNameOf(id) { const m = (typeof gameMaps !== 'undefined') && gameMaps[id]; return (m && m.name) || id; }
     function mapsWith(pred) {
@@ -101,6 +101,10 @@
                 parts.push(`<div class="src"><b>Coletar:</b> ${esc(NODE_LABEL[nt])}${maps.length ? ' em ' + maps.map((m) => `<span class="chip">${esc(mapNameOf(m))}</span>`).join('') : ''}<br>${NODE_HOW[nt]}</div>`);
             }
         });
+        if (window.Content) {
+            Object.keys(Content.CROPS).forEach((k) => { const c = Content.CROPS[k]; if (c.out === name) parts.push(`<div class="src"><b>Plantar:</b> ${esc(itemDB[c.seed] ? itemDB[c.seed].name : c.seed)} num <span class="chip grn">canteiro</span> (Agricultura ${c.lvl}). Cresce em ${Math.round(c.secs / 60 * 10) / 10} min. Sementes: Fazendeiro.</div>`); });
+            Content.BREW.forEach((r) => { if (r.out === name) parts.push(`<div class="src"><b>Preparar:</b> no <span class="chip yel">caldeirão</span> (Alquimia ${r.lvl}): ${r.needs.map((n) => n[1] + '× ' + esc(n[0])).join(' + ')}</div>`); });
+        }
         if (SMELT[name]) parts.push(`<div class="src"><b>Fundir:</b> ${SMELT[name]}</div>`);
         const cookedFrom = Object.keys(itemDB).filter((k) => itemDB[k].cooksInto === name);
         if (cookedFrom.length) parts.push(`<div class="src"><b>Cozinhar:</b> jogue ${cookedFrom.map((k) => `${esc(itemDB[k].icon)} ${esc(itemDB[k].name)}`).join(', ')} numa <b>fogueira</b> (use a <b>Tinderbox</b> com Logs para acender uma) e aperte Espaço perto do fogo.</div>`);
@@ -167,6 +171,9 @@
         ['chest', 'Vila, lojas e banco', `<ul><li>Fale com os NPCs (Espaço ou botão direito → Falar): lojas vendem ferramentas, comida e runas por moedas.</li><li>Moedas caem dos monstros. O <b>Banco</b> guarda itens além do limite da mochila (peso máximo 50 kg).</li></ul>`],
         ['flag', 'Missões de NPC', `<ul><li>NPC com <b style="color:#b07a1a">!</b> na cabeça tem missão nova; com <b style="color:#3f8a4a">?</b> você pode entregar uma missão pronta.</li><li>Fale com o NPC (botão direito → Falar) e escolha <b>Aceitar missão</b>. O progresso aparece no quadro do canto da tela.</li><li>Recompensas: moedas, experiência e itens. As missões do Guarda Real formam uma sequência até o dragão.</li></ul>`],
         ['star', 'Dia, noite e clima', `<ul><li>Um dia dura 20 minutos reais. À noite tudo escurece, as janelas e lampiões acendem, e monstros enxergam mais longe.</li><li>Chuva apaga fogueiras mais rápido. O selo no canto superior direito mostra hora e clima.</li><li>Ajuste música e efeitos na aba <b>Menu</b>.</li></ul>`],
+        ['star', 'Aço e mithril', `<ul><li><b>Coal</b> (carvão) e <b>Mithril Ore</b> são minerados nas minas e no covil. Carvão pede Mineração 5; mithril pede Mineração 15 e uma <b>Steel Pickaxe</b>.</li><li>Na fornalha: <b>Iron Ore + 2 Coal → Steel Bar</b> (Ferraria 10); <b>Mithril Ore + 3 Coal → Mithril Bar</b> (Ferraria 20).</li><li>Em Ofícios você cria espadas, escudos, armaduras e picaretas de aço e mithril.</li></ul>`],
+        ['bag', 'Fazenda e alquimia', `<ul><li>Compre sementes com o <b>Fazendeiro</b> e plante nos <b>canteiros</b> (botão direito). Cada planta cresce em tempo real, mesmo com você longe. Volte e colha!</li><li>No <b>caldeirão</b> (perto da igreja) misture ervas, frascos e drops de monstros para fazer poções de cura, mana, força e guarda.</li><li>Poções de força e guarda duram 3 minutos.</li></ul>`],
+        ['spark', 'Encantamento', `<ul><li>Na <b>Mesa de Encantamento</b> (perto do Mago) melhore armas e armaduras <b>equipadas</b>: até +3 níveis. Cada nível dá +2 de dano (armas) ou +1 de defesa.</li><li>Usa drops de monstros (Slime Ball, Spider Silk, Ectoplasm, Dragon Scale…) e moedas.</li></ul>`],
         ['save', 'Progresso', `<ul><li>Tudo é salvo automaticamente no servidor. O botão “Salvar agora” no Menu força um save.</li><li>Atalhos: <b>H</b> abre este guia, <b>I</b> mochila, <b>C</b> ofícios, <b>Enter</b> chat.</li></ul>`],
     ];
     function renderGuide() {
@@ -227,7 +234,10 @@
         if (o.type === 'tree') return ['Árvore', 'Botão direito: cortar (precisa de machado)'];
         if (typeof o.type === 'string' && o.type.startsWith('rock_')) return [NODE_LABEL[o.type] || 'Rocha', 'Botão direito: minerar (precisa de picareta)'];
         if (o.type === 'fishing_spot') return ['Ponto de pesca', 'Botão direito: pescar (precisa de rede)'];
-        if (o.type === 'furnace') return ['Fornalha', 'Espaço: fundir minério em barras'];
+        if (o.type === 'farm_plot') return ['Canteiro', 'Botão direito: plantar ou colher'];
+        if (o.type === 'cauldron') return ['Caldeirão de Alquimia', 'Botão direito: preparar poções'];
+        if (o.type === 'enchant_table') return ['Mesa de Encantamento', 'Botão direito: encantar equipamento'];
+        if (o.type === 'furnace') return ['Fornalha', 'Botão direito: fundir (aço: Iron Ore + 2 Coal)'];
         if (o.type === 'anvil') return ['Bigorna', 'Estação de ferreiro'];
         if (o.type === 'bank') return ['Banco', 'Botão direito: abrir banco'];
         if (o.type === 'fire') return ['Fogueira', 'Espaço: cozinhar carne ou peixe crus'];

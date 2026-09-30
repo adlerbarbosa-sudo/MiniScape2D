@@ -437,7 +437,7 @@
         ctx.restore();
     }
     function drawStump(ctx, o) { const ow = o.w || 40, oh = o.h || 50, cx = o.x + ow / 2, by = o.y + oh; ctx.save(); ctx.translate(cx, by); ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.beginPath(); ctx.ellipse(0, 0, 11, 3.4, 0, 0, TAU); ctx.fill(); ctx.beginPath(); ctx.moveTo(-8, 0); ctx.quadraticCurveTo(-8, -7, -6, -9); ctx.lineTo(6, -9); ctx.quadraticCurveTo(8, -7, 8, 0); ctx.closePath(); paint(ctx, lg(ctx, -8, 0, 8, 0, [[0, '#8a5a30'], [1, '#4a2f18']]), OUT, 1); ell(ctx, 0, -9, 6, 2.6, '#c9a066', OUT, 0.9); ell(ctx, 0, -9, 3, 1.2, null, '#a07a44', 0.7); ctx.restore(); }
-    const ORE = { rock_copper: ['#d9822b', '#ffb460'], rock_tin: ['#b8c8d8', '#f0f8ff'], rock_iron: ['#a0522d', '#d98a5a'] };
+    const ORE = { rock_copper: ['#d9822b', '#ffb460'], rock_tin: ['#b8c8d8', '#f0f8ff'], rock_iron: ['#a0522d', '#d98a5a'], rock_coal: ['#26262e', '#5a5a68'], rock_mithril: ['#3f78d0', '#a9d0ff'] };
     function drawRock(ctx, o, t) {
         const ow = o.w || 30, oh = o.h || 30, cx = o.x + ow / 2, by = o.y + oh, s = ow / 30, ore = ORE[o.type] || ['#c8c8c8', '#fff'];
         ctx.fillStyle = 'rgba(0,0,0,0.28)'; ctx.beginPath(); ctx.ellipse(cx + 3, by - 1, 15 * s, 4.4 * s, 0, 0, TAU); ctx.fill();
