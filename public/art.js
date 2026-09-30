@@ -63,10 +63,13 @@
         if (sp > 60) { a.x = o.x; a.y = o.y; a.lastHp = o.hp; return a; }   // teleporte: não anima
         a.x = o.x; a.y = o.y;
         const moving = sp > 0.06;
-        if (abs(dx) > 0.04) a.face = dx > 0 ? 1 : -1;
-        else if (tx !== undefined && !moving) a.face = (tx >= o.x + (o.w || 30) / 2) ? 1 : -1;
+        // vira de lado só depois de andar para o outro lado por alguns quadros (evita "tremer" ao raspar em paredes/outros bichos)
+        let want = 0;
+        if (abs(dx) > 0.12) want = dx > 0 ? 1 : -1;
+        else if (tx !== undefined && !moving) { const d = tx - (o.x + (o.w || 30) / 2); if (abs(d) > 10) want = d > 0 ? 1 : -1; }
+        if (want && want !== a.face) { a.flip = (a.flip || 0) + 1; if (a.flip >= 7) { a.face = want; a.flip = 0; } } else a.flip = 0;
         a.mv += ((moving ? 1 : 0) - a.mv) * 0.18;
-        a.ph += sp * 0.32 + 0.004;
+        a.ph += sp * 0.24 + 0.004;
         if (o.hp !== undefined && a.lastHp !== undefined && o.hp < a.lastHp) a.hurt = 1;
         a.lastHp = o.hp; a.hurt *= 0.9;
         if ((o.attackCooldown || 0) > 62) a.atk = 1; else a.atk *= 0.92;
@@ -80,6 +83,14 @@
     const S = {};   // species -> { w,h, sh:[rx,ry], draw(g,st) }
 
     /* --- GOBLIN --- */
+    /* braço + arma na mão: a = ângulo do braço (0 = pendurado, + = para frente/cima); a arma sai da mão e aponta para CIMA (-y), girando com wang.
+       Assim nunca cruza o rosto e não fica "esticada" para o lado. */
+    function held(g, sx, sy, a, len, w, armCol, handCol, wang, fn) {
+        const hx = sx + sin(a) * len, hy = sy + cos(a) * len;
+        limb(g, sx, sy, hx, hy, w, armCol);
+        g.save(); g.translate(hx, hy); g.rotate(wang); fn(g); g.restore();
+        ell(g, hx, hy, w * 0.56, w * 0.5, handCol, OUT, 1);
+    }
     S.goblin = { w: 30, h: 34, sh: [10, 3], draw(g, st) {
         const { t, mv, ph, atk, c1, c2 } = st; const sw = sin(ph) * mv, bob = abs(sin(ph)) * mv * 1.4, br = sin(t * 3 + st.seed) * 0.4;
         const skin = c1, skinD = shade(skin, -0.32), skinL = shade(skin, 0.28), cloth = c2, lean = atk * 3;
@@ -106,12 +117,11 @@
         poly(g, [hx + 6, hy + 0.5, hx + 11, hy + 2.5, hx + 6, hy + 3.5], skinD, OUT, 0.9);
         g.strokeStyle = '#3a0d0d'; g.lineWidth = 1.2; g.beginPath(); g.moveTo(hx - 2, hy + 4.4); g.quadraticCurveTo(hx + 2, hy + 6.8 + atk * 2, hx + 6, hy + 4); g.stroke();
         g.fillStyle = '#fff'; tri(g, hx - 1, hy + 4.5, hx + 0.6, hy + 4.7, hx - 0.2, hy + 6.6, '#fff'); tri(g, hx + 3, hy + 4.5, hx + 4.6, hy + 4.2, hx + 4, hy + 6.4, '#fff');
-        // braço da frente + adaga
-        const ax = 8 + lean, ay = -22 - bob, ang = -0.7 + atk * 1.9 + sw * 0.4;
-        g.save(); g.translate(ax, ay); g.rotate(ang);
-        limb(g, 0, 0, 2, 8, 3.8, skin); ell(g, 2, 8.5, 2.6, 2.4, skin, OUT, 1);
-        g.rotate(-0.15); poly(g, [0.4, 8, 3.6, 8, 3.4, 20, 2, 23, 0.6, 20], lg(g, 0, 0, 4, 0, [[0, '#f2f5f8'], [1, '#8f98a3']]), OUT, 1);
-        g.fillStyle = '#5b3a1e'; g.fillRect(-1, 7, 6, 2.3); g.restore();
+        // braço da frente + adaga (na mão, apontando para cima; no ataque desce para a frente)
+        held(g, 8 + lean, -22 - bob, -0.25 + atk * 2.2 + sw * 0.35, 8.5, 3.8, skin, skin, 0.35 + atk * 1.7, g2 => {
+            poly(g2, [-1.7, -1.5, 1.7, -1.5, 1.5, -15, 0, -19, -1.5, -15], lg(g2, -2, 0, 2, 0, [[0, '#f2f5f8'], [1, '#8f98a3']]), OUT, 1);
+            g2.fillStyle = '#5b3a1e'; g2.fillRect(-3.4, -2.4, 6.8, 2.3); g2.fillRect(-1, 0, 2, 4);
+        });
     } };
 
     /* --- ORC --- */
@@ -143,13 +153,11 @@
         tri(g, hx - 4.6, hy + 3.6, hx - 3, hy + 3.8, hx - 4, hy - 1, '#f4efd8', OUT, 0.7); tri(g, hx + 5.6, hy + 3.6, hx + 7.2, hy + 4, hx + 6.2, hy - 1.5, '#f4efd8', OUT, 0.7);
         tri(g, hx - 8, hy - 1, hx - 13, hy - 5, hx - 8, hy + 3, skinD, OUT, 1);
         g.restore();
-        // braço da frente + machado
-        const ax = 13 + lean, ay = -36 - bob, ang = -0.9 + atk * 2.4 + sw * 0.25;
-        g.save(); g.translate(ax, ay); g.rotate(ang);
-        limb(g, 0, 0, 3, 11, 6.5, skin); ell(g, 3, 12, 3.6, 3.2, skinD, OUT, 1);
-        g.fillStyle = '#5b3a1e'; g.strokeStyle = OUT; g.lineWidth = 1; g.beginPath(); g.rect(1.6, 4, 3.2, 26); g.fill(); g.stroke();
-        g.beginPath(); g.moveTo(3, 20); g.quadraticCurveTo(15, 14, 15, 29); g.quadraticCurveTo(15, 34, 3, 30); g.closePath(); paint(g, lg(g, 3, 20, 15, 30, [[0, '#e8ecf0'], [1, '#7c8590']]), OUT, 1.2);
-        g.restore();
+        // braço da frente + machado (empunhado para cima, ao lado da cabeça; no ataque desce em arco)
+        held(g, 13 + lean, -36 - bob, -0.2 + atk * 2.3 + sw * 0.3, 11, 6.5, skin, skinD, 0.32 + atk * 1.75, g2 => {
+            g2.fillStyle = '#5b3a1e'; g2.strokeStyle = OUT; g2.lineWidth = 1; g2.beginPath(); g2.rect(-1.6, -26, 3.2, 34); g2.fill(); g2.stroke();
+            g2.beginPath(); g2.moveTo(1.4, -25); g2.quadraticCurveTo(13, -28, 12, -16); g2.quadraticCurveTo(13, -8, 1.4, -11); g2.closePath(); paint(g2, lg(g2, 1, -25, 13, -12, [[0, '#e8ecf0'], [1, '#7c8590']]), OUT, 1.2);
+        });
     } };
 
     /* --- LOBO --- */
@@ -197,9 +205,10 @@
         g.strokeStyle = boneD; g.lineWidth = 2.6; g.lineCap = 'round'; g.beginPath(); g.moveTo(lean * 0.4, -19 - bob); g.lineTo(lean * 0.8, -33 - bob); g.stroke();
         for (let i = 0; i < 4; i++) { const y = -32 + i * 3.4 - bob + br; g.strokeStyle = OUT; g.lineWidth = 3.4; g.beginPath(); g.moveTo(-6 + lean * 0.8, y + 1); g.quadraticCurveTo(lean * 0.8, y - 1.5, 6 + lean * 0.8, y + 1); g.stroke(); g.strokeStyle = bone; g.lineWidth = 1.8; g.beginPath(); g.moveTo(-6 + lean * 0.8, y + 1); g.quadraticCurveTo(lean * 0.8, y - 1.5, 6 + lean * 0.8, y + 1); g.stroke(); }
         // braço + espada
-        const ax = 6 + lean, ay = -33 - bob, ang = -0.6 + atk * 2.0 + sw * 0.4;
-        g.save(); g.translate(ax, ay); g.rotate(ang); limb2(g, 0, 0, 1, 5, 2, 10, 2.4, bone);
-        poly(g, [0.6, 9, 3.4, 9, 3.1, 24, 2, 27, 0.9, 24], lg(g, 0, 0, 4, 0, [[0, '#dfe6ea'], [1, '#7b8792']]), OUT, 1); g.fillStyle = '#6b4a24'; g.fillRect(-1.5, 8, 7, 2); g.restore();
+        held(g, 8 + lean, -33 - bob, -0.1 + atk * 2.2 + sw * 0.3, 10, 2.6, bone, bone, 0.55 + atk * 1.5, g2 => {
+            poly(g2, [-1.6, -2, 1.6, -2, 1.4, -19, 0, -23, -1.4, -19], lg(g2, -2, 0, 2, 0, [[0, '#dfe6ea'], [1, '#7b8792']]), OUT, 1);
+            g2.fillStyle = '#6b4a24'; g2.fillRect(-4, -3, 8, 2.2); g2.fillRect(-1, -1, 2, 5);
+        });
         // crânio
         const hx = 2 + lean * 1.3, hy = -39 - bob + br;
         ell(g, hx, hy, 6.4, 6, lg(g, hx - 6, hy - 6, hx + 6, hy + 6, [[0, shade(bone, 0.25)], [1, boneD]]), OUT, 1.2);
@@ -349,15 +358,13 @@
         tri(g, hx - 5, hy + 5.2, hx - 2.4, hy + 5.6, hx - 3.8, hy - 1.4, '#f2ecd0', OUT, 0.8); tri(g, hx + 6.4, hy + 6, hx + 9, hy + 6, hx + 8, hy - 0.4, '#f2ecd0', OUT, 0.8);
         g.strokeStyle = '#5a4030'; g.lineWidth = 1.2; for (let i = 0; i < 4; i++) { g.beginPath(); g.moveTo(hx - 6 + i * 3.4, hy - 8); g.lineTo(hx - 8 + i * 3.4 + sin(t * 2 + i) * 0.8, hy - 14); g.stroke(); }
         g.restore();
-        // braço + tacape
-        const ax = 19 + lean, ay = -47 - bob, ang = -1.0 + atk * 2.6 + sw * 0.15;
-        g.save(); g.translate(ax, ay); g.rotate(ang);
-        limb2(g, 0, 0, 3, 10, 5, 20, 10, skin); ell(g, 5, 21, 6, 5.4, skinD, OUT, 1.1);
-        g.beginPath(); g.moveTo(2, 8); g.lineTo(9, 8); g.lineTo(12, 44); g.quadraticCurveTo(11, 56, 0, 54); g.quadraticCurveTo(-5, 46, 2, 8); g.closePath();
-        paint(g, lg(g, -4, 0, 14, 0, [[0, '#8a6238'], [1, '#4a3018']]), OUT, 1.3);
-        g.strokeStyle = 'rgba(0,0,0,0.3)'; g.lineWidth = 1; for (let i = 0; i < 4; i++) { g.beginPath(); g.moveTo(3, 18 + i * 8); g.lineTo(9, 20 + i * 8); g.stroke(); }
-        g.fillStyle = '#c8ccd2'; for (let i = 0; i < 4; i++) tri(g, 9 + (i % 2) * 2, 34 + i * 5, 14 + (i % 2) * 2, 36 + i * 5, 9 + (i % 2) * 2, 39 + i * 5, '#c8ccd2', OUT, 0.8);
-        g.restore();
+        // braço + tacape (apoiado para cima; no ataque desce pesado)
+        held(g, 19 + lean, -47 - bob, -0.15 + atk * 2.3 + sw * 0.15, 20, 10, skin, skinD, 0.3 + atk * 1.75, g2 => {
+            g2.beginPath(); g2.moveTo(-3, 6); g2.lineTo(3, 6); g2.lineTo(6, -30); g2.quadraticCurveTo(5, -44, -5, -42); g2.quadraticCurveTo(-9, -34, -3, 6); g2.closePath();
+            paint(g2, lg(g2, -8, 0, 8, 0, [[0, '#8a6238'], [1, '#4a3018']]), OUT, 1.3);
+            g2.strokeStyle = 'rgba(0,0,0,0.3)'; g2.lineWidth = 1; for (let i = 0; i < 4; i++) { g2.beginPath(); g2.moveTo(-3, -4 - i * 8); g2.lineTo(3, -2 - i * 8); g2.stroke(); }
+            for (let i = 0; i < 4; i++) tri(g2, 4 + (i % 2) * 2, -14 - i * 5, 9 + (i % 2) * 2, -12 - i * 5, 4 + (i % 2) * 2, -9 - i * 5, '#c8ccd2', OUT, 0.8);
+        });
     } };
 
     /* --- GOLEM --- */
@@ -729,7 +736,7 @@
     function drawPlayer(ctx, px, py, facing, anim, equip, name, isMain, extra) {
         extra = extra || {}; const key = name || '_'; const p = _pst[key] || (_pst[key] = { x: px, y: py, mv: 0, ph: 0 });
         const dx = px - p.x, dy = py - p.y, sp = Math.hypot(dx, dy); if (sp > 60) { p.x = px; p.y = py; }
-        else { p.x = px; p.y = py; p.mv += ((sp > 0.08 ? 1 : 0) - p.mv) * 0.25; p.ph += sp * 0.36; }
+        else { p.x = px; p.y = py; p.mv += ((sp > 0.08 ? 1 : 0) - p.mv) * 0.2; p.ph += sp * 0.085; }
         const now = performance.now() / 1000; const wp = equip ? equip.weapon : null, sh = equip ? equip.shield : null, body = equip ? equip.body : null;
         const view = facing.y < 0 ? 'back' : facing.y > 0 ? 'front' : 'side'; const flip = facing.x < 0 ? -1 : 1;
         const shirtCol = body ? armorColor(body, '#3b7dd8') : ((wp && wp.tool === 'magic') ? '#4a6fd8' : (wp && wp.tool === 'ranged') ? '#3f8f4f' : '#3b7dd8');
@@ -755,5 +762,9 @@
     }
 
     root.Art = root.Art || {};
-    Object.assign(root.Art, { hash, hex, shade, alpha, mix, ell, poly, rrect, limb, limb2, lg, rg, glow, tri, paint, OUT, PI, TAU, S, NPCLOOK, human, hat, prop, speciesOf, stepState, drawCreature, drawPlayer, SKIN });
+    function creatureTop(o, def) {   // y (mundo) do topo do desenho da criatura, para colocar nome/barra de vida
+        const sp = speciesOf(o.dbKey, def), S0 = S[sp], ow = o.w || 30, oh = o.h || 30; if (NPCLOOK[sp]) return o.y + oh - Math.max(oh, 46) * 1.02;
+        if (!S0) return o.y; const sc = ow / S0.w; return o.y + oh - (S0.h * (S0.bounds ? 1.12 : 1) + (S0.fly || 0)) * sc * 0.95;
+    }
+    Object.assign(root.Art, { creatureTop, hash, hex, shade, alpha, mix, ell, poly, rrect, limb, limb2, lg, rg, glow, tri, paint, OUT, PI, TAU, S, NPCLOOK, human, hat, prop, speciesOf, stepState, drawCreature, drawPlayer, SKIN });
 })(typeof window !== 'undefined' ? window : globalThis);

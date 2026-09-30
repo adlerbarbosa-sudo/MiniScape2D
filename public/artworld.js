@@ -367,6 +367,7 @@
     function drawGround(ctx, m, t) {
         const W = m.width || 800, H = m.height || 600, key = (m.id || '') + '|' + m.color + '|' + W + '|' + H; let c = _bg[key];
         if (!c) {
+            Object.keys(_bg).forEach(k => { if (k.split('|')[0] !== (m.id || '')) delete _bg[k]; });   // guarda só o mapa atual (mapas grandes gastam memória)
             c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d'); const base = m.color || '#4a6b2d';
             const dark = /^#([0-4])/.test(base) && false;
             g.fillStyle = base; g.fillRect(0, 0, W, H); g.fillStyle = patternOf(g, 'grass', base); g.fillRect(0, 0, W, H);
@@ -385,6 +386,27 @@
     /* ============================================================
        ÁRVORES, PEDRAS, ITENS E ESTAÇÕES
        ============================================================ */
+    /* copa orgânica: contorno irregular (sem "bolas"); vários lóbulos são unidos e recebem UM único contorno */
+    function lump(ctx, cx, cy, rx, ry, seed, n) {
+        const pts = []; for (let i = 0; i < n; i++) { const a = i / n * TAU, r = 0.84 + 0.26 * hash(seed + i * 7.31); pts.push([cx + cos(a) * rx * r, cy + sin(a) * ry * r]); }
+        const mid = (p, q) => [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2]; const s0 = mid(pts[n - 1], pts[0]); ctx.moveTo(s0[0], s0[1]);
+        for (let i = 0; i < n; i++) { const p = pts[i], q = pts[(i + 1) % n], m = mid(p, q); ctx.quadraticCurveTo(p[0], p[1], m[0], m[1]); }
+        ctx.closePath();
+    }
+    function foliage(ctx, o, lobes, sw, pal, seed, tx) {
+        ctx.save(); ctx.translate(sw, 0);
+        const union = () => { ctx.beginPath(); lobes.forEach((b, i) => lump(ctx, b[0], b[1], b[2], b[3], seed + i * 13.7, 13)); };
+        union(); ctx.strokeStyle = OUT; ctx.lineWidth = 3.4; ctx.lineJoin = 'round'; ctx.stroke();
+        union(); ctx.fillStyle = lg(ctx, 0, -72, 0, -22, [[0, pal[0]], [0.5, pal[1]], [1, pal[2]]]); ctx.fill();
+        ctx.save(); union(); ctx.clip();
+        // luz (cima-esquerda) e sombra (baixo-direita) em manchas irregulares
+        lobes.forEach((b, i) => { ctx.fillStyle = pal[3]; ctx.beginPath(); lump(ctx, b[0] - b[2] * 0.28, b[1] - b[3] * 0.34, b[2] * 0.55, b[3] * 0.42, seed + 40 + i * 5.1, 9); ctx.fill();
+            ctx.fillStyle = pal[4]; ctx.beginPath(); lump(ctx, b[0] + b[2] * 0.3, b[1] + b[3] * 0.5, b[2] * 0.62, b[3] * 0.4, seed + 70 + i * 3.7, 9); ctx.fill(); });
+        // folhas: pequenos "v" claros e escuros
+        for (let k = 0; k < 40; k++) { const b = lobes[k % lobes.length], a = hash(seed + k * 2.9) * TAU, r = Math.sqrt(hash(seed + k * 5.3)) * 0.92, x = b[0] + cos(a) * b[2] * r, y = b[1] + sin(a) * b[3] * r; ctx.strokeStyle = (k % 3 ? pal[5] : pal[4]); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x - 2.2, y - 1.4); ctx.lineTo(x, y + 1); ctx.lineTo(x + 2.2, y - 1.6); ctx.stroke(); }
+        ctx.restore();
+        ctx.restore();
+    }
     function drawTree(ctx, o, t) {
         const ow = o.w || 40, oh = o.h || 50, cx = o.x + ow / 2, by = o.y + oh, v = Math.floor(hash((o.id || 1) * 1.37) * 3), sw = sin(t * 1.1 + cx * 0.04) * 1.6, s = ow / 40;
         ctx.fillStyle = 'rgba(0,0,0,0.26)'; ctx.beginPath(); ctx.ellipse(cx + 6 * s, by - 1, 18 * s, 5 * s, 0, 0, TAU); ctx.fill();
@@ -392,17 +414,24 @@
         const trunk = (w, col) => { ctx.beginPath(); ctx.moveTo(-w, 0); ctx.quadraticCurveTo(-w + 1, -12, -w * 0.7, -26); ctx.lineTo(w * 0.7, -26); ctx.quadraticCurveTo(w - 1, -12, w, 0); ctx.quadraticCurveTo(0, 3, -w, 0); ctx.closePath(); paint(ctx, lg(ctx, -w, 0, w, 0, [[0, shade(col, 0.15)], [1, shade(col, -0.35)]]), OUT, 1.2); ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 0.8; for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.moveTo(-w * 0.5 + i * w * 0.35, -2); ctx.lineTo(-w * 0.4 + i * w * 0.3, -20); ctx.stroke(); } };
         if (v === 1) {   // pinheiro
             trunk(4.6, '#6a4326');
-            [[-30, 21, 12], [-20, 17, 10], [-11, 13, 9], [-4, 9, 8]].forEach((r, i) => { const sx = sin(t * 1.2 + i) * 0.5; ctx.beginPath(); ctx.moveTo(-r[1] + sx, r[0] + 16 - i * 2); ctx.lineTo(sx + sw * (0.4 + i * 0.15), r[0] - r[2] - 9); ctx.lineTo(r[1] + sx, r[0] + 16 - i * 2); ctx.quadraticCurveTo(0, r[0] + 21 - i * 2, -r[1] + sx, r[0] + 16 - i * 2); ctx.closePath(); paint(ctx, lg(ctx, -r[1], 0, r[1], 0, [[0, '#2f8a4a'], [0.6, '#1f6a34'], [1, '#124a24']]), OUT, 1.1); });
-            ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.beginPath(); ctx.moveTo(-3, -60); ctx.lineTo(2, -52); ctx.lineTo(-6, -50); ctx.fill();
+            const tiers = [[-10, 22, 24], [-22, 19, 22], [-34, 16, 20], [-46, 12, 18], [-57, 8, 16]];   // [base y, meia largura, altura]: do maior (embaixo) ao menor (topo)
+            tiers.forEach((r, i) => {
+                const sx = sin(t * 1.2 + i) * 0.5 + sw * (0.15 + i * 0.12), by0 = r[0], hw = r[1], hh = r[2];
+                ctx.beginPath(); ctx.moveTo(-hw, by0); ctx.lineTo(sx, by0 - hh); ctx.lineTo(hw, by0);
+                for (let k = 4; k >= 0; k--) { const x = -hw + (2 * hw) * (k / 4) * 1; const px = hw - (2 * hw) * ((4 - k) / 4); ctx.quadraticCurveTo(px + hw / 8, by0 + 4, px - hw / 4, by0 + (k % 2 ? 1 : 3.4)); }
+                ctx.closePath(); paint(ctx, lg(ctx, -hw, by0 - hh, hw, by0, [[0, '#4fb56a'], [0.5, '#2a8a4a'], [1, '#155f33']]), OUT, 1.3);
+                ctx.fillStyle = 'rgba(210,255,200,0.16)'; ctx.beginPath(); ctx.moveTo(sx, by0 - hh + 1); ctx.lineTo(-hw * 0.5, by0 - 3); ctx.lineTo(-hw * 0.1, by0 - 2); ctx.closePath(); ctx.fill();
+                ctx.fillStyle = 'rgba(0,30,10,0.22)'; ctx.beginPath(); ctx.moveTo(sx, by0 - hh + 1); ctx.lineTo(hw * 0.95, by0 - 1); ctx.lineTo(hw * 0.35, by0 - 2); ctx.closePath(); ctx.fill();
+            });
         } else if (v === 2) {   // bétula
             ctx.beginPath(); ctx.moveTo(-3.6, 0); ctx.lineTo(-2.8, -30); ctx.lineTo(2.8, -30); ctx.lineTo(3.6, 0); ctx.closePath(); paint(ctx, lg(ctx, -3.6, 0, 3.6, 0, [[0, '#f4f1e8'], [1, '#bfb8a6']]), OUT, 1.1); ctx.fillStyle = '#2a2a2a'; [[-1, -8], [0.6, -16], [-1.4, -23]].forEach(p => ctx.fillRect(p[0], p[1], 2.6, 1.2));
-            [[-10, -36, 11], [10, -38, 10], [0, -46, 13], [0, -32, 12], [-7, -44, 9], [8, -30, 9]].forEach((b, i) => { const x = b[0] + sw * (0.4 + (b[1] + 50) * 0.02); ell(ctx, x, b[1], b[2], b[2] * 0.85, rg(ctx, x - 3, b[1] - 3, 1, b[2], [[0, '#c8e86a'], [1, '#6aa02a']]), OUT, 1); });
+            foliage(ctx, o, [[-11, -38, 15, 12], [11, -40, 14, 12], [0, -50, 17, 13], [0, -34, 16, 10]], sw * (0.5), ['#d5f07a', '#9ccc3c', '#5f9a26', 'rgba(240,255,150,0.42)', 'rgba(20,70,10,0.32)', 'rgba(240,255,170,0.7)'], (o.id || 1) * 1.7, 0);
         } else {   // carvalho
             trunk(6, '#6f4526'); ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.moveTo(-6, 0); ctx.lineTo(-11, 2); ctx.lineTo(-4, -3); ctx.fill(); ctx.beginPath(); ctx.moveTo(6, 0); ctx.lineTo(11, 2); ctx.lineTo(4, -3); ctx.fill();
-            const bl = [[-13, -34, 13], [13, -36, 12], [0, -50, 15], [-1, -34, 16], [-14, -46, 10], [13, -48, 10], [0, -27, 12]];
-            bl.forEach((b, i) => { const x = b[0] + sw * (0.4 + (b[1] + 55) * 0.02); ell(ctx, x, b[1], b[2], b[2] * 0.86, rg(ctx, x - 4, b[1] - 4, 1, b[2] + 4, [[0, '#57cf62'], [0.55, '#2f9a3f'], [1, '#1a6a2a']]), OUT, 1.1); });
-            for (let i = 0; i < 14; i++) { const x = (hash(i * 3.3 + o.x) - 0.5) * 34 + sw * 0.6, y = -30 - hash(i * 4.1) * 26; ell(ctx, x, y, 2, 1.4, 'rgba(190,255,150,0.5)', null); }
-            if (hash((o.id || 1) * 9.1) > 0.7) { [[-8, -38], [6, -46]].forEach(p => ell(ctx, p[0] + sw, p[1], 2, 2, '#e0384a', OUT, 0.5)); }
+            ctx.strokeStyle = OUT; ctx.lineWidth = 6.4; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(0, -20); ctx.lineTo(-9, -34); ctx.moveTo(0, -22); ctx.lineTo(10, -36); ctx.stroke();
+            ctx.strokeStyle = '#6f4526'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(0, -20); ctx.lineTo(-9, -34); ctx.moveTo(0, -22); ctx.lineTo(10, -36); ctx.stroke();
+            foliage(ctx, o, [[0, -45, 26, 19], [-17, -37, 17, 13], [17, -38, 17, 13], [-6, -57, 17, 12], [9, -56, 15, 11]], sw * 0.6, ['#7ddb6a', '#3fa544', '#1c6a2d', 'rgba(200,255,150,0.34)', 'rgba(0,45,15,0.36)', 'rgba(210,255,160,0.55)'], (o.id || 1) * 2.3, 0);
+            if (hash((o.id || 1) * 9.1) > 0.7) { [[-8, -38], [6, -46], [14, -34]].forEach(p => ell(ctx, p[0] + sw, p[1], 2.2, 2.2, '#e0384a', OUT, 0.6)); }
         }
         ctx.restore();
     }

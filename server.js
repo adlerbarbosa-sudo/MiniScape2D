@@ -82,6 +82,7 @@ function loadDB() {
     } catch (e) {
         console.error('[DB] database.json ilegível:', e.message);
         try { fs.copyFileSync(DB_FILE, DB_FILE + '.corrompido-' + Date.now()); } catch (_) { }
+        try { if (fs.existsSync(DB_FILE + '.bak')) { console.error('[DB] restaurando de database.json.bak'); return normalizeDB(JSON.parse(fs.readFileSync(DB_FILE + '.bak', 'utf8'))); } } catch (e2) { console.error('[DB] .bak também ilegível:', e2.message); }
     }
     return emptyDB();
 }
@@ -89,17 +90,27 @@ let db = loadDB();
 let worldStr = db.worldData ? JSON.stringify(db.worldData) : '';
 let dbStr = JSON.stringify([db.itemDB, db.npcDB]);
 
-let dirty = false, flushTimer = null;
+let dirty = false, flushTimer = null, lastSnap = 0;
 function markDirty() { dirty = true; if (!flushTimer) flushTimer = setTimeout(flushDB, 1500); }
+/* grava de forma atômica (arquivo temporário + fsync + rename) e mantém cópias: .bak (último save bom) e snapshots de hora em hora (últimos 12) */
 function flushDB() {
-    flushTimer = null; if (!dirty) return; dirty = false;
+    if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+    if (!dirty) return; dirty = false;
     try {
         fs.mkdirSync(DATA_DIR, { recursive: true });
-        const tmp = DB_FILE + '.tmp';
-        fs.writeFileSync(tmp, JSON.stringify(db), 'utf8');
+        const tmp = DB_FILE + '.tmp', json = JSON.stringify(db);
+        const fd = fs.openSync(tmp, 'w'); fs.writeSync(fd, json, 0, 'utf8'); try { fs.fsyncSync(fd); } catch (_) { } fs.closeSync(fd);
+        if (fs.existsSync(DB_FILE)) { try { fs.copyFileSync(DB_FILE, DB_FILE + '.bak'); } catch (_) { } }
         fs.renameSync(tmp, DB_FILE);
-    } catch (e) { console.error('[DB] erro ao gravar:', e.message); dirty = true; }
+        if (Date.now() - lastSnap > 3600000) {
+            lastSnap = Date.now();
+            const dir = path.join(DATA_DIR, 'backups'); fs.mkdirSync(dir, { recursive: true });
+            fs.writeFileSync(path.join(dir, 'database-' + new Date().toISOString().replace(/[:.]/g, '-') + '.json'), json, 'utf8');
+            fs.readdirSync(dir).filter(f => f.startsWith('database-')).sort().slice(0, -12).forEach(f => { try { fs.unlinkSync(path.join(dir, f)); } catch (_) { } });
+        }
+    } catch (e) { console.error('[DB] erro ao gravar:', e.message); dirty = true; if (!flushTimer) flushTimer = setTimeout(flushDB, 5000); }
 }
+setInterval(() => { if (dirty) flushDB(); }, 10000).unref();
 ['SIGINT', 'SIGTERM'].forEach(sig => process.on(sig, () => { flushDB(); process.exit(0); }));
 process.on('exit', flushDB);
 process.on('unhandledRejection', e => console.error('[unhandledRejection]', e));
@@ -221,7 +232,7 @@ app.post('/api/register', rateLimit('reg', 10, 60000), async (req, res) => {
     if (Object.keys(db.users).some(n => n.toLowerCase() === username.toLowerCase())) return res.status(400).json({ error: 'Usuário já existe!' });
     if (Object.keys(db.users).length >= 5000) return res.status(400).json({ error: 'Servidor cheio.' });
     db.users[username] = { password: await hashPw(password), role: 'player', playerData: null };   // nunca cria admin por aqui
-    markDirty(); res.json({ success: true });
+    markDirty(); flushDB(); res.json({ success: true });   // conta nova é gravada na hora
 });
 
 app.post('/api/login', rateLimit('login', 20, 60000), async (req, res) => {

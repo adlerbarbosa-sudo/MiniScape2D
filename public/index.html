@@ -3,87 +3,55 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MiniScape 2D - V81 (Correções e Segurança)</title>
-    <style>
-        /* === BASE & RESPONSIVIDADE === */
-        body { margin: 0; padding: 10px; background-color: #121212; color: #e0e0e0; font-family: 'Segoe UI', Tahoma, sans-serif; display: flex; gap: 15px; justify-content: center; height: 100vh; box-sizing: border-box; overflow: hidden; flex-direction: row; align-items: stretch; user-select: none; -webkit-user-select: none; }
-        input, textarea { user-select: auto; -webkit-user-select: auto; }
-        
-        @media (max-width: 850px) { body { flex-direction: column; align-items: center; padding: 5px; overflow-y: auto; height: auto;} #ui-panel { width: 100% !important; max-width: 100%; min-height: 500px; } .mobile-btn { display: block !important; } #game-container { height: 50vh; min-height: 400px; } }
-        
-        #game-container { position: relative; flex: 1; border: 2px solid #3d2e24; background-color: #000; box-shadow: 0 0 20px rgba(0,0,0,0.8); overflow: hidden; border-radius: 4px; display: block;}
-        #gameCanvas { cursor: crosshair; display: block; width: 100%; height: 100%; touch-action: none; border: none; padding: 0; margin: 0;}
-        
-        #chat-container { position: absolute; bottom: 10px; left: 10px; width: 350px; background: rgba(0, 0, 0, 0.7); border: 1px solid #3d2e24; border-radius: 4px; display: flex; flex-direction: column; z-index: 100; pointer-events: auto; }
-        #chat-box { height: 150px; overflow-y: auto; padding: 8px; font-size: 0.8rem; font-family: monospace; display: flex; flex-direction: column; gap: 4px;}
-        .chat-msg { color: white; text-shadow: 1px 1px 0 #000; word-wrap: break-word;}
-        #chat-input-area { display: flex; border-top: 1px solid #3d2e24; }
-        #chat-input { flex: 1; background: rgba(0,0,0,0.8); border: none; color: white; padding: 8px; font-size: 0.8rem; outline: none; }
-        #chat-send { background: #3d2e24; border: none; color: white; padding: 0 15px; cursor: pointer; font-weight: bold; }
-        #chat-send:hover { background: #5d4037; }
-
-        .mobile-btn { display: none; width: 100%; padding: 15px; margin-bottom: 5px; background: #e74c3c; color: white; border: 2px solid #c0392b; border-radius: 4px; font-size: 1.1rem; font-weight: bold; cursor: pointer; text-shadow: 1px 1px 0 #000; }
-        
-        #tooltip { display: none; position: absolute; background: rgba(26, 21, 17, 0.95); border: 2px solid #5d4037; border-radius: 4px; padding: 8px; color: #fff; pointer-events: none; z-index: 3000; min-width: 120px; font-size: 0.8rem; box-shadow: 2px 2px 10px rgba(0,0,0,0.8); text-shadow: 1px 1px 0 #000; }
-        .tt-title { color: #f1c40f; font-weight: bold; font-size: 0.9rem; border-bottom: 1px solid #4a3321; margin-bottom: 4px; padding-bottom: 2px;} .tt-desc { color: #bdc3c7; margin-bottom: 4px; font-style: italic; font-size: 0.75rem;} .tt-stat { color: #2ecc71; } .tt-weight { color: #95a5a6; font-size: 0.7rem; margin-top: 4px; text-align: right; }
-        
-        #osrs-menu { display: none; position: absolute; background-color: #3d2e24; border: 2px solid #231912; box-shadow: 2px 2px 5px rgba(0,0,0,0.8); z-index: 9999; min-width: 150px; font-family: 'Courier New', Courier, monospace; font-weight: bold; color: #f1c40f; border-radius: 2px; }
-        .osrs-menu-item { padding: 8px 12px; cursor: pointer; font-size: 0.85rem; text-shadow: 1px 1px 0 #000; border-bottom: 1px solid #231912; } .osrs-menu-item:hover { background-color: #5d4037; color: #fff; }
-        
-        #custom-modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); z-index: 10000; align-items: center; justify-content: center; }
-        #custom-modal-box { background: #2c241b; border: 3px solid #5d4037; border-radius: 4px; padding: 20px; width: 320px; box-shadow: 0 0 25px black; color: white; display: flex; flex-direction: column; gap: 10px; }
-        
-        #ui-panel { width: 360px; min-width: 360px; background-color: #231c15; border: 2px solid #3d2e24; padding: 10px; display: flex; flex-direction: column; gap: 8px; box-sizing: border-box; overflow-y: hidden; border-radius: 4px; height: 100%; box-shadow: inset 0 0 15px rgba(0,0,0,0.8); }
-        .hud-header { display: flex; gap: 10px; align-items: stretch; background: #1a1511; padding: 8px; border: 1px solid #3d2e24; border-radius: 4px; }
-        #minimapCanvas { border: 2px solid #5d4037; background: #000; border-radius: 4px; width: 110px; height: 80px; flex-shrink: 0;}
-        .hud-bars-wrapper { flex-grow: 1; display: flex; flex-direction: column; justify-content: space-between; }
-        
-        .hud-bar-container { width: 100%; height: 18px; background: #111; border: 1px solid #000; position: relative; border-radius: 2px; overflow: hidden; box-shadow: inset 0 0 5px black;} 
-        .hud-bar-fill { height: 100%; transition: width 0.2s; } 
-        #bar-hp { background: linear-gradient(to bottom, #c0392b, #8e44ad); } #bar-mp { background: linear-gradient(to bottom, #2980b9, #2c3e50); } #bar-xp { background: linear-gradient(to bottom, #f39c12, #d35400); } 
-        .hud-text { position: absolute; width: 100%; text-align: center; top: -1px; left: 0; font-size: 0.75rem; font-weight: bold; color: white; text-shadow: 1px 1px 1px #000; line-height: 20px; } 
-        #action-text { color: #f1c40f; text-align: center; font-weight: bold; height: 16px; font-size: 0.8rem; text-shadow: 1px 1px 0 #000;}
-        
-        .tab-buttons { display: flex; gap: 2px; flex-wrap: wrap;} 
-        .tab-btn { flex: 1 1 20%; padding: 6px 2px; background: #3d2e24; color: #bdc3c7; border: 1px solid #231912; cursor: pointer; font-weight: bold; font-size: 0.70rem; text-align: center; border-radius: 2px 2px 0 0;} 
-        .tab-btn:hover { background: #5d4037; color: white;} .active-btn { background: #5d4037 !important; border-bottom: none !important; color: #f1c40f !important;} 
-        
-        #btn-dev { display: none !important; background-color: #c0392b; color: white; border-color: #900 !important; }
-        #btn-dev.is-admin { display: block !important; }
-        
-        .tab-content { display: none; background: #1a1511; padding: 10px; border: 1px solid #3d2e24; flex: 1; overflow-y: auto; border-radius: 0 4px 4px 4px;} .active-tab { display: block; }
-        
-        .grid-container { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; } .item-slot { aspect-ratio: 1; background: #231c15; border: 1px solid #3d2e24; position: relative; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; cursor: pointer; box-shadow: inset 0 0 8px rgba(0,0,0,0.6); border-radius: 3px; } .item-slot:hover { background: #3d2e24; border-color: #f1c40f;} .item-qty { position: absolute; top: 1px; left: 3px; color: #f1c40f; font-weight: bold; font-size: 0.65rem; text-shadow: 1px 1px 0 #000; font-family: Tahoma;}
-        #equip-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; text-align: center; font-size: 0.8rem; } .equip-slot-box { position: relative; background: #231c15; border: 1px solid #3d2e24; padding: 10px 5px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 4px;} .slot-name { color: #888; font-size: 0.65rem; margin-bottom: 2px; text-transform: uppercase;} .equip-icon { font-size: 1.5rem; } .skill-line { display: flex; justify-content: space-between; border-bottom: 1px solid #231c15; padding: 6px 4px; font-size: 0.75rem; color: #bdc3c7;}
-        
-        .spell-card { background: #231c15; border: 1px solid #3d2e24; padding: 8px; margin-bottom: 5px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s; border-radius: 4px;} .spell-card:hover { background: #3d2e24; } .spell-active { border: 1px solid #3498db; background: rgba(52, 152, 219, 0.1); } .spell-runes { font-size: 0.65rem; color: #95a5a6; }
-        .npc-dialog { background: #111; border-left: 4px solid #f1c40f; padding: 10px; font-style: italic; margin-bottom: 10px; color: #ecf0f1; font-size: 0.85rem;} .shop-item { display: flex; justify-content: space-between; align-items: center; background: #231c15; padding: 6px; border: 1px solid #3d2e24; margin-bottom: 4px; border-radius: 3px; font-size: 0.8rem;} .shop-btn { background: #5d4037; color: #fff; border: 1px solid #8b5a2b; padding: 4px 8px; font-weight: bold; cursor: pointer; font-size: 0.7rem; border-radius: 2px;} .shop-btn:hover { background: #8b5a2b; color: #f1c40f; } .shop-btn:disabled { background: #333; border-color: #222; color: #666; cursor: not-allowed; }
-        
-        .dev-sub-tabs { display: flex; margin-bottom: 10px; border-bottom: 2px solid #5d4037; flex-wrap: wrap;} .dev-sub-btn { background: #231c15; color: #888; border: none; padding: 6px 10px; cursor: pointer; font-size: 0.7rem; flex: 1; } .dev-sub-btn.active { background: #5d4037; color: #f1c40f; font-weight: bold; } .dev-sub-content { display: none; } .dev-sub-content.active { display: block; } .dev-form-group { margin-bottom: 8px; } .dev-form-group label { display: block; font-size: 0.65rem; color: #bdc3c7; margin-bottom: 2px; text-transform: uppercase;} .dev-input, .dev-select { width: 100%; padding: 6px; background: #111; color: #fff; border: 1px solid #3d2e24; box-sizing: border-box; font-size: 0.8rem; border-radius: 2px;} .dev-row { display: flex; gap: 5px; } .dev-save-btn { width: 100%; padding: 8px; background: #27ae60; color: white; border: none; font-weight: bold; cursor: pointer; margin-top: 5px; border-radius: 2px;} .dev-save-btn:hover { background: #2ecc71; } 
-        
-        #dev-entity-list { max-height: 180px; overflow-y: auto; background: #111; border: 1px solid #3d2e24; padding: 5px; border-radius: 4px;} .dev-ent-cat { color: #f39c12; font-size: 0.7rem; border-bottom: 1px solid #333; margin-top: 5px; padding-bottom: 2px; text-transform: uppercase; font-weight: bold;} .dev-ent-item { padding: 6px; font-size: 0.8rem; cursor: pointer; color: #ecf0f1; border-radius: 3px; display: flex; align-items: center; gap: 8px;} .dev-ent-item:hover { background: #2c241b; color: #f1c40f;} .dev-ent-item.selected { background: #5d4037; font-weight: bold; color: white;} .entity-selector-item:hover { filter: brightness(1.5); }
-        .map-tile-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; background: #222; padding: 2px; border: 2px solid #111; border-radius: 4px;} .map-tile { aspect-ratio: 1; background: #111; color: #888; font-size: 0.6rem; display: flex; align-items: center; justify-content: center; cursor: pointer; text-align: center; word-break: break-all; border-radius: 2px;} .map-tile:hover { background: #333; color: white;} .map-tile.active-tile { border: 2px solid #f1c40f; background: #5d4037; color: white;}
-
-        #login-overlay { display: flex; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #121212; z-index: 20000; align-items: center; justify-content: center; flex-direction: column; }
-        .login-box { background: #1e1e1e; border: 4px solid #3d2e24; padding: 30px; border-radius: 8px; width: 300px; box-shadow: 0 0 30px black; text-align: center;}
-        .login-box h1 { color: #f1c40f; margin-top: 0; text-transform: uppercase; letter-spacing: 2px;}
-        .login-input { width: 100%; padding: 10px; margin-bottom: 15px; background: #111; border: 1px solid #5d4037; color: white; box-sizing: border-box; border-radius: 4px;}
-        .login-btn { width: 100%; padding: 12px; background: #27ae60; color: white; border: none; font-weight: bold; cursor: pointer; border-radius: 4px; margin-bottom: 10px;}
-        .login-btn.reg { background: #2980b9; }
-        #login-msg { color: #e74c3c; font-size: 0.85rem; font-weight: bold; min-height: 20px; margin-bottom: 10px;}
-    </style>
+    <title>MiniScape 2D</title>
+    <link rel="stylesheet" href="ui.css">
 </head>
 <body>
 
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-bag" viewBox="0 0 24 24"><path d="M8 7V5.5A2.5 2.5 0 0 1 10.5 3h3A2.5 2.5 0 0 1 16 5.5V7"/><path d="M5 7h14l1 13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M9 12h6"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 5-3 8.5-7 10-4-1.500-7-5-7-10V6z"/><path d="M12 8v8M8.500 11h7"/></symbol>
+<symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3l2.600 5.600 6.100.7-4.500 4.200 1.200 6L12 16.500 6.600 19.500l1.200-6L3.300 9.300l6.100-.7z"/></symbol>
+<symbol id="i-book" viewBox="0 0 24 24"><path d="M4 5.500A1.500 1.500 0 0 1 5.500 4H11v16H5.500A1.500 1.500 0 0 0 4 21.500z"/><path d="M20 5.500A1.500 1.500 0 0 0 18.500 4H13v16h5.500A1.500 1.500 0 0 1 20 21.500z"/></symbol>
+<symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3v5M12 16v5M3 12h5M16 12h5M6 6l3 3M15 15l3 3M18 6l-3 3M9 15l-3 3"/></symbol>
+<symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 5h16v11H10l-4 4v-4H4z"/></symbol>
+<symbol id="i-chest" viewBox="0 0 24 24"><path d="M4 10a8 6 0 0 1 16 0v9H4z"/><path d="M4 12h16M11 12v3h2v-3"/></symbol>
+<symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.600 5.600l2.100 2.100M16.300 16.300l2.100 2.100M18.400 5.600l-2.100 2.100M7.700 16.300l-2.100 2.100"/></symbol>
+<symbol id="i-sword" viewBox="0 0 24 24"><path d="M14.500 4.500L20 4l-.5 5.500L9 20l-5-5z"/><path d="M6.500 12.500l5 5M4 20l3-3"/></symbol>
+<symbol id="i-hand" viewBox="0 0 24 24"><path d="M8 13V6a1.500 1.500 0 0 1 3 0v5m0-6a1.500 1.500 0 0 1 3 0v6m0-4a1.500 1.500 0 0 1 3 0v7a6 6 0 0 1-6 6h-.5A5.500 5.500 0 0 1 6 16.500L4.500 13a1.500 1.500 0 0 1 2.500-1.500z"/></symbol>
+<symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+<symbol id="i-crown" viewBox="0 0 24 24"><path d="M3 8l4 4 5-7 5 7 4-4-2 11H5z"/></symbol>
+<symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.400-5.700"/><path d="M20 4v5h-5"/></symbol>
+<symbol id="i-save" viewBox="0 0 24 24"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h7V4M8 20v-6h8v6"/></symbol>
+<symbol id="i-exit" viewBox="0 0 24 24"><path d="M10 4H5v16h5"/><path d="M15 8l4 4-4 4M19 12H9"/></symbol>
+<symbol id="i-down" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></symbol>
+<symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 3L5 14h6l-1 7 8-11h-6z"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M16 16l5 5"/></symbol>
+<symbol id="i-map" viewBox="0 0 24 24"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v14M15 6v14"/></symbol>
+<symbol id="i-castle" viewBox="0 0 24 24"><path d="M4 21V8h3v2h2V8h2v2h2V8h3v2h2V8h3v13z" transform="translate(-1 -1)"/><path d="M10 21v-5a2 2 0 0 1 4 0v5"/></symbol>
+<symbol id="i-compass" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15.500 8.500l-2 5-5 2 2-5z"/></symbol>
+<symbol id="i-grid" viewBox="0 0 24 24"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/></symbol>
+<symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></symbol>
+<symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18h.01"/></symbol>
+<symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21V4M5 5h12l-2 4 2 4H5"/></symbol>
+</defs></svg>
+
     <div id="login-overlay">
-        <div class="login-box">
-            <h1>MiniScape</h1>
-            <p style="font-size: 0.8rem; color: #bdc3c7;">Servidor Online / Offline</p>
-            <input type="text" id="auth-user" class="login-input" placeholder="Usuário">
-            <input type="password" id="auth-pass" class="login-input" placeholder="Senha">
-            <div id="login-msg"></div>
-            <button class="login-btn" onclick="login()">Entrar no Jogo</button>
-            <button class="login-btn reg" onclick="register()">Criar Conta Nova</button>
+        <canvas id="login-scene"></canvas>
+        <div class="login-wrap">
+            <div class="login-logo">
+                <h1>MiniScape<span>2 D</span></h1>
+                <div class="orn"><i></i><svg class="ic "><use href="#i-sword"/></svg><i></i></div>
+            </div>
+            <form class="login-box" onsubmit="event.preventDefault(); login();" autocomplete="on">
+                <div class="login-field"><label for="auth-user">Nome do aventureiro</label><svg class="ic "><use href="#i-user"/></svg><input type="text" id="auth-user" class="login-input" placeholder="Seu nome" autocomplete="username" maxlength="20"></div>
+                <div class="login-field"><label for="auth-pass">Senha</label><svg class="ic "><use href="#i-lock"/></svg><input type="password" id="auth-pass" class="login-input" placeholder="Sua senha secreta" autocomplete="current-password"></div>
+                <div id="login-msg"></div>
+                <button type="submit" class="login-btn"><svg class="ic "><use href="#i-crown"/></svg> Entrar no Reino</button>
+                <button type="button" class="login-btn reg" onclick="register()"><svg class="ic "><use href="#i-flag"/></svg> Criar novo aventureiro</button>
+            </form>
+            <div class="login-foot">Colha, lute, construa e explore. Dentro do jogo o <b>Livro de Ofícios</b> e o <b>Guia do Aventureiro</b> explicam tudo.</div>
         </div>
     </div>
 
@@ -94,11 +62,15 @@
         <div id="osrs-menu"></div>
         
         <div id="game-container">
-            <canvas id="gameCanvas"></canvas>
+                        <canvas id="gameCanvas"></canvas>
+            <div id="quest-tracker" title="Clique para abrir o Guia do Aventureiro"></div>
+            <div id="hover-hint"></div>
+            <div id="key-hints"><b>WASD</b>/setas andar · <b>Espaço</b> agir · <b>Ctrl</b> atacar · <b>Enter</b> chat · <b>H</b> guia · clique direito: menu</div>
             <div id="chat-container">
+                <div id="chat-hint">Enter para falar</div>
                 <div id="chat-box"></div>
                 <div id="chat-input-area">
-                    <input type="text" id="chat-input" placeholder="Aperte Enter para falar...">
+                    <input type="text" id="chat-input" placeholder="Digite e aperte Enter (Esc fecha)" maxlength="140" autocomplete="off">
                     <button id="chat-send" onclick="sendChat()">Enviar</button>
                 </div>
             </div>
@@ -116,26 +88,27 @@
             
             <div id="action-text">Conectado ao Mundo!</div>
             
-            <button id="mobile-action-btn" class="mobile-btn" onclick="tryPickupOrInteract()">🎯 AÇÃO (ESPAÇO)</button>
-            <button id="mobile-atk-btn" class="mobile-btn" style="background:#8e44ad; border-color:#9b59b6; margin-top:-5px;" onclick="tryAttack()">⚔️ ATACAR (CTRL)</button>
+            <button id="mobile-action-btn" class="mobile-btn" onclick="tryPickupOrInteract()"><svg class="ic "><use href="#i-hand"/></svg> AGIR (ESPAÇO)</button>
+            <button id="mobile-atk-btn" class="mobile-btn" onclick="tryAttack()"><svg class="ic "><use href="#i-sword"/></svg> ATACAR</button>
 
             <!-- O BOTÃO DO BANCO ESTÁ AQUI -->
             <div class="tab-buttons" id="tab-buttons-container">
-                <button id="btn-inv" class="tab-btn active-btn" onclick="openTab('inv')">Inv</button>
-                <button id="btn-eq" class="tab-btn" onclick="openTab('eq')">Equip</button>
-                <button id="btn-sk" class="tab-btn" onclick="openTab('sk')">Skills</button>
-                <button id="btn-craft" class="tab-btn" onclick="openTab('craft'); updateUI();" style="background-color: #d35400;">Craft</button>
-                <button id="btn-mag" class="tab-btn" onclick="openTab('mag')" style="background-color: #3498db;">✨</button>
-                <button id="btn-npc" class="tab-btn" onclick="openTab('npc')" style="display:none;">Falar</button>
-                <button id="btn-bank" class="tab-btn" onclick="openTab('bank')" style="display:none;">Banco</button>
-                <button id="btn-cfg" class="tab-btn" onclick="openTab('cfg')">⚙️</button>
+                <button id="btn-inv" class="tab-btn active-btn" onclick="openTab('inv')"><svg class="ic "><use href="#i-bag"/></svg><span>Mochila</span></button>
+                <button id="btn-eq" class="tab-btn" onclick="openTab('eq')"><svg class="ic "><use href="#i-shield"/></svg><span>Equip.</span></button>
+                <button id="btn-sk" class="tab-btn" onclick="openTab('sk')"><svg class="ic "><use href="#i-star"/></svg><span>Perícias</span></button>
+                <button id="btn-craft" class="tab-btn" onclick="openTab('craft'); updateUI();"><svg class="ic "><use href="#i-book"/></svg><span>Ofícios</span></button>
+                <button id="btn-mag" class="tab-btn" onclick="openTab('mag')"><svg class="ic "><use href="#i-spark"/></svg><span>Magia</span></button>
+                <button id="btn-npc" class="tab-btn" onclick="openTab('npc')" style="display:none;"><svg class="ic "><use href="#i-chat"/></svg><span>Falar</span></button>
+                <button id="btn-bank" class="tab-btn" onclick="openTab('bank')" style="display:none;"><svg class="ic "><use href="#i-chest"/></svg><span>Banco</span></button>
+                <button id="btn-guide" class="tab-btn" onclick="openTab('guide')"><svg class="ic "><use href="#i-compass"/></svg><span>Guia</span></button>
+                <button id="btn-cfg" class="tab-btn" onclick="openTab('cfg')"><svg class="ic "><use href="#i-gear"/></svg><span>Menu</span></button>
             </div>
 
             <div id="tab-inv" class="tab-content active-tab"><div id="inv-grid" class="grid-container"></div><div style="font-size: 0.65rem; color: #888; margin-top: 10px; text-align: right;">Peso: <span id="weight-txt" style="color:#bdc3c7;">0</span> / 50 kg</div></div>
             <div id="tab-eq" class="tab-content"><div id="equip-grid"><div class="equip-slot-box" onclick="unequip('head')"><span class="slot-name">Cabeça</span><span id="eq-head" class="equip-icon"></span></div><div class="equip-slot-box" onclick="unequip('body')"><span class="slot-name">Tronco</span><span id="eq-body" class="equip-icon"></span></div><div class="equip-slot-box" onclick="unequip('ammo')"><span class="slot-name">Munição</span><span id="eq-ammo" class="equip-icon"></span><span id="ammo-qty" class="item-qty" style="top:auto; bottom:2px;"></span></div><div class="equip-slot-box" onclick="unequip('weapon')"><span class="slot-name">Arma</span><span id="eq-weapon" class="equip-icon"></span></div><div class="equip-slot-box" onclick="unequip('shield')"><span class="slot-name">Escudo</span><span id="eq-shield" class="equip-icon"></span></div><div class="equip-slot-box"></div></div><div style="margin-top:10px; font-size:0.75rem; color:#f1c40f; text-align: center;" id="def-stats">Bônus de Defesa: 0</div></div>
             <div id="tab-sk" class="tab-content"><div id="skills-list"></div></div>
-            <div id="tab-craft" class="tab-content"><div style="font-size: 0.7rem; color: #bdc3c7; margin-bottom: 10px;">Crie itens e armas.</div><div id="craft-list"></div></div>
-            <div id="tab-mag" class="tab-content"><div style="font-size: 0.7rem; color: #bdc3c7; margin-bottom: 10px;">Equipe um Cajado e clique na magia.</div><div id="spellbook-list"></div></div>
+            <div id="tab-craft" class="tab-content"><div id="craft-list"></div></div>
+            <div id="tab-mag" class="tab-content"><div class="tab-note">Equipe um <b>Cajado</b> e clique na magia para prepará-la; depois use <b>Ctrl</b> perto de um inimigo. Cada lançamento gasta runas e MP.</div><div id="spellbook-list"></div></div>
             <div id="tab-npc" class="tab-content"><h3 id="npc-title" style="margin-top:0; color:#f39c12;">NPC</h3><div id="npc-dialog" class="npc-dialog">...</div><div id="npc-shop-list"></div></div>
 
             <div id="tab-dev" class="tab-content">
@@ -144,39 +117,40 @@
                     <button class="dev-sub-btn" onclick="openDevSub('dev-map-manager', this)">Mundos</button>
                     <button class="dev-sub-btn" onclick="openDevSub('dev-items', this)">Itens</button>
                     <button class="dev-sub-btn" onclick="openDevSub('dev-npcs', this)">NPCs</button>
-                    <button class="dev-sub-btn" onclick="openDevSub('dev-players', this)">👥 Contas</button>
-                    <button class="dev-sub-btn" onclick="openDevSub('dev-import', this)" style="color: #9b59b6; font-weight:bold;">📥 Import</button>
+                    <button class="dev-sub-btn" onclick="openDevSub('dev-players', this)">Contas</button>
+                    <button class="dev-sub-btn" onclick="openDevSub('dev-import', this)" style="color: #9b59b6; font-weight:bold;">Importar</button>
                 </div>
                 
                 <div id="dev-players" class="dev-sub-content">
                     <h3 style="color:#2ecc71; margin-top:0; border-bottom: 1px solid #333; padding-bottom:5px;">Gerenciar Contas & VIP</h3>
                     <p style="font-size:0.7rem; color:#bdc3c7;">Atribua multiplicadores de XP para jogadores.</p>
-                    <button class="dev-save-btn" style="background:#3498db;" onclick="loadDevPlayers()">🔄 Atualizar Lista de Players</button>
+                    <button class="dev-save-btn" style="background:#3498db;" onclick="loadDevPlayers()">Atualizar lista de jogadores</button>
                     <div id="dev-players-list" style="margin-top:10px; display:flex; flex-direction:column; gap:5px; max-height:250px; overflow-y:auto; border: 1px solid #3d2e24; padding:5px;">
                         <span style="color:#888; font-size:0.8rem; text-align:center;">Clique em Atualizar...</span>
                     </div>
-                    <h3 style="color:#f39c12; margin-top:20px; border-bottom: 1px solid #333; padding-bottom:5px;">💾 Backup do Servidor</h3>
+                    <h3 style="color:#f39c12; margin-top:20px; border-bottom: 1px solid #333; padding-bottom:5px;">Backup do Servidor</h3>
                     <p style="font-size:0.7rem; color:#bdc3c7;">Previna o wipe do Render! Baixe seu mapa e contas.</p>
-                    <button class="dev-save-btn" onclick="downloadServerBackup()">📥 Baixar Backup DB</button>
+                    <button class="dev-save-btn" onclick="downloadServerBackup()">Baixar backup</button>
                     <textarea id="db-restore-code" class="dev-input" style="height:60px; font-family:monospace; resize:none; margin-top:10px;" placeholder="Cole o código do Backup aqui para Restaurar..."></textarea>
-                    <button class="dev-save-btn" style="background:#e74c3c;" onclick="restoreServerBackup()">⚠️ Restaurar Backup no Servidor</button>
+                    <button class="dev-save-btn" style="background:#e74c3c;" onclick="restoreServerBackup()">Restaurar backup no servidor</button>
                 </div>
 
                 <!-- IMPORTAÇÃO UNIVERSAL E BLINDADA -->
                 <div id="dev-import" class="dev-sub-content">
-                    <h3 style="color:#2ecc71; margin-top:0;">📡 Injetor de Expansão</h3>
+                    <h3 style="color:#2ecc71; margin-top:0;">Injetor de Expansão</h3>
                     <p style="font-size:0.75rem; color:#bdc3c7; line-height: 1.4;">Cole o código <b>Base64</b> ou <b>JSON puro</b> abaixo.</p>
                     <textarea id="dev-import-code" class="dev-input" style="height:120px; font-family:monospace; resize: none; margin-bottom: 10px;" placeholder="Cole o código Base64 ou texto JSON aqui..."></textarea>
-                    <button class="dev-save-btn" onclick="importDevCode()" style="background:#8e44ad; font-size: 1rem;">⚡ Injetar Pacote</button>
+                    <button class="dev-save-btn" onclick="importDevCode()" style="background:#8e44ad; font-size: 1rem;">Injetar pacote</button>
                 </div>
                 
-                <div id="dev-map" class="dev-sub-content active"><div class="dev-row" style="margin-bottom: 5px;"><input type="text" id="dev-search" class="dev-input" placeholder="🔍 Buscar entidade..." oninput="filterDevEntities(this.value)" style="flex: 1; border-color: #5d4037;"><button class="dev-save-btn" style="width: auto; margin:0; background:#3d2e24;" onclick="toggleDevView()" title="Alternar Vista">🔲/📄</button></div><div id="dev-entity-list"></div><div class="dev-row" style="margin-top: 8px;"><input type="number" id="spawn-w" class="dev-input" placeholder="Largura (W)"><input type="number" id="spawn-h" class="dev-input" placeholder="Altura (H)"></div><div class="dev-form-group" style="margin-top: 5px;"><input type="text" id="spawn-img" class="dev-input" placeholder="URL Imagem PNG (Opcional)"></div><button onclick="toggleDevBuild()" id="btn-build-mode" style="width: 100%; padding: 10px; background: #e67e22; color: white; border: none; font-weight: bold; cursor: pointer; margin-top:5px; border-radius:4px;">Modo Construção: OFF</button><p style="font-size: 0.7rem; color: #f1c40f; margin-top:10px;">ESQUERDO: Colocar | DIREITO: <b>Apagar</b></p></div>
-                <div id="dev-map-manager" class="dev-sub-content"><div class="dev-form-group" style="background:#1a1511; padding:10px; border:1px solid #3d2e24; margin-bottom:10px; border-radius:4px;"><label style="color:#2ecc71; margin-bottom:5px;">🗺️ Editar Mapa Atual: <span id="cur-map-id-disp"></span></label><div class="dev-row"><input type="text" id="cur-map-name" class="dev-input" placeholder="Nome"><input type="color" id="cur-map-color" class="dev-input" style="padding:0; height:28px;"></div><div class="dev-row" style="margin-top:5px;"><input type="number" id="cur-map-w" class="dev-input" placeholder="Larg (W)"><input type="number" id="cur-map-h" class="dev-input" placeholder="Alt (H)"></div><button class="dev-save-btn" onclick="saveCurrentMapSettings()">Salvar Alterações</button></div><p style="font-size:0.7rem; color:#bdc3c7;">Conecte seus mapas clicando na grade.</p><div id="map-grid-ui" class="map-tile-grid"></div><div class="dev-form-group" style="background:#1a1511; padding:10px; border:1px solid #3d2e24; margin-top:10px; border-radius:4px;"><label style="color:#f1c40f;">🏰 Mundo Medieval (catálogo novo)</label><button class="dev-save-btn" style="background:#8e44ad;" onclick="installCatalogWorld()">Instalar mapas novos (5 mapas)</button><a href="catalogo.html" target="_blank" style="display:block; margin-top:6px; color:#3498db; font-size:0.8rem;">📖 Abrir catálogo de monstros e construções</a></div><div class="dev-form-group" style="margin-top:10px; padding-top: 10px; border-top: 1px solid #444;"><label style="color:#f39c12;">Criar Novo Mapa Solto:</label><div class="dev-row"><input type="text" id="dm-id" class="dev-input" placeholder="ID (floresta)"><input type="text" id="dm-name" class="dev-input" placeholder="Nome Exibição"></div><div class="dev-row" style="display:flex;gap:5px;margin:5px 0;"><input type="number" id="dm-w" class="dev-input" placeholder="Largura" value="800"><input type="number" id="dm-h" class="dev-input" placeholder="Altura" value="600"><input type="color" id="dm-color" value="#4a6b2d" style="width:44px;height:30px;"></div><button class="dev-save-btn" onclick="createNewMap()">Criar Mapa Base</button></div></div>
+                <div id="dev-map" class="dev-sub-content active"><div class="dev-row" style="margin-bottom: 5px;"><input type="text" id="dev-search" class="dev-input" placeholder="Buscar entidade..." oninput="filterDevEntities(this.value)" style="flex: 1; border-color: #5d4037;"><button class="dev-save-btn" style="width: auto; margin:0; background:#3d2e24;" onclick="toggleDevView()" title="Alternar Vista">Vista</button></div><div id="dev-entity-list"></div><div class="dev-row" style="margin-top: 8px;"><input type="number" id="spawn-w" class="dev-input" placeholder="Largura (W)"><input type="number" id="spawn-h" class="dev-input" placeholder="Altura (H)"></div><div class="dev-form-group" style="margin-top: 5px;"><input type="text" id="spawn-img" class="dev-input" placeholder="URL Imagem PNG (Opcional)"></div><button onclick="toggleDevBuild()" id="btn-build-mode" style="width: 100%; padding: 10px; background: #e67e22; color: white; border: none; font-weight: bold; cursor: pointer; margin-top:5px; border-radius:4px;">Modo Construção: OFF</button><p style="font-size: 0.7rem; color: #f1c40f; margin-top:10px;">ESQUERDO: Colocar | DIREITO: <b>Apagar</b></p></div>
+                <div id="dev-map-manager" class="dev-sub-content"><div class="dev-form-group" style="background:#1a1511; padding:10px; border:1px solid #3d2e24; margin-bottom:10px; border-radius:4px;"><label style="color:#2ecc71; margin-bottom:5px;">Editar mapa atual: <span id="cur-map-id-disp"></span></label><div class="dev-row"><input type="text" id="cur-map-name" class="dev-input" placeholder="Nome"><input type="color" id="cur-map-color" class="dev-input" style="padding:0; height:28px;"></div><div class="dev-row" style="margin-top:5px;"><input type="number" id="cur-map-w" class="dev-input" placeholder="Larg (W)"><input type="number" id="cur-map-h" class="dev-input" placeholder="Alt (H)"></div><button class="dev-save-btn" onclick="saveCurrentMapSettings()">Salvar Alterações</button></div><p style="font-size:0.7rem; color:#bdc3c7;">Conecte seus mapas clicando na grade.</p><div id="map-grid-ui" class="map-tile-grid"></div><div class="dev-form-group" style="background:#1a1511; padding:10px; border:1px solid #3d2e24; margin-top:10px; border-radius:4px;"><label style="color:#f1c40f;">Mundo Medieval (catálogo novo)</label><button class="dev-save-btn" style="background:#8e44ad;" onclick="installCatalogWorld()">Instalar mapas novos (5 mapas)</button><a href="catalogo.html" target="_blank" style="display:block; margin-top:6px; color:#3498db; font-size:0.8rem;">Abrir catálogo de monstros e construções</a></div><div class="dev-form-group" style="margin-top:10px; padding-top: 10px; border-top: 1px solid #444;"><label style="color:#f39c12;">Criar Novo Mapa Solto:</label><div class="dev-row"><input type="text" id="dm-id" class="dev-input" placeholder="ID (floresta)"><input type="text" id="dm-name" class="dev-input" placeholder="Nome Exibição"></div><div class="dev-row" style="display:flex;gap:5px;margin:5px 0;"><input type="number" id="dm-w" class="dev-input" placeholder="Largura" value="800"><input type="number" id="dm-h" class="dev-input" placeholder="Altura" value="600"><input type="color" id="dm-color" value="#4a6b2d" style="width:44px;height:30px;"></div><button class="dev-save-btn" onclick="createNewMap()">Criar Mapa Base</button></div></div>
                 <div id="dev-items" class="dev-sub-content"><div class="dev-form-group"><label>Editar/Criar:</label><select id="dev-item-select" class="dev-select" onchange="loadDevItemForm()"><option value="NEW">-- CRIAR NOVO ITEM --</option></select></div><div class="dev-form-group"><label>Nome (ID Único):</label><input type="text" id="di-name" class="dev-input"></div><div class="dev-row"><div class="dev-form-group" style="flex:1"><label>Ícone:</label><input type="text" id="di-icon" class="dev-input"></div><div class="dev-form-group" style="flex:1"><label>Peso (kg):</label><input type="number" step="0.1" id="di-weight" class="dev-input"></div></div><div class="dev-form-group"><label>Tipo:</label><select id="di-type" class="dev-select" onchange="toggleItemFields()"><option value="resource">Recurso/Material</option><option value="equipment">Equipamento</option><option value="consumable">Consumível</option><option value="tool">Ferramenta</option></select></div><div class="dev-form-group"><label>Stackable:</label><select id="di-stack" class="dev-select"><option value="true">Sim</option><option value="false">Não</option></select></div><div id="di-eq-fields" style="display:none; padding:5px; border:1px solid #3d2e24; background:#111; margin-bottom:5px;"><div class="dev-row"><select id="di-slot" class="dev-select" style="flex:1"><option value="weapon">Arma</option><option value="shield">Escudo</option><option value="head">Cabeça</option><option value="body">Tronco</option><option value="ammo">Munição</option></select><select id="di-tool" class="dev-select" style="flex:1"><option value="">Melee</option><option value="magic">Magia</option><option value="ranged">Arco</option><option value="pickaxe">Picareta</option><option value="axe">Machado</option><option value="net">Rede</option></select></div><div class="dev-row"><div class="dev-form-group"><label>Dano:</label><input type="number" id="di-dmg" class="dev-input" value="0"></div><div class="dev-form-group"><label>Defesa:</label><input type="number" id="di-def" class="dev-input" value="0"></div></div></div><div id="di-cons-fields" style="display:none; padding:5px; border:1px solid #3d2e24; background:#111; margin-bottom:5px;"><div class="dev-form-group"><label>Cura HP:</label><input type="number" id="di-heal" class="dev-input" value="0"></div></div><div class="dev-form-group"><label>Receita Crafting:</label><input type="text" id="di-recipe" class="dev-input" placeholder="Logs,1|Copper Ore,1"></div><div class="dev-form-group"><label>Quantidade Criada na Receita:</label><input type="number" id="di-craftqty" class="dev-input" value="1"></div><div class="dev-form-group"><label>Descrição Tooltip:</label><input type="text" id="di-desc" class="dev-input"></div><button class="dev-save-btn" onclick="saveDevItem()">Salvar/Atualizar Item</button></div>
-                <div id="dev-npcs" class="dev-sub-content"><div class="dev-form-group"><label>Editar/Criar NPC/Monstro:</label><select id="dev-npc-select" class="dev-select" onchange="loadDevNPCForm()"><option value="NEW">-- CRIAR NOVO --</option></select></div><div class="dev-form-group"><label>ID Único:</label><input type="text" id="dn-id" class="dev-input"></div><div class="dev-form-group"><label>Nome:</label><input type="text" id="dn-name" class="dev-input"></div><div class="dev-row"><div class="dev-form-group" style="flex:1"><label>HP Máx (0=NPC):</label><input type="number" id="dn-hp" class="dev-input" value="10"></div><div class="dev-form-group" style="flex:1"><label>Dano Máx:</label><input type="number" id="dn-hit" class="dev-input" value="1"></div><div class="dev-form-group" style="flex:1"><label>XP Base:</label><input type="number" id="dn-xp" class="dev-input" value="10"></div></div><div class="dev-row"><div class="dev-form-group" style="flex:1"><label>Cor Corpo:</label><input type="color" id="dn-c1" class="dev-input" value="#e74c3c" style="padding:0; height:30px;"></div><div class="dev-form-group" style="flex:1"><label>Cor Cabeça:</label><input type="color" id="dn-c2" class="dev-input" value="#c0392b" style="padding:0; height:30px;"></div></div><div class="dev-row"><div class="dev-form-group" style="flex:1"><label>Espécie (visual):</label><input type="text" id="dn-species" class="dev-input" list="dn-species-list" placeholder="goblin, cow, dragon..."><datalist id="dn-species-list"></datalist></div><div class="dev-form-group" style="flex:1"><label>Comportamento:</label><select id="dn-behavior" class="dev-select"><option value="neutral">Neutro (revida)</option><option value="aggressive">Agressivo</option><option value="passive">Manso (foge)</option><option value="skittish">Arisco (foge ao ver)</option><option value="npc">NPC</option></select></div></div><div class="dev-row"><div class="dev-form-group" style="flex:1"><label>Largura:</label><input type="number" id="dn-w" class="dev-input" value="30"></div><div class="dev-form-group" style="flex:1"><label>Altura:</label><input type="number" id="dn-h" class="dev-input" value="30"></div><div class="dev-form-group" style="flex:1"><label>Velocidade:</label><input type="number" step="0.1" id="dn-speed" class="dev-input" value="1"></div><div class="dev-form-group" style="flex:1"><label>Alcance:</label><input type="number" id="dn-range" class="dev-input" value="90"></div></div><div class="dev-form-group"><label>Diálogo (Se for NPC):</label><input type="text" id="dn-dialog" class="dev-input"></div><div class="dev-form-group"><label>Loja (Item,Preço|...):</label><input type="text" id="dn-shop" class="dev-input"></div><div class="dev-form-group"><label>Loot Drop (Item,Chance,MaxQty|...):</label><input type="text" id="dn-loot" class="dev-input" placeholder="Bones,1,1"></div><button class="dev-save-btn" onclick="saveDevNPC()">Salvar NPC/Monstro</button></div>
+                <div id="dev-npcs" class="dev-sub-content"><div class="dev-form-group"><label>Editar/Criar NPC/Monstro:</label><select id="dev-npc-select" class="dev-select" onchange="loadDevNPCForm()"><option value="NEW">-- CRIAR NOVO --</option></select></div><div class="dev-form-group"><label>ID Único:</label><input type="text" id="dn-id" class="dev-input"></div><div class="dev-form-group"><label>Nome:</label><input type="text" id="dn-name" class="dev-input"></div><div class="dev-row"><div class="dev-form-group" style="flex:1"><label>HP Máx (0=NPC):</label><input type="number" id="dn-hp" class="dev-input" value="10"></div><div class="dev-form-group" style="flex:1"><label>Dano Máx:</label><input type="number" id="dn-hit" class="dev-input" value="1"></div><div class="dev-form-group" style="flex:1"><label>XP Base:</label><input type="number" id="dn-xp" class="dev-input" value="10"></div></div><div class="dev-row"><div class="dev-form-group" style="flex:1"><label>Cor Corpo:</label><input type="color" id="dn-c1" class="dev-input" value="#e74c3c" style="padding:0; height:30px;"></div><div class="dev-form-group" style="flex:1"><label>Cor Cabeça:</label><input type="color" id="dn-c2" class="dev-input" value="#c0392b" style="padding:0; height:30px;"></div></div><div class="dev-row"><div class="dev-form-group" style="flex:1"><label>Espécie (visual):</label><input type="text" id="dn-species" class="dev-input" list="dn-species-list" placeholder="goblin, cow, dragon..."><datalist id="dn-species-list"></datalist></div><div class="dev-form-group" style="flex:1"><label>Comportamento:</label><select id="dn-behavior" class="dev-select"><option value="neutral">Neutro (revida)</option><option value="aggressive">Agressivo</option><option value="passive">Manso (foge)</option><option value="skittish">Arisco (foge ao ver)</option><option value="npc">NPC</option></select></div></div><div class="dev-row"><div class="dev-form-group" style="flex:1"><label>Largura:</label><input type="number" id="dn-w" class="dev-input" value="30"></div><div class="dev-form-group" style="flex:1"><label>Altura:</label><input type="number" id="dn-h" class="dev-input" value="30"></div><div class="dev-form-group" style="flex:1"><label>Velocidade:</label><input type="number" step="0.1" id="dn-speed" class="dev-input" value="1"></div><div class="dev-form-group" style="flex:1"><label>Alcance:</label><input type="number" id="dn-range" class="dev-input" value="90"></div></div><div class="dev-row"><div class="dev-form-group" style="flex:1"><label>Nível (0 = automático):</label><input type="number" id="dn-level" class="dev-input" value="0" min="0"></div><div class="dev-form-group" style="flex:1"><label>Mostrar nome:</label><select id="dn-showname" class="dev-select"><option value="true">Sim</option><option value="false">Não</option></select></div></div><div class="dev-row"><div class="dev-form-group" style="flex:2"><label>Cor do nome:</label><select id="dn-namemode" class="dev-select"><option value="auto">Automática (vermelho = agressivo, amarelo = neutro, verde = pacífico)</option><option value="custom">Personalizada</option></select></div><div class="dev-form-group" style="flex:1"><label>&nbsp;</label><input type="color" id="dn-namecolor" class="dev-input" value="#ffd24a" style="padding:0; height:30px;"></div></div><div class="dev-form-group"><label>Diálogo (Se for NPC):</label><input type="text" id="dn-dialog" class="dev-input"></div><div class="dev-form-group"><label>Loja (Item,Preço|...):</label><input type="text" id="dn-shop" class="dev-input"></div><div class="dev-form-group"><label>Loot Drop (Item,Chance,MaxQty|...):</label><input type="text" id="dn-loot" class="dev-input" placeholder="Bones,1,1"></div><button class="dev-save-btn" onclick="saveDevNPC()">Salvar NPC/Monstro</button></div>
             </div>
             <div id="tab-bank" class="tab-content"><div id="bank-grid" class="grid-container"></div></div>
-            <div id="tab-cfg" class="tab-content"><h3 style="color:#ecf0f1; margin-top: 0; border-bottom: 1px solid #3d2e24; padding-bottom: 5px;">Sistema</h3><p style="font-size: 0.75rem; color: #bdc3c7;">Seus dados são salvos online automaticamente.</p><button class="dev-save-btn" style="background: #27ae60;" onclick="saveDataLogic(true)">💾 Forçar Save Global</button><button class="dev-save-btn" style="background: #c0392b; margin-top: 20px;" onclick="logOut()">🚪 Sair da Conta / Reiniciar</button></div>
+            <div id="tab-guide" class="tab-content"><div id="guide-body"></div></div>
+            <div id="tab-cfg" class="tab-content"><h3 style="margin-top:0">Menu</h3><button class="dev-save-btn" style="background:linear-gradient(#5a3f22,#33220f)" onclick="openTab('guide')">Abrir Guia do Aventureiro</button><p class="tab-note">Seu progresso é salvo automaticamente no servidor a cada poucos segundos e ao sair. Se ficar sem conexão, o jogo guarda uma cópia neste aparelho.</p><button class="dev-save-btn" style="background: #27ae60;" onclick="saveDataLogic(true)">Salvar agora</button><button class="dev-save-btn" style="background: #c0392b; margin-top: 20px;" onclick="logOut()">Sair da conta</button></div>
         </div>
     </div>
 
@@ -276,7 +250,7 @@
         function showTooltip(item) { 
             if(!item) return; 
             let html = `<div class="tt-title">${item.name}</div><div class="tt-desc">${item.desc||''}</div>`; 
-            if (item.bonusDmg) html += `<div class="tt-stat">⚔️ Dano: +${item.bonusDmg}</div>`; 
+            if (item.bonusDmg) html += `<div class="tt-stat">Dano: +${item.bonusDmg}</div>`; 
             if (item.defBonus) html += `<div class="tt-stat">🛡️ Defesa: +${item.defBonus}</div>`; 
             if (item.heal) html += `<div class="tt-stat">❤️ Cura: +${item.heal}</div>`; 
             html += `<div class="tt-weight">⚖️ Peso: ${item.weight||0} kg</div>`; 
@@ -357,21 +331,22 @@
         };
         let player = JSON.parse(JSON.stringify(playerDefault));
 
+        const WORLD_K = 2, SCALE_BUILD = 1.75, SCALE_DECOR = 1.3, TREE_W = 76, TREE_H = 96;
         // --- MUNDO INICIAL MEDIEVAL (usado quando o servidor ainda não tem mapas; o editor DEV continua mandando em tudo) ---
         function buildDefaultWorld() {
             let _id = 100;
-            const CB = (window.CATALOG && CATALOG.BUILDINGS) || {}, CD = (window.CATALOG && CATALOG.DECOR) || {};
+            const CB = (window.CATALOG && CATALOG.BUILDINGS) || {}, CD = (window.CATALOG && CATALOG.DECOR) || {}; const K = WORLD_K, BS = SCALE_BUILD, DS = SCALE_DECOR;
             const E = o => Object.assign({ id: _id++, active: true }, o);
-            const tree = (x, y) => E({ type: 'tree', name: 'Oak Tree', x, y, w: 40, h: 50, hp: 3, maxHp: 3 });
-            const rock = (k, x, y) => E({ type: k, name: k, x, y, w: 30, h: 30, hp: k === 'rock_iron' ? 3 : 2, maxHp: k === 'rock_iron' ? 3 : 2, color: k === 'rock_copper' ? '#d35400' : k === 'rock_iron' ? '#7f8c8d' : '#bdc3c7' });
-            const B = (style, x, y) => E({ type: 'house', style, name: CB[style] ? CB[style].name : 'Casa', x, y, w: CB[style] ? CB[style].w : 104, h: CB[style] ? CB[style].h : 96 });
-            const D = (kind, x, y) => E({ type: 'decor', kind, name: CD[kind] ? CD[kind].name : kind, x, y, w: CD[kind] ? CD[kind].w : 30, h: CD[kind] ? CD[kind].h : 30 });
+            const tree = (x, y) => E({ type: 'tree', name: 'Oak Tree', x, y, w: TREE_W, h: TREE_H, hp: 3, maxHp: 3 });
+            const rock = (k, x, y) => E({ type: k, name: k, x, y, w: 38, h: 38, hp: k === 'rock_iron' ? 3 : 2, maxHp: k === 'rock_iron' ? 3 : 2, color: k === 'rock_copper' ? '#d35400' : k === 'rock_iron' ? '#7f8c8d' : '#bdc3c7' });
+            const B = (style, x, y) => E({ type: 'house', style, name: CB[style] ? CB[style].name : 'Casa', x, y, w: Math.round((CB[style] ? CB[style].w : 104) * BS), h: Math.round((CB[style] ? CB[style].h : 96) * BS) });
+            const D = (kind, x, y) => E({ type: 'decor', kind, name: CD[kind] ? CD[kind].name : kind, x, y, w: Math.round((CD[kind] ? CD[kind].w : 30) * DS), h: Math.round((CD[kind] ? CD[kind].h : 30) * DS) });
             const mob = (key, x, y) => { const d = npcDB[key]; return E({ type: 'enemy', dbKey: key, name: d.name, x, y, w: d.w || 30, h: d.h || 30, hp: d.hp, maxHp: d.hp, attackCooldown: 0 }); };
             const npc = (key, x, y) => { const d = npcDB[key]; return E({ type: 'npc', dbKey: key, name: d.name, x, y, w: d.w || 30, h: d.h || 44, hp: 0, maxHp: 0 }); };
-            const fish = (x, y) => E({ type: 'fishing_spot', name: 'Fishing Spot', x, y, w: 30, h: 30 });
-            const bank = (x, y) => E({ type: 'bank', name: 'Bank Booth', x, y, w: 50, h: 30 });
-            const furnace = (x, y) => E({ type: 'furnace', name: 'Furnace', x, y, w: 30, h: 45 });
-            const anvil = (x, y) => E({ type: 'anvil', name: 'Anvil', x, y, w: 30, h: 25 });
+            const fish = (x, y) => E({ type: 'fishing_spot', name: 'Fishing Spot', x, y, w: 46, h: 46 });
+            const bank = (x, y) => E({ type: 'bank', name: 'Bank Booth', x, y, w: 80, h: 48 });
+            const furnace = (x, y) => E({ type: 'furnace', name: 'Furnace', x, y, w: 48, h: 72 });
+            const anvil = (x, y) => E({ type: 'anvil', name: 'Anvil', x, y, w: 46, h: 39 });
             const P = { dirt: '#5c4033', stone: '#7f8c8d', grass: '#27ae60', water: '#3498db' };
             const paint = (c, x, y, w, h) => E({ type: 'paint', name: 'Chão', color: P[c], x, y, w, h });
             const gi = (item, x, y, qty = 1) => E({ type: 'ground_item', item, qty, x, y, w: 20, h: 20, life: 999999 });
@@ -379,7 +354,7 @@
             const strip = (c, x, y, w, h, step) => { const a = []; for (let i = 0; i < (w > h ? w : h); i += step) a.push(w > h ? paint(c, x + i, y, step, h) : paint(c, x, y + i, w, step)); return a; };
             const W = {};
 
-            W.lumbridge = { id: 'lumbridge', name: 'Vila de Aldeburgo', catalogV: 1, width: 1000, height: 700, color: '#4a6b2d', gridX: 0, gridY: 0, entities: [].concat(
+            W.lumbridge = { id: 'lumbridge', name: 'Vila de Aldeburgo', catalogV: 2, width: 1000, height: 700, color: '#4a6b2d', gridX: 0, gridY: 0, entities: [].concat(
                 strip('dirt', 0, 320, 1000, 60, 40), strip('dirt', 470, 0, 60, 700, 40), [paint('stone', 380, 260, 240, 180)],
                 [B('church', 250, 70), B('tavern', 90, 150), B('smithy', 700, 160), B('townhouse', 700, 420), B('cottage', 880, 420), B('cottage', 200, 440), B('cottage', 330, 470), B('windmill', 40, 510), B('barn', 760, 560), B('market', 560, 190), B('market', 655, 195)],
                 [D('fountain', 458, 285), D('well', 340, 395), D('lamp', 384, 262), D('lamp', 600, 262), D('lamp', 384, 384), D('lamp', 600, 384), D('barrel', 262, 255), D('barrel', 290, 262), D('crates', 60, 300), D('sign', 150, 292), D('banner', 260, 10), D('banner', 380, 10), D('haystack', 930, 620), D('cart', 640, 470), D('flowers', 200, 400), D('flowers', 420, 460), D('flowers', 660, 320), D('bush', 20, 60), D('bush', 930, 60), D('statue', 405, 335), D('fence_h', 590, 660), D('fence_h', 670, 660)],
@@ -390,7 +365,7 @@
                 [mob('slime_base', 560, 470), mob('slime_base', 600, 500), mob('goblin_base', 900, 200), mob('goblin_base', 940, 260)],
                 [gi('Coins', 500, 330, 5)]) };
 
-            W.floresta = { id: 'floresta', name: 'Floresta Sombria', catalogV: 1, width: 1000, height: 700, color: '#2f5d1f', gridX: -1, gridY: 0, entities: [].concat(
+            W.floresta = { id: 'floresta', name: 'Floresta Sombria', catalogV: 2, width: 1000, height: 700, color: '#2f5d1f', gridX: -1, gridY: 0, entities: [].concat(
                 strip('dirt', 500, 320, 500, 60, 40), [paint('water', 120, 420, 230, 150)],
                 [fish(140, 440), fish(300, 500), fish(200, 545)],
                 [B('cottage', 100, 290), B('wizard_tower', 760, 70), B('tent', 430, 130), B('watchtower', 860, 430)],
@@ -400,7 +375,7 @@
                 [mob('wolf_base', 400, 300), mob('wolf_base', 560, 470), mob('wolf_base', 800, 330), mob('spider_base', 230, 250), mob('spider_base', 640, 130), mob('boar_base', 470, 590), mob('boar_base', 300, 620), mob('bat_base', 900, 130), mob('goblin_base', 250, 200)],
                 [mob('deer_base', 520, 250), mob('deer_base', 610, 250), mob('deer_base', 740, 500), mob('rabbit_base', 380, 400), mob('rabbit_base', 450, 400), mob('rabbit_base', 100, 520), mob('rabbit_base', 660, 620)]) };
 
-            W.mina = { id: 'mina', name: 'Mina de Pedra', catalogV: 1, width: 900, height: 700, color: '#6b5b45', gridX: 1, gridY: 0, entities: [].concat(
+            W.mina = { id: 'mina', name: 'Mina de Pedra', catalogV: 2, width: 900, height: 700, color: '#6b5b45', gridX: 1, gridY: 0, entities: [].concat(
                 strip('dirt', 0, 320, 500, 60, 40), [paint('stone', 480, 250, 200, 200)],
                 [B('smithy', 130, 110), B('watchtower', 60, 430), B('tent', 240, 470)],
                 [npc('smith_npc', 300, 250), furnace(300, 130), anvil(345, 150)],
@@ -410,7 +385,7 @@
                 [mob('skeleton_base', 720, 300), mob('skeleton_base', 780, 400), mob('orc_base', 640, 420), mob('bat_base', 800, 200), mob('bat_base', 560, 130), mob('spider_base', 130, 600), mob('golem_base', 750, 200), mob('troll_base', 800, 620)],
                 [mob('rat_base', 200, 380), mob('rat_base', 400, 400)], [gi('Bronze Pickaxe', 200, 330)]) };
 
-            W.rio = { id: 'rio', name: 'Vale do Rio', catalogV: 1, width: 1000, height: 700, color: '#3f7a3a', gridX: 0, gridY: 1, entities: [].concat(
+            W.rio = { id: 'rio', name: 'Vale do Rio', catalogV: 2, width: 1000, height: 700, color: '#3f7a3a', gridX: 0, gridY: 1, entities: [].concat(
                 strip('dirt', 470, 0, 60, 300, 40),
                 [paint('water', 0, 300, 440, 110), paint('water', 560, 300, 440, 110), paint('stone', 440, 300, 120, 110)],
                 row(fish, 4, 60, 330, 90, 20), row(fish, 3, 620, 330, 100, -15),
@@ -421,7 +396,7 @@
                 [mob('cow_base', 200, 590), mob('cow_base', 260, 630), mob('sheep_base', 600, 560), mob('sheep_base', 650, 620), mob('pig_base', 700, 560), mob('chicken_base', 400, 610), mob('chicken_base', 440, 640), mob('deer_base', 900, 560), mob('rabbit_base', 860, 620)],
                 [mob('snake_base', 90, 440), mob('snake_base', 580, 430), mob('slime_base', 560, 500), mob('goblin_base', 850, 200), mob('rat_base', 200, 250)]) };
 
-            W.covil = { id: 'covil', name: 'Covil do Dragão', catalogV: 1, width: 900, height: 700, color: '#3b3b46', gridX: 0, gridY: -1, entities: [].concat(
+            W.covil = { id: 'covil', name: 'Covil do Dragão', catalogV: 2, width: 900, height: 700, color: '#3b3b46', gridX: 0, gridY: -1, entities: [].concat(
                 strip('dirt', 420, 400, 60, 300, 40), [paint('stone', 250, 120, 400, 240)],
                 [B('watchtower', 730, 260), B('tent', 110, 520)],
                 [D('statue', 260, 130), D('statue', 590, 130), D('banner', 230, 60), D('banner', 640, 60), D('crystal', 90, 90), D('crystal', 800, 100), D('crystal', 60, 380), D('crystal', 820, 470), D('gravestone', 200, 300), D('gravestone', 250, 380), D('gravestone', 640, 380), D('gravestone', 680, 300), D('bones', 350, 250), D('bones', 520, 280), D('bones', 450, 330), D('campfire', 150, 590), D('wall_h', 300, 400), D('wall_h', 500, 400)],
@@ -429,6 +404,42 @@
                 [mob('orc_base', 200, 480), mob('orc_base', 640, 500), mob('skeleton_base', 300, 450), mob('skeleton_base', 560, 450), mob('ghost_base', 150, 250), mob('ghost_base', 720, 160), mob('darkmage_base', 620, 420), mob('bat_base', 380, 600)],
                 [rock('rock_iron', 60, 240), rock('rock_iron', 110, 270), rock('rock_copper', 780, 350),
                  gi('Coins', 440, 300, 50), gi('Iron Bar', 470, 320)]) };
+            // mundo maior: posições e chão x K; prédios/árvores já foram feitos maiores em relação ao jogador
+            Object.keys(W).forEach(k => { const m = W[k]; m.width *= K; m.height *= K; m.entities.forEach(o => { o.x = Math.round(o.x * K); o.y = Math.round(o.y * K); if (o.type === 'paint') { o.w *= K; o.h *= K; } }); });
+            W.lumbridge.spawn = { x: 1000, y: 800 };
+
+            // preenche o mundo maior: árvores, arbustos, flores e mais bichos (posição pseudo-aleatória fixa, sem bloquear estradas, saídas ou construções)
+            const scatter = (m, seed, n, mk, opt) => {
+                opt = opt || {}; let r = seed >>> 0; const rnd = () => { r = (Math.imul(r, 1664525) + 1013904223) >>> 0; return r / 4294967296; };
+                const Wd = m.width, Hd = m.height, reg = opt.region || [60, 60, Wd - 60, Hd - 60], pad = opt.pad === undefined ? 34 : opt.pad, minD = opt.minD || 0; let placed = [], tries = 0;
+                const solidEnts = () => m.entities.filter(o => o.type !== 'ground_item' && o.type !== 'fishing_spot');
+                while (placed.length < n && tries++ < n * 60) {
+                    const e = mk(0, 0), w = e.w, h = e.h; const x = Math.round(reg[0] + rnd() * (reg[2] - reg[0] - w)), y = Math.round(reg[1] + rnd() * (reg[3] - reg[1] - h)); e.x = x; e.y = y;
+                    if (x < 40 || y < 40 || x + w > Wd - 40 || y + h > Hd - 40) continue;
+                    if (Math.abs(x + w / 2 - Wd / 2) < 200 && (y < 260 || y + h > Hd - 260)) continue;   // saídas norte/sul
+                    if (Math.abs(y + h / 2 - Hd / 2) < 200 && (x < 260 || x + w > Wd - 260)) continue;   // saídas oeste/leste
+                    if (m.entities.some(o => { if (o.type === 'ground_item') return false; const ow = o.w || 30, oh = o.h || 30; const pp = o.type === 'paint' ? 10 : pad; return x - pp < o.x + ow && x + w + pp > o.x && y - pp < o.y + oh && y + h + pp > o.y; })) continue;
+                    if (minD && placed.some(q => Math.hypot(q.x - x, q.y - y) < minD)) continue;
+                    m.entities.push(e); placed.push(e);
+                }
+                return placed;
+            };
+            const rr = (mkFn) => (x, y) => Object.assign(mkFn(x, y), { x, y });
+            const trees = (m, n, seed, region) => scatter(m, seed, n, () => tree(0, 0), { region, pad: 46, minD: 110 });
+            const decor = (m, kind, n, seed, region) => scatter(m, seed, n, () => D(kind, 0, 0), { region, pad: 20 });
+            const mobs = (m, key, n, seed, region) => scatter(m, seed, n, () => mob(key, 0, 0), { region, pad: 30, minD: 120 });
+            const Wl = W.lumbridge, Wf = W.floresta, Wm = W.mina, Wr = W.rio, Wc = W.covil;
+            trees(Wl, 34, 11, null); ['flowers', 'flowers', 'bush', 'mushrooms'].forEach((k, i) => decor(Wl, k, 10, 21 + i));
+            mobs(Wl, 'cow_base', 3, 31, [1100, 900, 1900, 1350]); mobs(Wl, 'sheep_base', 4, 32, [1100, 900, 1900, 1350]); mobs(Wl, 'chicken_base', 5, 33, [1100, 900, 1900, 1350]); mobs(Wl, 'pig_base', 2, 34, [1100, 900, 1900, 1350]);
+            mobs(Wl, 'rabbit_base', 4, 35, [60, 60, 1940, 1340]); mobs(Wl, 'slime_base', 2, 36, [1100, 800, 1900, 1100]); mobs(Wl, 'goblin_base', 2, 37, [1500, 80, 1940, 640]);
+            trees(Wf, 105, 12, null); ['flowers', 'bush', 'bush', 'mushrooms', 'mushrooms', 'stump'].forEach((k, i) => decor(Wf, k, 12, 41 + i));
+            mobs(Wf, 'wolf_base', 4, 51, null); mobs(Wf, 'spider_base', 3, 52, null); mobs(Wf, 'boar_base', 3, 53, null); mobs(Wf, 'deer_base', 5, 54, null); mobs(Wf, 'rabbit_base', 6, 55, null); mobs(Wf, 'bat_base', 2, 56, null); mobs(Wf, 'goblin_base', 2, 57, null);
+            trees(Wm, 22, 13, null); ['bush', 'mushrooms', 'bones'].forEach((k, i) => decor(Wm, k, 6, 61 + i)); ['crystal'].forEach((k, i) => decor(Wm, k, 4, 71 + i));
+            mobs(Wm, 'skeleton_base', 3, 81, [960, 100, 1740, 1300]); mobs(Wm, 'orc_base', 2, 82, [960, 100, 1740, 1300]); mobs(Wm, 'bat_base', 3, 83, null); mobs(Wm, 'rat_base', 3, 84, [60, 60, 900, 1340]); mobs(Wm, 'golem_base', 1, 85, [1200, 300, 1700, 900]); mobs(Wm, 'spider_base', 2, 86, [60, 700, 900, 1340]);
+            trees(Wr, 44, 14, null); ['flowers', 'flowers', 'bush', 'mushrooms'].forEach((k, i) => decor(Wr, k, 9, 91 + i));
+            mobs(Wr, 'cow_base', 2, 101, [60, 860, 1000, 1340]); mobs(Wr, 'sheep_base', 3, 102, [1000, 860, 1940, 1340]); mobs(Wr, 'deer_base', 3, 103, [1300, 800, 1940, 1340]); mobs(Wr, 'rabbit_base', 3, 104, [60, 60, 1940, 1340]); mobs(Wr, 'snake_base', 2, 105, [60, 860, 1940, 1340]); mobs(Wr, 'slime_base', 2, 106, [60, 860, 1940, 1340]);
+            ['bones', 'gravestone', 'mushrooms', 'crystal'].forEach((k, i) => decor(Wc, k, 6, 111 + i));
+            mobs(Wc, 'skeleton_base', 2, 121, [60, 800, 1740, 1340]); mobs(Wc, 'orc_base', 2, 122, [60, 800, 1740, 1340]); mobs(Wc, 'ghost_base', 2, 123, null); mobs(Wc, 'bat_base', 2, 124, null);
             return W;
         }
         // Instala (admin) o mundo medieval novo por cima dos 5 mapas padrão; mapas com outros IDs não são tocados
@@ -439,7 +450,7 @@
             if (!confirm(msg)) return false;
             if (!isOfflineMode && existing.length) { try { await downloadServerBackup(); } catch (e) {} }
             ids.forEach(k => { const old = gameMaps[k]; if (old) { fresh[k].gridX = old.gridX; fresh[k].gridY = old.gridY; } gameMaps[k] = fresh[k]; });
-            currentMap = 'lumbridge'; player.x = 400; player.y = 300; player.destX = 400; player.destY = 300; player.pendingAutoAction = null; player.isPerformingAction = false;
+            currentMap = 'lumbridge'; { const sp = fresh.lumbridge.spawn || { x: 400, y: 300 }; player.x = sp.x; player.y = sp.y; player.destX = sp.x; player.destY = sp.y; } player.pendingAutoAction = null; player.isPerformingAction = false;
             saveDataLogic(false, true); if (typeof loadDevMapManager === 'function') loadDevMapManager(); setActionText('Mundo medieval instalado!', '#2ecc71'); return true;
         }
         let defaultGameMaps = buildDefaultWorld();
@@ -527,12 +538,12 @@
                 player = { ...playerDefault, ...data.playerData };
                 if(data.playerData.stats) player.stats = { ...playerDefault.stats, ...data.playerData.stats };
                 if(data.playerData.stats && data.playerData.stats.skills) player.stats.skills = { ...playerDefault.stats.skills, ...data.playerData.stats.skills };
-            } else { player = JSON.parse(JSON.stringify(playerDefault)); giveStarterItems(); }
+            } else { player = JSON.parse(JSON.stringify(playerDefault)); giveStarterItems(); const sm = gameMaps['lumbridge']; if (sm && sm.spawn) { player.x = sm.spawn.x; player.y = sm.spawn.y; player.destX = sm.spawn.x; player.destY = sm.spawn.y; } }
 
             if (typeof player.x !== 'number' || isNaN(player.x)) player.x = 400; if (typeof player.y !== 'number' || isNaN(player.y)) player.y = 300;
             if (!player.facing) player.facing = { x: 0, y: 1 }; if (!player.equipment) player.equipment = { head: null, body: null, weapon: null, shield: null, ammo: null };
             if (!player.inventory) player.inventory = []; if (!player.bank) player.bank = []; player.actionAnim = player.actionAnim || 0;
-            currentMap = player.currentMap || 'lumbridge'; if(!gameMaps[currentMap]) currentMap = 'lumbridge';
+            currentMap = player.currentMap || 'lumbridge'; if(!gameMaps[currentMap]) currentMap = 'lumbridge'; try { ensurePlayerFree(); } catch (e) {}
             
             document.getElementById('login-overlay').style.display = 'none';
             document.getElementById('game-wrapper').style.display = 'flex';
@@ -541,7 +552,7 @@
                 resizeCanvas(); window.addEventListener('resize', resizeCanvas);
                 openTab('inv'); updateUI(); 
                 if(userRole === 'admin') { buildDevEntityList(); loadDevMapManager(); loadDevPlayers();
-                    try { const lm = gameMaps['lumbridge']; if (lm && !lm.catalogV && !localStorage.getItem('ms_catalog_declined')) { setTimeout(async () => { const ok = await installCatalogWorld(); if (ok === false) localStorage.setItem('ms_catalog_declined', '1'); }, 600); } } catch (e) {}
+                    try { const lm = gameMaps['lumbridge']; if (lm && (lm.catalogV || 0) < 2 && !localStorage.getItem('ms_catalog_declined2')) { setTimeout(async () => { const ok = await installCatalogWorld(); if (ok === false) localStorage.setItem('ms_catalog_declined2', '1'); }, 600); } } catch (e) {}
                 }
                 updateChatUI();
                 
@@ -598,7 +609,7 @@
                         curM.entities.forEach(o => {
                             if (o.type === 'enemy' || o.type === 'npc') {
                                 let sm = data.serverMobs[o.id];
-                                if (sm) { o.hp = sm.hp; o.active = !sm.isDead; o.aggroTarget = sm.aggro; }
+                                if (sm) { let pend = 0; for (let li = 0; li < pendingCombatLogs.length; li++) if (pendingCombatLogs[li].id === o.id) pend += pendingCombatLogs[li].dmg || 0; if (pend > 0) { o.hp = sm.hp - pend; o.active = o.hp > 0 && !sm.isDead; } else { o.hp = sm.hp; o.active = !sm.isDead; } o.aggroTarget = pend > 0 ? o.aggroTarget : sm.aggro; }
                                 if (!isMapHost && o.type === 'enemy' && mobPosFromHost[o.id]) { if (o.netX !== mobPosFromHost[o.id].x || o.netY !== mobPosFromHost[o.id].y || !o._nb) { o.netX = mobPosFromHost[o.id].x; o.netY = mobPosFromHost[o.id].y; netPush(o, o.netX, o.netY); } }
                             }
                         });
@@ -607,7 +618,7 @@
 
                 if(data.mapVersion > currentMapVersion) {
                     currentMapVersion = data.mapVersion;
-                    if (!worldDirty) api('/map').then(m => { if(m.worldData) { gameMaps = m.worldData; if(!gameMaps[currentMap]) currentMap = 'lumbridge'; } if(m.itemDB) itemDB = m.itemDB; if(m.npcDB) npcDB = m.npcDB; mergeCatalog(); updateUI(); }).catch(() => {});
+                    if (!worldDirty) api('/map').then(m => { if(m.worldData) { gameMaps = m.worldData; if(!gameMaps[currentMap]) currentMap = 'lumbridge'; } if(m.itemDB) itemDB = m.itemDB; if(m.npcDB) npcDB = m.npcDB; mergeCatalog(); try { ensurePlayerFree(); } catch (e) {} updateUI(); }).catch(() => {});
                 }
             } catch(e) {}
             isSyncing = false;
@@ -641,21 +652,36 @@
         }
         setInterval(() => { if(currentUser) saveDataLogic(); }, 60000);
 
+        // --- CHAT ESTILO JOGO: Enter abre, Enter envia e continua digitando, Esc/clique no jogo fecha; fechado fica pequeno e translúcido ---
+        let chatOpen = false, _chatShown = 0;
+        function chatOpenInput() { const c = document.getElementById('chat-container'), i = document.getElementById('chat-input'); c.classList.add('open'); chatOpen = true; i.focus(); const b = document.getElementById('chat-box'); b.scrollTop = b.scrollHeight; }
+        function chatCloseInput() { const c = document.getElementById('chat-container'), i = document.getElementById('chat-input'); c.classList.remove('open'); chatOpen = false; i.blur(); const b = document.getElementById('chat-box'); b.scrollTop = b.scrollHeight; }
         async function sendChat() {
-            if (isOfflineMode) { setActionText("Chat offline.", "#e74c3c"); return; }
-            const input = document.getElementById('chat-input'); const msg = input.value.trim(); if(!msg) return; input.value = ''; input.blur(); 
+            const input = document.getElementById('chat-input'); const msg = input.value.trim(); if(!msg) { input.focus(); return; }
+            if (isOfflineMode) { setActionText("Chat indisponível offline.", "#e74c3c"); return; }
+            input.value = ''; input.focus();   // continua aberto para a próxima frase
             try {
                 const data = await api('/chat', { msg: msg }); if(data.chat) { chatMessages = data.chat; lastChatVer = data.chatVer || 0; updateChatUI(); }
             } catch(e) {}
         }
-        function updateChatUI() { const box = document.getElementById('chat-box'); if(!box) return; box.innerHTML = ''; chatMessages.forEach(c => { const d = document.createElement('div'); d.className = 'chat-msg'; const sp = document.createElement('span'); sp.style.fontWeight = 'bold'; sp.style.color = /^#[0-9a-fA-F]{3,8}$/.test(c.color) ? c.color : '#ecf0f1'; sp.textContent = '[' + c.sender + ']'; d.appendChild(sp); d.appendChild(document.createTextNode(': ' + c.msg)); box.appendChild(d); }); box.scrollTop = box.scrollHeight; }
-        
-        document.getElementById('chat-input').addEventListener('keydown', function(e) { e.stopPropagation(); if (e.key === 'Enter') sendChat(); });
-        document.getElementById('chat-input').addEventListener('keyup', function(e) { e.stopPropagation(); });
+        function updateChatUI() {
+            const box = document.getElementById('chat-box'); if(!box) return; box.innerHTML = '';
+            chatMessages.forEach((c, idx) => { const d = document.createElement('div'); d.className = 'chat-msg' + (idx >= _chatShown && _chatShown > 0 ? ' fresh' : ''); const sp = document.createElement('span'); sp.className = 'chat-who'; sp.style.color = /^#[0-9a-fA-F]{3,8}$/.test(c.color) ? c.color : '#ecdfb8'; sp.textContent = c.sender; d.appendChild(sp); d.appendChild(document.createTextNode(' ' + c.msg)); box.appendChild(d); });
+            _chatShown = chatMessages.length; box.scrollTop = box.scrollHeight;
+        }
+        (function () {
+            const inp = document.getElementById('chat-input'), cc = document.getElementById('chat-container');
+            inp.addEventListener('keydown', function(e) { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); if (inp.value.trim()) sendChat(); else chatCloseInput(); } else if (e.key === 'Escape') { e.preventDefault(); chatCloseInput(); } });
+            inp.addEventListener('keyup', function(e) { e.stopPropagation(); });
+            cc.addEventListener('mousedown', function(e) { if (!chatOpen) { e.preventDefault(); chatOpenInput(); } });
+            document.getElementById('chat-send').addEventListener('mousedown', function(e) { e.preventDefault(); });
+            canvas.addEventListener('mousedown', function() { if (chatOpen) chatCloseInput(); });
+            canvas.addEventListener('touchstart', function() { if (chatOpen) chatCloseInput(); }, { passive: true });
+        })();
 
         window.addEventListener("keydown", function(e) {
             if(document.getElementById('login-overlay').style.display !== 'none') return; 
-            if (e.code === 'Enter') { const chatInput = document.getElementById('chat-input'); if (document.activeElement !== chatInput) { e.preventDefault(); chatInput.focus(); return; } }
+            if (e.code === 'Enter') { const chatInput = document.getElementById('chat-input'); if (document.activeElement !== chatInput && !/^(INPUT|TEXTAREA|SELECT)$/.test((e.target||{}).tagName || '')) { e.preventDefault(); chatOpenInput(); return; } }
             if(["Space","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].indexOf(e.code) > -1) { if(e.target.tagName !== "INPUT" && e.target.tagName !== "TEXTAREA") e.preventDefault(); }
         }, false);
         
@@ -674,7 +700,7 @@
         function getCameraOffset() {
             let mapObj = gameMaps[currentMap]; if (!mapObj) return { x: 0, y: 0 };
             let mapW = mapObj.width || 800; let mapH = mapObj.height || 600;
-            let camX = (canvas.width / 2) - player.x; let camY = (canvas.height / 2) - player.y;
+            const _cx = renderPX || player.x, _cy = renderPY || player.y; let camX = (canvas.width / 2) - _cx; let camY = (canvas.height / 2) - _cy;
             if (mapW > canvas.width) { if (camX > 0) camX = 0; if (camX < canvas.width - mapW) camX = canvas.width - mapW; } else { camX = (canvas.width - mapW) / 2; }
             if (mapH > canvas.height) { if (camY > 0) camY = 0; if (camY < canvas.height - mapH) camY = canvas.height - mapH; } else { camY = (canvas.height - mapH) / 2; }
             return { x: isNaN(camX) ? 0 : camX, y: isNaN(camY) ? 0 : camY };
@@ -732,7 +758,7 @@
                 const sL = document.getElementById('skills-list'); sL.innerHTML = ''; let tL = 0; Object.values(player.stats.skills || {}).forEach(s => { tL += s.level; sL.innerHTML += `<div class="skill-line"><span>${s.name}: Lvl ${s.level}</span> <span style="color:#888;">${s.xp}/${s.next} XP</span></div>`; }); document.getElementById('text-xp').innerText = `Nível Geral: ${tL}`;
                 const bG = document.getElementById('bank-grid'); bG.innerHTML = ''; for(let i = 0; i < Math.max(30, player.bank.length + 4); i++) { const item = player.bank[i]; const div = document.createElement('div'); div.className = 'item-slot'; if(item) { div.innerText = item.icon || '?'; if(item.qty > 1) div.innerHTML += `<span class="item-qty">${item.qty}</span>`; div.onclick = () => withdrawFromBank(i); div.onmouseenter = () => showTooltip(item); div.onmouseleave = () => hideTooltip(); } bG.appendChild(div); }
                 const mL = document.getElementById('spellbook-list'); if (mL) { mL.onclick = (ev) => { const c = ev.target.closest('[data-spell]'); if(c) setActiveSpell(c.dataset.spell); }; mL.innerHTML = ''; spellbookDB.forEach(sp => { let rT = Object.keys(sp.req).map(k => `${sp.req[k]}x ${itemDB[k]?itemDB[k].icon:'?'}`).join(' '); let iA = player.stats.skills.magic.level >= sp.lvl; let sC = player.activeSpell === sp.id ? 'spell-card spell-active' : 'spell-card'; mL.innerHTML += `<div class="${sC}" data-spell="${esc(sp.id)}" style="opacity:${iA?1:0.5}"><div><strong>${sp.name}</strong> <span style="font-size:0.7rem; color:${sp.color}">Dano: +${sp.dmg}</span><br><span class="spell-runes">Req: Lvl ${sp.lvl} | ${rT}</span></div>${player.activeSpell === sp.id ? '⭐' : ''}</div>`; }); }
-                const cG = document.getElementById('craft-list'); if(cG) { cG.innerHTML = ''; cG.onclick = (ev) => { const c = ev.target.closest('[data-craft]'); if(c) craftItem(c.dataset.craft); }; Object.values(itemDB).forEach(it => { if(it.recipe) { let reqs = it.recipe.split('|'); let hasAll = true; reqs.forEach(r => { let p = r.split(','); if(getInvCount(p[0].trim()) < parseInt(p[1])) hasAll = false; }); let rT = reqs.map(r => { let p=r.split(','); let ic = itemDB[p[0].trim()] ? itemDB[p[0].trim()].icon : '?'; return `${p[1]}x ${ic}`; }).join(' + '); let opacity = hasAll ? "1" : "0.4"; let btnDisabled = hasAll ? "" : "disabled"; let filter = hasAll ? "" : "filter: grayscale(100%);"; cG.innerHTML += `<div class="spell-card" style="opacity: ${opacity}; ${filter}" ${hasAll ? `data-craft="${esc(it.name)}"` : ''}> <div><strong>${it.icon} ${it.name}</strong> <span style="font-size:0.7rem; color:#bdc3c7;">(Cria ${it.craftQty||1})</span><br><span class="spell-runes">Req: ${rT}</span></div> <button class="shop-btn" ${btnDisabled}>Criar</button> </div>`; } }); }
+                if (window.renderCraftBook) renderCraftBook();
             } catch(e) { }
         }
 
@@ -805,11 +831,11 @@
         function filterDevEntities(term) { let val = removeAccents(term).toLowerCase(); document.querySelectorAll('.dev-ent-item').forEach(el => { let txt = removeAccents(el.getAttribute('data-name')).toLowerCase(); if(txt.includes(val)) el.style.display = devViewMode === 'list' ? 'flex' : 'flex'; else el.style.display = 'none'; }); if(devViewMode === 'list') { document.querySelectorAll('.dev-ent-cat').forEach(cat => { let hasVisible = false; let next = cat.nextElementSibling; while(next && next.classList.contains('dev-ent-item')) { if(next.style.display !== 'none') hasVisible = true; next = next.nextElementSibling; } cat.style.display = hasVisible ? 'block' : 'none'; }); } }
         function devDefaultSize(val) {   // tamanho natural de cada peça ao escolher no editor
             const C = window.CATALOG || {}; let w = 0, h = 0;
-            if (val.startsWith('b_') && C.BUILDINGS && C.BUILDINGS[val.substring(2)]) { w = C.BUILDINGS[val.substring(2)].w; h = C.BUILDINGS[val.substring(2)].h; }
-            else if (val.startsWith('d_') && C.DECOR && C.DECOR[val.substring(2)]) { w = C.DECOR[val.substring(2)].w; h = C.DECOR[val.substring(2)].h; }
+            if (val.startsWith('b_') && C.BUILDINGS && C.BUILDINGS[val.substring(2)]) { w = Math.round(C.BUILDINGS[val.substring(2)].w * SCALE_BUILD); h = Math.round(C.BUILDINGS[val.substring(2)].h * SCALE_BUILD); }
+            else if (val.startsWith('d_') && C.DECOR && C.DECOR[val.substring(2)]) { w = Math.round(C.DECOR[val.substring(2)].w * SCALE_DECOR); h = Math.round(C.DECOR[val.substring(2)].h * SCALE_DECOR); }
             else if (val.startsWith('e_') && npcDB[val.substring(2)]) { const n = npcDB[val.substring(2)]; w = n.w || 30; h = n.h || 30; }
-            else if (val === 'tree') { w = 40; h = 50; } else if (val === 'house') { w = 104; h = 96; } else if (val.startsWith('rock_')) { w = 30; h = 30; }
-            else if (val === 'furnace') { w = 30; h = 45; } else if (val === 'anvil') { w = 30; h = 25; } else if (val === 'bank') { w = 50; h = 30; } else if (val === 'fishing_spot') { w = 30; h = 30; }
+            else if (val === 'tree') { w = TREE_W; h = TREE_H; } else if (val === 'house') { w = Math.round(104 * SCALE_BUILD); h = Math.round(96 * SCALE_BUILD); } else if (val.startsWith('rock_')) { w = 38; h = 38; }
+            else if (val === 'furnace') { w = 48; h = 72; } else if (val === 'anvil') { w = 46; h = 39; } else if (val === 'bank') { w = 80; h = 48; } else if (val === 'fishing_spot') { w = 46; h = 46; }
             else if (val.startsWith('paint_')) { w = 40; h = 40; } else if (val === 'portal') { w = 60; h = 60; }
             return w ? { w, h } : null;
         }
@@ -837,8 +863,8 @@
         function loadDevItemForm(){ let k = document.getElementById('dev-item-select').value; if(k==='NEW'){ document.getElementById('di-name').value=''; document.getElementById('di-icon').value='📦'; document.getElementById('di-weight').value='1.0'; document.getElementById('di-desc').value=''; document.getElementById('di-type').value='resource'; document.getElementById('di-stack').value='true'; document.getElementById('di-recipe').value=''; document.getElementById('di-craftqty').value='1';}else{ let i=itemDB[k]; document.getElementById('di-name').value=k; document.getElementById('di-icon').value=i.icon; document.getElementById('di-weight').value=i.weight||0; document.getElementById('di-desc').value=i.desc||''; document.getElementById('di-type').value=i.type; document.getElementById('di-stack').value=i.stackable?'true':'false'; document.getElementById('di-recipe').value=i.recipe||''; document.getElementById('di-craftqty').value=i.craftQty||1; if(i.type==='equipment'){ document.getElementById('di-slot').value=i.slot; document.getElementById('di-tool').value=i.tool||''; document.getElementById('di-dmg').value=i.bonusDmg||0; document.getElementById('di-def').value=i.defBonus||0; } if(i.type==='consumable')document.getElementById('di-heal').value=i.heal||0; } toggleItemFields(); }
         function saveDevItem(){ let k=document.getElementById('di-name').value; if(!k)return; let t=document.getElementById('di-type').value; itemDB[k]={name:k,icon:document.getElementById('di-icon').value,type:t,stackable:document.getElementById('di-stack').value==='true',weight:parseFloat(document.getElementById('di-weight').value)||0,desc:document.getElementById('di-desc').value}; let rec=document.getElementById('di-recipe').value; if(rec) {itemDB[k].recipe=rec; itemDB[k].craftQty=parseInt(document.getElementById('di-craftqty').value)||1;} if(t==='equipment'){ itemDB[k].slot=document.getElementById('di-slot').value; let tl=document.getElementById('di-tool').value; if(tl)itemDB[k].tool=tl; let dmg=parseInt(document.getElementById('di-dmg').value); if(dmg)itemDB[k].bonusDmg=dmg; let def=parseInt(document.getElementById('di-def').value); if(def)itemDB[k].defBonus=def; } if(t==='consumable')itemDB[k].heal=parseInt(document.getElementById('di-heal').value)||0; populateDevItems(); document.getElementById('dev-item-select').value=k; setActionText(`Item ${k} salvo!`); saveDataLogic(false, true); updateUI(); buildDevEntityList();}
         function populateDevNPCs(){ let s=document.getElementById('dev-npc-select'); s.innerHTML='<option value="NEW">-- CRIAR NOVO --</option>'; Object.keys(npcDB).forEach(k=>{s.innerHTML+=`<option value="${k}">${k} (${npcDB[k].name})</option>`;}); }
-        function loadDevNPCForm(){ let k=document.getElementById('dev-npc-select').value; if(k==='NEW'){ document.getElementById('dn-id').value=''; document.getElementById('dn-name').value='Monstro'; document.getElementById('dn-hp').value=10; document.getElementById('dn-hit').value=1; document.getElementById('dn-xp').value=20; document.getElementById('dn-loot').value=''; document.getElementById('dn-dialog').value=''; document.getElementById('dn-shop').value=''; document.getElementById('dn-species').value=''; document.getElementById('dn-behavior').value='neutral'; document.getElementById('dn-w').value=30; document.getElementById('dn-h').value=30; document.getElementById('dn-speed').value=1; document.getElementById('dn-range').value=90; }else{ let n=npcDB[k]; document.getElementById('dn-id').value=k; document.getElementById('dn-name').value=n.name; document.getElementById('dn-hp').value=n.hp; document.getElementById('dn-hit').value=n.maxHit; document.getElementById('dn-xp').value=n.xp; document.getElementById('dn-c1').value=n.c1; document.getElementById('dn-c2').value=n.c2; document.getElementById('dn-loot').value=n.lootStr||''; document.getElementById('dn-dialog').value=n.dialog||''; document.getElementById('dn-shop').value=n.shopStr||''; document.getElementById('dn-species').value=n.species||''; document.getElementById('dn-behavior').value=n.behavior||(n.hp>0?'neutral':'npc'); document.getElementById('dn-w').value=n.w||30; document.getElementById('dn-h').value=n.h||30; document.getElementById('dn-speed').value=n.speed||1; document.getElementById('dn-range').value=n.range||90; const dl=document.getElementById('dn-species-list'); if(dl && window.Art && !dl.children.length) Object.keys(Art.S).concat(Object.keys(Art.NPCLOOK)).forEach(k=>{const op=document.createElement('option'); op.value=k; dl.appendChild(op);}); } }
-        function saveDevNPC(){ let k=document.getElementById('dn-id').value; if(!k)return; npcDB[k]=Object.assign({}, npcDB[k]||{}, {species:document.getElementById('dn-species').value||undefined,behavior:document.getElementById('dn-behavior').value,w:parseInt(document.getElementById('dn-w').value)||30,h:parseInt(document.getElementById('dn-h').value)||30,speed:parseFloat(document.getElementById('dn-speed').value)||1,range:parseInt(document.getElementById('dn-range').value)||90,name:document.getElementById('dn-name').value,hp:parseInt(document.getElementById('dn-hp').value),maxHit:parseInt(document.getElementById('dn-hit').value),xp:parseInt(document.getElementById('dn-xp').value),c1:document.getElementById('dn-c1').value,c2:document.getElementById('dn-c2').value,lootStr:document.getElementById('dn-loot').value,dialog:document.getElementById('dn-dialog').value,shopStr:document.getElementById('dn-shop').value}); populateDevNPCs(); document.getElementById('dev-npc-select').value=k; setActionText(`NPC salvo!`); saveDataLogic(false, true); buildDevEntityList();}
+        function loadDevNPCForm(){ let k=document.getElementById('dev-npc-select').value; if(k==='NEW'){ document.getElementById('dn-id').value=''; document.getElementById('dn-name').value='Monstro'; document.getElementById('dn-hp').value=10; document.getElementById('dn-hit').value=1; document.getElementById('dn-xp').value=20; document.getElementById('dn-loot').value=''; document.getElementById('dn-dialog').value=''; document.getElementById('dn-shop').value=''; document.getElementById('dn-species').value=''; document.getElementById('dn-behavior').value='neutral'; document.getElementById('dn-w').value=30; document.getElementById('dn-h').value=30; document.getElementById('dn-speed').value=1; document.getElementById('dn-range').value=90; document.getElementById('dn-level').value=0; document.getElementById('dn-showname').value='true'; document.getElementById('dn-namemode').value='auto'; }else{ let n=npcDB[k]; document.getElementById('dn-id').value=k; document.getElementById('dn-name').value=n.name; document.getElementById('dn-hp').value=n.hp; document.getElementById('dn-hit').value=n.maxHit; document.getElementById('dn-xp').value=n.xp; document.getElementById('dn-c1').value=n.c1; document.getElementById('dn-c2').value=n.c2; document.getElementById('dn-loot').value=n.lootStr||''; document.getElementById('dn-dialog').value=n.dialog||''; document.getElementById('dn-shop').value=n.shopStr||''; document.getElementById('dn-species').value=n.species||''; document.getElementById('dn-behavior').value=n.behavior||(n.hp>0?'neutral':'npc'); document.getElementById('dn-w').value=n.w||30; document.getElementById('dn-h').value=n.h||30; document.getElementById('dn-speed').value=n.speed||1; document.getElementById('dn-range').value=n.range||90; document.getElementById('dn-level').value=n.level||0; document.getElementById('dn-showname').value=(n.showName===false)?'false':'true'; document.getElementById('dn-namemode').value=n.nameColor?'custom':'auto'; if(n.nameColor) document.getElementById('dn-namecolor').value=n.nameColor; const dl=document.getElementById('dn-species-list'); if(dl && window.Art && !dl.children.length) Object.keys(Art.S).concat(Object.keys(Art.NPCLOOK)).forEach(k=>{const op=document.createElement('option'); op.value=k; dl.appendChild(op);}); } }
+        function saveDevNPC(){ let k=document.getElementById('dn-id').value; if(!k)return; npcDB[k]=Object.assign({}, npcDB[k]||{}, {species:document.getElementById('dn-species').value||undefined,behavior:document.getElementById('dn-behavior').value,w:parseInt(document.getElementById('dn-w').value)||30,h:parseInt(document.getElementById('dn-h').value)||30,speed:parseFloat(document.getElementById('dn-speed').value)||1,range:parseInt(document.getElementById('dn-range').value)||90,level:parseInt(document.getElementById('dn-level').value)||0,showName:document.getElementById('dn-showname').value!=='false',nameColor:document.getElementById('dn-namemode').value==='custom'?document.getElementById('dn-namecolor').value:undefined,name:document.getElementById('dn-name').value,hp:parseInt(document.getElementById('dn-hp').value),maxHit:parseInt(document.getElementById('dn-hit').value),xp:parseInt(document.getElementById('dn-xp').value),c1:document.getElementById('dn-c1').value,c2:document.getElementById('dn-c2').value,lootStr:document.getElementById('dn-loot').value,dialog:document.getElementById('dn-dialog').value,shopStr:document.getElementById('dn-shop').value}); populateDevNPCs(); document.getElementById('dev-npc-select').value=k; setActionText(`NPC salvo!`); saveDataLogic(false, true); buildDevEntityList();}
         function toggleDevBuild() { isDevBuildMode = !isDevBuildMode; document.getElementById('btn-build-mode').innerText=`Modo Construção: ${isDevBuildMode?'ON':'OFF'}`; document.getElementById('btn-build-mode').style.background=isDevBuildMode?'#2ecc71':'#e67e22'; setActionText(isDevBuildMode?"Build ON.":"Build OFF.", "#f1c40f"); }
 
         function loadDevMapManager() { let grid = document.getElementById('map-grid-ui'); if(!grid) return; grid.innerHTML = ''; for(let y = -2; y <= 2; y++) { for(let x = -2; x <= 2; x++) { let m = Object.keys(gameMaps).find(k => gameMaps[k].gridX === x && gameMaps[k].gridY === y); let div = document.createElement('div'); div.className = 'map-tile'; if(m) { div.innerText = m; div.style.background = gameMaps[m].color; } else { div.innerText = "+"; } if(m === currentMap) div.classList.add('active-tile'); div.onclick = () => handleGridClick(x, y, m); grid.appendChild(div); } } let cm = gameMaps[currentMap]; if(cm) { document.getElementById('cur-map-id-disp').innerText = cm.name; document.getElementById('cur-map-name').value = cm.name; document.getElementById('cur-map-w').value = cm.width || 800; document.getElementById('cur-map-h').value = cm.height || 600; document.getElementById('cur-map-color').value = cm.color || '#4a6b2d'; } }
@@ -852,6 +878,16 @@
         function saveCurrentMapSettings() { let cm = gameMaps[currentMap]; if(cm) { cm.name = document.getElementById('cur-map-name').value || cm.id; cm.width = parseInt(document.getElementById('cur-map-w').value) || 800; cm.height = parseInt(document.getElementById('cur-map-h').value) || 600; cm.color = document.getElementById('cur-map-color').value || '#4a6b2d'; resizeCanvas(); saveDataLogic(false, true); loadDevMapManager(); setActionText("Mapa Atualizado!"); } }
         function createNewMap() { let id = document.getElementById('dm-id').value; let n = document.getElementById('dm-name').value; let w = parseInt(document.getElementById('dm-w').value) || 800; let h = parseInt(document.getElementById('dm-h').value) || 600; let c = document.getElementById('dm-color').value; if(!id || gameMaps[id]) { alert("ID inválido/já existe!"); return; } gameMaps[id] = { id: id, name: n||id, width: w, height: h, color: c, gridX: null, gridY: null, entities: [] }; setActionText("Mapa Criado!"); saveDataLogic(false, true); loadDevMapManager(); }
 
+        // se o mundo mudou e o jogador ficou "dentro" de uma construção, tira ele de lá (procura o ponto livre mais próximo)
+        function ensurePlayerFree() {
+            const m = gameMaps[currentMap]; if (!m || !m.entities) return; const W = m.width || 800, H = m.height || 600;
+            const solid = m.entities.filter(o => o && o.active && !['ground_item','fishing_spot','portal','fire','paint','enemy','npc'].includes(o.type));
+            const hits = (x, y) => solid.some(o => { const h = getHitbox(o); return h && x - 10 < h.x + h.w && x + 10 > h.x && y - 10 < h.y + h.h && y + 10 > h.y; });
+            if (!hits(player.x, player.y)) return;
+            for (let r = 20; r < 600; r += 20) for (let a = 0; a < 16; a++) { const x = player.x + Math.cos(a / 16 * 6.283) * r, y = player.y + Math.sin(a / 16 * 6.283) * r; if (x > 20 && y > 20 && x < W - 20 && y < H - 20 && !hits(x, y)) { player.x = x; player.y = y; player.destX = x; player.destY = y; return; } }
+            const sp = m.spawn || { x: W / 2, y: H / 2 }; player.x = sp.x; player.y = sp.y; player.destX = sp.x; player.destY = sp.y;
+        }
+        function respawnAtVillage() { const m = gameMaps['lumbridge']; const sp = (m && m.spawn) || { x: 400, y: 300 }; switchMap('lumbridge', sp.x, sp.y); }
         function switchMap(targetMap, nx, ny) { if(!gameMaps[targetMap]) return; currentMap = targetMap; player.x = nx; player.y = ny; player.destX = nx; player.destY = ny; player.isPerformingAction = false; player.pendingAutoAction = null; player.actionTarget = null; player.actionToolItem = null; projectiles = []; setActionText(`Viajou: ${gameMaps[currentMap].name}`); saveDataLogic(); loadDevMapManager(); }
         
         // --- SISTEMAS DE FÍSICA DE ATAQUE E COLISÃO ---
@@ -859,7 +895,7 @@
             let hw = o.w || 30; let hh = o.h || 30; let hx = o.x; let hy = o.y;
             if (o.type === 'decor') return window.Art ? Art.hitboxFor(o) : null;   // decoração não sólida = sem colisão
             if (o.type === 'house' && window.Art) return Art.hitboxFor(o);
-            if(o.type === 'tree') { hy += hh - 20; hh = 20; hx += hw/2 - 10; hw = 20; }
+            if(o.type === 'tree') { const tw = Math.max(16, hw * 0.24), th = Math.max(12, hh * 0.17); hy += hh - th; hh = th; hx += hw/2 - tw/2; hw = tw; }
             else if(o.type === 'house') { hy += hh - 30; hh = 30; }
             else if(o.type === 'furnace' || o.type === 'bank') { hy += hh - 20; hh = 20; }
             return {x: hx, y: hy, w: hw, h: hh};
@@ -1085,11 +1121,12 @@
                 if (!best) return null; g = best;
             }
             const N = cols * rows, gs = new Float32Array(N).fill(1e9), from = new Int32Array(N).fill(-1), closed = new Uint8Array(N);
-            const open = [[0, s.y * cols + s.x]]; gs[s.y * cols + s.x] = 0; let it = 0;
+            const open = [[0, s.y * cols + s.x]]; gs[s.y * cols + s.x] = 0; let it = 0;   // 'open' é um heap binário (mapas grandes)
+            const hpush = (f, i) => { open.push([f, i]); let k = open.length - 1; while (k > 0) { const p = (k - 1) >> 1; if (open[p][0] <= open[k][0]) break; const t = open[p]; open[p] = open[k]; open[k] = t; k = p; } };
+            const hpop = () => { const top = open[0], last = open.pop(); if (open.length) { open[0] = last; let k = 0; for (;;) { const l = 2 * k + 1, r = l + 1; let m = k; if (l < open.length && open[l][0] < open[m][0]) m = l; if (r < open.length && open[r][0] < open[m][0]) m = r; if (m === k) break; const t = open[m]; open[m] = open[k]; open[k] = t; k = m; } } return top; };
             const h = (x, y) => { const dx = Math.abs(x - g.x), dy = Math.abs(y - g.y); return (dx + dy) + (1.414 - 2) * Math.min(dx, dy); };
-            while (open.length && it++ < 6000) {
-                let bi = 0; for (let i = 1; i < open.length; i++) if (open[i][0] < open[bi][0]) bi = i;
-                const [, cur0] = open.splice(bi, 1)[0]; if (closed[cur0]) continue; closed[cur0] = 1;
+            while (open.length && it++ < 60000) {
+                const cur0 = hpop()[1]; if (closed[cur0]) continue; closed[cur0] = 1;
                 const cx = cur0 % cols, cy = (cur0 / cols) | 0;
                 if (cx === g.x && cy === g.y) break;
                 for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
@@ -1097,7 +1134,7 @@
                     if (nx < 0 || ny < 0 || nx >= cols || ny >= rows || grid[ny * cols + nx]) continue;
                     if (dx && dy && (grid[cy * cols + nx] || grid[ny * cols + cx])) continue;   // não corta quina
                     const ni = ny * cols + nx; const ng = gs[cur0] + (dx && dy ? 1.414 : 1);
-                    if (ng < gs[ni]) { gs[ni] = ng; from[ni] = cur0; open.push([ng + h(nx, ny), ni]); }
+                    if (ng < gs[ni]) { gs[ni] = ng; from[ni] = cur0; hpush(ng + h(nx, ny), ni); }
                 }
             }
             const gi = g.y * cols + g.x; if (from[gi] === -1 && !(s.x === g.x && s.y === g.y)) return null;
@@ -1121,12 +1158,16 @@
             for (let wo of cur) {
                 if(!wo || !wo.active || ['ground_item','fishing_spot','portal','paint','enemy','npc'].includes(wo.type) || wo === o) continue;
                 let hb = getHitbox(wo); if (!hb) continue;
-                if(nx < hb.x+hb.w && nx+ow > hb.x && o.y < hb.y+hb.h && o.y+oh > hb.y) cx = true;
-                if(o.x < hb.x+hb.w && o.x+ow > hb.x && ny < hb.y+hb.h && ny+oh > hb.y) cy = true;
+                const bw = Math.max(10, ow * 0.7), bh = Math.max(8, oh * 0.4);   // colisão pelos "pés" do bicho, não pela imagem toda
+                const ov = (px, py) => { const bx = px + (ow - bw) / 2, by = py + oh - bh; return bx < hb.x + hb.w && bx + bw > hb.x && by < hb.y + hb.h && by + bh > hb.y; };
+                if (ov(o.x, o.y)) continue;   // já está dentro (nasceu colado): deixa sair
+                if (ov(nx, o.y)) cx = true;
+                if (ov(o.x, ny)) cy = true;
             }
             const cm = gameMaps[currentMap]; const mW = (cm && cm.width) || 800, mH = (cm && cm.height) || 600;
             if(nx < 15 || nx > mW - 15 - ow) cx = true; if(ny < 15 || ny > mH - 15 - oh) cy = true;
             if(!cx) o.x = nx; if(!cy) o.y = ny;
+            return !(cx && cy);
         }
 
         function update() {
@@ -1260,7 +1301,7 @@
                                     let bl = Math.floor(Math.random() * (getTotalDef() / 2 + 1)); let fD = Math.max(0, rD - bl);
                                     player.stats.hp -= fD; addFloatingText(player.x, player.y - 20, fD > 0 ? fD : "Block", fD > 0 ? "red" : "#3498db"); o.attackCooldown = 70;
                                     if (fD > 0) Art.burst(player.x, player.y - 8, '#d33', 5, 1);
-                                    if(player.stats.hp <= 0) { switchMap('lumbridge', 400, 300); player.stats.hp = player.stats.maxHp; addFloatingText(player.x, player.y - 40, "Renasceu", "#f1c40f"); o.aggroTarget = null; closeMenus(); }
+                                    if(player.stats.hp <= 0) { respawnAtVillage(); player.stats.hp = player.stats.maxHp; addFloatingText(player.x, player.y - 40, "Renasceu", "#f1c40f"); o.aggroTarget = null; closeMenus(); }
                                     updateUI();
                                 }
                             }
@@ -1273,7 +1314,7 @@
                                 if (best) { mobStep(o, cur, cxm - best.x, cym - best.y, best.d || 1, Math.min(spd * 1.6, 2.2), ow, oh); fled = true; o._wt = 0; }
                             }
                             if (!fled) {   // passeia perto do ponto de origem, com pausas
-                                if (o._wt > 0) { o._wt--; const ex = o.destX - o.x, ey = o.destY - o.y, ed = Math.hypot(ex, ey); if (ed > 2) mobStep(o, cur, ex, ey, ed, spd * 0.35, ow, oh); else o._wt = 0; }
+                                if (o._wt > 0) { o._wt--; const ex = o.destX - o.x, ey = o.destY - o.y, ed = Math.hypot(ex, ey); if (ed > 2) { if (mobStep(o, cur, ex, ey, ed, spd * 0.35, ow, oh)) o._stuck = 0; else if (++o._stuck > 20) { o._wt = 0; o._stuck = 0; } } else o._wt = 0; }
                                 else { o._idle = (o._idle === undefined ? Math.random() * 200 : o._idle) - 1; if (o._idle <= 0) { const R = (beh === 'passive' || beh === 'skittish') ? 110 : 70, a = Math.random() * 6.283, r = 20 + Math.random() * R; o.destX = Math.max(20, Math.min(mapW - ow - 20, o.homeX + Math.cos(a) * r)); o.destY = Math.max(20, Math.min(mapH - oh - 20, o.homeY + Math.sin(a) * r)); o._wt = 320; o._idle = 90 + Math.random() * 260; } }
                             }
                         }
@@ -1302,10 +1343,27 @@
             else if (t === 'fire' || t === 'fishing_spot' || t === 'furnace' || t === 'anvil' || t === 'bank' || t === 'portal') Art.drawStation(ctx, o, T);
             else { ctx.fillStyle = 'rgba(200,200,200,0.5)'; ctx.fillRect(o.x, o.y, o.w || 30, o.h || 30); }
 
-            if (!isHologram && o.active !== false && o.hp !== undefined && t === 'enemy' && o.maxHp > 0 && o.hp < o.maxHp) {   // barra de vida só aparece depois de levar dano
-                const ow = Math.max(24, Math.min(o.w || 30, 90)); const bx = o.x + (o.w || 30) / 2 - ow / 2, by = o.y - 6 - ((npcDB[o.dbKey] && npcDB[o.dbKey].species === 'dragon') ? 30 : 0);
-                ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(bx - 1, by - 1, ow + 2, 6); ctx.fillStyle = '#7a1e1e'; ctx.fillRect(bx, by, ow, 4); ctx.fillStyle = '#4fc36a'; ctx.fillRect(bx, by, ow * Math.max(0, o.hp / o.maxHp), 4);
+            if (!isHologram && o.active !== false && (t === 'enemy' || t === 'npc')) drawNameplate(ctx, o);
+        }
+
+        // cor do nome por comportamento: vermelho = agressivo, amarelo = neutro (revida), verde = pacífico, azul-claro = arisco, dourado = NPC
+        const BEH_COLOR = { aggressive: '#ff5a4a', neutral: '#ffd24a', passive: '#6fe08a', skittish: '#8fe0ff', npc: '#f6e7b4' };
+        const BEH_LABEL = { aggressive: 'Agressivo', neutral: 'Neutro', passive: 'Pacífico', skittish: 'Arisco', npc: 'NPC' };
+        function mobLevel(def) { if (!def) return 1; if (def.level > 0) return def.level; return Math.max(1, Math.round(((def.hp || 0) + (def.maxHit || 0) * 4) / 8)); }
+        function mobBehavior(def) { return (def && def.behavior) || ((def && def.hp > 0) ? 'neutral' : 'npc'); }
+        function drawNameplate(ctx, o) {
+            const def = npcDB[o.dbKey]; if (def && def.showName === false) return;
+            const beh = mobBehavior(def); const col = (def && def.nameColor) || BEH_COLOR[beh] || '#fff';
+            const top = (window.Art && Art.creatureTop) ? Art.creatureTop(o, def) : o.y; const cx = o.x + (o.w || 30) / 2;
+            const isMob = o.type === 'enemy'; const label = (o.name || (def && def.name) || '?') + (isMob ? '  Lv ' + mobLevel(def) : '');
+            let y = top - 6;
+            if (isMob && o.maxHp > 0 && o.hp < o.maxHp) {   // barra de vida aparece depois de levar dano
+                const bw = Math.max(30, Math.min((o.w || 30) * 0.9, 96)), bx = cx - bw / 2;
+                ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.fillRect(bx - 1.5, y - 7, bw + 3, 8); ctx.fillStyle = '#5a1616'; ctx.fillRect(bx, y - 5.5, bw, 5); ctx.fillStyle = '#4fc36a'; ctx.fillRect(bx, y - 5.5, bw * Math.max(0, o.hp / o.maxHp), 5); ctx.fillStyle = 'rgba(255,255,255,0.22)'; ctx.fillRect(bx, y - 5.5, bw * Math.max(0, o.hp / o.maxHp), 1.6);
+                y -= 10;
             }
+            ctx.save(); ctx.font = 'bold 11px "Trebuchet MS", Verdana, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+            ctx.lineWidth = 3.4; ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(10,6,2,0.92)'; ctx.strokeText(label, cx, y); ctx.fillStyle = col; ctx.fillText(label, cx, y); ctx.restore();
         }
 
         function drawCharacter(ctx, px, py, facing, anim, equip, name, isMain) { Art.drawPlayer(ctx, px, py, facing, anim, equip, name, isMain, {}); }
@@ -1356,7 +1414,7 @@
                     });
                 }
                 
-                renderQueue.push({ type: 'player', op: player, px: player.x, py: player.y, name: currentUser || 'Player', isMain: true, sortY: player.y });
+                renderQueue.push({ type: 'player', op: player, px: renderPX || player.x, py: renderPY || player.y, name: currentUser || 'Player', isMain: true, sortY: renderPY || player.y });
                 renderQueue.sort((a, b) => a.sortY - b.sortY);
                 
                 renderQueue.forEach(item => {
@@ -1420,17 +1478,22 @@
             } catch(e) {}
         }
 
-        function gameLoop(timestamp) { 
-            requestAnimationFrame(gameLoop); 
-            if (!timestamp) timestamp = 0; let elapsed = timestamp - lastFrameTime;
-            if (elapsed >= frameDelay) {
-                // passo fixo: em aparelho lento roda o update mais vezes (máx 3) para o jogo não "arrastar"
-                let steps = Math.min(3, Math.max(1, Math.round(elapsed / frameDelay)));
-                lastFrameTime = timestamp - (elapsed % frameDelay);
-                for (let k = 0; k < steps; k++) { try { update(); } catch(e){ logErr(e); } }
-                try { draw(); } catch(e){ logErr(e); } try { drawMinimap(); } catch(e){ logErr(e); } 
-            }
+        // passo fixo de 60Hz com acumulador (em monitor 120/144Hz o jogo NÃO acelera) + interpolação visual do jogador
+        let _acc = 0, _lastTs = 0, prevPX = 0, prevPY = 0, renderPX = 0, renderPY = 0;
+        function gameLoop(timestamp) {
+            requestAnimationFrame(gameLoop);
+            if (!timestamp) timestamp = performance.now();
+            if (!_lastTs) _lastTs = timestamp;
+            let dt = timestamp - _lastTs; _lastTs = timestamp;
+            if (dt > 250) dt = frameDelay;   // aba ficou em segundo plano: não "recupera" o tempo perdido
+            _acc += dt; let n = 0;
+            while (_acc >= frameDelay && n < 4) { prevPX = player.x; prevPY = player.y; try { update(); } catch(e){ logErr(e); } _acc -= frameDelay; n++; }
+            if (n >= 4) _acc = 0;
+            const al = Math.min(1, _acc / frameDelay);
+            if (Math.hypot(player.x - prevPX, player.y - prevPY) > 40) { renderPX = player.x; renderPY = player.y; } else { renderPX = prevPX + (player.x - prevPX) * al; renderPY = prevPY + (player.y - prevPY) * al; }
+            try { draw(); } catch(e){ logErr(e); } try { drawMinimap(); } catch(e){ logErr(e); }
         }
     </script>
+    <script src="ui.js"></script>
 </body>
 </html>
