@@ -261,7 +261,7 @@
         }
         btn.style.display = (typeof currentMap !== 'undefined' && currentMap === 'casa') ? '' : 'none';
     }
-    function onLogin() { if (!player.house) player.house = { items: [] }; if (!player.bestiary) player.bestiary = {}; merge(); }
+    function onLogin() { if (!player.house) player.house = { items: [] }; if (!player.bestiary) player.bestiary = {}; merge(); try { if (player.currentMap === 'casa') refreshHouse(); } catch (e) {} }
     function wire() {
         const oi = window.tryInteract; if (typeof oi === 'function') window.tryInteract = function (t) { if (tryInteractHook(t)) { player.actionAnim = 15; return; } return oi.apply(this, arguments); };
         const od = window.applyDamage; if (typeof od === 'function') window.applyDamage = function (t, dmg, s) { const was = t && t.type === 'enemy' && t.active !== false && t.hp > 0; const r = od.apply(this, arguments); try { if (was && t.hp <= 0) record(t.dbKey); } catch (e) {} return r; };

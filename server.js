@@ -19,6 +19,8 @@ const path = require('path');
 const crypto = require('crypto');
 const util = require('util');
 const cors = require('cors');
+const createSocial = require('./social');
+const wsServer = require('./wsserver');
 
 const scrypt = util.promisify(crypto.scrypt);
 const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
@@ -31,7 +33,7 @@ app.use((req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'no-referrer');
     res.setHeader('X-Frame-Options', 'DENY');
-    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src * data: blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'");
+    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src * data: blob:; connect-src 'self' ws: wss:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'");
     next();
 });
 /* limites de corpo: rotas leves aceitam pouco; save exige login antes de ler corpo grande; restauração só admin */
@@ -73,13 +75,15 @@ function normalizeDB(d) {
     if (d.itemDB && typeof d.itemDB === 'object') out.itemDB = d.itemDB;
     if (d.npcDB && typeof d.npcDB === 'object') out.npcDB = d.npcDB;
     if (Array.isArray(d.chat)) out.chat = d.chat.slice(-50).filter(c => c && typeof c.msg === 'string').map(c => ({ sender: String(c.sender || '?').slice(0, 40), msg: c.msg.slice(0, 200), color: /^#[0-9a-f]{3,8}$/i.test(c.color) ? c.color : '#ecf0f1' }));
+    out.trades = Object.create(null);
+    if (d.trades && typeof d.trades === 'object') for (const id of Object.keys(d.trades)) { const t = d.trades[id]; if (t && typeof t === 'object' && typeof t.a === 'string' && typeof t.b === 'string' && t.offer && t.ok && t.applied) out.trades[id] = t; }
     if (Number.isFinite(d.mapVersion)) out.mapVersion = d.mapVersion;
     if (d.sessions && typeof d.sessions === 'object') {
         for (const h of Object.keys(d.sessions)) { const s = d.sessions[h]; if (s && typeof s.user === 'string' && s.exp > Date.now()) out.sessions[h] = { user: s.user, exp: s.exp }; }
     }
     return out;
 }
-function loadDB() {
+function loadJsonDB() {
     try {
         if (fs.existsSync(DB_FILE)) return normalizeDB(JSON.parse(fs.readFileSync(DB_FILE, 'utf8')));
     } catch (e) {
@@ -89,6 +93,21 @@ function loadDB() {
         console.error('[DB] NÃO vou iniciar com banco vazio para não apagar suas contas. Restaure um arquivo da pasta backups/ ou corrija database.json.'); process.exit(1);
     }
     return emptyDB();
+}
+/* STORAGE=sqlite grava em SQLite (node:sqlite, Node 22.5+); o padrão continua sendo database.json. Na 1ª vez, o JSON existente é importado (o arquivo original é mantido). */
+let sql = null;
+if ((process.env.STORAGE || '').toLowerCase() === 'sqlite') {
+    try { fs.mkdirSync(DATA_DIR, { recursive: true }); sql = require('./sqlitestore').open(path.join(DATA_DIR, 'database.sqlite')); }
+    catch (e) { console.error('[DB] SQLite indisponível (' + e.message + '). Usando database.json.'); sql = null; }
+}
+function loadDB() {
+    if (!sql) return loadJsonDB();
+    let d = null;
+    try { d = sql.load(); } catch (e) { console.error('[DB] SQLite ilegível:', e.message, '— NÃO vou iniciar vazio para não apagar suas contas.'); process.exit(1); }
+    if (d) return normalizeDB(d);
+    const migrated = loadJsonDB();   // banco SQL vazio: importa o JSON (ou começa do zero se não houver)
+    try { sql.save(migrated); console.log('[DB] SQLite inicializado com ' + Object.keys(migrated.users).length + ' conta(s).'); } catch (e) { console.error('[DB] falha ao inicializar o SQLite:', e.message); process.exit(1); }
+    return migrated;
 }
 let db = loadDB();
 let worldStr = db.worldData ? JSON.stringify(db.worldData) : '';
@@ -100,6 +119,13 @@ function markDirty() { dirty = true; if (!flushTimer) flushTimer = setTimeout(fl
 function flushDB() {
     if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
     if (!dirty) return; dirty = false;
+    if (sql) {
+        try {
+            sql.save(db);
+            if (Date.now() - lastSnap > 3600000) { lastSnap = Date.now(); const dir = path.join(DATA_DIR, 'backups'); fs.mkdirSync(dir, { recursive: true }); sql.snapshot(path.join(dir, 'database-' + new Date().toISOString().replace(/[:.]/g, '-') + '.sqlite')); fs.readdirSync(dir).filter(f => f.startsWith('database-') && f.endsWith('.sqlite')).sort().slice(0, -12).forEach(f => { try { fs.unlinkSync(path.join(dir, f)); } catch (_) { } }); }
+        } catch (e) { console.error('[DB] erro ao gravar (SQLite):', e.message); dirty = true; if (!flushTimer) flushTimer = setTimeout(flushDB, 5000); }
+        return;
+    }
     try {
         fs.mkdirSync(DATA_DIR, { recursive: true });
         const tmp = DB_FILE + '.tmp', json = JSON.stringify(db);
@@ -209,6 +235,8 @@ const serverMobs = Object.create(null);      // map -> id -> {hp,maxHp,aggro,isD
 const mobPos = Object.create(null);          // map -> id -> {x,y}  (enviado pelo host)
 const hostByMap = Object.create(null);       // map -> username do host
 const lastChat = Object.create(null);        // user -> timestamp
+const social = createSocial({ db, activePlayers, markDirty });
+function chatFor(user) { return db.chat.filter(c => social.chatVisible(user, c)).map(c => { if (!c.party) return c; const { sender, msg, color } = c; return { sender, msg, color }; }); }
 
 const num = (v, d = 0) => Number.isFinite(v) ? v : d;
 const RESERVED = new Set(['__proto__', 'constructor', 'prototype', 'hasownproperty', 'tostring', 'valueof', 'sistema']);
@@ -269,7 +297,7 @@ app.post('/api/login', rateLimit('login', 20, 60000), async (req, res) => {
     const token = newSession(real);
     res.json({
         success: true, token, username: real, role: user.role, playerData: user.playerData,
-        worldData: db.worldData, itemDB: db.itemDB, npcDB: db.npcDB, chat: db.chat, chatVer: db.chatVer, mapVersion: db.mapVersion
+        worldData: db.worldData, itemDB: db.itemDB, npcDB: db.npcDB, chat: chatFor(real), chatVer: db.chatVer, mapVersion: db.mapVersion
     });
 });
 
@@ -298,14 +326,14 @@ app.post('/api/save', rateLimit('save', 90, 60000), (req, res) => {
     markDirty(); res.json({ success: true, mapVersion: db.mapVersion });
 });
 
-app.post('/api/sync', auth, (req, res) => {
-    const b = req.body || {}; const user = req.user; const now = Date.now();
+function doSync(user, b) {
+    b = b || {}; const now = Date.now();
     let map = (typeof b.map === 'string' && MAP_RE.test(b.map) && !RESERVED.has(b.map.toLowerCase())) ? b.map : 'lumbridge';
     if (db.worldData && !hasOwn(db.worldData, map)) map = hasOwn(db.worldData, 'lumbridge') ? 'lumbridge' : map;
     const prev = activePlayers[user];
     const eq = (b.equipment && typeof b.equipment === 'object' && JSON.stringify(b.equipment).length < 6000) ? b.equipment : (prev ? prev.equipment : null);
     const fc = (b.facing && typeof b.facing === 'object') ? { x: num(b.facing.x) | 0, y: num(b.facing.y) | 0 } : { x: 0, y: 1 };
-    activePlayers[user] = { x: coord(b.x, 400), y: coord(b.y, 300), map, facing: fc, actionAnim: num(b.actionAnim) | 0, equipment: eq, lastSeen: now };
+    activePlayers[user] = { x: coord(b.x, 400), y: coord(b.y, 300), map, facing: fc, actionAnim: num(b.actionAnim) | 0, equipment: eq, hp: Math.max(0, Math.min(99999, num(b.hp) | 0)), maxHp: Math.max(0, Math.min(99999, num(b.maxHp) | 0)), lastSeen: now };
     const host = electHost(map); const isHost = host === user;
 
     if (!serverMobs[map]) serverMobs[map] = Object.create(null);
@@ -347,11 +375,13 @@ app.post('/api/sync', auth, (req, res) => {
 
     const players = {};
     for (const u of Object.keys(activePlayers)) if (u !== user && activePlayers[u].map === map) players[u] = activePlayers[u];
-    const out = { players, mapVersion: db.mapVersion, serverMobs: serverMobs[map], isHost, chatVer: db.chatVer };
-    if (b.chatVer !== db.chatVer) out.chat = db.chat;
+    const out = { players, mapVersion: db.mapVersion, serverMobs: serverMobs[map], isHost, chatVer: db.chatVer, social: social.view(user) };
+    if (b.chatVer !== db.chatVer) out.chat = chatFor(user);
     if (!isHost && mobPos[map]) out.mobPos = mobPos[map];
-    res.json(out);
-});
+    return out;
+}
+app.post('/api/sync', auth, (req, res) => { res.json(doSync(req.user, req.body)); });
+app.post('/api/social', rateLimit('social', 120, 60000), auth, (req, res) => { const r = social.act(req.user, req.body); res.json(Object.assign({}, r, { social: social.view(req.user) })); });
 
 app.get('/api/map', auth, (req, res) => res.json({ worldData: db.worldData, itemDB: db.itemDB, npcDB: db.npcDB, mapVersion: db.mapVersion }));
 
@@ -359,17 +389,41 @@ app.post('/api/chat', auth, (req, res) => {
     const cb = req.body || {};
     let msg = typeof cb.msg === 'string' ? cb.msg.replace(/[\u0000-\u001f\u007f\u200b-\u200f\u202a-\u202e\u2066-\u2069]/g, ' ').trim().slice(0, 200) : '';
     const now = Date.now();
-    if (msg && now - (lastChat[req.user] || 0) < 800) return res.status(429).json({ error: 'Devagar!', chat: db.chat, chatVer: db.chatVer });
+    if (msg && now - (lastChat[req.user] || 0) < 800) return res.status(429).json({ error: 'Devagar!', chat: chatFor(req.user), chatVer: db.chatVer });
     if (msg) {
         lastChat[req.user] = now;
         const role = req.role;
         const color = role === 'admin' ? '#e74c3c' : role === 'vip_full' ? '#f1c40f' : role === 'vip_light' ? '#3498db' : '#ecf0f1';
         const prefix = role === 'admin' ? '[ADM] ' : role.startsWith('vip') ? '[VIP] ' : '';
-        db.chat.push({ sender: prefix + req.user, msg, color }); if (db.chat.length > 50) db.chat.shift();
+        const pid = cb.party ? social.partyOf(req.user) : null;
+        if (cb.party && !pid) return res.json({ error: 'Você não está em um grupo.', chat: chatFor(req.user), chatVer: db.chatVer });
+        db.chat.push(pid ? { sender: '[Grupo] ' + req.user, msg, color: '#7bd67b', party: pid } : { sender: prefix + req.user, msg, color }); if (db.chat.length > 50) db.chat.shift();
         db.chatVer++; markDirty();
     }
-    res.json({ chat: db.chat, chatVer: db.chatVer });
+    res.json({ chat: chatFor(req.user), chatVer: db.chatVer });
 });
+
+
+/* ---------------- WEBSOCKET (opcional; o cliente cai para HTTP se falhar) ---------------- */
+function onWsConnect(conn) {
+    let user = null, key = '', n = 0, win = Date.now();
+    const kill = setTimeout(() => { if (!user) conn.close(1008); }, 5000); kill.unref();
+    conn.on('close', () => clearTimeout(kill));
+    conn.on('message', (txt) => {
+        let m; try { m = JSON.parse(txt); } catch (e) { return conn.close(1003); }
+        if (!m || typeof m !== 'object') return;
+        const t0 = Date.now(); if (t0 - win > 1000) { win = t0; n = 0; } if (++n > 40) return;   // no máximo 40 mensagens por segundo
+        if (!user) {
+            if (m.t !== 'auth' || typeof m.token !== 'string') return conn.close(1008);
+            key = sha(m.token); const s = db.sessions[key];
+            if (!s || s.exp < Date.now() || !hasOwn(db.users, s.user)) { conn.send(JSON.stringify({ t: 'auth', ok: false })); return conn.close(1008); }
+            user = s.user; return void conn.send(JSON.stringify({ t: 'auth', ok: true }));
+        }
+        const s = db.sessions[key]; if (!s || s.exp < Date.now()) { conn.send(JSON.stringify({ t: 'auth', ok: false })); return conn.close(1008); }
+        if (m.t === 'sync') { conn.send(JSON.stringify({ t: 'sync', i: m.i, d: doSync(user, m.d) })); }
+        else if (m.t === 'social') { const r = social.act(user, m.d); conn.send(JSON.stringify({ t: 'social', i: m.i, d: Object.assign({}, r, { social: social.view(user) }) })); }
+    });
+}
 
 /* ---------- administração ---------- */
 app.get('/api/users', auth, adminOnly, (req, res) => {
@@ -397,7 +451,7 @@ app.post('/api/restore', auth, adminOnly, (req, res) => {
     const restored = normalizeDB(dbData); restored.sessions = db.sessions;
     if (!hasOwn(restored.users, req.user)) restored.users[req.user] = db.users[req.user];   // quem restaura não perde o acesso
     restored.users[req.user].role = 'admin';
-    db = restored; worldStr = db.worldData ? JSON.stringify(db.worldData) : ''; dbStr = JSON.stringify([db.itemDB, db.npcDB]);
+    db = restored; social.rebind(db); worldStr = db.worldData ? JSON.stringify(db.worldData) : ''; dbStr = JSON.stringify([db.itemDB, db.npcDB]);
     db.mapVersion = Math.max(Date.now(), db.mapVersion + 1); db.chatVer++; markDirty(); flushDB();
     res.json({ success: true, mapVersion: db.mapVersion });
 });
@@ -412,5 +466,6 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 3000;
 ensureAdmin().then(() => {
-    app.listen(PORT, () => console.log(`MiniScape rodando na porta ${PORT} (dados em ${DB_FILE})`));
+    const srv = app.listen(PORT, () => console.log(`MiniScape rodando na porta ${PORT} (dados em ${sql ? path.join(DATA_DIR, "database.sqlite") : DB_FILE})`));
+    if (srv && typeof srv.on === 'function') wsServer.attach(srv, { path: '/ws', onConnect: onWsConnect });
 });

@@ -162,6 +162,7 @@
     <script src="catalog.js"></script>
     <script src="content.js"></script>
     <script src="world2.js"></script>
+    <script src="net.js"></script>
     <script src="art.js"></script>
     <script src="env.js"></script>
     <script src="sfx.js"></script>
@@ -599,10 +600,11 @@
                     payload.mobPos = mp;
                 }
                 let data;
-                try { data = await api('/sync', payload); } catch(e) { pendingCombatLogs = sentLogs.concat(pendingCombatLogs); lastEqStr = ''; throw e; }
+                try { data = await (window.Net ? Net.sync(payload) : api('/sync', payload)); } catch(e) { pendingCombatLogs = sentLogs.concat(pendingCombatLogs); lastEqStr = ''; throw e; }
                 if (data.error) { if (data._status !== 401) pendingCombatLogs = sentLogs.concat(pendingCombatLogs); lastEqStr = ''; isSyncing = false; return; }
 
                 if (data.isHost !== undefined) { isMapHost = data.isHost; }
+                try { if (window.Net) Net.onSync(data); } catch (e) { console.error(e); }
 
                 if(data.players) {
                     Object.keys(data.players).forEach(u => {
@@ -702,7 +704,8 @@
             if (isOfflineMode) { setActionText("Chat indisponível offline.", "#e74c3c"); return; }
             input.value = ''; input.focus();   // continua aberto para a próxima frase
             try {
-                const data = await api('/chat', { msg: msg }); if(data.chat) { chatMessages = data.chat; lastChatVer = data.chatVer || 0; updateChatUI(); }
+                let cm = msg, pty = false; const gm = /^\/(g|p)\s+(.+)$/i.exec(msg); if (gm) { cm = gm[2]; pty = true; }
+                const data = await api('/chat', pty ? { msg: cm, party: true } : { msg: cm }); if (data.error) setActionText(data.error, '#e74c3c'); if(data.chat) { chatMessages = data.chat; lastChatVer = data.chatVer || 0; updateChatUI(); }
             } catch(e) {}
         }
         function updateChatUI() {
