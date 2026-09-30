@@ -190,7 +190,7 @@
             <small>Recursos: ${tr} árvores, ${rk} rochas, ${fs} pontos de pesca</small>${ports.length ? `<small>Portais para: ${[...new Set(ports)].map(esc).join(', ')}</small>` : ''}</div></div>`;
     }
     function mapHtml() {
-        const ids = Object.keys(gameMaps).filter((k) => gameMaps[k] && gameMaps[k].entities); const grid = ids.filter((k) => gameMaps[k].gridX != null && gameMaps[k].gridY != null), other = ids.filter((k) => !grid.includes(k));
+        const ids = Object.keys(gameMaps).filter((k) => gameMaps[k] && gameMaps[k].entities && k !== 'casa' && !/^casa_/.test(k)); const grid = ids.filter((k) => gameMaps[k].gridX != null && gameMaps[k].gridY != null), other = ids.filter((k) => !grid.includes(k));
         if (!mapSel || !gameMaps[mapSel]) mapSel = currentMap;
         let h = '<div style="font-size:.78rem;margin-bottom:4px">Clique num lugar para ver criaturas, NPCs e recursos. Amarelo = NPC, vermelho = criatura, azul = portal, ponto branco = você.</div>';
         if (grid.length) {

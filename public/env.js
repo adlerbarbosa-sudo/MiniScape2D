@@ -93,7 +93,7 @@
                 }
             }
             const px = (player.renderX != null ? player.renderX : player.x) + offset.x, py = (player.renderY != null ? player.renderY : player.y) + offset.y;
-            glowAt(ctx, px, py - 14, 105, TORCH, 0.55 * lightK);    // o herói carrega uma tocha
+            glowAt(ctx, px, py - 14, 72, TORCH, 0.24 * lightK);    // o herói carrega uma tocha
             ctx.restore();
         }
         ctx.globalAlpha = 1;

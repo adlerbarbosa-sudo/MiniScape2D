@@ -41,7 +41,8 @@ Abra http://localhost:3000 e entre com usuário `Admin` e a senha definida.
 - `content.js`: carvão e mithril, aço e mithril (fornalha), agricultura (canteiros, sementes do Fazendeiro, crescimento em tempo real), alquimia (caldeirão) e encantamento (mesa). Os itens/peças são colocados uma única vez por mapa (`m.c3`), sem sobrescrever o que o admin editou.
 - `world2.js`: Bestiário (aba Ofícios), Casa do Aventureiro e Catacumbas com o Lich Rei Ossian.
   - A casa é o mapa `casa`: cada jogador decora a sua (guardada em `playerData.house`); os móveis são reconstruídos localmente e nunca vão para o mundo salvo.
-  - Os mapas `casa` e `catacumbas` (e a porta da vila / entrada no Covil) são criados pelo admin no login e salvos no servidor; jogadores comuns os recebem depois disso.
+  - **Porta de casa (Dev):** no painel Dev > Estações, "Porta de Casa (dono)" — coloque sobre a porta de qualquer construção e informe o nome do dono. A peça é invisível (só aparece tracejada no modo Dev e como plaquinha quando o jogador chega perto). O dono decora e convida jogadores por nome (Decorar > Visitantes autorizados); a lista fica em `playerData.house.guests` e o acesso é checado no servidor (`POST /api/house`). Cada casa é uma instância separada no multiplayer (`casa_<dono>`).
+  - Os mapas `casa` e `catacumbas` (e a entrada no Covil) são criados pelo admin no login e salvos no servidor; jogadores comuns os recebem depois disso.
 - `ui.js` e `ui.css`: tema, tela de login, livro de ofícios, guia (H), rastreador de missões.
 
 ## Notas de operação

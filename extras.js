@@ -103,6 +103,28 @@ module.exports = function createExtras(ctx) {
     function bossOpen(t) { t = t == null ? Date.now() : t; return t % BOSS_PERIOD < BOSS_OPEN_MS; }
     function bossInfo() { const t = Date.now(); return { h: bossHour(t), open: bossOpen(t), left: bossOpen(t) ? BOSS_OPEN_MS - (t % BOSS_PERIOD) : 0, next: bossOpen(t) ? 0 : BOSS_PERIOD - (t % BOSS_PERIOD) }; }
 
+
+    // ---- casas de jogadores (porta colocada pelo Dev, vinculada a um dono) ----
+    const findUser = (n) => { if (typeof n !== 'string') return null; n = n.trim().slice(0, 40); if (!n) return null; if (Object.prototype.hasOwnProperty.call(db.users, n)) return n; const l = n.toLowerCase(); return Object.keys(db.users).find((k) => k.toLowerCase() === l) || null; };
+    const houseOf = (u) => { const pd = db.users[u] && db.users[u].playerData; if (!pd || typeof pd !== 'object') return null; if (!pd.house || typeof pd.house !== 'object') pd.house = { items: [] }; if (!Array.isArray(pd.house.items)) pd.house.items = []; if (!Array.isArray(pd.house.guests)) pd.house.guests = []; return pd.house; };
+    function house(user, b) {
+        b = b || {};
+        if (b.a === 'enter') {
+            const owner = findUser(b.owner); if (!owner) return { ok: false, error: 'Esta casa ainda não tem um dono válido.' };
+            const h = houseOf(owner); if (!h) return owner === user ? { ok: true, owner, items: [], guests: [] } : { ok: false, error: 'O dono ainda não montou a casa.' };
+            const me = user.toLowerCase();
+            const isAdmin = db.users[user] && db.users[user].role === 'admin';
+            if (owner !== user && !isAdmin && !h.guests.some((g) => String(g).toLowerCase() === me)) return { ok: false, error: 'Casa de ' + owner + ': você não foi convidado.' };
+            return { ok: true, owner, items: h.items.slice(0, 60), guests: owner === user ? h.guests.slice(0, 30) : undefined };
+        }
+        if (b.a === 'guests') {
+            const h = houseOf(user); if (!h) return { ok: false, error: 'Salve o jogo antes (jogue alguns segundos) e tente de novo.' };
+            const list = []; (Array.isArray(b.list) ? b.list : []).slice(0, 30).forEach((n) => { const u = findUser(n); if (u && u !== user && !list.includes(u)) list.push(u); });
+            h.guests = list; markDirty(); return { ok: true, guests: list };
+        }
+        return { ok: false, error: 'Pedido inválido.' };
+    }
+
     function rebind(nd) { db = nd; ensure(); rankCache = { t: 0, data: null }; }
-    return { market, ranking, rebind, bossInfo, bossHour, bossOpen, cleanTitle: (s) => (typeof s === 'string' ? s.replace(/[^\p{L}\p{N} '\-]/gu, '').trim().slice(0, 28) : '') };
+    return { house, market, ranking, rebind, bossInfo, bossHour, bossOpen, cleanTitle: (s) => (typeof s === 'string' ? s.replace(/[^\p{L}\p{N} '\-]/gu, '').trim().slice(0, 28) : '') };
 };

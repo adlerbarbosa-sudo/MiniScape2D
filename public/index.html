@@ -596,7 +596,7 @@
             if(!currentUser || isOfflineMode || isSyncing || !authToken) return;
             isSyncing = true;
             try {
-                let payload = { x: player.x, y: player.y, map: currentMap, facing: player.facing, actionAnim: player.actionAnim, combatLogs: pendingCombatLogs, chatVer: lastChatVer, title: player.title || '' }; if (window.Life) { const _em = Life.pendingEmote(); if (_em) payload.emote = _em; }
+                let payload = { x: player.x, y: player.y, map: (currentMap === 'casa' && window.World2 && World2.houseKey && World2.houseKey()) || currentMap, facing: player.facing, actionAnim: player.actionAnim, combatLogs: pendingCombatLogs, chatVer: lastChatVer, title: player.title || '' }; if (window.Life) { const _em = Life.pendingEmote(); if (_em) payload.emote = _em; }
                 const eqStr = JSON.stringify(player.equipment); if (eqStr !== lastEqStr) { payload.equipment = player.equipment; lastEqStr = eqStr; }
                 const sentLogs = pendingCombatLogs; pendingCombatLogs = [];
                 if (isMapHost) {
@@ -657,6 +657,7 @@
         }
         function buildWorldCopy() {
             const tempMaps = JSON.parse(JSON.stringify(gameMaps));
+            for (const _k in tempMaps) { if (/^casa_/.test(_k)) delete tempMaps[_k]; }
             if (tempMaps.casa && tempMaps.casa.entities) tempMaps.casa.entities = tempMaps.casa.entities.filter(o => o && !o.hf);
             for (const _k in tempMaps) { const _m = tempMaps[_k]; if (_m && _m.entities) _m.entities = _m.entities.filter(o => o && !o.wb); }   // o chefe de mundo é temporário   // móveis são pessoais de cada jogador
             for (let map in tempMaps) { if (tempMaps[map] && tempMaps[map].entities) { tempMaps[map].entities.forEach(obj => { if(obj && obj.aggroTarget) obj.aggroTarget = null; }); } }
@@ -921,7 +922,7 @@
             let cont = document.getElementById('dev-entity-list'); if(!cont) return; let html = ''; 
             let list = [ 
                 { cat: '🌲 Ambiente', items: [ { v: 'tree', n: 'Árvore', ic: '🌲' }, { v: 'fishing_spot', n: 'Lagos', ic: '🐟' }, { v: 'rock_copper', n: 'Minério (Copper)', ic: '🪨' }, { v: 'rock_coal', n: 'Carvão', ic: '⚫' }, { v: 'rock_mithril', n: 'Mithril', ic: '🔷' }, { v: 'farm_plot', n: 'Canteiro', ic: '🌱' }, { v: 'cauldron', n: 'Caldeirão', ic: '🧪' }, { v: 'enchant_table', n: 'Mesa de Encantamento', ic: '✨' }, { v: 'rock_tin', n: 'Minério (Tin)', ic: '🪨' }, { v: 'rock_iron', n: 'Minério (Iron)', ic: '🪨' } ]}, 
-                { cat: '🏠 Estações', items: [ { v: 'furnace', n: 'Fornalha', ic: '♨️' }, { v: 'anvil', n: 'Bigorna', ic: '🔨' }, { v: 'bank', n: 'Bank', ic: '🏦' }, { v: 'portal', n: 'Portal', ic: '🚪' }, { v: 'house', n: 'Casa (Sapê)', ic: '🏠' } ]}, 
+                { cat: '🏠 Estações', items: [ { v: 'furnace', n: 'Fornalha', ic: '♨️' }, { v: 'anvil', n: 'Bigorna', ic: '🔨' }, { v: 'bank', n: 'Bank', ic: '🏦' }, { v: 'house_door', n: 'Porta de Casa (dono)', ic: '🚪' }, { v: 'portal', n: 'Portal', ic: '🚪' }, { v: 'house', n: 'Casa (Sapê)', ic: '🏠' } ]}, 
                 { cat: '🏰 Construções Medievais', items: Object.keys((window.CATALOG && CATALOG.BUILDINGS) || {}).map(k => ({ v: 'b_'+k, n: CATALOG.BUILDINGS[k].name, ic: '🏰' })) }, 
                 { cat: '🪑 Decoração', items: Object.keys((window.CATALOG && CATALOG.DECOR) || {}).map(k => ({ v: 'd_'+k, n: CATALOG.DECOR[k].name, ic: '🪑' })) }, 
                 { cat: '🎨 Chão e Pintura', items: [ { v: 'paint_dirt', n: 'Estrada de Terra', ic: '🟫' }, { v: 'paint_stone', n: 'Piso de Pedra', ic: '⬜' }, { v: 'paint_grass', n: 'Grama Escura', ic: '🟩' }, { v: 'paint_water', n: 'Água', ic: '🟦' } ]}, 
@@ -1137,6 +1138,11 @@
                     else if(val.startsWith('d_')) { let k = val.substring(2); let dd = window.CATALOG && CATALOG.DECOR[k]; if(!dd) return; n.type = 'decor'; n.kind = k; n.name = dd.name; n.w = cW||dd.w; n.h = cH||dd.h; }
                     else if(val.startsWith('i_')) { let k = val.substring(2); n.type = 'ground_item'; n.item = k; n.qty = 1; n.life = 999999; n.w=20; n.h=20; }
                     else if (val === 'portal') { openModal(`<h3 style="margin-top:0;">Criar Portal</h3><label>ID Destino:</label><input type="text" id="p-dest" value="lumbridge" class="dev-input" style="margin-bottom:8px;"><div class="dev-row" style="margin-bottom:8px;"><div style="flex:1"><label>Pos X:</label><input type="number" id="p-x" value="400" class="dev-input"></div><div style="flex:1"><label>Pos Y:</label><input type="number" id="p-y" value="300" class="dev-input"></div></div><button class="dev-save-btn" onclick="finalizePortal(${pos.x}, ${pos.y}, ${cW||60}, ${cH||60})">Criar</button><button class="dev-save-btn" style="background:#555;" onclick="closeModal()">Cancelar</button>`); return; }
+                    else if (val === 'house_door') { n.type = 'house_door'; n.name = 'Casa'; n.w = cW || 44; n.h = cH || 44; n.owner = '';
+                        if(!curM.entities) curM.entities = []; curM.entities.push(n); saveDataLogic(false, true);
+                        openModal(`<h3 style="margin-top:0;">Porta de Casa</h3><p style="font-size:.8rem;opacity:.85;margin:0 0 6px;">Coloque sobre a porta de qualquer construção. Só o dono decora e convida.</p><label>Dono (nome do usuário):</label><input type="text" id="hd-owner" class="dev-input" maxlength="40" style="margin-bottom:8px;"><div style="text-align:right;"><button class="dev-btn" id="hd-ok" style="background:#2a5a3a;color:#fff;border-radius:6px;padding:4px 14px;">Salvar</button></div>`);
+                        const _ok = document.getElementById('hd-ok'); if (_ok) _ok.onclick = () => { n.owner = (document.getElementById('hd-owner').value || '').trim().slice(0, 40); n.name = n.owner ? 'Casa de ' + n.owner : 'Casa'; saveDataLogic(false, true); closeModal(); };
+                        return; }
                     else if (val === 'tree') { n.type = 'tree'; n.name = 'Tree'; n.hp = 3; n.maxHp = 3; n.h = cH||50; }
                     else if (val === 'fishing_spot') { n.type = 'fishing_spot'; n.name = 'Fishing Spot'; }
                     else if (val === 'house') { n.type = 'house'; n.name = 'House'; n.w=cW||100; n.h=cH||100; }

@@ -337,20 +337,29 @@
             let top = 0, bot = 0, lef = 0, rig = 0;
             for (let x = o.x + 2; x < o.x + w; x += step) { if (!has(x, o.y - 3, k)) top++; if (!has(x, o.y + h + 3, k)) bot++; }
             for (let y = o.y + 2; y < o.y + h; y += step) { if (!has(o.x - 3, y, k)) lef++; if (!has(o.x + w + 3, y, k)) rig++; }
-            o._edge = { t: top > 0, b: bot > 0, l: lef > 0, r: rig > 0 }; }
+            o._edge = { t: top > 0, b: bot > 0, l: lef > 0, r: rig > 0 };
+            if (k === 'water') { const X = o.x, Y = o.y, XR = o.x + w, YB = o.y + h;   // cantos convexos da união de água ficam arredondados
+                o._cr = [!has(X - 3, Y - 3, k) && !has(X - 3, Y + 3, k) && !has(X + 3, Y - 3, k), !has(XR + 3, Y - 3, k) && !has(XR + 3, Y + 3, k) && !has(XR - 3, Y - 3, k), !has(XR + 3, YB + 3, k) && !has(XR + 3, YB - 3, k) && !has(XR - 3, YB + 3, k), !has(X - 3, YB + 3, k) && !has(X - 3, YB - 3, k) && !has(X + 3, YB + 3, k)]; } }
     }
     function drawPaint(ctx, o, t) {
         const ow = o.w || 40, oh = o.h || 40; const kind = PAINT_KIND[o.color]; const e = o._edge || {};
         if (!kind) { ctx.fillStyle = o.color || '#888'; ctx.fillRect(o.x, o.y, ow, oh); return; }
-        ctx.fillStyle = patternOf(ctx, kind, PAINT_BASE[kind]); ctx.fillRect(o.x, o.y, ow, oh);
         const x = o.x, y = o.y;
+        const cr = kind === 'water' && o._cr ? o._cr : null, R = Math.min(26, ow / 2, oh / 2);
+        const rpath = () => { ctx.beginPath(); ctx.moveTo(x + (cr[0] ? R : 0), y); ctx.lineTo(x + ow - (cr[1] ? R : 0), y); if (cr[1]) ctx.arcTo(x + ow, y, x + ow, y + R, R); ctx.lineTo(x + ow, y + oh - (cr[2] ? R : 0)); if (cr[2]) ctx.arcTo(x + ow, y + oh, x + ow - R, y + oh, R); ctx.lineTo(x + (cr[3] ? R : 0), y + oh); if (cr[3]) ctx.arcTo(x, y + oh, x, y + oh - R, R); ctx.lineTo(x, y + (cr[0] ? R : 0)); if (cr[0]) ctx.arcTo(x, y, x + R, y, R); ctx.closePath(); };
+        if (cr && cr.some(Boolean)) { ctx.save(); rpath(); ctx.clip(); ctx.fillStyle = patternOf(ctx, kind, PAINT_BASE[kind]); ctx.fillRect(x, y, ow, oh); ctx.restore(); }
+        else { ctx.fillStyle = patternOf(ctx, kind, PAINT_BASE[kind]); ctx.fillRect(x, y, ow, oh); }
         if (kind === 'water') {
-            ctx.save(); ctx.beginPath(); ctx.rect(x, y, ow, oh); ctx.clip();
+            ctx.save(); if (cr && cr.some(Boolean)) rpath(); else { ctx.beginPath(); ctx.rect(x, y, ow, oh); } ctx.clip();
             for (let i = 0; i < Math.max(2, ow * oh / 700); i++) { const px = x + hash(i * 3 + x) * ow, py = y + hash(i * 5 + y) * oh, ph = t * 1.2 + i * 1.7; ctx.strokeStyle = 'rgba(255,255,255,' + (0.22 + 0.16 * sin(ph)) + ')'; ctx.lineWidth = 1.3; ctx.beginPath(); ctx.moveTo(px - 6 + sin(ph) * 3, py); ctx.quadraticCurveTo(px, py - 2.4, px + 6 + sin(ph) * 3, py); ctx.stroke(); }
             const shore = (x0, y0, x1, y1, nx, ny) => { const g2 = ctx.createLinearGradient(x0, y0, x0 + nx * 12, y0 + ny * 12); g2.addColorStop(0, 'rgba(205,240,255,0.75)'); g2.addColorStop(1, 'rgba(205,240,255,0)'); ctx.fillStyle = g2; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.lineTo(x1 + nx * (8 + sin(t * 2 + x0 * 0.1) * 3), y1 + ny * (8 + sin(t * 2 + x0 * 0.1) * 3)); ctx.lineTo(x0 + nx * (8 + sin(t * 2 + x1 * 0.1) * 3), y0 + ny * (8 + sin(t * 2 + x1 * 0.1) * 3)); ctx.closePath(); ctx.fill(); };
             if (e.t) shore(x, y, x + ow, y, 0, 1); if (e.b) shore(x, y + oh, x + ow, y + oh, 0, -1); if (e.l) shore(x, y, x, y + oh, 1, 0); if (e.r) shore(x + ow, y, x + ow, y + oh, -1, 0);
             ctx.restore();
-            ctx.strokeStyle = 'rgba(30,60,30,0.45)'; ctx.lineWidth = 3; ctx.beginPath(); if (e.t) { ctx.moveTo(x, y); ctx.lineTo(x + ow, y); } if (e.b) { ctx.moveTo(x, y + oh); ctx.lineTo(x + ow, y + oh); } if (e.l) { ctx.moveTo(x, y); ctx.lineTo(x, y + oh); } if (e.r) { ctx.moveTo(x + ow, y); ctx.lineTo(x + ow, y + oh); } ctx.stroke();
+            ctx.strokeStyle = 'rgba(30,60,30,0.45)'; ctx.lineWidth = 3; ctx.beginPath();
+            const c0 = cr ? cr[0] * R : 0, c1 = cr ? cr[1] * R : 0, c2 = cr ? cr[2] * R : 0, c3 = cr ? cr[3] * R : 0;
+            if (e.t) { ctx.moveTo(x + c0, y); ctx.lineTo(x + ow - c1, y); } if (e.b) { ctx.moveTo(x + c3, y + oh); ctx.lineTo(x + ow - c2, y + oh); } if (e.l) { ctx.moveTo(x, y + c0); ctx.lineTo(x, y + oh - c3); } if (e.r) { ctx.moveTo(x + ow, y + c1); ctx.lineTo(x + ow, y + oh - c2); }
+            if (cr) { if (cr[0]) { ctx.moveTo(x, y + R); ctx.arcTo(x, y, x + R, y, R); } if (cr[1]) { ctx.moveTo(x + ow - R, y); ctx.arcTo(x + ow, y, x + ow, y + R, R); } if (cr[2]) { ctx.moveTo(x + ow, y + oh - R); ctx.arcTo(x + ow, y + oh, x + ow - R, y + oh, R); } if (cr[3]) { ctx.moveTo(x + R, y + oh); ctx.arcTo(x, y + oh, x, y + oh - R, R); } }
+            ctx.stroke();
         } else {
             const dark = kind === 'stone' ? 'rgba(0,0,0,0.35)' : 'rgba(30,15,5,0.30)';
             const edge = (x0, y0, x1, y1, nx, ny) => { const g2 = ctx.createLinearGradient(x0, y0, x0 + nx * 7, y0 + ny * 7); g2.addColorStop(0, dark); g2.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = g2; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.lineTo(x1 + nx * 7, y1 + ny * 7); ctx.lineTo(x0 + nx * 7, y0 + ny * 7); ctx.closePath(); ctx.fill(); };

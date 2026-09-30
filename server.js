@@ -38,7 +38,7 @@ app.use((req, res, next) => {
     next();
 });
 /* limites de corpo: rotas leves aceitam pouco; save exige login antes de ler corpo grande; restauração só admin */
-app.use(['/api/sync', '/api/chat', '/api/market', '/api/rank', '/api/login', '/api/register', '/api/logout'], express.json({ limit: '64kb' }));
+app.use(['/api/sync', '/api/chat', '/api/house', '/api/market', '/api/rank', '/api/login', '/api/register', '/api/logout'], express.json({ limit: '64kb' }));
 app.use('/api/save', (req, res, next) => auth(req, res, next), express.json({ limit: '8mb' }));
 app.use('/api/restore', (req, res, next) => auth(req, res, () => adminOnly(req, res, next)), express.json({ limit: '30mb' }));
 app.use(express.json({ limit: '1mb' }));
@@ -332,7 +332,7 @@ app.post('/api/save', rateLimit('save', 90, 60000), (req, res) => {
 function doSync(user, b) {
     b = b || {}; const now = Date.now();
     let map = (typeof b.map === 'string' && MAP_RE.test(b.map) && !RESERVED.has(b.map.toLowerCase())) ? b.map : 'lumbridge';
-    if (db.worldData && !hasOwn(db.worldData, map)) map = hasOwn(db.worldData, 'lumbridge') ? 'lumbridge' : map;
+    if (!/^casa_/.test(map) && db.worldData && !hasOwn(db.worldData, map)) map = hasOwn(db.worldData, 'lumbridge') ? 'lumbridge' : map;
     const prev = activePlayers[user];
     const eq = (b.equipment && typeof b.equipment === 'object' && JSON.stringify(b.equipment).length < 6000) ? b.equipment : (prev ? prev.equipment : null);
     const fc = (b.facing && typeof b.facing === 'object') ? { x: num(b.facing.x) | 0, y: num(b.facing.y) | 0 } : { x: 0, y: 1 };
@@ -388,6 +388,7 @@ function doSync(user, b) {
 app.post('/api/sync', auth, (req, res) => { res.json(doSync(req.user, req.body)); });
 app.post('/api/social', rateLimit('social', 120, 60000), auth, (req, res) => { const r = social.act(req.user, req.body); res.json(Object.assign({}, r, { social: social.view(req.user) })); });
 
+app.post('/api/house', rateLimit('house', 60, 60000), auth, (req, res) => { res.json(extras.house(req.user, req.body)); });
 app.post('/api/market', rateLimit('market', 90, 60000), auth, (req, res) => { res.json(extras.market(req.user, req.body)); });
 app.post('/api/rank', rateLimit('rank', 30, 60000), auth, (req, res) => { res.json(extras.ranking(req.user, req.body || {})); });
 

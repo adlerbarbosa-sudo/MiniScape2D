@@ -58,6 +58,9 @@
     };
     const fixedMk = (m, k) => { if (!m.c5 || typeof m.c5 !== 'object') m.c5 = {}; if (m.c5[k]) return false; m.c5[k] = true; if (window.Content && Content.mark) Content.mark(); return true; };
 
+    let hctx = null;   // casa em que o jogador está: { owner, items }
+    const me = () => { try { return currentUser; } catch (e) { return ''; } };
+    const isMine = () => !hctx || hctx.owner === me();
     function houseData() { if (!player.house || !Array.isArray(player.house.items)) player.house = { items: [] }; return player.house; }
     function furnEntity(it, i) {
         const f = FURN[it.k]; if (!f) return null;
@@ -72,12 +75,12 @@
     function refreshHouse() {
         const m = gameMaps && gameMaps.casa; if (!m) return;
         m.entities = (m.entities || []).filter((o) => o && !o.hf);
-        const h = houseData();
-        h.items.forEach((it, i) => { const e = furnEntity(it, i); if (e) m.entities.push(e); });
+        const items = (hctx && hctx.owner !== me()) ? hctx.items : houseData().items;
+        items.forEach((it, i) => { const e = furnEntity(it, i); if (e) m.entities.push(e); });
     }
     function inHouseBounds(m, x, y, w, h) { return x > 60 && y > 60 && x + w < (m.width || 900) - 60 && y + h < (m.height || 640) - 90; }
     function buyFurn(k) {
-        const f = FURN[k]; const m = gameMaps.casa; if (!f || !m || currentMap !== 'casa') return;
+        const f = FURN[k]; const m = gameMaps.casa; if (!f || !m || currentMap !== 'casa' || !isMine()) return;
         const h = houseData(); if (h.items.length >= HOUSE_MAX) { setActionText('A casa está cheia (máx. ' + HOUSE_MAX + ' peças).', '#e74c3c'); return; }
         if (f.need && kills(f.need) < 1) { setActionText(f.needTxt + ' para ganhar este troféu.', '#e74c3c'); return; }
         if (f.c > 0 && getInvCount('Coins') < f.c) { setActionText('Faltam moedas (' + f.c + ').', '#e74c3c'); return; }
@@ -101,7 +104,7 @@
         openDecor();
     }
     function openDecor() {
-        if (currentMap !== 'casa') { setActionText('Você só decora dentro da sua casa.', '#e74c3c'); return; }
+        if (currentMap !== 'casa' || !isMine()) { setActionText('Você só decora dentro da sua casa.', '#e74c3c'); return; }
         const h = houseData();
         const coins = getInvCount('Coins');
         let html = `<h3 style="margin:0 0 6px">Decorar a casa <small style="opacity:.7">(${h.items.length}/${HOUSE_MAX} peças · ${coins} moedas)</small></h3><p style="margin:0 0 8px;font-size:.78rem;opacity:.85">A peça aparece à sua frente. Fique de frente para o lugar desejado.</p><div style="max-height:46vh;overflow:auto"><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px">`;
@@ -113,19 +116,36 @@
         if (h.items.length) {
             html += `<h4 style="margin:10px 0 4px">Peças na casa</h4><div style="display:flex;flex-wrap:wrap;gap:4px">` + h.items.map((it, i) => `<button class="dev-btn" data-rm="${i}" style="padding:3px 7px;font-size:.75rem;background:#4a2a20;color:#f0e2bd;border:1px solid #8a4a3a;border-radius:6px">✕ ${esc((FURN[it.k] || {}).n || it.k)}</button>`).join('') + `</div>`;
         }
+        const gl = houseData().guests || [];
+        html += `<h4 style="margin:10px 0 4px">Visitantes autorizados</h4><div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:5px">` + (gl.length ? gl.map((g, i) => `<button class="dev-btn" data-gd="${i}" style="padding:3px 7px;font-size:.75rem;background:#2a3a4a;color:#f0e2bd;border:1px solid #4a7a9a;border-radius:6px">✕ ${esc(g)}</button>`).join('') : '<small style="opacity:.7">Só você entra. Adicione nomes de jogadores.</small>') + `</div><div style="display:flex;gap:4px"><input id="gst-name" class="dev-input" maxlength="30" placeholder="Nome do jogador" style="flex:1"><button class="dev-btn" data-ga="1" style="background:#2a5a3a;color:#f0e2bd;border:1px solid #4a9a6a;border-radius:6px;padding:4px 10px">Convidar</button></div>`;
         html += `</div><div style="margin-top:8px;text-align:right"><button class="dev-btn" onclick="closeModal()" style="background:#3a2a18;color:#f0e2bd;border:1px solid #8a6a2a;border-radius:6px;padding:4px 14px">Fechar</button></div>`;
         openModal(html);
         const box = $('custom-modal-box'); if (!box) return;
-        box.onclick = (ev) => { const b = ev.target.closest('[data-buy]'); if (b && !b.disabled) { buyFurn(b.dataset.buy); return; } const r = ev.target.closest('[data-rm]'); if (r) removeFurn(parseInt(r.dataset.rm)); };
+        box.onclick = (ev) => { const b = ev.target.closest('[data-buy]'); if (b && !b.disabled) { buyFurn(b.dataset.buy); return; } const r = ev.target.closest('[data-rm]'); if (r) { removeFurn(parseInt(r.dataset.rm)); return; }
+            const gd = ev.target.closest('[data-gd]'); if (gd) { const l = (houseData().guests || []).slice(); l.splice(parseInt(gd.dataset.gd), 1); setGuests(l); return; }
+            if (ev.target.closest('[data-ga]')) { const inp = $('gst-name'); const n = inp && inp.value.trim(); if (n) setGuests((houseData().guests || []).concat([n])); } };
     }
-    function enterHouse() {
+    async function setGuests(list) {
+        try {
+            const r = await api('/house', { a: 'guests', list });
+            if (r && r.ok) { houseData().guests = r.guests; try { saveDataLogic(); } catch (e) {} const asked = list.length, got = r.guests.length; if (got < asked) setActionText('Alguns nomes não existem e foram ignorados.', '#f1c40f'); }
+            else setActionText((r && r.error) || 'Não foi possível salvar os convidados.', '#e74c3c');
+        } catch (e) { setActionText('Sem conexão com o servidor.', '#e74c3c'); }
+        openDecor();
+    }
+    async function enterHouse(door) {
         if (!gameMaps.casa) { setActionText('A casa ainda não foi construída neste mundo (o administrador precisa entrar uma vez).', '#e74c3c'); return; }
-        const door = (gameMaps.lumbridge.entities || []).find((o) => o && o.type === 'house_door');
+        if (!door || !door.owner) { setActionText('Esta porta ainda não tem dono (o Dev define no painel).', '#f1c40f'); return; }
+        let r;
+        try { r = await api('/house', { a: 'enter', owner: door.owner }); } catch (e) { r = null; }
+        if (!r || !r.ok) { setActionText((r && r.error) || 'Não foi possível entrar agora.', '#e74c3c'); return; }
+        hctx = { owner: r.owner, items: r.items || [] };
+        if (r.owner === me()) { const h = houseData(); if (r.guests) h.guests = r.guests; }
         const ex = gameMaps.casa.entities.find((o) => o && o.type === 'portal');
-        if (ex && door) { ex.destX = door.x + Math.round((door.w || 60) / 2) - 12; ex.destY = door.y + (door.h || 80) + 26; }
+        if (ex) { ex.destMap = currentMap; ex.destX = door.x + Math.round((door.w || 60) / 2) - 12; ex.destY = door.y + (door.h || 80) + 26; }
         refreshHouse();
         const m = gameMaps.casa; switchMap('casa', Math.round((m.width || 900) / 2) - 12, (m.height || 640) - 150);
-        setActionText('Casa, doce casa. Use o botão Decorar.', '#2ecc71');
+        setActionText(r.owner === me() ? 'Casa, doce casa. Use o botão Decorar.' : 'Casa de ' + r.owner, '#2ecc71');
     }
     function useFurniture(t) {
         if (t.fk === 'bed') {
@@ -185,12 +205,7 @@
         const lb = maps.lumbridge; if (!lb) return;
         if (!maps.casa) { maps.casa = buildHouseShell(); if (window.Content && Content.mark) Content.mark(); }
         if (!maps.catacumbas && npcDB.lich_boss) { maps.catacumbas = buildCatacombs(); if (window.Content && Content.mark) Content.mark(); }
-        if (fixedMk(lb, 'housedoor')) {
-            const sp = lb.spawn || { x: 1000, y: 800 };
-            const p = findSpot(lb, sp.x + 160, sp.y - 150, 64, 84);
-            if (p) (lb.entities = lb.entities || []).push({ id: 'c5_door', type: 'house_door', name: 'Minha Casa', x: p.x, y: p.y, w: 64, h: 84, active: true });
-            else delete lb.c5.housedoor;
-        }
+        if (fixedMk(lb, 'housedoor_rm') && lb.entities) lb.entities = lb.entities.filter((o) => !(o && o.id === 'c5_door'));   // a casa agora é colocada pelo Dev, com dono
         const cv = maps.covil;
         if (cv && maps.catacumbas && fixedMk(cv, 'cataportal')) {
             const p = findSpot(cv, 1560, 880, 60, 60);
@@ -210,11 +225,16 @@
         const shadow = () => { ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.beginPath(); ctx.ellipse(x + w / 2, y + h, w * .52, 5, 0, 0, 6.3); ctx.fill(); };
         ctx.lineWidth = 2; ctx.strokeStyle = '#1c120a';
         if (t === 'house_door') {
-            shadow(); ctx.fillStyle = '#7b5b3a'; ctx.fillRect(x, y + h * .18, w, h * .82); ctx.strokeRect(x, y + h * .18, w, h * .82);
-            ctx.fillStyle = '#a24a34'; ctx.beginPath(); ctx.moveTo(x - 6, y + h * .2); ctx.lineTo(x + w / 2, y - 2); ctx.lineTo(x + w + 6, y + h * .2); ctx.closePath(); ctx.fill(); ctx.stroke();
-            ctx.fillStyle = '#4a2f18'; ctx.fillRect(x + w * .3, y + h * .5, w * .4, h * .5); ctx.strokeRect(x + w * .3, y + h * .5, w * .4, h * .5);
-            ctx.fillStyle = '#e0b84a'; ctx.beginPath(); ctx.arc(x + w * .62, y + h * .78, 2.4, 0, 6.3); ctx.fill();
-            ctx.fillStyle = '#e8d29a'; ctx.fillRect(x + w * .1, y + h * .3, w * .8, 10); ctx.strokeRect(x + w * .1, y + h * .3, w * .8, 10); ctx.fillStyle = '#3a2410'; ctx.font = 'bold 8px serif'; ctx.textAlign = 'center'; ctx.fillText('CASA', x + w / 2, y + h * .3 + 8); ctx.textAlign = 'start';
+            // porta invisível sobre a porta do prédio: só aparece no modo Dev, ou como plaquinha quando o jogador chega perto
+            let dev = false; try { dev = !!isDevBuildMode; } catch (e) {}
+            const near = Math.hypot(player.x - (x + w / 2), player.y - (y + h / 2)) < 90;
+            if (dev) { ctx.save(); ctx.setLineDash([5, 4]); ctx.strokeStyle = '#f1c40f'; ctx.lineWidth = 2; ctx.strokeRect(x, y, w, h); ctx.restore(); }
+            if (dev || near) {
+                const txt = '\u{1F3E0} ' + (o.owner ? 'Casa de ' + o.owner : 'Porta sem dono');
+                ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center'; const tw = ctx.measureText(txt).width + 12;
+                ctx.fillStyle = 'rgba(20,12,6,.78)'; ctx.fillRect(x + w / 2 - tw / 2, y - 22, tw, 16);
+                ctx.fillStyle = o.owner ? '#f0e2bd' : '#f1c40f'; ctx.fillText(txt, x + w / 2, y - 10); ctx.textAlign = 'left';
+            }
             return;
         }
         const k = o.fk;
@@ -248,7 +268,7 @@
     /* ============================ LIGAÇÕES COM O JOGO ============================ */
     function tryInteractHook(t) {
         if (!t || t.active === false) return false;
-        if (t.type === 'house_door') { enterHouse(); return true; }
+        if (t.type === 'house_door') { enterHouse(t); return true; }
         if (t.type === 'furniture') return useFurniture(t);
         return false;
     }
@@ -259,7 +279,7 @@
             btn.style.cssText = 'position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:60;display:none;padding:6px 14px;font-weight:700;background:linear-gradient(#5a3d1e,#3a2410);color:#f0e2bd;border:2px solid #c9a24a;border-radius:8px;cursor:pointer';
             btn.onclick = openDecor; document.body.appendChild(btn);
         }
-        btn.style.display = (typeof currentMap !== 'undefined' && currentMap === 'casa') ? '' : 'none';
+        btn.style.display = (typeof currentMap !== 'undefined' && currentMap === 'casa' && isMine()) ? '' : 'none';
     }
     function onLogin() { if (!player.house) player.house = { items: [] }; if (!player.bestiary) player.bestiary = {}; merge(); try { if (player.currentMap === 'casa') refreshHouse(); } catch (e) {} }
     function wire() {
@@ -268,5 +288,5 @@
         setInterval(tickBtn, 400);
     }
     window.addEventListener('load', wire);
-    window.World2 = { ITEMS, CREATURES, FURN, HOUSE_MAX, record, kills, beastList, beastProgress, placeInWorld, merge, drawEntity, enterHouse, openDecor, buyFurn, removeFurn, refreshHouse, onLogin, buildCatacombs, buildHouseShell };
+    window.World2 = { houseKey: () => (hctx && hctx.owner ? 'casa_' + String(hctx.owner).toLowerCase().replace(/[^\w\-]/g, '_').slice(0, 34) : null), ITEMS, CREATURES, FURN, HOUSE_MAX, record, kills, beastList, beastProgress, placeInWorld, merge, drawEntity, enterHouse, openDecor, buyFurn, removeFurn, refreshHouse, onLogin, buildCatacombs, buildHouseShell };
 })();

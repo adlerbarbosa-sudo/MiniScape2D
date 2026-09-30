@@ -171,7 +171,7 @@
     function applyBuff(b) { if (!player.buffs) player.buffs = {}; player.buffs[b.k] = { v: b.v, until: Date.now() + b.secs * 1000 }; setActionText(`${b.k === 'dmg' ? 'Força' : 'Guarda'} +${b.v} por ${Math.round(b.secs / 60)} min`, '#7aa8ff'); }
 
     /* ============================ MUNDO: canteiros, estações e minérios novos ============================ */
-    const NONSOLID = ['ground_item', 'fishing_spot', 'portal', 'fire', 'paint', 'enemy', 'npc', 'farm_plot'];
+    const NONSOLID = ['ground_item', 'fishing_spot', 'portal', 'fire', 'paint', 'enemy', 'npc', 'farm_plot', 'house_door'];
     function findFree(m, x, y, w, h) {
         const W = m.width || 800, H = m.height || 600; const solid = (m.entities || []).filter((o) => o && o.active !== false && !NONSOLID.includes(o.type));
         const free = (px, py) => px > 40 && py > 40 && px + w < W - 40 && py + h < H - 40 && !solid.some((o) => { const ow = o.w || 30, oh = o.h || 30; return px - 6 < o.x + ow && px + w + 6 > o.x && py - 6 < o.y + oh && py + h + 6 > o.y; });
