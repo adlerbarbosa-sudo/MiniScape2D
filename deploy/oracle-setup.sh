@@ -76,6 +76,9 @@ UNIT
 sudo systemctl daemon-reload && sudo systemctl enable --now miniscape && sudo systemctl restart miniscape
 
 # ---------- 7. Caddy (porta 80, ou HTTPS se DOMAIN for informado) ----------
+# o domínio fica guardado em /etc/miniscape.domain: rodar de novo sem DOMAIN= mantém o HTTPS
+if [ -n "${DOMAIN:-}" ]; then echo "$DOMAIN" | sudo tee /etc/miniscape.domain >/dev/null; fi
+[ -z "${DOMAIN:-}" ] && [ -f /etc/miniscape.domain ] && DOMAIN="$(cat /etc/miniscape.domain)"
 if [ -n "${DOMAIN:-}" ]; then SITE="$DOMAIN"; else SITE=":80"; fi
 sudo tee /etc/caddy/Caddyfile >/dev/null <<CADDY
 $SITE {
