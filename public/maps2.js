@@ -698,6 +698,7 @@
         gridWalls(b, xs, ys, [[1, 1, 'd'], [0, 2, 'r'], [1, 2, 'r'], [0, 1, 'r'], [1, 1, 'r'], [1, 0, 'd'], [0, 0, 'd'], [2, 0, 'd']]);
         b.port('s', 800, 1070, 'up');
         const R = (i, j, m) => roomRect(xs, ys, i, j, m || 80);
+        b.lake(800, 610, 120, 70, { irr: 0.1 }); b.fish(750, 600); b.fish(850, 630);   // lago subterrâneo: pesca de caverna
         b.decor('lamp', 640, 960); b.decor('lamp', 930, 960); b.decors('cart', 2, R(1, 2)); b.decors('crates', 3, R(1, 2)); b.decors('barrel', 2, R(1, 2));
         b.decors('crates', 4, R(0, 2)); b.decors('bones', 4, R(0, 2)); b.fire(200, 1040); b.decors('barrel', 3, R(2, 2)); b.decors('cart', 1, R(2, 2)); b.decors('bones', 3, R(2, 2));
         b.rock('rock_iron', 120, 880); b.rock('rock_iron', 220, 920); b.rock('rock_coal', 1300, 880); b.rock('rock_coal', 1400, 930); b.rock('rock_mithril', 1480, 1040, { force: false });
@@ -730,6 +731,7 @@
         ring(b, 'boulder', 50, 38, { sides: 'tblr', tone: 'snow' });
         [[280, 140, 500, 240], [1000, 160, 520, 220], [240, 980, 560, 240], [1100, 1000, 640, 240]].forEach((p) => b.paint(SNOWD, p[0], p[1], p[2], p[3]));
         b.paint(ICE, 700, 480, 620, 380); b.paint(ICE, 1300, 600, 240, 160);
+        b.lake(1000, 670, 150, 90, { irr: 0.12 }); b.fish(930, 650); b.fish(1060, 690);   // buraco no gelo: pesca de águas geladas
         b.road([[190, 700], [620, 700]], 90, { kind: '#b8a78a', amp: 20 });
         // trono do gigante: círculo de espinhos de gelo no leste
         b.paint('#9ec7e0', 1400, 240, 500, 420, false);
@@ -811,6 +813,7 @@
         b.port('e', 1810, 700, 'left', { safe: 140 }); b.port('s', 1000, 1180, 'up', { safe: 140 });
         ring(b, 'boulder', 50, 38, { sides: 'tblr', tone: 'ash' });
         [[260, 140, 560, 260], [1100, 150, 600, 240], [200, 980, 540, 260], [1260, 980, 560, 240]].forEach((p) => b.paint('#2f2523', p[0], p[1], p[2], p[3]));
+        b.lake(820, 680, 100, 62, { irr: 0.12 }); b.fish(770, 670); b.fish(860, 700);   // lago termal da cratera: pesca de lava
         b.road([[1810, 700], [1400, 700], [1400, 1000], [1000, 1000], [1000, 1180]], 90, { kind: '#6b5b52', amp: 0 });
         // campos de lava: poças sólidas agrupadas (a pedra escura é o caminho seguro)
         [[300, 300], [620, 220], [420, 600], [860, 420], [1150, 260], [1500, 330], [620, 880], [1120, 800], [1560, 860], [360, 1100], [1560, 1130], [700, 1150], [1560, 530]].forEach((p) => { b.decor('lava', p[0], p[1], { force: true }); b.decor('lava', p[0] + 80, p[1], { force: true }); b.decor('lava', p[0] + 40, p[1] + 52, { force: true }); });

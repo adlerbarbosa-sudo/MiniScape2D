@@ -28,6 +28,7 @@
         if (p && p.then) p.then(after).catch(() => { }); else after();
     }
     function setDrawer(v, auto) {
+        if (!v && drawerOpen && window.Bank && Bank.isOpen()) Bank.close();   // sem a mochila ao lado o banco não serve: fecha junto
         drawerOpen = !!v; autoOpened = !!(v && auto); document.body.classList.toggle('m-drawer', drawerOpen);
         const b = $('m-menu'); if (b) b.setAttribute('aria-expanded', drawerOpen ? 'true' : 'false');
         try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
@@ -61,9 +62,9 @@
         fsBtns.forEach((b) => { if (b) { b.addEventListener('click', goFullscreen); if (fsOk()) b.style.display = ''; } });
         $('m-menu').addEventListener('click', () => setDrawer(!drawerOpen, false));
         $('m-chat').addEventListener('click', () => { try { const cc = $('chat-container'); if (cc) cc.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true })); } catch (e) { } });
-        // tocar fora da gaveta fecha; NPC/banco abrem a gaveta sozinhos (a loja e o banco moram no painel)
+        // tocar fora da gaveta fecha; NPC abre a gaveta sozinho; o banco é janela à parte (bank.js) e abre a gaveta ao lado (Mochila)
         const op = window.openTab;
-        if (typeof op === 'function') window.openTab = function (t) { const r = op.apply(this, arguments); try { if ((t === 'npc' || t === 'bank') && !drawerOpen) setDrawer(true, true); else if (t === 'inv' && autoOpened) setDrawer(false); } catch (e) { } return r; };
+        if (typeof op === 'function') window.openTab = function (t) { const r = op.apply(this, arguments); try { if (t === 'npc' && !drawerOpen) setDrawer(true, true); else if (t === 'inv' && autoOpened) setDrawer(false); } catch (e) { } return r; };
         document.addEventListener('fullscreenchange', syncFs); document.addEventListener('webkitfullscreenchange', syncFs);
         // gestos da página: sem zoom por pinça, sem zoom por toque duplo, sem puxar para atualizar
         ['gesturestart', 'gesturechange', 'gestureend'].forEach((n) => document.addEventListener(n, (e) => e.preventDefault(), { passive: false }));
@@ -144,6 +145,6 @@
         const top = $('m-top'); ['.soc-btn', '.hub-btn'].forEach((sel) => { const hb = document.querySelector(sel); if (hb && top && hb.parentNode !== top) top.insertBefore(hb, $('m-menu')); });
     }
     function init() { if (build()) { setInterval(tick, 250); tick(); window.addEventListener('orientationchange', () => setTimeout(tick, 120)); window.addEventListener('resize', tick); if (window.matchMedia) { try { matchMedia('(orientation: portrait)').addEventListener('change', tick); } catch (e) { } } } }
-    Mobile.setDrawer = setDrawer; Mobile.drawer = () => drawerOpen; Mobile.fullscreen = goFullscreen;
+    Mobile.setDrawer = setDrawer; Mobile.drawer = () => drawerOpen; Mobile.autoOpened = () => autoOpened; Mobile.fullscreen = goFullscreen;
     if (document.readyState === 'loading') window.addEventListener('DOMContentLoaded', () => window.addEventListener('load', init)); else window.addEventListener('load', init);
 })();

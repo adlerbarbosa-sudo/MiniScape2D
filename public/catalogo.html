@@ -44,6 +44,7 @@ footer { text-align:center; color:var(--dim); padding:20px; font-size:.85rem; }
 <nav id="nav">
   <a href="#monstro">👹 Monstros</a><a href="#fera">🐺 Feras</a><a href="#chefe">🐲 Chefes</a><a href="#recurso">🐄 Animais de recurso</a><a href="#npc">🧙 NPCs</a><a href="#pred">🏰 Construções</a><a href="#dec">🪵 Decoração</a><a href="#mundo">🌲 Mundo</a><a href="#itens">🎒 Itens</a>
   <button id="btnMode" class="on">▶ Animação: ciclo</button>
+  <button id="btnDir" class="on">↔ Direção: auto</button>
   <a href="/">🎮 Jogar</a>
 </nav>
 <main id="main"></main>
@@ -60,7 +61,7 @@ footer { text-align:center; color:var(--dim); padding:20px; font-size:.85rem; }
   const BEH = { aggressive:'Ataca ao ver você', neutral:'Só revida', passive:'Foge quando atacado', skittish:'Foge só de ver você', npc:'Fala e vende' };
   const main = document.getElementById('main');
   const cards = [];
-  let mode = 'cycle';
+  let mode = 'cycle', dirM = 'auto';
 
   function el(tag, cls, html) { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; }
   function lootHtml(s) { if (!s) return ''; return s.split('|').map(p => { const d = p.split(','); const pc = Math.round(parseFloat(d[1]) * 100); return '<span>' + (ICON[d[0].trim()] || '📦') + ' ' + d[0].trim() + ' · ' + pc + '%</span>'; }).join(''); }
@@ -129,11 +130,12 @@ footer { text-align:center; color:var(--dim); padding:20px; font-size:.85rem; }
         const e = c.ent, d = c.d; const sp = A.S[A.speciesOf(c.key, d)] || {}; const bb = sp.bounds || [e.w, e.h]; const s = Math.min((c.cv.width - 90) / bb[0], (c.cv.height - 70) / bb[1], 3.4);
         const phase = (t + c.t0) % 8; let mv = 0, atk = false;
         if (mode === 'cycle') { if (phase < 2) mv = 0; else if (phase < 5) mv = 1; else if (phase < 6.4) mv = 0; else atk = true; } else if (mode === 'walk') mv = 1; else if (mode === 'attack') atk = true;
-        const baseX = 0; c.px = (c.px || 0); if (mv) c.px += (Math.floor((t + c.t0) / 3) % 2 ? -1 : 1) * 0.45 * (d.speed || 1) * 1.5; if (Math.abs(c.px) > 14) c.px = 14 * Math.sign(c.px);
+        const baseX = 0; c.px = (c.px || 0); c.py = (c.py || 0); const sg = Math.floor((t + c.t0) / 3) % 2 ? -1 : 1, spd = 0.45 * (d.speed || 1) * 1.5;
+        if (mv) { if (dirM === 'auto' || dirM === 'left' || dirM === 'right') c.px += (dirM === 'auto' ? sg : dirM === 'left' ? -1 : 1) * spd; else c.py += (dirM === 'up' ? -1 : 1) * spd; } const wr = dirM === 'auto' ? 1 : -1; if (Math.abs(c.px) > 14) c.px = 14 * Math.sign(c.px) * wr; if (Math.abs(c.py) > 14) c.py = 14 * Math.sign(c.py) * wr;
         const flyOff = 0; ctx.translate(c.cv.width / 2, c.cv.height - 22); ctx.scale(s, s);
-        e.x = -e.w / 2 + c.px / s * 1; e.y = -e.h; if (atk) { if (((t * 60) | 0) % 90 === 0 || e.attackCooldown <= 0) e.attackCooldown = 70; }
+        e.x = -e.w / 2 + c.px / s * 1; e.y = -e.h + c.py / s; if (atk) { if (((t * 60) | 0) % 90 === 0 || e.attackCooldown <= 0) e.attackCooldown = 70; }
         e.attackCooldown = Math.max(0, (e.attackCooldown || 0) - 1);
-        if (!mv) { e.x = e.x; } A.drawCreature(ctx, e, d, c.px > 0 ? 1e9 : -1e9);
+        if (!mv) { e.x = e.x; } A.drawCreature(ctx, e, d, c.px > 0 ? 1e9 : -1e9, dirM === 'auto' || dirM === 'left' || dirM === 'right' ? undefined : (dirM === 'up' ? -1e9 : 1e9));
         if (d.behavior !== 'npc') { ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(e.x, e.y - 8, e.w, 4); ctx.fillStyle = '#5cc26a'; ctx.fillRect(e.x, e.y - 8, e.w, 4); }
       } else if (c.kind === 'building') {
         const e = c.ent; fit(ctx, c.cv, e.w, e.h, 1.5); e.x = 0; e.y = 0; A.drawBuilding(ctx, e, t);
@@ -157,6 +159,7 @@ footer { text-align:center; color:var(--dim); padding:20px; font-size:.85rem; }
     A.fxDraw(ctx);
   }
   function patternOf(n) { return '#3a8ac8'; }
+  document.getElementById('btnDir').addEventListener('click', function () { dirM = ({ auto: 'down', down: 'up', up: 'left', left: 'right', right: 'auto' })[dirM]; this.textContent = '↔ Direção: ' + ({ auto: 'auto', down: 'baixo', up: 'cima', left: 'esquerda', right: 'direita' })[dirM]; });
   document.getElementById('btnMode').addEventListener('click', function () { mode = mode === 'cycle' ? 'walk' : mode === 'walk' ? 'attack' : mode === 'attack' ? 'idle' : 'cycle'; this.textContent = '▶ Animação: ' + ({ cycle: 'ciclo', walk: 'andando', attack: 'atacando', idle: 'parado' })[mode]; });
   addEventListener('keydown', e => { if (e.key === 'h' || e.key === 'H') showFoot = !showFoot; });
   window.__catalog = { cards, setMode(m) { mode = m; }, setFoot(v) { showFoot = v; } };

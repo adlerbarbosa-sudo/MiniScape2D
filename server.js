@@ -306,12 +306,36 @@ app.post('/api/login', rateLimit('login', 20, 60000), async (req, res) => {
 
 app.post('/api/logout', auth, (req, res) => { delete db.sessions[req.tokenKey]; delete activePlayers[req.user]; markDirty(); res.json({ success: true }); });
 
+/* diário de pesca e bônus temporários: só estruturas pequenas e válidas (qualquer outra coisa é descartada) */
+function cleanFishData(pd) {
+    const num = (v, a, b) => (typeof v === 'number' && isFinite(v) && v >= a && v <= b) ? v : null;
+    if (pd.fish !== undefined) {
+        const out = {}; let n = 0;
+        if (pd.fish && typeof pd.fish === 'object' && !Array.isArray(pd.fish)) for (const k of Object.keys(pd.fish)) {
+            if (n >= 64) break; if (!/^[a-z_]{2,24}$/.test(k)) continue; const v = pd.fish[k]; if (!v || typeof v !== 'object') continue;
+            const max = num(v.max, 0.1, 2000); if (max === null) continue; const kg = num(v.kg, 0, 2000), c = num(v.count, 1, 1e7);
+            out[k] = { max: Math.round(max * 10) / 10, kg: kg === null ? 0 : Math.round(kg * 100) / 100, count: c === null ? 1 : Math.floor(c) }; n++;
+        }
+        pd.fish = out;
+    }
+    if (pd.buffs !== undefined) {
+        const out = {}; let n = 0, now = Date.now();
+        if (pd.buffs && typeof pd.buffs === 'object' && !Array.isArray(pd.buffs)) for (const k of Object.keys(pd.buffs)) {
+            if (n >= 16) break; if (!/^[a-z]{2,10}$/.test(k)) continue; const b = pd.buffs[k]; if (!b || typeof b !== 'object') continue;
+            const v = num(b.v, -100, 1000), u = num(b.until, 0, now + 86400000); if (v === null || u === null) continue; out[k] = { v, until: u }; n++;
+        }
+        pd.buffs = out;
+    }
+    if (pd.bait !== undefined && pd.bait !== null && (typeof pd.bait !== 'string' || pd.bait.length > 40)) pd.bait = null;
+    if (pd.fishMode !== undefined && pd.fishMode !== 'net' && pd.fishMode !== 'rod') delete pd.fishMode;
+}
+
 app.post('/api/save', rateLimit('save', 90, 60000), (req, res) => {
     const { playerData, worldData, itemDB, npcDB } = req.body || {};
     const u = db.users[req.user]; if (!u) return res.status(401).json({ error: 'Conta não encontrada.', code: 'AUTH' });
     if (playerData !== undefined) {
         if (!playerData || typeof playerData !== 'object' || Array.isArray(playerData) || JSON.stringify(playerData).length > 1500000) return res.status(400).json({ error: 'Dados do jogador inválidos.' });
-        u.playerData = playerData;
+        cleanFishData(playerData); u.playerData = playerData;
     }
     if (req.role === 'admin') {   // somente admin altera o mundo
         let changed = false;

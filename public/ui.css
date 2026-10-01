@@ -354,3 +354,28 @@ html.touch #ui-panel { padding-top: 58px; }
 html.touch .hud-header { display: none; }
 html.touch body.m-drawer #m-ctl, html.touch body.m-drawer #qb, html.touch body.m-drawer #m-hud { display: none !important; }
 html.touch #m-top .soc-btn { position: static !important; left: auto !important; top: auto !important; height: 44px; padding: 0 12px; border-radius: 12px; }
+
+/* ---------- banco: janela à parte sobre o mapa (bank.js); a mochila fica no painel lateral ---------- */
+#bank-win { display: none; position: absolute; z-index: 130; left: 50%; top: 12px; transform: translateX(-50%); width: min(560px, calc(100% - 24px)); max-height: calc(100% - 92px); flex-direction: column; gap: 7px; padding: 10px; border-radius: 14px; color: var(--text); background: linear-gradient(#2c1e12, #1a110a); border: 3px solid var(--gold-0); box-shadow: 0 0 0 2px #000, 0 14px 40px rgba(0, 0, 0, .7); }
+#bank-win .bk-h { display: flex; align-items: center; gap: 8px; flex: none; }
+#bank-win .bk-t { font-family: var(--serif); color: var(--gold-2); font-size: 1.05rem; }
+#bank-win #bk-s { flex: 1; min-width: 0; padding: 6px 10px; border-radius: 999px; border: 1px solid #000; background: #0f0905; color: var(--text); font-size: .8rem; }
+#bank-win .bk-c { font-size: .72rem; color: var(--muted); white-space: nowrap; }
+#bank-win .bk-b, #bank-win .bk-fb button, #bank-win .bk-qb button { min-height: 36px; padding: 4px 12px; border-radius: 999px; border: 1px solid #000; cursor: pointer; font: 700 .78rem var(--serif); color: #e9dcc0; background: linear-gradient(#4a3520, #2a1c0f); white-space: nowrap; }
+#bank-win .bk-fb .go, #bank-win .bk-qb .go { color: #2b1a05; background: linear-gradient(#f0cf7c, #b98a2e); }
+#bank-win .bk-x { width: 36px; height: 36px; flex: none; border-radius: 50%; border: 1px solid #000; cursor: pointer; font-size: 1.3rem; line-height: 1; color: #ffb2a4; background: linear-gradient(#4a1f1a, #2a100d); }
+#bank-win #bank-grid { flex: 1 1 auto; min-height: 90px; overflow-y: auto; overscroll-behavior: contain; align-content: start; grid-template-columns: repeat(auto-fill, minmax(46px, 1fr)); padding: 2px; }
+#bank-win .bk-empty { grid-column: 1 / -1; padding: 14px; text-align: center; color: var(--muted); font-size: .8rem; }
+#bank-win .bk-f { flex: none; display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 5px 8px; border-radius: 10px; background: rgba(0, 0, 0, .3); border: 1px solid rgba(232, 196, 105, .25); }
+#bank-win .bk-hint { font-size: .72rem; color: var(--muted); line-height: 1.3; }
+#bank-win .bk-fi { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
+#bank-win .bk-fic { width: 34px; height: 34px; flex: none; display: flex; align-items: center; justify-content: center; }
+#bank-win .bk-ft { display: flex; flex-direction: column; min-width: 0; } #bank-win .bk-ft b { color: #f4e3b0; font-size: .85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } #bank-win .bk-ft small { color: #bfae86; font-size: .72rem; }
+#bank-win .bk-fb { display: flex; gap: 5px; flex: none; }
+#bank-win .bk-q { position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 5; flex-direction: column; gap: 7px; padding: 10px; border-radius: 12px; background: linear-gradient(#35251a, #1d130b); border: 2px solid var(--gold-0); box-shadow: 0 -6px 24px rgba(0, 0, 0, .7); }
+#bank-win .bk-qt { display: flex; align-items: center; gap: 8px; } #bank-win .bk-qt div { display: flex; flex-direction: column; } #bank-win .bk-qt small { font-size: .72rem; opacity: .8; }
+#bank-win .bk-qb { display: flex; gap: 6px; } #bank-win .bk-qb button { flex: 1; } #bank-win #bk-qe { min-height: 1em; font-size: .72rem; color: #ff8a7a; }
+html.touch #bank-win { left: 0; top: 0; bottom: 0; transform: none; width: calc(100% - min(400px, 46vw)); max-height: none; border-radius: 0 12px 12px 0; padding: 6px; padding-left: max(6px, env(safe-area-inset-left)); gap: 5px; }
+html.touch body.bank-open #ui-panel { width: min(400px, 46vw) !important; }
+html.touch body.bank-open .isel { width: calc(min(400px, 46vw) - 12px); }
+html.touch #bank-win .bk-t { display: none; } html.touch #bank-win .bk-b { padding: 4px 9px; font-size: .7rem; }

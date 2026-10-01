@@ -22,7 +22,7 @@
         if (item.type === 'equipment') return item.slot && player.equipment && item.slot in player.equipment ? { label: item.slot === 'ammo' ? 'Equipar munição' : 'Equipar' } : null;
         if (item.type === 'consumable') {
             if (item.name === 'Bones') return { label: 'Enterrar' };
-            if (item.buff || item.mp > 0 || /potion|po[cç][aã]o/i.test(item.name)) return { label: 'Beber' };
+            if ((item.buff && !item.fishId) || item.mp > 0 || /potion|po[cç][aã]o/i.test(item.name)) return { label: 'Beber' };
             return { label: item.heal > 0 ? 'Comer' : 'Usar' };
         }
         if (item.name === 'Tinderbox') return { label: 'Acender fogueira' };
@@ -58,15 +58,15 @@
             const bar = c.slot ? be : bi, other = c.slot ? bi : be; other.style.display = 'none'; other._sig = '';
             if (c.slot) { const el = $('eq-' + c.slot); if (el && el.parentElement) el.parentElement.classList.add('isel-on'); }
             else { const g = $('inv-grid'); if (g && g.children[c.idx]) g.children[c.idx].classList.add('isel-on'); }
-            const p = c.slot ? { label: 'Desequipar' } : primary(c.item);
-            const sig = [c.item.name, c.item.qty || 1, p ? p.label : '-', c.slot || 'i'].join('|');
+            const bk = !c.slot && bankOpen(), p = c.slot ? { label: 'Desequipar' } : bk ? { label: 'Depositar' } : primary(c.item);
+            const sig = [c.item.name, c.item.qty || 1, p ? p.label : '-', c.slot || 'i', bk ? 'B' : ''].join('|');
             if (bar._sig !== sig || bar.style.display === 'none') {
                 bar._sig = sig; let ic = ''; try { ic = Icons.html(c.item.name, 34); } catch (e) { }
                 const q = c.item.stackable && c.item.qty > 1 ? '×' + (window.fmtNum ? fmtNum(c.item.qty) : c.item.qty) : '', inf = info(c.item);
                 const sub = [q, inf, p ? '' : 'sem uso direto'].filter(Boolean).join(' · ');
                 bar.innerHTML = `<div class="isel-top"><span class="isel-ic">${ic}</span><div class="isel-tx"><b>${esc(c.item.name)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</div></div>` +
-                    `<div class="isel-btns">${p ? `<button type="button" class="isel-go" data-a="${c.slot ? 'unequip' : 'use'}">${esc(p.label)}</button>` : ''}${c.slot ? '' : '<button type="button" class="isel-drop" data-a="drop">Jogar fora</button>'}<button type="button" class="isel-x" data-a="cancel">Cancelar</button></div>` +
-                    (p && !c.slot ? '<div class="isel-hint">Dica: clique duplo usa direto.</div>' : '');
+                    `<div class="isel-btns">${p ? `<button type="button" class="isel-go" data-a="${c.slot ? 'unequip' : bk ? 'deposit' : 'use'}">${esc(p.label)}</button>` : ''}${c.slot || bk ? '' : '<button type="button" class="isel-drop" data-a="drop">Jogar fora</button>'}<button type="button" class="isel-x" data-a="cancel">Cancelar</button></div>` +
+                    (p && !c.slot ? '<div class="isel-hint">Dica: clique duplo ' + (bk ? 'deposita' : 'usa direto') + '.</div>' : '');
             }
             bar.style.display = '';
         } catch (e) { }
@@ -78,7 +78,7 @@
     function doUse() {
         const c = current(); if (!c || c.slot) return; const p = primary(c.item);
         if (!p) { say('Este item não tem uso direto.', '#bdc3c7'); return; }
-        if (bankOpen()) { say('Feche o banco para usar itens.'); return; }
+        if (bankOpen()) { say('Feche o banco para usar itens (aqui o clique deposita).'); return; }
         const it = c.item, d = (typeof itemDB !== 'undefined' && itemDB[it.name]) || it;
         if (it.type === 'consumable' && d.heal > 0 && player.stats.hp >= player.stats.maxHp && !(d.mp > 0) && !d.buff && it.name !== 'Bones') { say('Você já está com a vida cheia.'); return; }
         useItem(c.idx);
@@ -91,13 +91,14 @@
         if (a === 'cancel') { clear(); return; }
         if (!c) { clear(); return; }
         if (a === 'use') doUse();
+        else if (a === 'deposit') { if (window.Bank) Bank.deposit(c.item); }
         else if (a === 'unequip') { const s = c.slot; unequip(s); clear(); }
         else if (a === 'drop') { if (window.Inv2) Inv2.ask(c.item); else say('Arraste o item para fora do painel para jogá-lo.'); }
     }
     function click(i) {    // clique num slot da mochila
         if (!ready()) return; const item = player.inventory[i]; if (!item) { clear(); return; }
         const n = performance.now();
-        if (last.ref === item && n - last.t < DBL_MS) { last = { ref: null, t: 0 }; sel = { kind: 'inv', ref: item }; doUse(); return; }   // clique duplo: usa direto
+        if (last.ref === item && n - last.t < DBL_MS) { last = { ref: null, t: 0 }; sel = { kind: 'inv', ref: item }; if (bankOpen() && window.Bank) Bank.deposit(item); else doUse(); return; }   // clique duplo: usa direto
         last = { ref: item, t: n };
         if (sel && sel.kind === 'inv' && sel.ref === item) { sel = null; render(); } else select({ kind: 'inv', ref: item });   // (sem clear(): ele zera o registro do clique duplo)
     }

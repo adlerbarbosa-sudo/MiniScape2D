@@ -110,6 +110,34 @@
         poly([48, 32, 62, 18, 60, 46], grad(48, 18, 62, 46, shade(body, -0.1)), 3); g.beginPath(); g.moveTo(6, 32); g.quadraticCurveTo(22, 12, 48, 32); g.quadraticCurveTo(22, 52, 6, 32); g.closePath(); fillStroke(grad(6, 12, 48, 52, body), 3.5);
         g.beginPath(); g.moveTo(10, 34); g.quadraticCurveTo(26, 46, 46, 34); g.quadraticCurveTo(26, 40, 10, 34); g.fillStyle = belly; g.fill(); ell(16, 30, 3.2, 3.2, '#fff', 2); ell(16.6, 30, 1.4, 1.4, OUT, 0);
         if (!raw) { g.strokeStyle = 'rgba(70,35,10,.6)'; g.lineWidth = 2; for (let i = 0; i < 3; i++) { g.beginPath(); g.moveTo(26 + i * 6, 24); g.lineTo(28 + i * 6, 40); g.stroke(); } } else shine(28, 22, 8, 2.2, 0.55); };
+    /* peixes de várias espécies (it.fishIcon = [corpo, barriga, forma]) e lixo da pescaria */
+    D.fishx = (raw, tint) => {
+        const sh = tint[2] || ''; if (!sh) return D.fish(raw, tint);
+        shadowFloor(); const body = raw ? tint[0] : shade(tint[0], -0.25), belly = tint[1];
+        if (sh === 'eel') {
+            g.lineCap = 'round'; [[OUT, 15], [body, 10.5]].forEach((q) => { g.strokeStyle = q[0]; g.lineWidth = q[1]; g.beginPath(); g.moveTo(8, 40); g.bezierCurveTo(16, 14, 30, 58, 40, 30); g.bezierCurveTo(46, 14, 54, 22, 56, 34); g.stroke(); });
+            g.strokeStyle = belly; g.lineWidth = 3; g.beginPath(); g.moveTo(10, 41); g.bezierCurveTo(18, 20, 30, 56, 39, 33); g.stroke();
+            g.fillStyle = '#ffe66a'; for (let i = 0; i < 4; i++) { g.beginPath(); g.moveTo(18 + i * 9, 30 + (i % 2) * 8); g.lineTo(21 + i * 9, 24 + (i % 2) * 8); g.lineTo(24 + i * 9, 30 + (i % 2) * 8); g.fill(); }
+            ell(54, 31, 2.4, 2.4, '#fff', 1.6); ell(54.4, 31, 1, 1, OUT, 0); if (raw) shine(24, 24, 6, 1.8, 0.5); return;
+        }
+        const ry = sh === 'slim' ? 0.7 : sh === 'round' || sh === 'gold' ? 1.25 : 1;
+        if (sh === 'sword') { poly([8, 31, 0, 30, 8, 33], '#dfe6ee', 2); }
+        poly([48, 32, 62, 18, 60, 46], grad(48, 18, 62, 46, shade(body, -0.1)), 3);
+        if (sh === 'spike' || sh === 'dragon') { for (let i = 0; i < 4; i++) poly([20 + i * 7, 22 - (sh === 'dragon' ? 2 : 0), 24 + i * 7, 11 - (sh === 'dragon' ? 3 : 0), 28 + i * 7, 24], sh === 'dragon' ? '#ffb35a' : shade(body, 0.3), 2.2); }
+        if (sh === 'lobe') { ell(30, 48, 5, 3, shade(body, -0.1), 2.4, 0.4); ell(40, 46, 4, 2.6, shade(body, -0.1), 2.4, 0.2); }
+        g.save(); g.translate(0, 32); g.scale(1, ry); g.translate(0, -32);
+        g.beginPath(); g.moveTo(6, 32); g.quadraticCurveTo(22, 12, 48, 32); g.quadraticCurveTo(22, 52, 6, 32); g.closePath(); fillStroke(grad(6, 12, 48, 52, body), 3.5);
+        g.beginPath(); g.moveTo(10, 34); g.quadraticCurveTo(26, 46, 46, 34); g.quadraticCurveTo(26, 40, 10, 34); g.fillStyle = belly; g.fill(); g.restore();
+        ell(16, 30, 3.2, 3.2, '#fff', 2); ell(16.6, 30, 1.4, 1.4, OUT, 0);
+        if (sh === 'whisk') { g.strokeStyle = OUT; g.lineWidth = 1.8; g.lineCap = 'round'; [[8, 35, 1, 42], [10, 36, 4, 46], [8, 33, 1, 27]].forEach((l) => { g.beginPath(); g.moveTo(l[0], l[1]); g.lineTo(l[2], l[3]); g.stroke(); }); }
+        if (sh === 'teeth') { g.fillStyle = '#fff'; for (let i = 0; i < 3; i++) poly([8 + i * 3.4, 34, 10 + i * 3.4, 38.5, 12 + i * 3.4, 34], '#fff', 1.2); }
+        if (sh === 'glow') { g.strokeStyle = OUT; g.lineWidth = 2; g.beginPath(); g.moveTo(14, 24); g.quadraticCurveTo(12, 8, 24, 8); g.stroke(); const r = g.createRadialGradient(24, 8, 1, 24, 8, 12); r.addColorStop(0, '#fff'); r.addColorStop(0.35, '#7fe8ff'); r.addColorStop(1, 'rgba(127,232,255,0)'); g.fillStyle = r; g.beginPath(); g.arc(24, 8, 12, 0, TAU); g.fill(); ell(24, 8, 3, 3, '#e8ffff', 1.4); }
+        if (sh === 'dragon') { poly([12, 22, 8, 10, 17, 19], '#ffd8a0', 2); poly([20, 19, 20, 8, 26, 19], '#ffd8a0', 2); }
+        if (sh === 'gold') { poly([50, 6, 52, 13, 59, 15, 52, 17, 50, 24, 48, 17, 41, 15, 48, 13], '#fff6c8', 1); }
+        if (!raw) { g.strokeStyle = 'rgba(70,35,10,.6)'; g.lineWidth = 2; for (let i = 0; i < 3; i++) { g.beginPath(); g.moveTo(26 + i * 6, 24); g.lineTo(28 + i * 6, 40); g.stroke(); } } else shine(28, 24, 8, 2.2, 0.5);
+    };
+    D.boot = () => { shadowFloor(); g.beginPath(); g.moveTo(18, 8); g.lineTo(36, 8); g.lineTo(37, 30); g.quadraticCurveTo(54, 32, 56, 46); g.lineTo(56, 52); g.lineTo(14, 52); g.lineTo(16, 30); g.closePath(); fillStroke(grad(14, 8, 56, 52, '#6b5a3c'), 3.5);
+        g.strokeStyle = 'rgba(30,60,30,.8)'; g.lineWidth = 3; g.beginPath(); g.moveTo(22, 36); g.quadraticCurveTo(26, 44, 20, 48); g.moveTo(40, 44); g.quadraticCurveTo(46, 48, 42, 50); g.stroke(); ell(26, 14, 3, 2, '#2f6a3a', 1.4); rr(18, 6, 18, 6, 2, '#8a7650', 2.4); };
     D.rod = () => diag(() => {
         g.lineCap = 'round'; g.strokeStyle = OUT; g.lineWidth = 6.4; g.beginPath(); g.moveTo(0, 32); g.quadraticCurveTo(2, -4, 14, -30); g.stroke();
         g.strokeStyle = '#a06a30'; g.lineWidth = 3.2; g.stroke(); g.strokeStyle = '#d2a066'; g.lineWidth = 1; g.beginPath(); g.moveTo(-0.8, 30); g.quadraticCurveTo(1.2, -4, 13.2, -29); g.stroke();
@@ -174,6 +202,7 @@
         if (it.tool === 'magic' || /staff|wand/.test(L)) return ['staff'];
         if (it.tool === 'net' || /net\b|^rede\b/.test(L)) return ['net'];
         if (it.tool === 'rod' || /^vara\b/.test(L)) return ['rod'];
+        if (it.fishIcon) return ['fishx', it.type !== 'consumable', it.fishIcon]; if (/^bota velha/.test(L)) return ['boot'];
         if (/^minhoca/.test(L)) return ['bait', 'worm']; if (/^isca brilhante/.test(L)) return ['bait', 'shiny']; if (/^isca de cam/.test(L)) return ['bait', 'shrimp']; if (/^isca dourada/.test(L)) return ['bait', 'gold'];
         if (/^(truta|robalo)/.test(L)) { const raw = /crua|cru$/.test(L), T = /truta/.test(L) ? ['#8fb878', '#f3e3c8'] : ['#6f8aa0', '#e4edf2']; return ['fish', raw, T]; }
         if (/sword|blade|dagger|scimitar/.test(L)) return ['sword', m || (/bone/.test(L) ? MAT.bone : '#9ea7b1')];
@@ -217,6 +246,8 @@
             if (fn === 'sack') D.sack(it);
             else if (fn === 'steak' || fn === 'leg') D[fn](p[1], p[2]);
             else if (fn === 'fish') D.fish(p[1], p[2]);
+            else if (fn === 'fishx') D.fishx(p[1], p[2]);
+            else if (fn === 'boot') D.boot();
             else if (fn === 'potato') D.potato(p[1]);
             else if (fn === 'seed') D.seed(p[1]);
             else if (fn === 'bait') D.bait(p[1]);
