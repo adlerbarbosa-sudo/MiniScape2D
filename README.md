@@ -17,11 +17,41 @@ Abra http://localhost:3000 e entre com usuário `Admin` e a senha definida.
 | `ADMIN_USER` | nome da conta admin (padrão `Admin`) |
 | `DATA_DIR` | pasta do `database.json`. No Render, aponte para um **Disk** persistente (ex.: `/data`) para não perder contas. |
 | `PORT` | porta (padrão 3000) |
+| `REG_PER_IP_HOUR` | contas novas por IP por hora (padrão 5; `0` = sem limite) |
+| `SECURITY_STRICT` | `1` (padrão) aplica as correções da validação de save/sync; `0` só registra no `security.log` (modo observação) |
+| `SEC_LOCK_STRIKES` | nº de infrações em 30 min que suspende os saves por 10 min (padrão 40) |
 
 ## Segurança
-- Senhas com scrypt; sessão por token (24h); rate limit em login/registro/chat.
-- Só admin altera mundo, itens, NPCs, cargos, backup e restauração.
-- Ninguém consegue se registrar como admin; `database.json` não vai mais para o Git.
+O jogo é **cliente-autoritativo** (inventário, XP, moedas e posição nascem no navegador), então o servidor faz validação de envelope e de plausibilidade, sem nunca atrapalhar quem joga limpo.
+
+**Contas e sessão**
+- Senhas com scrypt + comparação em tempo constante (contas antigas em texto puro migram no próximo login). Mínimo 6 caracteres; lista de senhas triviais e "senha igual ao nome" são recusadas.
+- Token aleatório de 32 bytes, validade de 30 dias renovável (1 gravação/h), máx. 8 sessões por conta; sair invalida o token no servidor.
+- Login: atraso progressivo por usuário (até 3 s, nunca bloqueia a conta) e bloqueio curto de 5 min por IP/usuário só depois de muitas falhas seguidas. Registro: `REG_PER_IP_HOUR` contas por IP por hora.
+- Só admin altera mundo, itens, NPCs, cargos, backup/restauração e dá itens; toda rota admin confere a sessão e o cargo **no servidor**.
+
+**Rede e cabeçalhos**
+- Sem CORS aberto: só mesma origem (chamadas de outro site são recusadas; `file://` só em loopback). `x-powered-by` desligado.
+- CSP (`default-src 'self'`, sem frames, `object-src 'none'`; `unsafe-inline` ainda é necessário porque o cliente tem script/estilo inline), `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`, HSTS em HTTPS.
+- Limite de corpo por rota (login/chat 4 KB, social/casa/mercado 16 KB, sync 64 KB, save 8 MB, restore 30 MB), JSON profundo/`__proto__`/NaN são recusados ou limpos.
+- Arquivos sensíveis (`database.json`, `.env`, `security.log`, dumps) não são servidos; `%00`, `\` e `..` nas URLs dão 400/404.
+- `deploy/hook.js`: HMAC `timingSafeEqual`, payload máx. 2 MB, só `refs/heads/main`, escuta em 127.0.0.1.
+- XSS: texto de jogador (nome, chat, título, pet, casa, mapa-múndi, anúncios) é escapado ou entra via `textContent`; o servidor também normaliza nomes de habilidade, `house.items/guests` e equipamento visto por outros.
+
+**Validação de save e sync (`security.js`)**
+- Envelope: itens só com nomes conhecidos (catálogo do jogo + `itemnames.json` + `learned-items.json` aprendido do admin), quantidade inteira 1..2.147.483.647, campos numéricos com teto, listas (mochila 40, banco 130) e subobjetos limpos por whitelist.
+- Plausibilidade com **orçamento por minuto** (balde) para moedas, itens empilháveis/não-empilháveis, itens novos distintos, XP por habilidade, níveis de Mímico, coleções (pets/montarias/Mímicos) e XP de montaria. Os tetos são generosos de propósito; só o campo suspeito volta ao valor do save anterior e conta uma infração. Ganhos legítimos entregues pelo servidor (correio do mercado, trocas, presentes) são descontados.
+- Infrações: com `SEC_LOCK_STRIKES` em 30 min os saves ficam suspensos por 10 min (HTTP 423). Contas **nunca** são apagadas e o admin é isento. 1 caso isolado só gera log.
+- Posição/velocidade: deslocamento acima de 3x o máximo possível (270 px/s) em 2 s ignora a posição enviada (e, se persistir por 3 syncs, é aceito como teleporte/respawn); nunca desconecta por uma ocorrência.
+- Combate: dano por golpe tem teto pelo nível de combate, máx. 20 reports/s, vida máxima do mob vem do mundo (não do cliente) e um chefe não morre com 1 report.
+- Limites de ritmo: chat ≤ 200 caracteres, 700 ms entre mensagens, 20/min e mensagem repetida; sync 25/s por usuário e 150/s por IP; save com rajada máx. 12 por 10 s; WebSocket ≤ 20 conexões por IP.
+- `DATA_DIR/security.log` (rotativo, 1 MB + `.1`) registra infrações, saves recusados, locks, ações de admin (cargo, backup, restore, presentes).
+
+**O que continua sendo do cliente (limitações conhecidas)**
+- Itens, XP e moedas ganhos *dentro dos tetos* vêm do gameplay local e não são reconferidos; recompensas de chefe e posição salva também.
+- Colisão com parede, alcance de ataque e linha de visão não são validados no servidor; um cliente adulterado pode atravessar paredes ou bater de longe (dentro do teto de dano e de velocidade).
+- `unsafe-inline` na CSP; o token fica só em memória, mas o modo offline (servidor fora do ar) guarda a senha no `localStorage` do próprio navegador.
+- Recomendações: HTTPS atrás de proxy, `ADMIN_PASSWORD` forte, backup do `DATA_DIR`, acompanhar o `security.log` na primeira semana de testes (`SECURITY_STRICT=0` para só observar), e, para o futuro, mover inventário/loot para o servidor.
 
 ## Multiplayer
 - O servidor escolhe 1 "host" por mapa que simula os monstros e repassa as posições; os outros jogadores só interpolam.
@@ -217,6 +247,10 @@ Jogador, NPCs e criaturas escolhem a vista pelo movimento (com histerese de ~8 q
 - **Como obter**: drops por monstro/chefe (`Pets.cfg.dropMul`), baús, pesca, lojas (Mercador: Pet Gato, Sela Cavalo Branco; Fazendeiro: Pet Coelho, Sela Cavalo Marrom) e craft (Sela Cavalo Marrom).
 - **Atributos**: crítico e sorte entram como fonte `'pets'` em `Stats.addSource`; demais bônus em `Pets.bonus()`; velocidade via `Pets.speedFactor()` aplicada só durante `update()`.
 - **Rede**: `/api/sync` leva `pet {id,l}` e `mount`; o servidor sanitiza (`extras.cleanPetSync`, `cleanMountId`) e `/api/save` passa por `extras.cleanPetData` (whitelist de ids/modos, nome 14 chars, nível 1..10). Pets de outros jogadores são simulados localmente (máx. 40 por câmera).
+- **Evolução das montarias**: cada sela tem nível 1..30 e XP própria, em `player.mounts[id] = {lvl, xp, name?}` (o formato antigo `1` é migrado para nível 1). Ganha ~1 XP a cada 40 px cavalgados + 1 XP a cada 10 s andando montado; o XP para subir é `250 * 1,2^(nível-1)` (nível 10 em ~20 min, 20 em ~2 h, 30 em ~14 h cavalgando). A velocidade é a base `x (1 + até 20% no nível 30)` e continua sob o teto global de +80% (o dragão já chega nele; o ganho dele vem do bônus secundário). Cada espécie ganha um bônus secundário a cada fase (só montado): Marrom moedas +2%, Branco regen +3%, de Guerra XP +2%, Lobo/Pantera sorte +2%, Esqueleto regen de mana +4%, de Fogo XP +2%, Unicórnio regen +4%, Dragão XP +3% (por fase, até 3 fases).
+- **Fases visuais** (níveis 10/20/30): 1 arreios; 2 aura (e armadura de cavalo de guerra nos cavalos comuns); 3 penacho/crista e aura forte com faíscas; cavalo de fogo deixa rastro de brasas; o dragão cresce +5% por fase (até +15%, só visual, a hitbox não muda). Os outros jogadores veem a fase pelo campo `ms` (0..3) do `/api/sync` (sanitizado em `extras.cleanMountStage`).
+- **Painel**: aba Montarias (tecla `P`) mostra nome (editável, 14 caracteres), nível, fase, barra de XP, bônus atuais e o que vem no próximo nível/fase.
+- **Servidor**: `extras.cleanPetData` limita nível 1..30, XP >= 0 e abaixo do necessário, ids por whitelist e nome só com letras/números; `security.checkCollections` impõe orçamento de XP de montaria por minuto (montaria nova começa no nível 1) e reverte só a montaria suspeita.
 - **Depuração**: `Pets.state()`, `Pets.isMounted()`, `Pets._P`.
 
 ## Itens Mímicos (`public/mimic.js`, `mimicnames.js`)
@@ -230,3 +264,7 @@ Equipamentos raros e "vivos" (aura roxa/dourada que pulsa, olhinhos e dentes sut
 - **Como obter** (raro): chefes (Dragão 10%, Lich Rei 14%; demais chefes 6%, 9,6% se `hp>=500`; "chefes" fracos de `hp<300` só 1%), chefe de mundo (30%), monstros das masmorras profundas (Catacumba do Rei, Torre do Mago, Ruínas de Sahr-Kal, Mina Abandonada, Ninho do Dragão, Catacumbas: 0,4% com `hp>=60`), baús do tesouro da pesca (1,2%) e peixes raros (0,4%) — todos multiplicados pela Sorte; `Mimic.cfg.drop`. A peça sorteada é, em 70%, da classe da perícia mais alta do jogador e prefere peças que ainda não tem. Também há a **Caixa Mímica** (Ofícios: 6 Gold Bar, 4 Dragon Scale, 2 Stone Core, 1 Soul Gem; ligada à conta): ao usar, entrega uma peça aleatória. Peça duplicada vira XP (60% do nível atual) ou 3.000 moedas se já estiver no nível 50.
 - **Servidor**: `mimicnames.js` guarda a lista branca de nomes e `cleanMimicData` (chamado em `/api/save`): nomes inventados saem, `lvl` vira inteiro 1..50, `xp` 0..1e7 (0 no nível 50) e `mimicPct` inteiro 0..100.
 - **Testes/depuração**: `Mimic.grant('Elmo Mímico do Guerreiro')`, `Mimic.addXp(nome, n)`, `Mimic.setPct(50)`, `Mimic.state()`, `Mimic.setInfo('guerreiro')`. Admin: no painel Mímicos há "Admin: dar peça" (também dá a Caixa Mímica). Integração: ganchos em `addXP`, `applyDamage`, `useItem`, `Life.cnt` (como pets.js), `Stats.tipHtml`, ícones (`icons.js`) e desenho do personagem (`art.js`).
+
+## Dev: dar itens (`public/gift.js`) e itens colocados no mundo
+- **Presentes**: DEV > *Presentes*. Busca jogador (online/offline) e item do catálogo inteiro, quantidade 1..2.147.483.647 e mensagem opcional. `POST /api/admin/give` (admin verificado no servidor, rate limit, whitelist de itens) grava no **correio do mercado** (`db.market.mail`): id único, entrega atômica com confirmação após salvar, não duplica ao relogar e fica na fila se a mochila estiver cheia (chega online em até ~20 s). Registrado em `DATA_DIR/admin-gifts.log` e `security.log`; histórico em `GET /api/admin/gifts`, busca em `GET /api/admin/search`. Presentes não entram nos tetos anti-trapaça.
+- **Itens de mundo (`wi:1`)**: ao colocar um item no modo construção o admin vê a tag tracejada "Item • único" ou "Item • reaparece 5m" (só no modo construção e só para admin); clique abre o modal (quantidade, "reaparece", segundos) e o botão direito/Apagar remove e persiste. Padrão `respawn:false`: cada jogador pega **uma vez** e o item some para ele (`player.taken[mapa_id]`); `respawn:true` volta após `respawnSecs` para quem pegou. Itens largados por jogadores, drops de monstros e `np` nunca entram no mundo salvo (`buildWorldCopy` no cliente e `cleanWorld` no servidor).

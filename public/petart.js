@@ -285,6 +285,13 @@
             // pernas perto
             leg2(-9, by + 6, 8, 8, sw(0) * 0.7, -0.15 + Math.max(0, sin(ph)) * mv * 0.9, 3.6, P.skel ? '#cfc8b0' : c, 1, hc); leg2(12, by + 6, 8, 8, sw(PI) * 0.7, 0.1 - Math.max(0, sin(ph + PI)) * mv * 0.6, 3.3, P.skel ? '#cfc8b0' : c, 1, hc);
             if (P.sock) { }
+            if (P.tack) {   // arreios: peitoral, cilha e rédea (nível 10+); penacho no nível 30
+                const tc = P.armor ? '#8c1f1f' : '#5a2f14';
+                ln(9, by - 7, 10.5, by + 7.5, 1.8, tc); ell(10.2, by + 1, 1.4, 1.4, '#e6c25a', 0, 0.5); ln(-1, by - 8.5, -1.5, by + 8.8, 1.7, tc);
+                g.save(); g.translate(hx, hy); g.rotate(0.45); ln(4.2, -3.8, 4.8, 3.2, 1.2, tc); ln(-1.2, -3.6, 4.2, 1.2, 1, tc); ell(4.6, 0, 0.9, 0.9, '#e6c25a', 0, 0.4);
+                if (P.plume) { for (let i = 0; i < 3; i++) poly([-3 + i * 0.5, -4.4, -6.6 + i * 2.4, -12.5 - i * 1.2 - sin(t * 5 + i) * 0.8, -1.4 + i * 1.4, -5], i === 1 ? '#ffd24a' : '#d83a3a', 0.6); }
+                g.restore();
+            }
             rider(seat);
             // sela
             rr(-7.5, by - 10, 11, 3.2, 1.5, P.armor ? '#7a1e1e' : '#6b3a1c'); if (!P.skel) { g.strokeStyle = '#d6a83a'; g.lineWidth = 0.8; g.beginPath(); g.moveTo(-7, by - 8.2); g.lineTo(3, by - 8.2); g.stroke(); }
@@ -325,6 +332,7 @@
             }
             if (back && P.mane && !P.fire) { }
             if (P.fire) embers(0, by - 4, 18, t, 5);
+            if (P.tack && !back) { const tc = P.armor ? '#8c1f1f' : '#5a2f14', hy2 = by - 11 + sin(t * 1.5) * 0.4; ln(-4.2, hy2 + 5, 4.2, hy2 + 5, 1.2, tc); ln(-4, by - 2, 4, by - 2, 1.6, tc); ell(0, by - 2, 1.4, 1.4, '#e6c25a', 0, 0.5); if (P.plume) for (let i = -1; i <= 1; i++) poly([i * 1.6, hy2 - 3, i * 3.4, hy2 - 10 - Math.abs(i), i * 1.2 + 1, hy2 - 3], i === 0 ? '#ffd24a' : '#d83a3a', 0.6); }
         }
         g.restore(); return seat;
     }
@@ -362,9 +370,27 @@
     }
     function quadFB2(q, o, back, rider, seat) { if (back) { quadFB(q, o, true); rider(seat); rr(-5, seat.y + 2, 10, 3, 1.5, '#6b3a1c', 0.8); } else { rider(seat); quadFB(q, o, false); } }
 
+    /* fases (nível 10/20/30): 1 arreios, 2 armadura (cavalos comuns) + aura, 3 penacho/cristas + aura forte e faíscas */
+    const AURA = { cav_marrom: '255,215,120', cav_branco: '255,235,170', cav_guerra: '255,120,80', lobo_gigante: '150,210,255', pantera: '170,110,255', cav_esqueleto: '79,214,255', cav_fogo: '255,140,40', unicornio: '255,170,255', dragao: '255,150,50' };
+    function stg(base, st, id) {
+        if (!st) return base; const P = Object.assign({}, base); P.tack = 1;
+        if (st >= 2 && (id === 'cav_marrom' || id === 'cav_branco')) P.armor = 1;
+        if (st >= 3 && !P.skel) P.plume = 1;
+        return P;
+    }
+    function aura(id, st, t, big) {
+        if (st < 2) return; const col = AURA[id] || '255,230,150', r = (big ? 34 : 28) * (st >= 3 ? 1.25 : 1);
+        glow(0, -(big ? 22 : 20), r, 'rgba(' + col + ',A)', (st >= 3 ? 0.42 : 0.24) + sin(t * 3) * 0.04);
+        if (st >= 3) { for (let i = 0; i < 7; i++) { const p = (t * 0.5 + i / 7) % 1, a = i * 2.4 + t; g.fillStyle = 'rgba(' + col + ',' + (0.85 * (1 - p)) + ')'; g.fillRect(sin(a) * (14 + p * 8) - 0.8, -6 - p * 36, 1.8, 1.8); } }
+    }
     const MOUNT_FN = {};
-    Object.keys(HORSES).forEach((k) => { MOUNT_FN[k] = (v, o, r) => horse(HORSES[k], v, o, r); });
-    Object.keys(BIG).forEach((k) => { MOUNT_FN[k] = (v, o, r) => bigQuad(k, v, o, r); });
+    Object.keys(HORSES).forEach((k) => { MOUNT_FN[k] = (v, o, r) => { aura(k, o.stage | 0, o.t, false); return horse(stg(HORSES[k], o.stage | 0, k), v, o, r); }; });
+    Object.keys(BIG).forEach((k) => { MOUNT_FN[k] = (v, o, r) => { const st = o.stage | 0; aura(k, st, o.t, true); const seat = bigQuad(k, v, o, r); if (st >= 1) tackBig(v, seat, k, st, o.t); return seat; }; });
+    function tackBig(v, seat, id, st, t) {   // arreios dos quadrúpedes grandes (por cima do corpo; o cavaleiro já foi desenhado)
+        const tc = '#5a2f14', y0 = seat.y + 3;
+        if (v === 'side') { ln(seat.x - 6, y0 + 1, seat.x - 7, y0 + 13, 1.8, tc); ln(seat.x + 5, y0 + 1, seat.x + 7, y0 + 13, 1.8, tc); ell(seat.x + 6.4, y0 + 7, 1.3, 1.3, '#e6c25a', 0, 0.4); if (st >= 3 && id !== 'dragao') { for (let i = 0; i < 4; i++) poly([seat.x - 10 + i * 3, y0 + 2, seat.x - 9 + i * 3, y0 - 3 - (id === 'dragao' ? 2 : 0), seat.x - 8 + i * 3, y0 + 2], '#ffd24a', 0.6); } }
+        else if (v === 'front') { ln(seat.x - 8, y0 + 6, seat.x + 8, y0 + 6, 1.8, tc); ell(seat.x, y0 + 6, 1.4, 1.4, '#e6c25a', 0, 0.4); }
+    }
 
     function pet(ctx, id, x, y, o) {
         const f = PET[id]; if (!f) return 0; g = ctx; o = o || {};
@@ -375,8 +401,9 @@
     }
     function mount(ctx, id, x, y, o, rider) {
         const f = MOUNT_FN[id]; g = ctx; o = o || {};
-        const oo = { t: o.t || 0, ph: o.ph || 0, mv: o.mv || 0 };
-        const v = o.view || 'side', fl = v === 'side' && o.flip < 0 ? -1 : 1, sc = o.scale || 1; let seat = { x: 0, y: -30 };
+        const stage = Math.max(0, Math.min(3, o.stage | 0)), oo = { t: o.t || 0, ph: o.ph || 0, mv: o.mv || 0, stage };
+        const v = o.view || 'side', fl = v === 'side' && o.flip < 0 ? -1 : 1, sc = (o.scale || 1) * (id === 'dragao' ? 1 + stage * 0.05 : 1);   // o dragão cresce até +15% (só visual: a hitbox não muda)
+        let seat = { x: 0, y: -30 };
         const M = g.getTransform();
         g.save(); g.translate(x, y); if (sc !== 1) g.scale(sc, sc); if (fl < 0) g.scale(-1, 1);
         // o cavaleiro é desenhado no espaço normal (sem espelho/escala): recebe a posição do quadril em coordenadas do mundo
@@ -387,12 +414,12 @@
 
     const NAMES = { pet: Object.keys(PET), mount: Object.keys(MOUNT_FN) };
     const _pc = Object.create(null);
-    function portrait(id, kind, size) {
-        const key = kind + id + '|' + size; if (_pc[key]) return _pc[key];
+    function portrait(id, kind, size, stage) {
+        stage = stage | 0; const key = kind + id + '|' + size + '|' + stage; if (_pc[key]) return _pc[key];
         const S = size || 48, cv = document.createElement('canvas'); cv.width = cv.height = S; const c = cv.getContext('2d');
         c.clearRect(0, 0, S, S); const sc = kind === 'mount' ? S / 62 : S / 30;
         try {
-            if (kind === 'mount') mount(c, id, S * 0.5, S * 0.8, { view: 'side', flip: 1, t: 0.3, ph: 0, mv: 0, scale: sc }, null);
+            if (kind === 'mount') mount(c, id, S * 0.5, S * 0.8, { view: 'side', flip: 1, t: 0.3, ph: 0, mv: 0, scale: sc, stage }, null);
             else pet(c, id, S * 0.5, S * 0.86, { view: 'front', flip: 1, t: 0.3, ph: 0, mv: 0, scale: sc });
         } catch (e) { }
         return (_pc[key] = cv);

@@ -184,7 +184,7 @@
             if (player.mailDone.length > 200) player.mailDone.splice(0, player.mailDone.length - 200);
             if (changed) { updateUI(); if (!(await saveConfirmed())) return; }   // só confirma ao servidor depois de salvar
             if (ack.length) await mkCall({ a: 'ack', ids: ack });
-            got.forEach((e) => { try { addPickupText(e.item, e.qty); if (/^Venda/.test(e.why)) Life.cnt('sold'); } catch (er) { } if (/^Venda/.test(e.why)) note(e.why, '#f1c40f'); });
+            got.forEach((e) => { try { addPickupText(e.item, e.qty); if (/^Venda/.test(e.why)) Life.cnt('sold'); } catch (er) { } if (/^Venda/.test(e.why)) note(e.why, '#f1c40f'); else if (/^Presente/.test(e.why)) { note(e.why + ' \u2014 ' + (itemDB[e.item] ? itemDB[e.item].name : e.item) + ' x ' + fn(e.qty), '#2ecc71'); try { Sfx.play('quest'); } catch (er) { } } });
             if (got.length) { Life.checkAch(); loadMarket(); }
             mailN = Math.max(0, r.mail.length - ack.length);
         } finally { claiming = false; }

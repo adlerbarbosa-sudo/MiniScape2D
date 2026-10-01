@@ -83,7 +83,7 @@
     }
     function giveOrDrop(name, qty) {
         if (addInvItem(name, qty)) return;
-        try { gameMaps[currentMap].entities.push({ id: newEntId(), type: 'ground_item', item: name, qty, x: player.x + (Math.random() * 30 - 15), y: player.y + 20, w: 20, h: 20, life: 999999, active: true }); note('Mochila cheia: item deixado no chão.', '#f1c40f'); } catch (e) { }
+        try { gameMaps[currentMap].entities.push({ id: newEntId(), type: 'ground_item', item: name, qty, x: player.x + (Math.random() * 30 - 15), y: player.y + 20, w: 20, h: 20, life: 999999, active: true, np: 1 }); note('Mochila cheia: item deixado no chão.', '#f1c40f'); } catch (e) { }
     }
     function returnEscrow() {
         const e = player.escrow; if (!e) return; player.escrow = null;

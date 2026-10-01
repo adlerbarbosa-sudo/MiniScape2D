@@ -18,10 +18,10 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const util = require('util');
-const cors = require('cors');
 const createSocial = require('./social');
 const createExtras = require('./extras');
 const wsServer = require('./wsserver');
+const createSecurity = require('./security');
 
 const scrypt = util.promisify(crypto.scrypt);
 const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
@@ -29,20 +29,36 @@ const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
-app.use(cors());
+app.use((req, res, next) => { if (/%00|\0|%5c|\\|%2e%2e%2f|%2e%2e\//i.test(req.url)) return res.status(400).end('Pedido inválido.'); next(); });   // bytes nulos e tentativas de sair da pasta
 app.use((req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'no-referrer');
     res.setHeader('X-Frame-Options', 'DENY');
-    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src * data: blob:; connect-src 'self' ws: wss:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'");
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=()');
+    if (req.secure) res.setHeader('Strict-Transport-Security', 'max-age=15552000');
+    /* O jogo usa scripts e handlers inline (onclick), então 'unsafe-inline' é necessário; o resto é fechado: sem plugins, sem <base>, sem iframes, sem formulários externos */
+    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' ws: wss:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'");
+    if (req.path.startsWith('/api/')) res.setHeader('Cache-Control', 'no-store');
     next();
 });
-/* limites de corpo: rotas leves aceitam pouco; save exige login antes de ler corpo grande; restauração só admin */
-app.use(['/api/sync', '/api/chat', '/api/house', '/api/market', '/api/rank', '/api/login', '/api/register', '/api/logout'], express.json({ limit: '64kb' }));
+/* CORS restrito: só a própria origem (a API não envia Access-Control-Allow-*). Pedido de outra origem é recusado; "file://" (Origin: null) só vale vindo do próprio computador (modo de desenvolvimento). */
+app.use('/api', (req, res, next) => {
+    const o = req.headers.origin; if (!o) return next();
+    let ok = false; try { ok = new URL(o).host === req.headers.host; } catch (e) { ok = false; }
+    if (!ok && o === 'null' && /^(::1|::ffff:127\.0\.0\.1|127\.0\.0\.1)$/.test(req.socket.remoteAddress || '')) { res.setHeader('Access-Control-Allow-Origin', 'null'); res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization'); res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS'); if (req.method === 'OPTIONS') return res.status(204).end(); ok = true; }
+    if (!ok) return res.status(403).json({ error: 'Origem não permitida.' });
+    next();
+});
+/* limites de corpo por rota: leves aceitam pouco; save exige login antes de ler corpo grande; restauração só admin */
+app.use(['/api/login', '/api/register'], express.json({ limit: '4kb' }));
+app.use(['/api/chat', '/api/rank', '/api/logout'], express.json({ limit: '4kb' }));
+app.use(['/api/house', '/api/market', '/api/social'], express.json({ limit: '16kb' }));
+app.use('/api/sync', express.json({ limit: '64kb' }));
 app.use('/api/save', (req, res, next) => auth(req, res, next), express.json({ limit: '8mb' }));
 app.use('/api/restore', (req, res, next) => auth(req, res, () => adminOnly(req, res, next)), express.json({ limit: '30mb' }));
-app.use(express.json({ limit: '1mb' }));
-app.use(express.static(path.join(__dirname, 'public'), { dotfiles: 'ignore' }));
+app.use(express.json({ limit: '64kb' }));
+app.use(express.static(path.join(__dirname, 'public'), { dotfiles: 'ignore', index: 'index.html' }));
 
 /* ---------------- BANCO DE DADOS (em memória + disco) ---------------- */
 const DATA_DIR = process.env.DATA_DIR || __dirname;
@@ -112,6 +128,8 @@ function loadDB() {
     return migrated;
 }
 let db = loadDB();
+const sec = createSecurity({ dataDir: DATA_DIR, root: __dirname, getDB: () => db });
+const SEC_IP = (req) => String(req.ip || '').replace(/^::ffff:/, '');
 let worldStr = db.worldData ? JSON.stringify(db.worldData) : '';
 let dbStr = JSON.stringify([db.itemDB, db.npcDB]);
 
@@ -198,19 +216,23 @@ async function ensureAdmin() {
 }
 
 /* ---------------- SESSÕES ---------------- */
-const SESSION_MS = 24 * 3600 * 1000;
+const SESSION_MS = 30 * 24 * 3600 * 1000, MAX_SESSIONS = 8;   // 30 dias, renovável a cada uso
 const sha = t => crypto.createHash('sha256').update(t).digest('hex');
 function newSession(user) {
-    const token = crypto.randomBytes(24).toString('hex');
-    db.sessions[sha(token)] = { user, exp: Date.now() + SESSION_MS }; markDirty(); return token;
+    const token = crypto.randomBytes(32).toString('hex');
+    db.sessions[sha(token)] = { user, exp: Date.now() + SESSION_MS };
+    const mine = Object.keys(db.sessions).filter(h => db.sessions[h].user === user);   // no máximo 8 sessões por conta (as mais antigas caem)
+    if (mine.length > MAX_SESSIONS) mine.sort((a, b) => db.sessions[a].exp - db.sessions[b].exp).slice(0, mine.length - MAX_SESSIONS).forEach(h => delete db.sessions[h]);
+    markDirty(); return token;
 }
 function auth(req, res, next) {
-    const h = req.headers.authorization || ''; const t = h.startsWith('Bearer ') ? h.slice(7) : '';
-    const key = t ? sha(t) : ''; const s = key && db.sessions[key];
+    const h = req.headers.authorization || ''; const t = h.startsWith('Bearer ') ? h.slice(7, 200) : '';
+    const key = t ? sha(t) : ''; const s = key && hasOwn(db.sessions, key) ? db.sessions[key] : null;
     if (!s || s.exp < Date.now() || !hasOwn(db.users, s.user)) {
         if (s) { delete db.sessions[key]; markDirty(); }
         return res.status(401).json({ error: 'Sessão expirada. Entre novamente.', code: 'AUTH' });
     }
+    if (s.exp - Date.now() < SESSION_MS - 3600000) { s.exp = Date.now() + SESSION_MS; markDirty(); }   // renova (no máximo 1 gravação por hora)
     req.user = s.user; req.role = db.users[s.user].role; req.tokenKey = key; next();
 }
 function adminOnly(req, res, next) {
@@ -218,18 +240,34 @@ function adminOnly(req, res, next) {
     next();
 }
 
-/* ---------------- LIMITES (anti-abuso simples) ---------------- */
+/* ---------------- LIMITES (anti-abuso) ---------------- */
 const hits = new Map();
-const failedLogins = new Map();
+const failedLogins = new Map();      // ip|usuário -> {n, until}
+const userFails = new Map();         // usuário -> {n, t}   (só gera ATRASO: nunca bloqueia a conta de outra pessoa)
+const ipFails = new Map();           // ip -> {n, t, until}
+const regByIp = new Map();           // ip -> [timestamps]
+const REG_PER_IP_HOUR = process.env.REG_PER_IP_HOUR != null ? Math.max(0, +process.env.REG_PER_IP_HOUR) : 5;   // 0 = sem limite
 function rateLimit(name, max, windowMs) {
     return (req, res, next) => {
         const key = name + '|' + req.ip; const now = Date.now();
         let e = hits.get(key); if (!e || e.reset < now) { e = { n: 0, reset: now + windowMs }; hits.set(key, e); }
-        if (++e.n > max) return res.status(429).json({ error: 'Muitas tentativas. Aguarde um pouco.' });
+        if (++e.n > max) { sec.slog('RATE:' + name, req.user || '-', SEC_IP(req), 'excedeu ' + max + '/' + windowMs + 'ms'); return res.status(429).json({ error: 'Muitas tentativas. Aguarde um pouco.' }); }
         next();
     };
 }
-setInterval(() => { const now = Date.now(); for (const [k, e] of failedLogins) if (e.until < now) failedLogins.delete(k); for (const [k, e] of hits) if (e.reset < now) hits.delete(k); for (const h of Object.keys(db.sessions)) if (db.sessions[h].exp < now) delete db.sessions[h]; }, 60000).unref();
+/* limite por USUÁRIO (depois do login): token bucket simples */
+const userHits = new Map();
+function userLimit(name, max, windowMs) {
+    return (req, res, next) => {
+        const key = name + '|' + req.user; const now = Date.now();
+        let e = userHits.get(key); if (!e || e.reset < now) { e = { n: 0, reset: now + windowMs }; userHits.set(key, e); }
+        if (++e.n > max) { sec.slog('RATE:' + name, req.user, SEC_IP(req), 'excedeu ' + max + '/' + windowMs + 'ms'); return res.status(429).json({ error: 'Devagar! Muitas ações seguidas.', code: 'RATE' }); }
+        next();
+    };
+}
+let hashing = 0;   // scrypt simultâneos: evita que uma enxurrada de logins/registros trave o servidor
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+setInterval(() => { const now = Date.now(); for (const [k, e] of failedLogins) if (e.until < now) failedLogins.delete(k); for (const [k, e] of hits) if (e.reset < now) hits.delete(k); for (const [k, e] of userHits) if (e.reset < now) userHits.delete(k); for (const [k, e] of userFails) if (now - e.t > 600000) userFails.delete(k); for (const [k, e] of ipFails) if (now - e.t > 600000 && e.until < now) ipFails.delete(k); for (const [k, a] of regByIp) { const b = a.filter(t => now - t < 3600000); if (b.length) regByIp.set(k, b); else regByIp.delete(k); } for (const h of Object.keys(db.sessions)) if (db.sessions[h].exp < now) delete db.sessions[h]; }, 60000).unref();
 
 /* ---------------- ESTADO EM TEMPO REAL ---------------- */
 const activePlayers = Object.create(null);   // user -> {x,y,map,facing,actionAnim,equipment,lastSeen}
@@ -269,14 +307,22 @@ app.post('/api/register', rateLimit('reg', 10, 60000), async (req, res) => {
     const rb = req.body || {};
     const username = typeof rb.username === 'string' ? rb.username.trim() : '';
     const password = typeof rb.password === 'string' ? rb.password : '';
+    const ip = SEC_IP(req);
     if (RESERVED.has(username.toLowerCase())) return res.status(400).json({ error: 'Nome não permitido.' });
     if (!NAME_RE.test(username)) return res.status(400).json({ error: 'Nome inválido (2 a 20 letras, números, espaço, _ . -).' });
-    if (password.length < 4 || password.length > 100) return res.status(400).json({ error: 'A senha deve ter de 4 a 100 caracteres.' });
+    if (password.length > 100) return res.status(400).json({ error: 'A senha deve ter de 6 a 100 caracteres.' });
+    const weak = sec.weakPassword(password, username); if (weak) return res.status(400).json({ error: weak });
     if (Object.keys(db.users).some(n => n.toLowerCase() === username.toLowerCase())) return res.status(400).json({ error: 'Usuário já existe!' });
     if (Object.keys(db.users).length >= 5000) return res.status(400).json({ error: 'Servidor cheio.' });
-    const pwHash = await hashPw(password);
+    if (REG_PER_IP_HOUR > 0) {
+        const now = Date.now(), arr = (regByIp.get(ip) || []).filter(t => now - t < 3600000);
+        if (arr.length >= REG_PER_IP_HOUR) { sec.slog('REG-LIMIT', username, ip, 'limite de contas por IP/hora atingido'); return res.status(429).json({ error: 'Muitas contas criadas deste endereço. Tente novamente mais tarde.' }); }
+    }
+    if (hashing >= 12) return res.status(429).json({ error: 'Servidor ocupado. Tente de novo em instantes.' });
+    hashing++; let pwHash; try { pwHash = await hashPw(password); } finally { hashing--; }
     if (Object.keys(db.users).some(n => n.toLowerCase() === username.toLowerCase())) return res.status(400).json({ error: 'Usuário já existe!' });   // rechecagem: outro pedido pode ter criado o nome durante o hash
     db.users[username] = { password: pwHash, role: 'player', playerData: null };   // nunca cria admin por aqui
+    if (REG_PER_IP_HOUR > 0) { const arr = regByIp.get(ip) || []; arr.push(Date.now()); regByIp.set(ip, arr); }
     markDirty(); flushDB(); res.json({ success: true });   // conta nova é gravada na hora
 });
 
@@ -284,19 +330,28 @@ app.post('/api/login', rateLimit('login', 20, 60000), async (req, res) => {
     const lb = req.body || {};
     const username = typeof lb.username === 'string' ? lb.username.trim().slice(0, 40) : '';
     const password = typeof lb.password === 'string' ? lb.password.slice(0, 200) : '';
-    const fk = req.ip + '|' + username.toLowerCase(); const f = failedLogins.get(fk);
-    if (f && f.until < Date.now()) failedLogins.delete(fk);
-    if (f && f.n >= 8 && f.until > Date.now()) return res.status(429).json({ error: 'Muitas tentativas erradas. Tente em alguns minutos.' });
+    const ip = SEC_IP(req), now0 = Date.now(), lk = username.toLowerCase();
+    const fk = req.ip + '|' + lk; const f = failedLogins.get(fk);
+    if (f && f.until < now0) failedLogins.delete(fk);
+    if (f && f.n >= 8 && f.until > now0) return res.status(429).json({ error: 'Muitas tentativas erradas. Tente em alguns minutos.' });
+    const ipf = ipFails.get(req.ip); if (ipf && ipf.until > now0) return res.status(429).json({ error: 'Muitas tentativas erradas deste endereço. Tente em alguns minutos.' });
+    /* atraso progressivo por usuário (qualquer IP): só atrasa, não bloqueia, então ninguém consegue trancar a conta de outra pessoa */
+    const uf = userFails.get(lk); if (uf && now0 - uf.t < 600000 && uf.n > 3) await sleep(Math.min(3000, (uf.n - 3) * 250));
     // busca sem diferenciar maiúsculas/minúsculas (contas antigas continuam funcionando)
-    const real = hasOwn(db.users, username) ? username : Object.keys(db.users).find(n => n.toLowerCase() === username.toLowerCase());
+    const real = hasOwn(db.users, username) ? username : Object.keys(db.users).find(n => n.toLowerCase() === lk);
     const user = real ? db.users[real] : null;
-    if (!user) await checkPw(password, DUMMY_HASH);   // gasta o mesmo tempo: não revela se o usuário existe
-    if (!user || !(await checkPw(password, user.password))) {
+    if (hashing >= 12) return res.status(429).json({ error: 'Servidor ocupado. Tente de novo em instantes.' });
+    hashing++; let okPw = false;
+    try { if (!user) await checkPw(password, DUMMY_HASH); okPw = !!user && await checkPw(password, user.password); } finally { hashing--; }   // sem usuário: gasta o mesmo tempo (não revela se existe)
+    if (!okPw) {
         const e = failedLogins.get(fk) || { n: 0, until: 0 }; e.n++; e.until = Date.now() + 5 * 60000; failedLogins.set(fk, e);
+        const u2 = userFails.get(lk) || { n: 0, t: 0 }; u2.n++; u2.t = Date.now(); userFails.set(lk, u2);
+        const i2 = ipFails.get(req.ip) || { n: 0, t: 0, until: 0 }; i2.n = (Date.now() - i2.t > 600000 ? 0 : i2.n) + 1; i2.t = Date.now(); if (i2.n >= 30) { i2.until = Date.now() + 5 * 60000; i2.n = 0; sec.slog('BRUTEFORCE', lk, ip, '30 senhas erradas em 10 min: IP em espera por 5 min', true); } ipFails.set(req.ip, i2);
+        if (u2.n === 5 || u2.n === 20 || u2.n % 100 === 0) sec.slog('LOGIN-FAIL', lk, ip, u2.n + ' falhas recentes para este usuário', true);
         return res.status(401).json({ error: 'Usuário ou senha incorretos!' });
     }
-    failedLogins.delete(fk);
-    if (!user.password.startsWith('scrypt$')) { user.password = await hashPw(password); markDirty(); }   // migra conta antiga
+    failedLogins.delete(fk); userFails.delete(lk);
+    if (!user.password.startsWith('scrypt$')) { user.password = await hashPw(password); markDirty(); }   // migra conta antiga (texto puro) para scrypt
     const token = newSession(real);
     res.json({
         success: true, token, username: real, role: user.role, playerData: user.playerData,
@@ -335,21 +390,51 @@ function cleanStatsData(pd) {
     if (pd.energy !== undefined) { const e = pd.energy; pd.energy = (typeof e === 'number' && isFinite(e)) ? Math.max(0, Math.min(100, Math.round(e * 10) / 10)) : 100; }
 }
 
+/* mundo salvo pelo admin: itens que os jogadores largaram/drops ficam de fora (temporários); itens fixos colocados no Dev ficam; marcas de "já pego" não persistem */
+function cleanWorld(w) {
+    for (const mk of Object.keys(w)) {
+        const m = w[mk]; if (!m || typeof m !== 'object' || !Array.isArray(m.entities)) continue;
+        m.entities = m.entities.filter(o => {
+            if (!o || typeof o !== 'object') return false;
+            if (o.type === 'ground_item' && (o.np || o.owner || (!o.wi && !(o.life >= 50000)))) return false;   // temporários: largados por jogadores (np), drops de monstro (life 3000-18000)
+            return true;
+        });
+        for (const o of m.entities) if (o.type === 'ground_item') { if (o.tk) { o.active = true; delete o.tk; } delete o.rt; }
+    }
+    return w;
+}
+const lastSaveAt = Object.create(null), saveBurst = Object.create(null);
 app.post('/api/save', rateLimit('save', 90, 60000), (req, res) => {
     const { playerData, worldData, itemDB, npcDB } = req.body || {};
     const u = db.users[req.user]; if (!u) return res.status(401).json({ error: 'Conta não encontrada.', code: 'AUTH' });
+    const ip = SEC_IP(req), now = Date.now(), isAdmin = req.role === 'admin';
     if (playerData !== undefined) {
-        if (!playerData || typeof playerData !== 'object' || Array.isArray(playerData) || JSON.stringify(playerData).length > 1500000) return res.status(400).json({ error: 'Dados do jogador inválidos.' });
-        cleanFishData(playerData); cleanStatsData(playerData); extras.cleanPetData(playerData); require('./mimicnames').cleanMimicData(playerData); u.playerData = playerData;
+        if (!isAdmin) {
+            const lu = sec.lockedUntil(req.user);
+            if (lu) return res.status(423).json({ error: 'Salvamento suspenso por alguns minutos por atividade suspeita. Se isso for um engano, avise o administrador.', code: 'LOCKED', until: lu });
+            const sb = saveBurst[req.user] || (saveBurst[req.user] = []); while (sb.length && now - sb[0] > 10000) sb.shift();   // no máximo 12 saves em 10 s (o jogo salva a cada 2,5 s no máximo, mais salvamentos manuais)
+            if (sb.length >= 12) { sec.slog('RATE:save-burst', req.user, ip, '12 saves em 10s'); return res.status(429).json({ error: 'Devagar! Salvando rápido demais.', code: 'RATE' }); }
+            sb.push(now);
+        }
+        let pdLen = 0; try { pdLen = (playerData && typeof playerData === 'object' && !Array.isArray(playerData)) ? JSON.stringify(playerData).length : -1; } catch (e) { pdLen = -1; }   // JSON profundo demais estoura a pilha: tratado como inválido
+        if (pdLen < 0 || pdLen > 1500000) { sec.slog('SAVE-REJECT', req.user, ip, 'playerData inválido/grande (' + pdLen + ')', true); return res.status(400).json({ error: 'Dados do jogador inválidos.' }); }
+        const r = sec.checkSave(req.user, req.role, playerData, ip);
+        if (r.error) { sec.slog('SAVE-REJECT', req.user, ip, r.error, true); return res.status(400).json({ error: r.error }); }
+        const pd = r.pd;
+        cleanFishData(pd); cleanStatsData(pd); extras.cleanPetData(pd); require('./mimicnames').cleanMimicData(pd);
+        sec.checkCollections(req.user, req.role, pd, u.playerData, ip);
+        u.playerData = pd; lastSaveAt[req.user] = now;
+        if (isAdmin && Array.isArray(req.body.itemNames)) sec.learnItems(req.body.itemNames);
     }
-    if (req.role === 'admin') {   // somente admin altera o mundo
+    if (isAdmin) {   // somente admin altera o mundo
         let changed = false;
         if (worldData && typeof worldData === 'object' && !Array.isArray(worldData)) {
+            cleanWorld(worldData);
             const s = JSON.stringify(worldData);
             if (s !== worldStr) { db.worldData = worldData; worldStr = s; changed = true; }
         }
         if ((itemDB && typeof itemDB === 'object') || (npcDB && typeof npcDB === 'object')) {
-            if (itemDB && typeof itemDB === 'object') db.itemDB = itemDB;
+            if (itemDB && typeof itemDB === 'object') { db.itemDB = itemDB; sec.learnItems(Object.keys(itemDB)); }
             if (npcDB && typeof npcDB === 'object') db.npcDB = npcDB;
             const s = JSON.stringify([db.itemDB, db.npcDB]); if (s !== dbStr) { dbStr = s; changed = true; }
         }
@@ -372,26 +457,48 @@ function cleanLook(l) {
 }
 
 function savedLook(user) { const u = hasOwn(db.users, user) ? db.users[user] : null; return u && u.playerData && typeof u.playerData === 'object' ? cleanLook(u.playerData.look) : null; }
-function doSync(user, b) {
-    b = b || {}; const now = Date.now();
+/* casa_<dono>: só o dono, convidados e admin entram (o mesmo critério de /api/house) */
+const houseKeyOf = (n) => 'casa_' + String(n).toLowerCase().replace(/[^\w\-]/g, '_').slice(0, 34);
+function houseMapAllowed(user, map) {
+    try {
+        if (db.users[user] && db.users[user].role === 'admin') return true;
+        const owner = Object.keys(db.users).find(n => houseKeyOf(n) === map); if (!owner) return false; if (owner === user) return true;
+        const h = db.users[owner].playerData && db.users[owner].playerData.house; const me = user.toLowerCase();
+        return !!(h && Array.isArray(h.guests) && h.guests.some(g => String(g).toLowerCase() === me));
+    } catch (e) { return true; }
+}
+function doSync(user, b, ip) {
+    b = b || {}; const now = Date.now(); ip = ip || '-';
     let map = (typeof b.map === 'string' && MAP_RE.test(b.map) && !RESERVED.has(b.map.toLowerCase())) ? b.map : 'lumbridge';
     if (!/^casa_/.test(map) && db.worldData && !hasOwn(db.worldData, map)) map = hasOwn(db.worldData, 'lumbridge') ? 'lumbridge' : map;
+    if (/^casa_/.test(map) && sec.STRICT() && !houseMapAllowed(user, map)) { sec.slog('HOUSE-DENY', user, ip, 'sync em ' + map + ' sem convite'); map = 'lumbridge'; }
     const prev = activePlayers[user];
-    const eq = (b.equipment && typeof b.equipment === 'object' && JSON.stringify(b.equipment).length < 6000) ? b.equipment : (prev ? prev.equipment : null);
-    const fc = (b.facing && typeof b.facing === 'object') ? { x: num(b.facing.x) | 0, y: num(b.facing.y) | 0 } : { x: 0, y: 1 };
-    activePlayers[user] = { x: coord(b.x, 400), y: coord(b.y, 300), map, facing: fc, actionAnim: num(b.actionAnim) | 0, equipment: eq, hp: Math.max(0, Math.min(99999, num(b.hp) | 0)), maxHp: Math.max(0, Math.min(99999, num(b.maxHp) | 0)), lastSeen: now,
+    const eq = (b.equipment !== undefined && b.equipment && typeof b.equipment === 'object' && JSON.stringify(b.equipment).length < 6000) ? sec.cleanSyncEquip(b.equipment) : (prev ? prev.equipment : null);
+    const fc = (b.facing && typeof b.facing === 'object') ? { x: Math.max(-1, Math.min(1, num(b.facing.x) | 0)), y: Math.max(-1, Math.min(1, num(b.facing.y) | 0)) } : { x: 0, y: 1 };
+    const role = hasOwn(db.users, user) ? db.users[user].role : 'player';
+    let px = coord(b.x, 400), py = coord(b.y, 300);
+    const sz = (!/^casa_/.test(map) && db.worldData && hasOwn(db.worldData, map) && db.worldData[map]) || (db.worldData && db.worldData.casa);   // limites do mapa (as casas usam o tamanho do mapa "casa")
+    if (sz && Number.isFinite(sz.width) && Number.isFinite(sz.height)) { px = Math.min(px, sz.width + 40); py = Math.min(py, sz.height + 40); }
+    const mv = sec.checkMove(user, role, prev, map, px, py, now, ip); px = mv.x; py = mv.y;
+    activePlayers[user] = { x: px, y: py, map, facing: fc, actionAnim: Math.max(0, Math.min(60, num(b.actionAnim) | 0)), equipment: eq, hp: Math.max(0, Math.min(99999, num(b.hp) | 0)), maxHp: Math.max(0, Math.min(99999, num(b.maxHp) | 0)), lastSeen: now,
         title: typeof b.title === 'string' ? extras.cleanTitle(b.title) : (prev ? prev.title : ''), emote: prev ? prev.emote : null,
         look: (b.look !== undefined && cleanLook(b.look)) || (prev ? prev.look : null) || savedLook(user),
-        pet: b.pet !== undefined ? extras.cleanPetSync(b.pet) : (prev ? prev.pet : null), mount: b.mount !== undefined ? extras.cleanMountId(b.mount) : (prev ? prev.mount : null) };
+        pet: b.pet !== undefined ? extras.cleanPetSync(b.pet) : (prev ? prev.pet : null), mount: b.mount !== undefined ? extras.cleanMountId(b.mount) : (prev ? prev.mount : null), ms: b.ms !== undefined ? extras.cleanMountStage(b.ms) : (prev ? prev.ms : 0) };
     if (typeof b.emote === 'string' && /^[a-z]{2,10}$/.test(b.emote) && (!prev || !prev.emote || now - prev.emote.t > 1500)) activePlayers[user].emote = { k: b.emote, t: now };
     const host = electHost(map); const isHost = host === user;
 
     if (!serverMobs[map]) serverMobs[map] = Object.create(null);
     if (Array.isArray(b.combatLogs)) {
+        const cap = sec.hitCap(user);
         for (const log of b.combatLogs.slice(0, 20)) {
             if (!log || (typeof log.id !== 'number' && typeof log.id !== 'string')) continue;
             const id = String(log.id); if (!ID_RE.test(id) || RESERVED.has(id.toLowerCase())) continue;
-            let dmg = Math.max(0, Math.min(500, num(log.dmg))); const maxHp = Math.max(1, Math.min(100000, num(log.maxHp, 10)));
+            const rawDmg = num(log.dmg); let dmg = Math.max(0, Math.min(500, rawDmg)); let maxHp = Math.max(1, Math.min(100000, num(log.maxHp, 10)));
+            if (sec.STRICT() && role !== 'admin') {
+                if (dmg > cap) { sec.strike(user, ip, 'dmg', 1, 'golpe ' + Math.round(rawDmg) + ' acima do teto ' + cap + ' (mob ' + id + ' em ' + map + ')'); dmg = cap; }
+                if (dmg > 0 && !sec.dmgOk(user, now)) { sec.slog('RATE:dmg', user, ip, 'mais de 20 relatórios de dano por segundo'); continue; }
+                const ex = sec.expectedMaxHp(map, id); if (ex > 0) maxHp = ex;   // a vida máxima vem do catálogo do servidor, não do cliente
+            }
             if (dmg > 0) { const bd = dmgBudget[user] || (dmgBudget[user] = { t: now, d: 0 }); if (now - bd.t > 1000) { bd.t = now; bd.d = 0; } bd.d += dmg; if (bd.d > 1500) continue; }   // teto de dano por segundo
             let sm = serverMobs[map][id];
             if (!sm) {
@@ -430,20 +537,29 @@ function doSync(user, b) {
     if (!isHost && mobPos[map]) out.mobPos = mobPos[map];
     return out;
 }
-app.post('/api/sync', auth, (req, res) => { res.json(doSync(req.user, req.body)); });
-app.post('/api/social', rateLimit('social', 120, 60000), auth, (req, res) => { const r = social.act(req.user, req.body); res.json(Object.assign({}, r, { social: social.view(req.user) })); });
+/* sync: no máximo ~25/s por jogador (o jogo manda 10/s) e 150/s por IP (várias pessoas na mesma rede); acima disso o pedido é ignorado e o cliente tenta de novo */
+const syncBucket = Object.create(null), syncIp = Object.create(null);
+function syncAllowed(user, ip) {
+    const now = Date.now(); let u = syncBucket[user]; if (!u || now - u.t > 1000) u = syncBucket[user] = { t: now, n: 0 }; u.n++;
+    let i = syncIp[ip]; if (!i || now - i.t > 1000) i = syncIp[ip] = { t: now, n: 0 }; i.n++;
+    if (u.n > 25 || i.n > 150) { sec.slog('RATE:sync', user, ip, (u.n > 25 ? 'usuário ' + u.n : 'ip ' + i.n) + ' syncs/s'); return false; }
+    return true;
+}
+setInterval(() => { const n = Date.now(); for (const k of Object.keys(syncBucket)) if (n - syncBucket[k].t > 5000) delete syncBucket[k]; for (const k of Object.keys(syncIp)) if (n - syncIp[k].t > 5000) delete syncIp[k]; for (const k of Object.keys(lastSaveAt)) if (n - lastSaveAt[k] > 3600000) { delete lastSaveAt[k]; delete saveBurst[k]; } }, 60000).unref();
+app.post('/api/sync', auth, (req, res) => { if (!syncAllowed(req.user, SEC_IP(req))) return res.status(429).json({ error: 'rate', code: 'RATE' }); res.json(doSync(req.user, req.body, SEC_IP(req))); });
+app.post('/api/social', auth, userLimit('social', 120, 60000), (req, res) => { const r = social.act(req.user, req.body); res.json(Object.assign({}, r, { social: social.view(req.user) })); });
 
-app.post('/api/house', rateLimit('house', 60, 60000), auth, (req, res) => { res.json(extras.house(req.user, req.body)); });
-app.post('/api/market', rateLimit('market', 90, 60000), auth, (req, res) => { res.json(extras.market(req.user, req.body)); });
-app.post('/api/rank', rateLimit('rank', 30, 60000), auth, (req, res) => { res.json(extras.ranking(req.user, req.body || {})); });
+app.post('/api/house', auth, userLimit('house', 60, 60000), (req, res) => { res.json(extras.house(req.user, req.body)); });
+app.post('/api/market', auth, userLimit('market', 90, 60000), (req, res) => { res.json(extras.market(req.user, req.body)); });
+app.post('/api/rank', auth, userLimit('rank', 30, 60000), (req, res) => { res.json(extras.ranking(req.user, req.body || {})); });
 
-app.get('/api/map', auth, (req, res) => res.json({ worldData: db.worldData, itemDB: db.itemDB, npcDB: db.npcDB, mapVersion: db.mapVersion }));
+app.get('/api/map', auth, userLimit('map', 30, 60000), (req, res) => res.json({ worldData: db.worldData, itemDB: db.itemDB, npcDB: db.npcDB, mapVersion: db.mapVersion }));
 
 app.post('/api/chat', auth, (req, res) => {
     const cb = req.body || {};
     let msg = typeof cb.msg === 'string' ? cb.msg.replace(/[\u0000-\u001f\u007f\u200b-\u200f\u202a-\u202e\u2066-\u2069]/g, ' ').trim().slice(0, 200) : '';
     const now = Date.now();
-    if (msg && now - (lastChat[req.user] || 0) < 800) return res.status(429).json({ error: 'Devagar!', chat: chatFor(req.user), chatVer: db.chatVer });
+    if (msg) { const why = sec.chatCheck(req.user, msg, now); if (why) { sec.slog('CHAT-BLOCK', req.user, SEC_IP(req), why + ' | ' + msg.slice(0, 40)); return res.status(429).json({ error: why, chat: chatFor(req.user), chatVer: db.chatVer }); } }
     if (msg) {
         lastChat[req.user] = now;
         const role = req.role;
@@ -459,7 +575,12 @@ app.post('/api/chat', auth, (req, res) => {
 
 
 /* ---------------- WEBSOCKET (opcional; o cliente cai para HTTP se falhar) ---------------- */
-function onWsConnect(conn) {
+const wsByIp = Object.create(null);
+function onWsConnect(conn, req) {
+    let ip = req && req.socket ? String(req.socket.remoteAddress || '').replace(/^::ffff:/, '') : '-';
+    if (req && req.headers && req.headers['x-forwarded-for']) { const parts = String(req.headers['x-forwarded-for']).split(',').map(x => x.trim()).filter(Boolean); if (parts.length) ip = parts[parts.length - 1].replace(/^::ffff:/, ''); }   // confia só no último salto (nosso proxy)
+    conn.ip = ip; wsByIp[ip] = (wsByIp[ip] || 0) + 1; conn.on('close', () => { if (--wsByIp[ip] <= 0) delete wsByIp[ip]; });
+    if (wsByIp[ip] > 20) { sec.slog('RATE:ws-conns', '-', ip, 'mais de 20 conexões WebSocket do mesmo IP'); return conn.close(1008); }
     let user = null, key = '', n = 0, win = Date.now();
     const kill = setTimeout(() => { if (!user) conn.close(1008); }, 5000); kill.unref();
     conn.on('close', () => clearTimeout(kill));
@@ -474,12 +595,38 @@ function onWsConnect(conn) {
             user = s.user; return void conn.send(JSON.stringify({ t: 'auth', ok: true }));
         }
         const s = db.sessions[key]; if (!s || s.exp < Date.now()) { conn.send(JSON.stringify({ t: 'auth', ok: false })); return conn.close(1008); }
-        if (m.t === 'sync') { conn.send(JSON.stringify({ t: 'sync', i: m.i, d: doSync(user, m.d) })); }
+        if (m.t === 'sync') { if (!syncAllowed(user, conn.ip || '-')) return void conn.send(JSON.stringify({ t: 'sync', i: m.i, d: { error: 'rate', code: 'RATE' } })); conn.send(JSON.stringify({ t: 'sync', i: m.i, d: doSync(user, m.d, conn.ip) })); }
         else if (m.t === 'social') { const r = social.act(user, m.d); conn.send(JSON.stringify({ t: 'social', i: m.i, d: Object.assign({}, r, { social: social.view(user) }) })); }
     });
 }
 
 /* ---------- administração ---------- */
+/* presentes do admin (todas as rotas /api/admin/* exigem sessão admin verificada no servidor) */
+const GIFT_LOG = path.join(DATA_DIR, 'admin-gifts.log');
+function giftLog(obj) { try { fs.mkdirSync(DATA_DIR, { recursive: true }); try { if (fs.statSync(GIFT_LOG).size > 2 * 1024 * 1024) fs.renameSync(GIFT_LOG, GIFT_LOG + '.1'); } catch (e) { } fs.appendFileSync(GIFT_LOG, JSON.stringify(obj) + '\n'); } catch (e) { } }
+app.post('/api/admin/give', auth, adminOnly, userLimit('give', 60, 60000), (req, res) => {
+    const b = req.body || {}; const to = extras.findUser(b.to);
+    if (!to) return res.status(404).json({ error: 'Jogador não encontrado.' });
+    const item = typeof b.item === 'string' ? b.item.trim() : ''; const qty = b.qty;
+    if (!sec.knownItem(item)) return res.status(400).json({ error: 'Item desconhecido.' });
+    if (typeof qty !== 'number' || !Number.isInteger(qty) || qty < 1 || qty > 2147483647) return res.status(400).json({ error: 'Quantidade inválida (1 a 2.147.483.647).' });
+    const msg = typeof b.msg === 'string' ? b.msg.replace(/[\u0000-\u001f\u007f\u200b-\u200f\u202a-\u202e\u2066-\u2069<>]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 100) : '';
+    const id = extras.giveMail(to, item, qty, msg);
+    if (!id) return res.status(400).json({ error: 'O correio de ' + to + ' está cheio (peça para ele esvaziar).' });
+    const rec = { t: new Date().toISOString(), admin: req.user, to, item, qty, msg, id, ip: SEC_IP(req) };
+    giftLog(rec); sec.slog('ADMIN-GIVE', req.user, SEC_IP(req), to + ' <- ' + qty + 'x ' + item + ' (' + id + ')', true);
+    res.json({ success: true, id, to, online: !!activePlayers[to] && Date.now() - activePlayers[to].lastSeen < 6000 });
+});
+app.get('/api/admin/gifts', auth, adminOnly, userLimit('gifts', 30, 60000), (req, res) => {
+    let rows = []; try { rows = fs.readFileSync(GIFT_LOG, 'utf8').trim().split('\n').slice(-40).map(l => { try { return JSON.parse(l); } catch (e) { return null; } }).filter(Boolean).reverse(); } catch (e) { }
+    res.json({ gifts: rows });
+});
+app.get('/api/admin/search', auth, adminOnly, userLimit('search', 120, 60000), (req, res) => {
+    const q = String(req.query.q || '').toLowerCase().slice(0, 30); const now = Date.now();
+    const list = Object.keys(db.users).filter(n => !q || n.toLowerCase().includes(q)).sort().slice(0, 30).map(n => ({ name: n, role: db.users[n].role, online: !!activePlayers[n] && now - activePlayers[n].lastSeen < 6000 }));
+    res.json({ users: list });
+});
+
 app.get('/api/users', auth, adminOnly, (req, res) => {
     const users = {}; for (const u of Object.keys(db.users)) users[u] = { role: db.users[u].role };
     res.json({ users, activePlayers: Object.keys(activePlayers) });
@@ -491,10 +638,11 @@ app.post('/api/users/role', auth, adminOnly, (req, res) => {
     if (!ROLES.includes(newRole)) return res.status(400).json({ error: 'Cargo inválido.' });
     const admins = Object.keys(db.users).filter(n => db.users[n].role === 'admin');
     if (db.users[targetUser].role === 'admin' && newRole !== 'admin' && admins.length <= 1) return res.status(400).json({ error: 'Precisa existir ao menos 1 admin.' });
-    db.users[targetUser].role = newRole; markDirty(); res.json({ success: true });
+    db.users[targetUser].role = newRole; markDirty(); sec.slog('ADMIN-ROLE', req.user, SEC_IP(req), targetUser + ' -> ' + newRole, true); res.json({ success: true });
 });
 
 app.get('/api/backup', auth, adminOnly, (req, res) => {
+    sec.slog('ADMIN-BACKUP', req.user, SEC_IP(req), 'download do banco', true);
     const copy = { ...db }; delete copy.sessions; res.json(copy);
 });
 
@@ -502,6 +650,7 @@ app.post('/api/restore', auth, adminOnly, (req, res) => {
     const { dbData } = req.body || {};
     if (!dbData || typeof dbData !== 'object' || !dbData.users) return res.status(400).json({ error: 'Backup inválido.' });
     try { const dir = path.join(DATA_DIR, 'backups'); fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(path.join(dir, 'antes-do-restore-' + Date.now() + '.json'), JSON.stringify(db), 'utf8'); } catch (e) { console.error('[DB] snapshot pré-restore falhou:', e.message); }
+    sec.slog('ADMIN-RESTORE', req.user, SEC_IP(req), 'restauração de backup', true);
     const restored = normalizeDB(dbData); restored.sessions = db.sessions;
     if (!hasOwn(restored.users, req.user)) restored.users[req.user] = db.users[req.user];   // quem restaura não perde o acesso
     restored.users[req.user].role = 'admin';
@@ -515,6 +664,8 @@ app.use('/api', (req, res) => res.status(404).json({ error: 'Rota não encontrad
 app.use((err, req, res, next) => {
     if (err && err.type === 'entity.parse.failed') return res.status(400).json({ error: 'JSON inválido.' });
     if (err && err.type === 'entity.too.large') return res.status(413).json({ error: 'Dados grandes demais.' });
+    if (err instanceof URIError || (err && (err.status === 400 || err.statusCode === 400)) || (err instanceof RangeError)) return res.status(400).json({ error: 'Pedido inválido.' });
+    if (err && err.status === 404) return res.status(404).end();
     console.error('[erro]', err); res.status(500).json({ error: 'Erro interno.' });
 });
 

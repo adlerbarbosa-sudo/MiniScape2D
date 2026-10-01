@@ -190,6 +190,7 @@
     <script src="petart.js"></script>
     <script src="pets.js"></script>
     <script src="mimic.js"></script>
+    <script src="gift.js"></script>
     <script>
         // === 1. DECLARAÇÕES GLOBAIS ÚNICAS ===
         let lastFrameTime = 0; 
@@ -586,7 +587,7 @@
             const pass = document.getElementById('auth-pass').value.trim();
             const msg = document.getElementById('login-msg');
             if(!user || !pass) { msg.innerText = "Preencha usuário e senha!"; return; }
-            if(pass.length < 4 || pass.length > 100) { msg.innerText = "A senha deve ter de 4 a 100 caracteres."; return; }
+            if(pass.length < 6 || pass.length > 100) { msg.innerText = "A senha deve ter de 6 a 100 caracteres."; return; }
             if(window.Chargen && !Chargen.NAME_RE.test(user)) { msg.innerText = Chargen.NAME_ERR; return; }
             msg.innerText = "";
             if(!window.Chargen) { msg.innerText = "Tela de criação indisponível. Recarregue a página."; return; }
@@ -667,6 +668,7 @@
                 if(data.playerData.stats && data.playerData.stats.skills) player.stats.skills = { ...playerDefault.stats.skills, ...data.playerData.stats.skills };
             } else { player = JSON.parse(JSON.stringify(playerDefault)); if (!applyNewChar()) giveStarterItems(); const sm = gameMaps['lumbridge']; if (sm && sm.spawn) { player.x = sm.spawn.x; player.y = sm.spawn.y; player.destX = sm.spawn.x; player.destY = sm.spawn.y; } }
 
+            normalizeWorldItems();
             if (typeof player.x !== 'number' || isNaN(player.x)) player.x = 400; if (typeof player.y !== 'number' || isNaN(player.y)) player.y = 300;
             if (!player.facing) player.facing = { x: 0, y: 1 }; if (!player.equipment) player.equipment = { head: null, body: null, weapon: null, shield: null, ammo: null, amulet: null, ring: null };
             { const _q = player.equipment; if (_q) { if (!('amulet' in _q)) _q.amulet = null; if (!('ring' in _q)) _q.ring = null; } } if (typeof player.energy !== 'number' || !isFinite(player.energy)) player.energy = 100;
@@ -684,7 +686,7 @@
                 resizeCanvas(); window.addEventListener('resize', resizeCanvasSoon); window.addEventListener('orientationchange', resizeCanvasSoon); try { if (window.ResizeObserver) new ResizeObserver(resizeCanvasSoon).observe(document.getElementById('game-container')); } catch (e) { }
                 openTab('inv'); updateUI(); 
                 if (window._saveNewChar) { window._saveNewChar = false; try { saveDataLogic(true); } catch (e) { console.error(e); } }   // conta nova: grava a criação já, sem esperar a primeira ação
-                if(userRole === 'admin') { buildDevEntityList(); loadDevMapManager(); loadDevPlayers();
+                if(userRole === 'admin') { buildDevEntityList(); loadDevMapManager(); loadDevPlayers(); try { Gift.init(); } catch (e) { console.error(e); }
                     try { const lm = gameMaps['lumbridge']; if (lm && (lm.catalogV || 0) < 2 && !localStorage.getItem('ms_catalog_declined2')) { setTimeout(async () => { const ok = await installCatalogWorld(); if (ok === false) localStorage.setItem('ms_catalog_declined2', '1'); }, 600); } } catch (e) {}
                 }
                 updateChatUI();
@@ -759,7 +761,7 @@
 
                 if(data.mapVersion > currentMapVersion) {
                     currentMapVersion = data.mapVersion;
-                    if (!worldDirty) api('/map').then(m => { if(m.worldData) { gameMaps = m.worldData; if(!gameMaps[currentMap]) currentMap = 'lumbridge'; } if(m.itemDB) itemDB = m.itemDB; if(m.npcDB) npcDB = m.npcDB; mergeCatalog(); try { ensurePlayerFree(); } catch (e) {} updateUI(); }).catch(() => {});
+                    if (!worldDirty) api('/map').then(m => { if(m.worldData) { gameMaps = m.worldData; if(!gameMaps[currentMap]) currentMap = 'lumbridge'; try { normalizeWorldItems(); } catch (e) {} } if(m.itemDB) itemDB = m.itemDB; if(m.npcDB) npcDB = m.npcDB; mergeCatalog(); try { ensurePlayerFree(); } catch (e) {} updateUI(); }).catch(() => {});
                 }
             } catch(e) {}
             isSyncing = false;
@@ -778,6 +780,8 @@
             for (const _k in tempMaps) { if (/^casa_/.test(_k)) delete tempMaps[_k]; }
             if (tempMaps.casa && tempMaps.casa.entities) tempMaps.casa.entities = tempMaps.casa.entities.filter(o => o && !o.hf);
             for (const _k in tempMaps) { const _m = tempMaps[_k]; if (_m && _m.entities) _m.entities = _m.entities.filter(o => o && !o.wb); }   // o chefe de mundo é temporário   // móveis são pessoais de cada jogador
+            // itens no chão: só entram no mundo salvo os colocados pelo Dev (wi). Drops de monstros e itens largados por jogadores (np) são temporários e NUNCA persistem; "pego" (tk) é estado do jogador, não do mundo.
+            for (const _k in tempMaps) { const _m = tempMaps[_k]; if (_m && _m.entities) { _m.entities = _m.entities.filter(o => !(o.type === 'ground_item' && (o.np || o.owner || !o.wi))); _m.entities.forEach(o => { if (o.type === 'ground_item') { if (o.tk) o.active = true; delete o.tk; delete o.rt; o.life = 999999; } }); } }
             for (let map in tempMaps) { if (tempMaps[map] && tempMaps[map].entities) { tempMaps[map].entities.forEach(obj => { if(obj && obj.aggroTarget) obj.aggroTarget = null; }); } }
             return tempMaps;
         }
@@ -797,6 +801,7 @@
                 try {
                     const sendWorld = sendWorldNow; if (sendWorld) worldDirty = false;
                     const body = { playerData: pd }; if (sendWorld) { body.worldData = tempMaps; body.itemDB = itemDB; body.npcDB = npcDB; }
+                    if (userRole === 'admin' && !window._itemNamesSent) { body.itemNames = Object.keys(itemDB); window._itemNamesSent = true; }   // o servidor aprende os nomes do catálogo completo (lista de itens válidos)
                     let data = await api('/save', body);
                     if (data.error) { if (sendWorld) worldDirty = true; throw new Error(data.error); }
                     if (sendWorld && data.mapVersion) currentMapVersion = data.mapVersion;
@@ -978,7 +983,7 @@
                 const iG = document.getElementById('inv-grid'); const iSig = player.inventory.slice(0, 30).map(x => x.name + '*' + (x.stackable && x.qty > 1 ? x.qty : 1) + (x.ench ? 'e' + x.ench : '')).join('|');
                 if (iG._sig !== iSig || iG.children.length !== 30) { iG._sig = iSig; iG.innerHTML = ''; for(let i = 0; i < 30; i++) { const item = player.inventory[i]; const div = document.createElement('div'); div.className = 'item-slot'; if(item) { div.innerHTML = Icons.html(item.name); if(item.stackable && item.qty > 1) div.innerHTML += `<span class="item-qty">${fmtQty(item.qty)}</span>`; if (item.qty >= 1000) div.title = fmtNum(item.qty); div.onclick = () => invClick(i); div.onmouseenter = () => showTooltip(player.inventory[i]); div.onmouseleave = () => hideTooltip(); } iG.appendChild(div); } } document.getElementById('weight-txt').innerText = calcTotalWeight();
                 Object.keys(player.equipment || {}).forEach(sl => { const el = document.getElementById(`eq-${sl}`); if(el && player.equipment[sl]) { el.innerHTML = Icons.html(player.equipment[sl].name); if (sl === 'ammo' && player.equipment.ammo) document.getElementById('ammo-qty').innerText = player.equipment.ammo.qty ? fmtQty(player.equipment.ammo.qty) : ''; el.parentElement.onmouseenter = () => showTooltip(player.equipment[sl]); el.parentElement.onmouseleave = () => hideTooltip(); } else if(el) { el.innerText = ''; if (sl === 'ammo') document.getElementById('ammo-qty').innerText = ''; el.parentElement.onmouseenter = null; } }); document.getElementById('def-stats').innerText = `Bônus de Defesa: ${getTotalDef()}`;
-                const sL = document.getElementById('skills-list'); sL.innerHTML = ''; let tL = 0; Object.values(player.stats.skills || {}).forEach(s => { tL += s.level; sL.innerHTML += `<div class="skill-line"><span>${s.name}: Lvl ${s.level}</span> <span style="color:#888;">${s.xp}/${s.next} XP</span></div>`; }); document.getElementById('text-xp').innerText = `Nível Geral: ${tL}`;
+                const sL = document.getElementById('skills-list'); sL.innerHTML = ''; let tL = 0; Object.values(player.stats.skills || {}).forEach(s => { tL += s.level; sL.innerHTML += `<div class="skill-line"><span>${esc(s.name)}: Lvl ${Number(s.level) || 0}</span> <span style="color:#888;">${Number(s.xp) || 0}/${Number(s.next) || 0} XP</span></div>`; }); document.getElementById('text-xp').innerText = `Nível Geral: ${tL}`;
                 if (window.Bank) Bank.render();
                 const mL = document.getElementById('spellbook-list'); if (mL) { mL.onclick = (ev) => { const c = ev.target.closest('[data-spell]'); if(c) setActiveSpell(c.dataset.spell); }; mL.innerHTML = ''; spellbookDB.forEach(sp => { let rT = Object.keys(sp.req).map(k => `${sp.req[k]}x ${itemDB[k]?Icons.html(k,16):'?'}`).join(' '); let iA = player.stats.skills.magic.level >= sp.lvl; let sC = player.activeSpell === sp.id ? 'spell-card spell-active' : 'spell-card'; mL.innerHTML += `<div class="${sC}" data-spell="${esc(sp.id)}" style="opacity:${iA?1:0.5}"><div><strong>${sp.name}</strong> <span style="font-size:0.7rem; color:${sp.color}">Dano: +${sp.dmg}</span><br><span class="spell-runes">Req: Lvl ${sp.lvl} | ${rT}</span></div>${player.activeSpell === sp.id ? '⭐' : ''}</div>`; }); }
                 if (window.renderCraftBook) renderCraftBook();
@@ -997,15 +1002,15 @@
                 for(let u in data.users) {
                     let isOnline = data.activePlayers.includes(u) ? '<span style="color:#2ecc71">● ON</span>' : '<span style="color:#e74c3c">● OFF</span>';
                     html += `<div style="background:#111; padding:5px; border:1px solid #3d2e24; border-radius:3px;">
-                        <div style="display:flex; justify-content:space-between; margin-bottom:5px;"><strong style="color:#f1c40f">${u}</strong> ${isOnline}</div>
+                        <div style="display:flex; justify-content:space-between; margin-bottom:5px;"><strong style="color:#f1c40f">${esc(u)}</strong> ${isOnline}</div>
                         <div style="display:flex; gap:5px;">
-                            <select id="role-${u}" class="dev-select" style="flex:1">
+                            <select class="dev-select role-sel" style="flex:1">
                                 <option value="player" ${data.users[u].role === 'player' ? 'selected' : ''}>Player Normal</option>
                                 <option value="vip_light" ${data.users[u].role === 'vip_light' ? 'selected' : ''}>VIP Light (2x XP)</option>
                                 <option value="vip_full" ${data.users[u].role === 'vip_full' ? 'selected' : ''}>VIP Full (4x XP)</option>
                                 <option value="admin" ${data.users[u].role === 'admin' ? 'selected' : ''}>Admin</option>
                             </select>
-                            <button class="dev-save-btn" style="width:auto; margin:0; padding:4px 8px;" onclick="changeUserRole('${u}')">Salvar</button>
+                            <button class="dev-save-btn" style="width:auto; margin:0; padding:4px 8px;" data-u="${esc(u)}" onclick="changeUserRole(this.dataset.u, this.parentNode.querySelector('.role-sel'))">Salvar</button>
                         </div>
                     </div>`;
                 }
@@ -1013,7 +1018,7 @@
             } catch(e) { }
         }
 
-        async function changeUserRole(tUser) { let nRole = document.getElementById('role-'+tUser).value; try { let r = await api('/users/role', { targetUser: tUser, newRole: nRole }); if(r.error) { setActionText(r.error, '#e74c3c'); return; } setActionText(`Cargo de ${tUser} alterado!`); loadDevPlayers(); } catch(e) {} }
+        async function changeUserRole(tUser, selEl) { let nRole = selEl ? selEl.value : ''; try { let r = await api('/users/role', { targetUser: tUser, newRole: nRole }); if(r.error) { setActionText(r.error, '#e74c3c'); return; } setActionText(`Cargo de ${tUser} alterado!`); loadDevPlayers(); } catch(e) {} }
         async function downloadServerBackup() { try { let data = await api('/backup'); if(data.error) { setActionText(data.error, '#e74c3c'); return; } delete data._status; let dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data)); let dlAnchorElem = document.createElement('a'); dlAnchorElem.setAttribute("href", dataStr); dlAnchorElem.setAttribute("download", "miniscape_backup.json"); dlAnchorElem.click(); setActionText("Backup baixado!", "#3498db"); } catch(e) { setActionText("Erro no backup.", "#e74c3c"); } }
         async function restoreServerBackup() { let code = document.getElementById('db-restore-code').value.trim(); if(!code) return; try { let parsed = JSON.parse(code); let data = await api('/restore', { dbData: parsed }); if(data.error) { setActionText(data.error, '#e74c3c'); return; } if(data.success) { setActionText("DB Restaurado com Sucesso!"); setTimeout(()=>location.reload(), 1500); } } catch(e) { setActionText("JSON inválido.", "#e74c3c"); } }
 
@@ -1168,12 +1173,71 @@
             }
         }
 
+
+        /* ---------- itens de mundo (colocados pelo Dev) ----------
+           wi:1 = item de mundo; respawn:false (padrão) = cada jogador pega UMA vez e ele some para sempre para esse jogador (guardado em player.taken);
+           respawn:true = reaparece para quem pegou após respawnSecs. Itens largados por jogadores (np) e drops de monstros são temporários e nunca entram no mundo salvo. */
+        function worldItemKey(mapId, o) { return (String(mapId).slice(0, 24) + '_' + String(o.id)).replace(/[^\w\-]/g, '_').slice(0, 60); }
+        function onGroundTaken(o) {
+            try {
+                if (!o || !o.wi) return; if (!player.taken || typeof player.taken !== 'object') player.taken = {};
+                o.tk = 1; player.taken[worldItemKey(currentMap, o)] = Date.now();
+                if (o.respawn) o.rt = Date.now() + Math.max(10, Math.min(86400, Number(o.respawnSecs) || 300)) * 1000; else delete o.rt;
+            } catch (e) { }
+        }
+        window.onGroundTaken = onGroundTaken;
+        function normalizeWorldItems() {   // no login: separa itens de mundo dos temporários e aplica o "já pego" deste jogador
+            try {
+                if (!player.taken || typeof player.taken !== 'object' || Array.isArray(player.taken)) player.taken = {};
+                const alive = {}, now = Date.now();
+                for (const mk in gameMaps) {
+                    const m = gameMaps[mk]; if (!m || !Array.isArray(m.entities)) continue;
+                    m.entities = m.entities.filter(o => { if (!o || o.type !== 'ground_item') return !!o; if (o.np || o.owner) return false; if (!o.wi && !(o.life >= 50000)) return false; return true; });
+                    for (const o of m.entities) {
+                        if (o.type !== 'ground_item') continue;
+                        o.wi = 1; o.life = 999999; if (typeof o.respawn !== 'boolean') o.respawn = false; delete o.tk; delete o.rt; o.active = true;
+                        const k = worldItemKey(mk, o), t = player.taken[k]; if (t === undefined) continue;
+                        alive[k] = t;
+                        if (o.respawn) { const due = t + Math.max(10, Math.min(86400, Number(o.respawnSecs) || 300)) * 1000; if (now >= due) { delete alive[k]; continue; } o.active = false; o.tk = 1; o.rt = due; }
+                        else { o.active = false; o.tk = 1; }
+                    }
+                }
+                player.taken = alive;
+            } catch (e) { console.error(e); }
+        }
+        window.normalizeWorldItems = normalizeWorldItems;
+        function findWorldItemAt(m, x, y) {
+            const cur = (m && m.entities) || [];
+            for (let i = cur.length - 1; i >= 0; i--) { const o = cur[i]; if (o && o.type === 'ground_item' && o.wi && x >= o.x - 4 && x <= o.x + (o.w || 20) + 4 && y >= o.y - 4 && y <= o.y + (o.h || 20) + 4) return o; }
+            return null;
+        }
+        function worldItemLabel(o) { return 'Item • ' + (o.respawn ? 'reaparece ' + fmtRespawn(o.respawnSecs) : 'único'); }
+        function fmtRespawn(sec) { sec = Math.max(10, Math.round(Number(sec) || 300)); return sec >= 3600 ? (Math.round(sec / 360) / 10) + 'h' : sec >= 60 ? (Math.round(sec / 6) / 10) + 'm' : sec + 's'; }
+        function drawWorldItemTag(ctx, o) {   // só no modo construção (admin): plaquinha no estilo do Dev, tracejado amarelo
+            const w = o.w || 20, h = o.h || 20; ctx.save();
+            ctx.setLineDash([4, 3]); ctx.strokeStyle = '#f1c40f'; ctx.lineWidth = 1.5; ctx.strokeRect(o.x - 2, o.y - 2, w + 4, h + 4); ctx.setLineDash([]);
+            const txt = worldItemLabel(o); ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center'; const tw = ctx.measureText(txt).width + 10;
+            ctx.fillStyle = 'rgba(20,12,6,.8)'; ctx.fillRect(o.x + w / 2 - tw / 2, o.y - 22, tw, 14); ctx.fillStyle = '#f1c40f'; ctx.fillText(txt, o.x + w / 2, o.y - 12); ctx.restore();
+        }
+        function openWorldItemModal(o) {   // o é re-localizado pelo id ao salvar (o mapa pode ter sido recarregado)
+            const nm = (itemDB[o.item] && itemDB[o.item].name) || o.item;
+            openModal(`<h3 style="margin-top:0;">Item de mundo</h3><p style="font-size:.8rem;opacity:.85;margin:0 0 6px;">${esc(nm)}. Clique com o botão direito (modo construção) sobre ele para apagar.</p>
+              <label>Quantidade:</label><input type="number" id="wi-qty" class="dev-input" min="1" max="2147483647" value="${Number(o.qty) || 1}" style="margin-bottom:8px;">
+              <label style="display:flex;gap:6px;align-items:center;margin-bottom:6px;"><input type="checkbox" id="wi-resp" ${o.respawn ? 'checked' : ''}> Reaparece (padrão: não, é pego uma vez por jogador)</label>
+              <label>Reaparece após (segundos):</label><input type="number" id="wi-secs" class="dev-input" min="10" max="86400" value="${Number(o.respawnSecs) || 300}" style="margin-bottom:8px;">
+              <div style="text-align:right;"><button class="dev-btn" id="wi-ok" style="background:#2a5a3a;color:#fff;border-radius:6px;padding:4px 14px;">Salvar</button> <button class="dev-btn" id="wi-del" style="background:#7a2a2a;color:#fff;border-radius:6px;padding:4px 14px;">Apagar</button></div>`);
+            const ok = document.getElementById('wi-ok'), del = document.getElementById('wi-del');
+            if (ok) ok.onclick = () => { { const cm0 = gameMaps[currentMap], f = cm0 && cm0.entities ? cm0.entities.find(e => e.id === o.id) : null; if (f) o = f; } o.qty = Math.max(1, Math.min(2147483647, Math.floor(Number(document.getElementById('wi-qty').value)) || 1)); o.respawn = !!document.getElementById('wi-resp').checked; o.respawnSecs = Math.max(10, Math.min(86400, Math.floor(Number(document.getElementById('wi-secs').value)) || 300)); saveDataLogic(false, true); closeModal(); };
+            if (del) del.onclick = () => { const cm = gameMaps[currentMap]; const i = cm && cm.entities ? cm.entities.indexOf(o) : -1; if (i >= 0) cm.entities.splice(i, 1); saveDataLogic(false, true); closeModal(); };
+        }
+        window.worldItemKey = worldItemKey;
+
         function tryInteract(tObj) {
             player.actionAnim = 15; 
             const wp = player.equipment ? player.equipment.weapon : null; 
             if (!tObj || !tObj.type || !tObj.active) return;
 
-            if (tObj.type === 'ground_item') { if (Math.hypot(player.x - (tObj.x + 10), player.y - (tObj.y + 10)) < 60) { if (addInvItem(tObj.item, tObj.qty)) { tObj.active = false; addPickupText(tObj.item, tObj.qty); updateUI(); saveDataLogic(); } else setActionText('Inventário cheio!', '#e74c3c'); } return; }
+            if (tObj.type === 'ground_item') { if (Math.hypot(player.x - (tObj.x + 10), player.y - (tObj.y + 10)) < 60) { if (addInvItem(tObj.item, tObj.qty)) { tObj.active = false; onGroundTaken(tObj); addPickupText(tObj.item, tObj.qty); updateUI(); saveDataLogic(); } else setActionText('Inventário cheio!', '#e74c3c'); } return; }
             if (tObj.type === 'npc') { openShop(npcDB[tObj.dbKey]); return; }
             if (tObj.type === 'bank') { if (window.Bank) Bank.open(); return; }
             if (tObj.type === 'portal') { switchMap(tObj.destMap, tObj.destX, tObj.destY); return; }
@@ -1241,6 +1305,8 @@
                 e.preventDefault();
                 if (isDevBuildMode) {
                     let cur = curM.entities || [];
+                    const _wi = findWorldItemAt(curM, pos.x, pos.y);   // itens de mundo (tag "Item") têm prioridade: nada os esconde na hora de apagar
+                    if (_wi) { const _ix = cur.indexOf(_wi); if (_ix >= 0) { cur.splice(_ix, 1); addFloatingText(pos.x, pos.y, "Item apagado", "#e74c3c"); saveDataLogic(false, true); return; } }
                     for (let i = cur.length - 1; i >= 0; i--) { 
                         let o = cur[i]; 
                         if (pos.x >= o.x && pos.x <= o.x + (o.w||30) && pos.y >= o.y && pos.y <= o.y + (o.h||30)) { cur.splice(i, 1); addFloatingText(pos.x, pos.y, "Deletado", "#e74c3c"); saveDataLogic(false, true); return; } 
@@ -1290,7 +1356,7 @@
                     if(val.startsWith('e_')) { let k = val.substring(2); let nb = npcDB[k]; if(!nb) return; n.type = nb.hp>0?'enemy':'npc'; n.dbKey = k; n.name = nb.name; n.hp = nb.hp; n.maxHp = nb.hp; n.w=cW||nb.w||30; n.h=cH||nb.h||30; n.attackCooldown = 0; }
                     else if(val.startsWith('b_')) { let k = val.substring(2); let bd = window.CATALOG && CATALOG.BUILDINGS[k]; if(!bd) return; n.type = 'house'; n.style = k; n.name = bd.name; n.w = cW||bd.w; n.h = cH||bd.h; }
                     else if(val.startsWith('d_')) { let k = val.substring(2); let dd = window.CATALOG && CATALOG.DECOR[k]; if(!dd) return; n.type = 'decor'; n.kind = k; n.name = dd.name; n.w = cW||dd.w; n.h = cH||dd.h; }
-                    else if(val.startsWith('i_')) { let k = val.substring(2); n.type = 'ground_item'; n.item = k; n.qty = 1; n.life = 999999; n.w=20; n.h=20; }
+                    else if(val.startsWith('i_')) { let k = val.substring(2); const _ex = findWorldItemAt(curM, pos.x, pos.y); if (_ex) { openWorldItemModal(_ex); return; } n.type = 'ground_item'; n.item = k; n.qty = 1; n.life = 999999; n.w=20; n.h=20; n.wi = 1; n.respawn = false; n.respawnSecs = 300; n.x = pos.x - 10; n.y = pos.y - 10; if(!curM.entities) curM.entities = []; curM.entities.push(n); addFloatingText(pos.x, pos.y, 'Item colocado', '#2ecc71'); saveDataLogic(false, true); openWorldItemModal(n); return; }
                     else if (val === 'portal') { openModal(`<h3 style="margin-top:0;">Criar Portal</h3><label>ID Destino:</label><input type="text" id="p-dest" value="lumbridge" class="dev-input" style="margin-bottom:8px;"><div class="dev-row" style="margin-bottom:8px;"><div style="flex:1"><label>Pos X:</label><input type="number" id="p-x" value="400" class="dev-input"></div><div style="flex:1"><label>Pos Y:</label><input type="number" id="p-y" value="300" class="dev-input"></div></div><button class="dev-save-btn" onclick="finalizePortal(${pos.x}, ${pos.y}, ${cW||60}, ${cH||60})">Criar</button><button class="dev-save-btn" style="background:#555;" onclick="closeModal()">Cancelar</button>`); return; }
                     else if (val === 'house_door') { n.type = 'house_door'; n.name = 'Casa'; n.w = cW || 44; n.h = cH || 44; n.owner = '';
                         if(!curM.entities) curM.entities = []; curM.entities.push(n); saveDataLogic(false, true);
@@ -1542,7 +1608,7 @@
                 for (let i = cur.length - 1; i >= 0; i--) { const o = cur[i];
                     if(!o || !o.type) continue; 
                     if(o.type === 'fire') { if(!o.active) { cur.splice(i, 1); continue; } o.life--; if(o.life <= 0) o.active = false; }
-                    if(o.type === 'ground_item') { if(!o.active) { cur.splice(i, 1); continue; } o.life--; if(o.life <= 0) { cur.splice(i, 1); continue; } }
+                    if(o.type === 'ground_item') { if(!o.active) { if (o.tk) { if (o.rt && Date.now() >= o.rt) { o.active = true; delete o.tk; delete o.rt; try { delete player.taken[worldItemKey(currentMap, o)]; } catch (e) { } } } else { cur.splice(i, 1); } continue; } if (o.wi) continue; o.life--; if(o.life <= 0) { cur.splice(i, 1); continue; } }
                     
                     if(o.type === 'enemy' && o.active) {
                         const simulate = (isOfflineMode || isMapHost);
@@ -1682,7 +1748,7 @@
 
                 // DESENHA ITENS NO CHÃO
                 cur.forEach(o => { 
-                    if (o && o.type === 'ground_item' && o.active && inView(o, 40)) Art.drawGroundItem(ctx, o, T, itemDB[o.item] ? itemDB[o.item].icon : '?');
+                    if (o && o.type === 'ground_item' && o.active && inView(o, 40)) { Art.drawGroundItem(ctx, o, T, itemDB[o.item] ? itemDB[o.item].icon : '?'); if (o.wi && isDevBuildMode && userRole === 'admin') drawWorldItemTag(ctx, o); }
                 });
                 
                 // === Y-SORTING ===

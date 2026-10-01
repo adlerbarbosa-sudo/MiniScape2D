@@ -148,6 +148,8 @@ module.exports = function createExtras(ctx) {
     const PET_MODES = new Set(['follow', 'attack', 'items', 'coins', 'all']);
     const pInt = (v, a, b, d) => { v = Math.floor(Number(v)); return Number.isFinite(v) ? Math.max(a, Math.min(b, v)) : d; };
     function cleanPetSync(p) { if (!p || typeof p !== 'object' || Array.isArray(p) || typeof p.id !== 'string' || !PET_IDS.has(p.id)) return null; return { id: p.id, l: pInt(p.l, 1, 10, 1) }; }
+    const MOUNT_MAXLVL = 30, mountNeed = (l) => Math.round(250 * Math.pow(1.2, l - 1));   // mesma curva do cliente (pets.js)
+    function cleanMountStage(v) { return pInt(v, 0, 3, 0); }
     function cleanMountId(m) { return typeof m === 'string' && MOUNT_IDS.has(m) ? m : null; }
     function cleanPetData(pd) {
         if (!pd || typeof pd !== 'object') return;
@@ -159,11 +161,24 @@ module.exports = function createExtras(ctx) {
             if (v && typeof v === 'object' && !Array.isArray(v) && typeof v.id === 'string' && PET_IDS.has(v.id)) { o = st(v) || { lvl: 1, xp: 0 }; o.id = v.id; o.mode = PET_MODES.has(v.mode) ? v.mode : 'follow'; }
             pd.pet = o;
         }
-        if (pd.mounts !== undefined) { const out = {}; if (pd.mounts && typeof pd.mounts === 'object' && !Array.isArray(pd.mounts)) for (const k of Object.keys(pd.mounts)) if (MOUNT_IDS.has(k) && pd.mounts[k]) out[k] = 1; pd.mounts = out; }
+        if (pd.mounts !== undefined) {   // montarias: {lvl 1..30, xp, name?}; o formato antigo (1) vira nível 1
+            const out = {}; if (pd.mounts && typeof pd.mounts === 'object' && !Array.isArray(pd.mounts)) for (const k of Object.keys(pd.mounts)) {
+                if (!MOUNT_IDS.has(k) || !pd.mounts[k]) continue; const v = pd.mounts[k];
+                if (typeof v !== 'object' || Array.isArray(v)) { out[k] = { lvl: 1, xp: 0 }; continue; }
+                const o = { lvl: pInt(v.lvl, 1, MOUNT_MAXLVL, 1), xp: pInt(v.xp, 0, 1e9, 0) }; if (o.lvl >= MOUNT_MAXLVL) o.xp = 0; else o.xp = Math.min(o.xp, mountNeed(o.lvl) - 1);
+                const n = nm(v.name); if (n) o.name = n; out[k] = o;
+            } pd.mounts = out;
+        }
         if (pd.mount !== undefined) pd.mount = cleanMountId(pd.mount);
         if (pd.petsOpts !== undefined) { const v = pd.petsOpts; pd.petsOpts = (v && typeof v === 'object' && !Array.isArray(v)) ? { auto: v.auto === false ? false : true } : { auto: true }; }
     }
 
+    /* presente do admin: entra no mesmo correio do mercado (id único, entrega com confirmação, fica na fila se a mochila estiver cheia) */
+    function giveMail(user, item, qty, msg) {
+        const m = ensure(); const arr = m.mail[user] || []; if (arr.length >= 250) return null;
+        const why = 'Presente do administrador' + (msg ? ': ' + msg : ''); pushMail(user, item, qty, why); markDirty();
+        const a = m.mail[user]; return a[a.length - 1].id;
+    }
     function rebind(nd) { db = nd; ensure(); rankCache = { t: 0, data: null }; }
-    return { house, market, ranking, rebind, lotCost, cleanPetSync, cleanMountId, cleanPetData, bossInfo, bossHour, bossOpen, cleanTitle: (s) => (typeof s === 'string' ? s.replace(/[^\p{L}\p{N} '\-]/gu, '').trim().slice(0, 28) : '') };
+    return { giveMail, findUser, house, market, ranking, rebind, lotCost, cleanPetSync, cleanMountId, cleanMountStage, mountNeed, MOUNT_MAXLVL, cleanPetData, bossInfo, bossHour, bossOpen, cleanTitle: (s) => (typeof s === 'string' ? s.replace(/[^\p{L}\p{N} '\-]/gu, '').trim().slice(0, 28) : '') };
 };
