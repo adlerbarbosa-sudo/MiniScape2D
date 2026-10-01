@@ -5,6 +5,7 @@
    → se os dois disseram que estão prontos, "done" (cada cliente recebe as peças do outro e confirma) ; qualquer falha = "cancel" (o depósito volta).
    Trocas terminadas ficam gravadas até os DOIS confirmarem, para nada se perder se alguém cair no meio. */
 
+const MIMIC = require('./mimicnames');
 const MAX_PARTY = 5, INVITE_MS = 60000, OPEN_IDLE_MS = 10 * 60000, COMMIT_MS = 20000, OFFLINE_MS = 120000, STALE_MS = 30 * 86400000;
 const ITEM_RE = /^[\p{L}\p{N}_.'\- ]{1,40}$/u;
 const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
@@ -112,7 +113,7 @@ module.exports = function createSocial(ctx) {
             case 'trade_accept': if (t.st !== 'invite' || t.b !== u) return err('Nada para aceitar.'); t.st = 'open'; t.t = now(); markDirty(); return { ok: true };
             case 'trade_cancel': case 'trade_decline': endTrade(t, u + ' cancelou'); return { ok: true };
             case 'trade_offer': {
-                if (t.st !== 'open') return err('A troca não está aberta.'); const items = cleanItems(b.items); if (!items) return err('Oferta inválida.');
+                if (t.st !== 'open') return err('A troca não está aberta.'); if (Array.isArray(b.items) && b.items.some((it) => Array.isArray(it) && MIMIC.NAMES.has(it[0]))) return err('Itens Mímicos são ligados à sua conta e não podem ser trocados.'); const items = cleanItems(b.items); if (!items) return err('Oferta inválida.');
                 t.offer[s] = items; t.ok.a = t.ok.b = false; t.t = now(); markDirty(); return { ok: true };
             }
             case 'trade_ok': {

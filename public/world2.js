@@ -213,6 +213,7 @@
             else delete cv.c5.cataportal;
         }
         try { if (window.Maps2) window.Maps2.place(maps); } catch (e) { console.error(e); }   // maps2.js: 26 mapas novos + portais
+        try { if (window.Edges) window.Edges.migrate(maps); } catch (e) { console.error(e); }   // edges.js: bordas naturais, entradas de masmorra e tochas (idempotente)
     }
     function merge() {
         Object.keys(ITEMS).forEach((k) => { if (!itemDB[k]) itemDB[k] = Object.assign({}, ITEMS[k]); });

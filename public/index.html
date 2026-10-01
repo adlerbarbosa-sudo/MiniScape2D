@@ -111,7 +111,7 @@
             </div>
 
             <div id="tab-inv" class="tab-content active-tab"><div id="inv-grid" class="grid-container"></div><div style="font-size: 0.65rem; color: #888; margin-top: 10px; text-align: right;">Peso: <span id="weight-txt" style="color:#bdc3c7;">0</span> / 50 kg</div></div>
-            <div id="tab-eq" class="tab-content"><div id="equip-grid"><div class="equip-slot-box" onclick="eqClick('head')"><span class="slot-name">Cabeça</span><span id="eq-head" class="equip-icon"></span></div><div class="equip-slot-box" onclick="eqClick('body')"><span class="slot-name">Tronco</span><span id="eq-body" class="equip-icon"></span></div><div class="equip-slot-box" onclick="eqClick('ammo')"><span class="slot-name">Munição</span><span id="eq-ammo" class="equip-icon"></span><span id="ammo-qty" class="item-qty" style="top:auto; bottom:2px;"></span></div><div class="equip-slot-box" onclick="eqClick('weapon')"><span class="slot-name">Arma</span><span id="eq-weapon" class="equip-icon"></span></div><div class="equip-slot-box" onclick="eqClick('shield')"><span class="slot-name">Escudo</span><span id="eq-shield" class="equip-icon"></span></div><div class="equip-slot-box"></div></div><div style="margin-top:10px; font-size:0.75rem; color:#f1c40f; text-align: center;" id="def-stats">Bônus de Defesa: 0</div></div>
+            <div id="tab-eq" class="tab-content"><div id="equip-grid"><div class="equip-slot-box" onclick="eqClick('head')"><span class="slot-name">Cabeça</span><span id="eq-head" class="equip-icon"></span></div><div class="equip-slot-box" onclick="eqClick('body')"><span class="slot-name">Tronco</span><span id="eq-body" class="equip-icon"></span></div><div class="equip-slot-box" onclick="eqClick('ammo')"><span class="slot-name">Munição</span><span id="eq-ammo" class="equip-icon"></span><span id="ammo-qty" class="item-qty" style="top:auto; bottom:2px;"></span></div><div class="equip-slot-box" onclick="eqClick('weapon')"><span class="slot-name">Arma</span><span id="eq-weapon" class="equip-icon"></span></div><div class="equip-slot-box" onclick="eqClick('shield')"><span class="slot-name">Escudo</span><span id="eq-shield" class="equip-icon"></span></div><div class="equip-slot-box" onclick="eqClick('amulet')"><span class="slot-name">Amuleto</span><span id="eq-amulet" class="equip-icon"></span></div><div class="equip-slot-box" onclick="eqClick('ring')"><span class="slot-name">Anel</span><span id="eq-ring" class="equip-icon"></span></div></div><div style="margin-top:10px; font-size:0.75rem; color:#f1c40f; text-align: center;" id="def-stats">Bônus de Defesa: 0</div></div>
             <div id="tab-sk" class="tab-content"><div id="skills-list"></div></div>
             <div id="tab-craft" class="tab-content"><div id="craft-list"></div></div>
             <div id="tab-mag" class="tab-content"><div class="tab-note">Equipe um <b>Cajado</b> e clique na magia para prepará-la; depois use <b>Ctrl</b> perto de um inimigo. Cada lançamento gasta runas e MP.</div><div id="spellbook-list"></div></div>
@@ -162,6 +162,12 @@
     <!-- SCRIPT GIGANTE E UNIFICADO DO JOGO -->
     <script src="catalog.js"></script>
     <script src="content.js"></script>
+    <script src="stats.js"></script>
+    <script src="gear.js"></script>
+    <script src="qty.js"></script>
+    <script src="recycle.js"></script>
+    <script src="los.js"></script>
+    <script src="edges.js"></script>
     <script src="world2.js"></script>
     <script src="maps2.js"></script>
     <script src="net.js"></script>
@@ -181,6 +187,9 @@
     <script src="sfx.js"></script>
     <script src="quests.js"></script>
     <script src="artworld.js"></script>
+    <script src="petart.js"></script>
+    <script src="pets.js"></script>
+    <script src="mimic.js"></script>
     <script>
         // === 1. DECLARAÇÕES GLOBAIS ÚNICAS ===
         let lastFrameTime = 0; 
@@ -267,7 +276,7 @@
 
         // --- ATAQUE À DISTÂNCIA NO CLIQUE: arco/cajado param no alcance, viram para o alvo e atacam sozinhos; fora do alcance perseguem só até entrar ---
         const RANGED_RANGE = 220, MAGIC_RANGE = 200;
-        let rangedTarget = null, _rtLx = 0, _rtLy = 0, _rtN = 0;
+        let rangedTarget = null, _rtLx = 0, _rtLy = 0, _rtN = 0, _losMsgT = 0;
         function rangedWeapon() { const w = player.equipment && player.equipment.weapon; return (w && (w.tool === 'ranged' || w.tool === 'magic')) ? w : null; }
         function attackRange(w) { return w && w.tool === 'ranged' ? RANGED_RANGE : MAGIC_RANGE; }
         function beginAttack(obj) {   // true = o clique virou ataque à distância
@@ -275,7 +284,8 @@
             rangedTarget = obj; _rtLx = _rtLy = -1e9; _rtN = 0; player.pendingAutoAction = null; player.isPerformingAction = false; player.actionToolItem = null; player.destX = player.x; player.destY = player.y;
             if (isNPCOpen && obj.type !== 'npc') { closeMenus(); openTab('inv'); } osrsMenu.style.display = 'none'; return true;
         }
-        function lineClear(ax, ay, bx, by, cur) {   // linha de visão simples: nada sólido no caminho do tiro
+        function lineClear(ax, ay, bx, by, cur) {   // linha de visão: nada sólido ALTO no caminho (los.js); cercas, barris e minérios não bloqueiam
+            if (window.LOS) return LOS.clear(ax, ay, bx, by, cur);
             const n = Math.max(1, Math.ceil(Math.hypot(bx - ax, by - ay) / 12));
             for (const o of cur) {
                 if (!o || !o.type || !o.active || PF_SKIP.includes(o.type) || o.type === 'npc') continue;
@@ -336,7 +346,7 @@
             if (item.defBonus) html += `<div class="tt-stat">🛡️ Defesa: +${item.defBonus}</div>`; 
             if (item.heal) html += `<div class="tt-stat">❤️ Cura: +${item.heal}</div>`; 
             if (item.stackable && item.qty > 1) html += `<div class="tt-stat">Quantidade: ${fmtNum(item.qty)}</div>`; html += `<div class="tt-weight">⚖️ Peso: ${Number(item.weight)||0} kg</div>`; 
-            tooltip.innerHTML = html; tooltip.style.left = (mouseX + 15) + 'px'; tooltip.style.top = (mouseY + 15) + 'px'; tooltip.style.display = 'block'; 
+            if (window.Stats) html += Stats.tipHtml(item); tooltip.innerHTML = html; tooltip.style.left = (mouseX + 15) + 'px'; tooltip.style.top = (mouseY + 15) + 'px'; tooltip.style.display = 'block'; 
         }
         function hideTooltip() { tooltip.style.display = 'none'; }
         
@@ -354,8 +364,8 @@
             player.look = Object.assign({}, lk); player.cls = cls; player.race = lk.race;
             const equipNew = (n, qty) => { if (!addInvItem(n, qty || 1)) return; const i = player.inventory.findIndex(x => x && x.name === n); if (i < 0) return; const it = player.inventory[i]; if (it.slot && it.slot in player.equipment && !player.equipment[it.slot]) { player.inventory.splice(i, 1); player.equipment[it.slot] = it; } };
             if (cls === 'warrior') { equipNew('Bronze Sword'); equipNew('Bronze Shield'); }
-            else if (cls === 'archer') { equipNew('Shortbow'); equipNew('Bronze Arrow', 50); }
-            else { equipNew('Staff'); addInvItem('Air Rune', 50); addInvItem('Mind Rune', 50); }
+            else if (cls === 'archer') { equipNew('Shortbow'); equipNew('Bronze Arrow', 250); }
+            else { equipNew('Staff'); addInvItem('Air Rune', 250); addInvItem('Mind Rune', 250); }
             addInvItem('Bronze Pickaxe', 1); addInvItem('Bronze Axe', 1); addInvItem('Tinderbox', 1); addInvItem('Rede de Pesca', 1); addInvItem('Coins', 100);
             let hpB = 0, mpB = 0; if (cls === 'warrior') hpB += 3; if (cls === 'mage') mpB += 8;
             if (lk.race === 'elf') mpB += 4; else if (lk.race === 'dwarf') hpB += 4; else if (lk.race === 'orc') { hpB += 2; mpB -= 2; }
@@ -414,6 +424,9 @@
             if (itemDB['Raw Fish'] && !itemDB['Raw Fish'].cooksInto) { itemDB['Raw Fish'].cooksInto = 'Cooked Fish'; itemDB['Raw Fish'].cookXp = 20; }
             if (window.Content) Content.merge();
             if (window.Fishing) Fishing.merge();
+            if (window.Pets) Pets.merge();
+            if (window.Gear) Gear.merge();
+            if (window.Mimic) Mimic.merge();
         }
         mergeCatalog();
 
@@ -425,8 +438,8 @@
         let playerDefault = {
             x: 400, y: 300, width: 24, height: 24, destX: 400, destY: 300, speed: 2.5, facing: { x: 0, y: 1 }, 
             isPerformingAction: false, actionTarget: null, actionType: null, actionTimer: 0, actionDelay: 100, attackCooldown: 0, pendingAutoAction: null, actionAnim: 0, actionToolItem: null,
-            activeSpell: 'wind_strike', regenTimer: 300, currentMap: 'lumbridge',
-            equipment: { head: null, body: null, weapon: null, shield: null, ammo: null }, inventory: [], bank: [],
+            activeSpell: 'wind_strike', regenTimer: 300, energy: 100, currentMap: 'lumbridge',
+            equipment: { head: null, body: null, weapon: null, shield: null, ammo: null, amulet: null, ring: null }, inventory: [], bank: [],
             stats: { hp: 15, maxHp: 15, mp: 10, maxMp: 10, skills: { hp: { level: 10, xp: 0, next: 100, name: 'Health' }, combat: { level: 1, xp: 0, next: 100, name: 'Combat' }, ranged: { level: 1, xp: 0, next: 100, name: 'Ranged' }, magic: { level: 1, xp: 0, next: 100, name: 'Magic' }, prayer: { level: 1, xp: 0, next: 50, name: 'Prayer' }, woodcutting: { level: 1, xp: 0, next: 50, name: 'Woodcut' }, mining: { level: 1, xp: 0, next: 50, name: 'Mining' }, smithing: { level: 1, xp: 0, next: 50, name: 'Smithing' }, firemaking: { level: 1, xp: 0, next: 50, name: 'Firemk' }, cooking: { level: 1, xp: 0, next: 50, name: 'Cooking' }, crafting: { level: 1, xp: 0, next: 50, name: 'Crafting' }, fishing: { level: 1, xp: 0, next: 50, name: 'Fishing' }, farming: { level: 1, xp: 0, next: 50, name: 'Farming' }, alchemy: { level: 1, xp: 0, next: 50, name: 'Alchemy' }, enchanting: { level: 1, xp: 0, next: 50, name: 'Enchant' } } }
         };
         let player = JSON.parse(JSON.stringify(playerDefault));
@@ -655,7 +668,8 @@
             } else { player = JSON.parse(JSON.stringify(playerDefault)); if (!applyNewChar()) giveStarterItems(); const sm = gameMaps['lumbridge']; if (sm && sm.spawn) { player.x = sm.spawn.x; player.y = sm.spawn.y; player.destX = sm.spawn.x; player.destY = sm.spawn.y; } }
 
             if (typeof player.x !== 'number' || isNaN(player.x)) player.x = 400; if (typeof player.y !== 'number' || isNaN(player.y)) player.y = 300;
-            if (!player.facing) player.facing = { x: 0, y: 1 }; if (!player.equipment) player.equipment = { head: null, body: null, weapon: null, shield: null, ammo: null };
+            if (!player.facing) player.facing = { x: 0, y: 1 }; if (!player.equipment) player.equipment = { head: null, body: null, weapon: null, shield: null, ammo: null, amulet: null, ring: null };
+            { const _q = player.equipment; if (_q) { if (!('amulet' in _q)) _q.amulet = null; if (!('ring' in _q)) _q.ring = null; } } if (typeof player.energy !== 'number' || !isFinite(player.energy)) player.energy = 100;
             if (!player.inventory) player.inventory = []; if (!player.bank) player.bank = []; player.actionAnim = player.actionAnim || 0;
             try { if (window.Fishing) Fishing.migrate(player); } catch (e) { console.error(e); }
             try { mergeStacks(player.inventory); mergeStacks(player.bank); } catch (e) { console.error(e); }
@@ -881,7 +895,7 @@
 
         function useItem(index) {
             if(isBankOpen) { transferToBank(index); return; } const item = player.inventory[index]; if(!item) return;
-            if(item.type === 'equipment') { if(!item.slot || !(item.slot in player.equipment)) { setActionText('Este item não pode ser equipado.', '#e74c3c'); return; } if(item.stackable && item.slot === 'ammo') { let curAm = player.equipment.ammo; player.equipment.ammo = player.inventory.splice(index, 1)[0]; if(curAm && !addInvItem(curAm.name, curAm.qty)) player.inventory.push(curAm); } else { player.inventory.splice(index, 1); if(player.equipment[item.slot]) player.inventory.push(player.equipment[item.slot]); player.equipment[item.slot] = item; } } 
+            if(item.type === 'equipment') { if(!item.slot || !(item.slot in player.equipment)) { setActionText('Este item não pode ser equipado.', '#e74c3c'); return; } { const _rq = window.Stats && Stats.canEquip(item); if (_rq && !_rq.ok) { setActionText(_rq.msg, '#e74c3c'); return; } } if(item.stackable && item.slot === 'ammo') { let curAm = player.equipment.ammo; player.equipment.ammo = player.inventory.splice(index, 1)[0]; if(curAm && !addInvItem(curAm.name, curAm.qty)) player.inventory.push(curAm); } else { player.inventory.splice(index, 1); if(player.equipment[item.slot]) player.inventory.push(player.equipment[item.slot]); player.equipment[item.slot] = item; } } 
             else if(item.type === 'consumable') { if(item.mp > 0) { player.stats.mp = Math.min(player.stats.maxMp, player.stats.mp + item.mp); setActionText(`Restaurou ${item.mp} MP.`, '#3498db'); } if(item.buff && window.Content) Content.applyBuff(item.buff); if(item.heal > 0) { player.stats.hp = Math.min(player.stats.maxHp, player.stats.hp + item.heal); setActionText(`Curou ${item.heal} HP.`); } if(item.name === 'Bones') { addXP('prayer', 5); addFloatingText(player.x, player.y - 15, "Enterrou", "#bdc3c7"); } removeInvItem(item.name, 1); } 
             else if(item.name === 'Tinderbox') { if(getInvCount('Logs') >= 1) { removeInvItem('Logs', 1); let curM = gameMaps[currentMap]; if(curM){ if(!curM.entities) curM.entities = []; curM.entities.push({ id: newEntId(), type: 'fire', name: 'Fire', x: player.x - 15, y: player.y - 15, w: 30, h: 30, active: true, life: 1000 }); } addXP('firemaking', 15); setActionText("Acendeu fogo!"); saveDataLogic(); } else { setActionText("Precisa de Logs.", "#e74c3c"); } } 
             else if(item.bait && window.Fishing) { Fishing.selectBait(item.name); hideTooltip(); updateUI(); return; }
@@ -945,13 +959,13 @@
         
         function addXP(sK, a) { 
             let mult = 1; if(userRole === 'vip_light') mult = 2; if(userRole === 'vip_full' || userRole === 'admin') mult = 4; let finalXP = a * mult; if (player.race === 'human') finalXP = Math.max(0, Math.round(finalXP * 1.05));
-            const sk = player.stats.skills[sK]; if(!sk) return; sk.xp += finalXP; addFloatingText(player.x, player.y - 20, `+${finalXP} XP`, '#f1c40f'); 
+            const sk = player.stats.skills[sK]; if(!sk) return; sk.xp += finalXP; if (finalXP > 0) addFloatingText(player.x, player.y - 20, `+${finalXP} XP`, '#f1c40f');   // 0 XP (tudo desviado para os Mímicos) não mostra popup 
             let leveledUp = false; if (!(sk.next > 0)) sk.next = 50; while (sk.xp >= sk.next) { sk.level++; sk.xp -= sk.next; sk.next = Math.floor(sk.next * 1.5); leveledUp = true; if (sK === 'hp') { player.stats.maxHp += 2; player.stats.hp = player.stats.maxHp; } } 
             if(leveledUp) { setActionText(`${sk.name} Nível ${sk.level}!`, "#f1c40f"); addFloatingText(player.x, player.y - 40, `Level Up!`, '#2ecc71'); } updateUI(); 
         }
 
-        function getTotalDef() { let d = player.stats.skills.combat.level + (window.Content ? Content.buff('def') : 0); if(player.equipment && player.equipment.shield) d += (player.equipment.shield.defBonus || 0); if(player.equipment && player.equipment.body) d += (player.equipment.body.defBonus || 0); return d; }
-        function openShop(nData) { if (!nData) { setActionText('Esse NPC não tem loja.', '#e74c3c'); return; } document.getElementById('btn-npc').style.display = 'block'; openTab('npc'); document.getElementById('npc-title').innerText = nData.name; document.getElementById('npc-dialog').innerText = `"${nData.dialog || '...'}"`; let sL = document.getElementById('npc-shop-list'); sL.innerHTML = ''; sL.onclick = (ev) => { const b = ev.target.closest('[data-buy]'); if(!b) return; const ct = parseInt(b.dataset.cost); if (ct >= 100 && window.ItemSel && !ItemSel.arm('shop:' + b.dataset.buy)) { const old = b.textContent; b.textContent = 'Confirmar ' + ct + ' 🪙?'; setTimeout(() => { if (b.isConnected) b.textContent = old; }, 4000); return; } buyItem(b.dataset.buy, ct); }; if(nData.shopStr) { nData.shopStr.split('|').forEach(p => { let pt = p.split(','); if(pt.length >= 2) { let iN = pt[0].trim(); let ct = parseInt(pt[1]); let iD = itemDB[iN]; if(iD) { sL.innerHTML += `<div class="shop-item"><span>${Icons.html(iD.name, 24)} ${esc(iD.name)}${iD.shopQty > 1 ? ' ×' + iD.shopQty : ''}</span><button class="shop-btn" data-buy="${esc(iN)}" data-cost="${ct}">Comprar (${ct} 🪙)</button></div>`; } } }); } }
+        function getTotalDef() { let d = player.stats.skills.combat.level + (window.Content ? Content.buff('def') : 0); if(player.equipment && player.equipment.shield) d += (player.equipment.shield.defBonus || 0); if(player.equipment && player.equipment.body) d += (player.equipment.body.defBonus || 0); if(player.equipment && player.equipment.head) d += (player.equipment.head.defBonus || 0); return d; }
+        function openShop(nData) { if (!nData) { setActionText('Esse NPC não tem loja.', '#e74c3c'); return; } document.getElementById('btn-npc').style.display = 'block'; openTab('npc'); document.getElementById('npc-title').innerText = nData.name; document.getElementById('npc-dialog').innerText = `"${nData.dialog || '...'}"`; let sL = document.getElementById('npc-shop-list'); sL.innerHTML = ''; sL.onclick = (ev) => { const b = ev.target.closest('[data-buy]'); if(!b) return; const ct = parseInt(b.dataset.cost); if (window.Qty) { Qty.shop(b.dataset.buy, ct); return; } if (ct >= 100 && window.ItemSel && !ItemSel.arm('shop:' + b.dataset.buy)) { const old = b.textContent; b.textContent = 'Confirmar ' + ct + ' 🪙?'; setTimeout(() => { if (b.isConnected) b.textContent = old; }, 4000); return; } buyItem(b.dataset.buy, ct); }; if(nData.shopStr) { nData.shopStr.split('|').forEach(p => { let pt = p.split(','); if(pt.length >= 2) { let iN = pt[0].trim(); let ct = parseInt(pt[1]); let iD = itemDB[iN]; if(iD) { sL.innerHTML += `<div class="shop-item"><span>${Icons.html(iD.name, 24)} ${esc(iD.name)}${iD.shopQty > 1 ? ' ×' + iD.shopQty : ''}</span><button class="shop-btn" data-buy="${esc(iN)}" data-cost="${ct}">Comprar (${ct} 🪙)</button></div>`; } } }); } }
         function buyItem(iN, ct) { if (!(ct > 0)) return; const _q = (itemDB[iN] && itemDB[iN].shopQty > 1) ? itemDB[iN].shopQty : 1; if(getInvCount('Coins') >= ct) { if(addInvItem(iN, _q)) { removeInvItem('Coins', ct); setActionText(`Comprou ${_q > 1 ? _q + '× ' : ''}${iN}!`); updateUI(); } else { setActionText("Inv Cheio!", "#e74c3c"); } } else { setActionText("Coins insuficientes!", "#e74c3c"); } }
         function setActiveSpell(sId) { player.activeSpell = sId; updateUI(); }
 
@@ -1146,7 +1160,7 @@
             let range = (wp && (wp.tool === 'magic' || wp.tool === 'ranged')) ? attackRange(wp) : 45;
             let curM = gameMaps[currentMap]; if(!curM) return;
             let cur = curM.entities || []; let cEnemy = null; let minDEnemy = range;
-            for(let o of cur) { if(o && o.active && o.type === 'enemy') { let d = Math.hypot(player.x - (o.x + (o.w||30)/2), player.y - (o.y + (o.h||30)/2)); if(d < minDEnemy) { minDEnemy = d; cEnemy = o; } } }
+            for(let o of cur) { if(o && o.active && o.type === 'enemy') { let d = Math.hypot(player.x - (o.x + (o.w||30)/2), player.y - (o.y + (o.h||30)/2)); if(d < minDEnemy && (!window.LOS || LOS.playerTo(o, cur))) { minDEnemy = d; cEnemy = o; } } }
             if(cEnemy) {
                 let dx = cEnemy.x + (cEnemy.w||30)/2 - player.x; let dy = cEnemy.y + (cEnemy.h||30)/2 - player.y; 
                 if(Math.abs(dx) > Math.abs(dy)) { player.facing.x = dx>0?1:-1; player.facing.y = 0; } else { player.facing.x = 0; player.facing.y = dy>0?1:-1; }
@@ -1164,14 +1178,19 @@
             if (tObj.type === 'bank') { if (window.Bank) Bank.open(); return; }
             if (tObj.type === 'portal') { switchMap(tObj.destMap, tObj.destX, tObj.destY); return; }
 
+            if(tObj.type === 'enemy' && window.LOS && !LOS.playerTo(tObj)) {   // atrás de uma parede: não ataca, contorna
+                if (!_losMsgT || performance.now() - _losMsgT > 1500) { _losMsgT = performance.now(); setActionText('Sem linha de visão: contorne a parede.', '#e67e22'); }
+                if (!rangedWeapon()) { player.pendingAutoAction = tObj; player.destX = tObj.x + (tObj.w||30)/2; player.destY = tObj.y + (tObj.h||30)/2; } else if (rangedTarget !== tObj) beginAttack(tObj);
+                return;
+            }
             if(tObj.type === 'enemy' && player.attackCooldown <= 0) {
-                let d = 1; let sT = 'combat'; player.attackCooldown = 50; 
+                let d = 1; let sT = 'combat'; player.attackCooldown = window.Stats ? Stats.cd(50) : 50; 
                 if (wp && wp.tool === 'magic') {
                     let spell = spellbookDB.find(s => s.id === player.activeSpell);
                     if(spell && player.stats.skills.magic.level >= spell.lvl) {
                         let hasRunes = true; Object.keys(spell.req).forEach(rk => { if(getInvCount(rk) < spell.req[rk]) hasRunes = false; });
                         if(hasRunes) {
-                            Object.keys(spell.req).forEach(rk => removeInvItem(rk, spell.req[rk])); d = spell.dmg + Math.floor(player.stats.skills.magic.level / 2); sT = 'magic';
+                            if (!(window.Stats && Stats.saves())) Object.keys(spell.req).forEach(rk => removeInvItem(rk, spell.req[rk])); d = spell.dmg + Math.floor(player.stats.skills.magic.level / 2) + (wp.bonusDmg || 0) + (window.Stats ? Stats.spellDmg() : 0); sT = 'magic';
                             projectiles.push({ x: player.x, y: player.y, target: tObj, tx: tObj.x + (tObj.w||30)/2, ty: tObj.y + (tObj.h||30)/2, dmg: d, speed: 6, type: 'magic', color: spell.color });
                             updateUI(); return; 
                         } else { setActionText("Sem runas!", "#e74c3c"); return; }
@@ -1180,7 +1199,7 @@
                 else if (wp && wp.tool === 'ranged') {
                     let ammo = player.equipment ? player.equipment.ammo : null;
                     if(ammo && ammo.qty >= 1) {
-                        ammo.qty--; if(ammo.qty <= 0) { if(player.equipment) player.equipment.ammo = null; }
+                        if (!(window.Stats && Stats.saves())) ammo.qty--; if(ammo.qty <= 0) { if(player.equipment) player.equipment.ammo = null; }
                         d = 1 + Math.floor(player.stats.skills.ranged.level / 2) + (wp.bonusDmg || 0) + (ammo.bonusDmg || 0) + (window.Content ? Content.buff('dmg') : 0); sT = 'ranged';
                         projectiles.push({ x: player.x, y: player.y, target: tObj, tx: tObj.x + (tObj.w||30)/2, ty: tObj.y + (tObj.h||30)/2, dmg: d, speed: 8, type: 'ranged' }); 
                         updateUI(); return;
@@ -1201,12 +1220,13 @@
         }
 
         function applyDamage(t, dmg, sT, maxHit) {
-            t.hp -= dmg; t.aggroTarget = currentUser; const crit = dmg > 0 && maxHit >= 4 && dmg >= maxHit * 0.9; Fx.dmg(floatingTexts, t.x + (t.w||30)/2, t.y + 2, dmg, dmg > 0 ? (crit ? 'crit' : 'hit') : 'miss'); if (dmg > 0) { Art.burst(t.x + (t.w||30)/2, t.y + (t.h||30)/2, '#d33', crit ? 12 : 6, crit ? 1.6 : 1); if (crit) Art.burst(t.x + (t.w||30)/2, t.y + (t.h||30)/2, '#ffe27a', 8, 1.8); }
+            let _cr = false; if (window.Stats && dmg > 0) { const _r = Stats.rollAttack(dmg); dmg = _r.dmg; _cr = _r.crit; const _h = Stats.lifestealHeal(dmg); if (_h > 0 && player.stats.hp < player.stats.maxHp) { player.stats.hp = Math.min(player.stats.maxHp, player.stats.hp + _h); Fx.dmg(floatingTexts, player.x, player.y - 50, _h, 'heal'); } }
+            t.hp -= dmg; t.aggroTarget = currentUser; const crit = _cr, big = !_cr && dmg > 0 && maxHit >= 4 && dmg >= maxHit * 0.9; Fx.dmg(floatingTexts, t.x + (t.w||30)/2, t.y + 2, dmg, dmg > 0 ? (crit ? 'crit' : big ? 'big' : 'hit') : 'miss'); if (dmg > 0) { Art.burst(t.x + (t.w||30)/2, t.y + (t.h||30)/2, '#d33', (crit || big) ? 12 : 6, (crit || big) ? 1.6 : 1); if (crit || big) Art.burst(t.x + (t.w||30)/2, t.y + (t.h||30)/2, '#ffe27a', 8, 1.8); }
             if (!isOfflineMode) { pendingCombatLogs.push({ id: t.id, dmg: dmg, aggro: currentUser, maxHp: t.maxHp }); if (pendingCombatLogs.length > 200) pendingCombatLogs.splice(0, pendingCombatLogs.length - 200); }
             if(t.hp <= 0) { 
                 Fx.ghost(t); t.active = false; t.aggroTarget = null; Art.poof(t.x + (t.w||30)/2, t.y + (t.h||30)/2);
                 let bXP = (t.dbKey && npcDB[t.dbKey]) ? npcDB[t.dbKey].xp : 15; let cXP = Math.floor(bXP * 0.3) || 1; let hXP = bXP - cXP; addXP(sT, cXP); addXP('hp', hXP);
-                if(t.dbKey && npcDB[t.dbKey] && npcDB[t.dbKey].lootStr){ let pts = npcDB[t.dbKey].lootStr.split('|'); pts.forEach((p, i) => { let d = p.split(','); if(d.length >= 3 && Math.random() <= parseFloat(d[1])){ let curM = gameMaps[currentMap]; if(curM) { if(!curM.entities) curM.entities = []; curM.entities.push({ id: newEntId(), type: 'ground_item', item: d[0].trim(), qty: Math.floor(Math.random()*parseInt(d[2]))+1, x: t.x+(Math.random()*20)-10, y: t.y, w: 20, h: 20, active: true, life: 3000 }); } } }); } saveDataLogic(); 
+                if(t.dbKey && npcDB[t.dbKey] && npcDB[t.dbKey].lootStr){ let pts = npcDB[t.dbKey].lootStr.split('|'); pts.forEach((p, i) => { let d = p.split(','); if(d.length >= 3 && Math.random() <= parseFloat(d[1]) * (window.Stats ? Stats.luckMul() : 1)){ let curM = gameMaps[currentMap]; if(curM) { if(!curM.entities) curM.entities = []; curM.entities.push({ id: newEntId(), type: 'ground_item', item: d[0].trim(), qty: Math.floor(Math.random()*parseInt(d[2]))+1, x: t.x+(Math.random()*20)-10, y: t.y, w: 20, h: 20, active: true, life: 3000 }); } } }); } saveDataLogic(); 
             }
         }
 
@@ -1421,7 +1441,7 @@
         function update() {
             try {
                 let curM = gameMaps[currentMap]; if(!curM) return; let cur = curM.entities || []; let mapW = curM.width || 800; let mapH = curM.height || 600;
-                if(player.attackCooldown > 0) player.attackCooldown--; if(player.actionAnim > 0) player.actionAnim--; if (window.Art) Art.tickAll(); if (window.Env) Env.tick(curM);
+                if (window.Stats) Stats.tick(); if(player.attackCooldown > 0) player.attackCooldown--; if(player.actionAnim > 0) player.actionAnim--; if (window.Art) Art.tickAll(); if (window.Env) Env.tick(curM);
 
                 if(player.regenTimer > 0) player.regenTimer--;
                 if(player.regenTimer <= 0) {
@@ -1430,7 +1450,7 @@
 
                 if (typeof otherPlayers !== 'undefined') { Object.keys(otherPlayers).forEach(u => { let op = otherPlayers[u]; const sp = netSample(op, op.x, op.y); op.displayX = sp.x; op.displayY = sp.y; }); }
 
-                for(let i = projectiles.length - 1; i >= 0; i--) { let p = projectiles[i]; if (p.target && p.target.active) { p.tx = p.target.x + (p.target.w||30) / 2; p.ty = p.target.y + (p.target.h||30) / 2; } let dx = p.tx - p.x; let dy = p.ty - p.y; let dist = Math.hypot(dx, dy); if (dist < p.speed) { if(p.target && p.target.active) applyDamage(p.target, p.dmg, p.type); projectiles.splice(i, 1); } else { p.x += (dx/dist)*p.speed; p.y += (dy/dist)*p.speed; } }
+                for(let i = projectiles.length - 1; i >= 0; i--) { let p = projectiles[i]; if (p.target && p.target.active) { p.tx = p.target.x + (p.target.w||30) / 2; p.ty = p.target.y + (p.target.h||30) / 2; } let dx = p.tx - p.x; let dy = p.ty - p.y; let dist = Math.hypot(dx, dy); if (window.LOS && !(p._nl) && dist > 0 && !LOS.clear(p.x, p.y, p.x + (dx/dist)*Math.min(dist, p.speed + 4), p.y + (dy/dist)*Math.min(dist, p.speed + 4), cur)) { Art.burst(p.x, p.y, p.type === 'magic' ? (p.color || '#9ad') : '#cbb28a', 6, 0.8); projectiles.splice(i, 1); if (p.type === 'ranged' || p.type === 'magic') { if (!_losMsgT || performance.now() - _losMsgT > 1500) { _losMsgT = performance.now(); setActionText('O tiro bateu na parede.', '#e67e22'); } } continue; } if (dist < p.speed) { if(p.target && p.target.active) applyDamage(p.target, p.dmg, p.type); projectiles.splice(i, 1); } else { p.x += (dx/dist)*p.speed; p.y += (dy/dist)*p.speed; } }
 
                 if (rangedTarget) rangedTick(cur);
                 let dxK = 0, dyK = 0;
@@ -1440,7 +1460,7 @@
                 if (dxK !== 0 || dyK !== 0) {
                     if (isBankOpen || isNPCOpen) { closeMenus(); openTab('inv'); } 
                     player.destX = player.x; player.destY = player.y; player.pendingAutoAction = null; player.isPerformingAction = false; player.actionToolItem = null; rangedTarget = null;
-                    let dK = Math.hypot(dxK, dyK); let mx = (dxK / dK) * player.speed; let my = (dyK / dK) * player.speed; 
+                    let dK = Math.hypot(dxK, dyK); const _sp = window.Stats ? Stats.spd(true) : player.speed; let mx = (dxK / dK) * _sp; let my = (dyK / dK) * _sp; 
                     let nX = player.x + mx; let nY = player.y + my; let colX = false, colY = false; let pw = 10, ph = 10;
                     
                     for(let o of cur) {
@@ -1465,7 +1485,7 @@
 
                     if (dist > sD) {
                         let sdx = dx, sdy = dy, sdist = dist; const wp = getSteerPoint(cur, mapW, mapH); if (wp) { sdx = wp.x - player.x; sdy = wp.y - player.y; sdist = Math.hypot(sdx, sdy) || 1; }
-                        const mx = (sdx / sdist) * player.speed; const my = (sdy / sdist) * player.speed; let nX = player.x + mx; let nY = player.y + my; let colX = false, colY = false; let pw = 10, ph = 10;
+                        const _sp2 = window.Stats ? Stats.spd(true) : player.speed; const mx = (sdx / sdist) * _sp2; const my = (sdy / sdist) * _sp2; let nX = player.x + mx; let nY = player.y + my; let colX = false, colY = false; let pw = 10, ph = 10;
                         for(let o of cur) {
                             if(!o || !o.type || !o.active || ['ground_item','fishing_spot','farm_plot','portal','fire','paint'].includes(o.type)) continue;
                             let hb = getHitbox(o); if (!hb) continue;
@@ -1496,8 +1516,10 @@
                 }
 
                 if (gameMaps[currentMap] && gameMaps[currentMap] !== curM) { curM = gameMaps[currentMap]; mapW = curM.width || 800; mapH = curM.height || 600; }   // portal usado neste frame: não testar a borda com o tamanho do mapa ANTIGO (bug: chegar em x>largura antiga voltava ao mapa vizinho)
+                if (!(window.Edges && Edges.step(curM, mapW, mapH))) {   // mapas com bordas (edges.js) usam as aberturas de estrada; os demais seguem a grade antiga
                 if (player.x <= 15) { if (!attemptGridTransition(-1, 0)) { player.x = 15; player.destX = 15; } } else if (player.x >= mapW - 15) { if (!attemptGridTransition(1, 0)) { player.x = mapW - 15; player.destX = mapW - 15; } }
                 if (player.y <= 15) { if (!attemptGridTransition(0, -1)) { player.y = 15; player.destY = 15; } } else if (player.y >= mapH - 15) { if (!attemptGridTransition(0, 1)) { player.y = mapH - 15; player.destY = mapH - 15; } }
+                }
 
                 if(player.isPerformingAction && player.actionTarget && player.actionTarget.active) {
                     if (player.actionTimer % 30 === 0) player.actionAnim = 10; player.actionTimer--;
@@ -1539,7 +1561,7 @@
                         const cxm = o.x + ow/2, cym = o.y + oh/2;
                         // monstro agressivo "vê" o jogador: manda um golpe de dano 0 para o servidor marcar o alvo (sem roubar alvo de outro jogador)
                         if (o._seen > 0) o._seen--;
-                        if (beh === 'aggressive' && !o.aggroTarget && !(o._seen > 0) && player.stats.hp > 0 && Math.hypot(player.x - cxm, player.y - cym) < ((def.range || 100) * (window.Env ? Env.rangeMul() : 1))) {
+                        if (beh === 'aggressive' && !o.aggroTarget && !(o._seen > 0) && player.stats.hp > 0 && Math.hypot(player.x - cxm, player.y - cym) < ((def.range || 100) * (window.Env ? Env.rangeMul() : 1)) && (!window.LOS || LOS.clear(cxm, cym, player.x, player.y - 8, cur))) {
                             o._seen = 90; o.aggroTarget = currentUser; pendingCombatLogs.push({ id: o.id, dmg: 0, aggro: currentUser, maxHp: o.maxHp });
                         }
                         let threat = null;   // quem está atacando este monstro
@@ -1554,9 +1576,9 @@
                             } else {
                                 const reach = def.reach || Math.max(22, ow * 0.45 + 10);
                                 if (ed > reach) { if (simulate) mobStep(o, cur, ex, ey, ed, Math.min(spd * 0.95, 1.4), ow, oh); }
-                                else if (o.aggroTarget === currentUser && o.attackCooldown <= 0) {   // cada jogador sofre o próprio dano
+                                else if (o.aggroTarget === currentUser && o.attackCooldown <= 0 && (!window.LOS || LOS.clear(cxm, cym, player.x, player.y - 8, cur))) {   // cada jogador sofre o próprio dano (e só se o bicho enxerga: nada de golpe pela parede)
                                     let rD = Math.floor(Math.random() * ((def.maxHit || 2) + 1));
-                                    let bl = Math.floor(Math.random() * (getTotalDef() / 2 + 1)); let fD = Math.max(0, rD - bl);
+                                    let bl = Math.floor(Math.random() * (getTotalDef() / 2 + 1)); let fD = Math.max(0, rD - bl); if (window.Stats) fD = Stats.reduce(fD);
                                     player.stats.hp -= fD; Fx.dmg(floatingTexts, player.x, player.y - 50, fD, fD > 0 ? 'hurt' : 'block'); o.attackCooldown = 70;
                                     if (fD > 0) Art.burst(player.x, player.y - 8, '#d33', 5, 1);
                                     if(player.stats.hp <= 0) { respawnAtVillage(); player.stats.hp = player.stats.maxHp; addFloatingText(player.x, player.y - 40, "Renasceu", "#f1c40f"); o.aggroTarget = null; closeMenus(); }
@@ -1681,16 +1703,21 @@
                 }
                 
                 renderQueue.push({ type: 'player', op: player, px: renderPX || player.x, py: renderPY || player.y, name: currentUser || 'Player', isMain: true, sortY: renderPY || player.y });
+                if (window.Pets) Pets.queue(renderQueue, VW);   // pets seguidores entram na ordenação por y
                 renderQueue.sort((a, b) => a.sortY - b.sortY);
                 
                 renderQueue.forEach(item => {
                     if (item.type === 'entity') {
                         renderEntity(ctx, item.obj, false);
+                    } else if (item.type === 'fn') {
+                        item.fn(ctx);
                     } else {
                         let myWp = (item.isMain && player.isPerformingAction && player.actionToolItem) ? player.actionToolItem : (item.op.equipment ? item.op.equipment.weapon : null); 
                         let myEquip = { weapon: myWp, shield: item.op.equipment ? item.op.equipment.shield : null, body: item.op.equipment ? item.op.equipment.body : null, head: item.op.equipment ? item.op.equipment.head : null };
                         const _pf = () => drawCharacter(ctx, item.px, item.py, item.op.facing || {x:0, y:1}, item.op.actionAnim || 0, myEquip, item.name, item.isMain, { title: item.op.title || '', emote: item.op._em || null, look: item.op.look || null });
-                        if (Art.isWater(mapObj, item.px, item.py)) Art.drawSubmerged(ctx, item.px, item.py, 26, 50, 0.4, T, _pf); else _pf();
+                        const _mt = window.Pets && Pets.mountOf(item);   // montado: o cavaleiro senta sobre a montaria (pets.js)
+                        if (_mt) Pets.drawMounted(ctx, item, _mt, myEquip, { title: item.op.title || '', emote: item.op._em || null, look: item.op.look || null }, T, mapObj);
+                        else if (Art.isWater(mapObj, item.px, item.py)) Art.drawSubmerged(ctx, item.px, item.py, 26, 50, 0.4, T, _pf); else _pf();
                     }
                 });
 
@@ -1730,6 +1757,7 @@
                 }
                 ctx.restore(); 
                 if (window.Env) Env.draw(ctx, canvas, offset, mapObj, VW, { x: player.x, y: player.y, renderX: renderPX, renderY: renderPY }, T);
+                if (window.Edges) Edges.drawFade(ctx, LW, LH);
                 Art.drawAmbient(ctx, LW, LH, mapObj, T);
             } catch (e) { console.error("Ignorado Draw Error", e); }
         }

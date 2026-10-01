@@ -8,7 +8,7 @@
     function rgb(h) { h = String(h).replace('#', ''); if (h.length === 3) h = h.split('').map((c) => c + c).join(''); const n = parseInt(h, 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
     function hex(a) { return '#' + a.map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join(''); }
     function shade(c, k) { const a = rgb(c); return hex(a.map((v) => k >= 0 ? v + (255 - v) * k : v * (1 + k))); }
-    const MAT = { copper: '#d7803e', tin: '#c3cad2', bronze: '#c98443', iron: '#9ea7b1', steel: '#c9d1dc', mithril: '#5aa8ff', coal: '#34343d', dragon: '#b8352d', bone: '#e9e3cb', lich: '#78f0c0', leather: '#98612f', dragonscale: '#b8352d', wooden: '#8b5a2b', feather: '#e8edf0', stone: '#8d959c' };
+    const MAT = { gold: '#e6c24a', copper: '#d7803e', tin: '#c3cad2', bronze: '#c98443', iron: '#9ea7b1', steel: '#c9d1dc', mithril: '#5aa8ff', coal: '#34343d', dragon: '#b8352d', bone: '#e9e3cb', lich: '#78f0c0', leather: '#98612f', dragonscale: '#b8352d', wooden: '#8b5a2b', feather: '#e8edf0', stone: '#8d959c' };
     function matOf(n) { n = n.toLowerCase(); for (const k of Object.keys(MAT)) if (n.includes(k)) return MAT[k]; return null; }
 
     /* ---------- ferramentas de desenho ---------- */
@@ -45,13 +45,13 @@
         rr(-5, -30, 10, 13, 2.5, '#59606a', 2.5);
     }, PI / 4.5, 1.0);
     D.bow = (c) => { g.save(); g.translate(30, 32); g.rotate(-0.15);
-        g.beginPath(); g.arc(-14, 0, 30, -1.05, 1.05); g.lineCap = 'round'; g.strokeStyle = OUT; g.lineWidth = 8; g.stroke(); g.strokeStyle = '#a4642a'; g.lineWidth = 5; g.stroke(); g.strokeStyle = '#d29a58'; g.lineWidth = 1.5; g.stroke();
+        g.beginPath(); g.arc(-14, 0, 30, -1.05, 1.05); g.lineCap = 'round'; g.strokeStyle = OUT; g.lineWidth = 8; g.stroke(); g.strokeStyle = c || '#a4642a'; g.lineWidth = 5; g.stroke(); g.strokeStyle = '#d29a58'; g.lineWidth = 1.5; g.stroke();
         const y = Math.sin(1.05) * 30, x = -14 + Math.cos(1.05) * 30; g.strokeStyle = 'rgba(245,245,245,.95)'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(x, -y); g.lineTo(x - 5, 0); g.lineTo(x, y); g.stroke();
         g.restore(); };
-    D.staff = () => diag(() => {
+    D.staff = (c) => diag(() => {
         line(0, 30, 0, -14, 6, '#8b5a2b'); g.strokeStyle = '#c28a4c'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(-1.2, 26); g.lineTo(-1.2, -10); g.stroke();
         rr(-4, 4, 8, 5, 2, '#5a3a1a', 2);
-        const r = g.createRadialGradient(-3, -24, 1, 0, -22, 12); r.addColorStop(0, '#ffffff'); r.addColorStop(0.35, '#7fd0ff'); r.addColorStop(1, '#2b56b8'); ell(0, -22, 10, 10, r, 3);
+        const r = g.createRadialGradient(-3, -24, 1, 0, -22, 12); r.addColorStop(0, '#ffffff'); r.addColorStop(0.35, c || '#7fd0ff'); r.addColorStop(1, '#2b56b8'); ell(0, -22, 10, 10, r, 3);
         g.fillStyle = 'rgba(120,200,255,.25)'; g.beginPath(); g.arc(0, -22, 16, 0, TAU); g.fill();
     }, PI / 4.5, 1.0);
     D.net = () => diag(() => {
@@ -59,7 +59,7 @@
         g.lineWidth = 6; g.strokeStyle = OUT; g.beginPath(); g.arc(0, -19, 14, 0, TAU); g.stroke(); g.lineWidth = 3; g.strokeStyle = '#c28a4c'; g.stroke();
         g.strokeStyle = 'rgba(240,240,240,.95)'; g.lineWidth = 1.4; for (let i = -2; i <= 2; i++) { g.beginPath(); g.moveTo(-12, -19 + i * 5); g.lineTo(12, -19 + i * 5); g.moveTo(i * 5, -31); g.lineTo(i * 5, -7); g.stroke(); }
     }, PI / 4.5, 1.0);
-    D.arrows = (c, it) => { const head = /iron/i.test(it.name) ? '#aab3bd' : /feather/i.test(it.name) ? '#e4e8ea' : '#c98443';
+    D.arrows = (c, it) => { const head = /steel/i.test(it.name) ? '#d4dbe4' : /mithril/i.test(it.name) ? '#5aa8ff' : /dragon/i.test(it.name) ? '#d24a36' : /iron/i.test(it.name) ? '#aab3bd' : /feather/i.test(it.name) ? '#e4e8ea' : '#c98443';
         const one = (ox, oy, rot) => { g.save(); g.translate(32 + ox, 32 + oy); g.rotate(rot); line(0, 24, 0, -18, 3, '#b98850'); poly([0, -30, 5, -16, -5, -16], grad(-5, -30, 5, -16, head), 2.5); poly([0, 26, 8, 30, 6, 16, 0, 20, -6, 16, -8, 30], '#e3e3d8', 2); g.restore(); };
         one(-10, 3, 0.55); one(10, 3, 0.95); one(0, 0, 0.75); };
     D.tinderbox = () => { shadowFloor(); rr(10, 26, 44, 26, 4, grad(10, 26, 54, 52, '#8b5a2b'), 3); rr(8, 20, 48, 12, 4, grad(8, 20, 56, 32, '#a8703a'), 3); g.fillStyle = '#d2a437'; g.fillRect(29, 26, 6, 8); g.strokeStyle = OUT; g.lineWidth = 2; g.strokeRect(29, 26, 6, 8);
@@ -188,18 +188,40 @@
     D.sack = (it) => { shadowFloor(); g.beginPath(); g.moveTo(22, 12); g.quadraticCurveTo(32, 6, 42, 12); g.quadraticCurveTo(58, 34, 54, 50); g.quadraticCurveTo(50, 58, 32, 58); g.quadraticCurveTo(14, 58, 10, 50); g.quadraticCurveTo(6, 34, 22, 12); g.closePath(); fillStroke(grad(8, 8, 56, 58, '#b88a52'), 3.5); rr(20, 8, 24, 8, 3, '#8a6236', 2.6);
         if (it && it.icon && !/[\u0000-\u007f]/.test(it.icon)) { g.font = '26px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(it.icon, 32, 38); g.textBaseline = 'alphabetic'; } };
 
+
+    /* ---------- equipamentos novos: chapéu de mago, capuz, veste, anel, amuleto, pó ---------- */
+    D.wizhat = (c) => { g.beginPath(); g.moveTo(14, 44); g.quadraticCurveTo(20, 34, 26, 10); g.quadraticCurveTo(34, 4, 44, 4); g.quadraticCurveTo(38, 14, 44, 24); g.quadraticCurveTo(48, 34, 50, 44); g.closePath(); fillStroke(grad(14, 4, 50, 44, c), 3.5);
+        ell(32, 46, 27, 7, grad(5, 40, 59, 52, shade(c, -0.15)), 3.2); rr(18, 36, 28, 6, 2, shade(c, 0.25), 2.4); g.fillStyle = '#ffe36a'; ell(30, 24, 2.4, 2.4, '#ffe36a', 1.4); ell(36, 32, 1.8, 1.8, '#ffe36a', 1.2); shine(26, 20, 2, 5, 0.45); };
+    D.hood = (c) => { g.beginPath(); g.moveTo(10, 50); g.quadraticCurveTo(6, 12, 32, 8); g.quadraticCurveTo(58, 12, 54, 50); g.lineTo(44, 50); g.quadraticCurveTo(44, 30, 32, 28); g.quadraticCurveTo(20, 30, 20, 50); g.closePath(); fillStroke(grad(8, 8, 56, 50, c), 3.5);
+        g.strokeStyle = shade(c, 0.4); g.lineWidth = 1.6; g.beginPath(); g.moveTo(22, 48); g.quadraticCurveTo(22, 32, 32, 30); g.quadraticCurveTo(42, 32, 42, 48); g.stroke(); shine(22, 18, 5, 2.4, 0.4); };
+    D.robe = (c) => { g.beginPath(); g.moveTo(18, 8); g.lineTo(8, 16); g.lineTo(10, 32); g.lineTo(18, 30); g.lineTo(12, 58); g.lineTo(52, 58); g.lineTo(46, 30); g.lineTo(54, 32); g.lineTo(56, 16); g.lineTo(46, 8); g.quadraticCurveTo(32, 22, 18, 8); g.closePath(); fillStroke(grad(8, 8, 56, 58, c), 3.5);
+        g.strokeStyle = shade(c, 0.45); g.lineWidth = 1.8; g.beginPath(); g.moveTo(32, 20); g.lineTo(32, 56); g.stroke(); rr(18, 34, 28, 5, 2, '#e0b93c', 2); ell(32, 36.5, 3, 3, '#7fd0ff', 1.4); shine(22, 16, 5, 2.4, 0.35); };
+    D.ring = (gem) => { shadowFloor(); g.lineWidth = 11; g.strokeStyle = OUT; g.beginPath(); g.ellipse(32, 38, 15, 14, 0, 0, TAU); g.stroke(); g.lineWidth = 6.4; g.strokeStyle = '#e6b83a'; g.stroke(); g.lineWidth = 1.6; g.strokeStyle = 'rgba(255,255,255,.65)'; g.beginPath(); g.ellipse(32, 38, 15, 14, 0, 3.6, 5.2); g.stroke();
+        if (gem) { poly([32, 8, 40, 17, 32, 26, 24, 17], grad(24, 8, 40, 26, gem), 3); shine(30, 14, 2, 1.4, 0.8); } else { ell(32, 22, 5, 4, '#f4d56a', 2.4); shine(30, 21, 1.8, 1.2, 0.8); } };
+    D.amulet = (gem) => { g.lineWidth = 6; g.strokeStyle = OUT; g.beginPath(); g.moveTo(10, 6); g.quadraticCurveTo(32, 34, 54, 6); g.stroke(); g.lineWidth = 2.6; g.strokeStyle = '#e6b83a'; g.stroke();
+        poly([32, 28, 46, 38, 42, 54, 22, 54, 18, 38], grad(18, 28, 46, 54, '#e6b83a'), 3.2); ell(32, 42, 6.4, 6.4, gem ? grad(26, 36, 38, 48, gem) : grad(26, 36, 38, 48, '#f4d56a'), 2.6); shine(30, 39, 2, 1.4, 0.85); };
+    D.dust = () => { shadowFloor(); g.beginPath(); g.moveTo(8, 50); g.quadraticCurveTo(10, 30, 32, 26); g.quadraticCurveTo(54, 30, 56, 50); g.quadraticCurveTo(32, 58, 8, 50); g.closePath(); fillStroke(grad(8, 26, 56, 58, '#a98bff'), 3.4);
+        [[22, 40, 2.4], [34, 34, 2], [44, 44, 2.6], [30, 48, 1.8]].forEach((s) => { g.fillStyle = '#f4ecff'; g.beginPath(); g.arc(s[0], s[1], s[2], 0, TAU); g.fill(); }); poly([32, 8, 34, 16, 42, 18, 34, 20, 32, 28, 30, 20, 22, 18, 30, 16], '#fff6c8', 1.4); };
+
     /* ---------- escolha do desenho pelo item ---------- */
     function pick(it) {
-        const n = it.name || '', L = n.toLowerCase(), m = matOf(n);
+        const n = it.name || '', L = n.toLowerCase(), m = (typeof it.col === 'string' && /^#[0-9a-fA-F]{6}$/.test(it.col)) ? it.col : matOf(n);
+        if (L === 'pó arcano') return ['dust'];
+        if (it.slot === 'ring' || /\bring of\b|\bgold ring$/.test(L)) return ['ring', /fury/.test(L) ? '#e0384a' : /swift/.test(L) ? '#4cc36a' : /vigor/.test(L) ? '#9adf4a' : null];
+        if (it.slot === 'amulet' || /amulet|pendant/.test(L)) return ['amulet', /blood/.test(L) ? '#c01838' : /haste/.test(L) ? '#7fd0ff' : /ward/.test(L) ? '#54d6f0' : /soul/.test(L) ? '#b07aff' : null];
         if (L === 'coins') return ['coins'];
         if (it.slot === 'ammo' || /arrow/.test(L)) return ['arrows', m];
+        if (it.mimic && it.slot === 'weapon' && !it.tool) return ['sword', m || '#7a44b8'];
+        if (it.hat === 'wizard') return ['wizhat', m || '#4a6fc0'];
+        if (it.hat === 'hood') return ['hood', m || '#8b5a2b'];
+        if (it.robe) return ['robe', m || '#4a6fc0'];
         if (it.slot === 'head' || /helm/.test(L)) return /crown/.test(L) ? ['crown', /lich/.test(L) ? '#7fe8c8' : '#e0b93c'] : ['helmet', m || '#9ea7b1'];
         if (it.slot === 'shield' || /shield/.test(L)) return ['shield', m || '#9ea7b1'];
         if (it.slot === 'body' || /body|armor/.test(L)) return ['body', m || '#8b5a2b'];
         if (it.tool === 'pickaxe' || /pickaxe/.test(L)) return ['pickaxe', m || '#9ea7b1'];
         if (it.tool === 'axe' || /\baxe\b/.test(L)) return ['axe', m || '#9ea7b1'];
-        if (it.tool === 'ranged' || /bow\b/.test(L)) return ['bow'];
-        if (it.tool === 'magic' || /staff|wand/.test(L)) return ['staff'];
+        if (it.tool === 'ranged' || /bow\b/.test(L)) return ['bow', (typeof it.col === 'string' && /^#[0-9a-fA-F]{6}$/.test(it.col)) ? it.col : null];
+        if (it.tool === 'magic' || /staff|wand/.test(L)) return ['staff', /^#[0-9a-fA-F]{6}$/.test(it.gem || '') ? it.gem : null];
         if (it.tool === 'net' || /net\b|^rede\b/.test(L)) return ['net'];
         if (it.tool === 'rod' || /^vara\b/.test(L)) return ['rod'];
         if (it.fishIcon) return ['fishx', it.type !== 'consumable', it.fishIcon]; if (/^bota velha/.test(L)) return ['boot'];
@@ -214,7 +236,7 @@
         if (/colossus/.test(L)) return ['gem', '#ff9d3a'];
         if (/core|soul gem/.test(L)) return ['gem', /soul/.test(L) ? '#b07aff' : '#54d6f0'];
         if (/bar\b/.test(L)) return ['bar', m || '#9ea7b1'];
-        if (/ore\b|coal/.test(L)) return ['ore', /copper/.test(L) ? MAT.copper : /tin/.test(L) ? MAT.tin : /iron/.test(L) ? '#b0644a' : /mithril/.test(L) ? MAT.mithril : /coal/.test(L) ? '#55555f' : '#c0a060'];
+        if (/ore\b|coal/.test(L)) return ['ore', /gold/.test(L) ? '#e8c04a' : /copper/.test(L) ? MAT.copper : /tin/.test(L) ? MAT.tin : /iron/.test(L) ? '#b0644a' : /mithril/.test(L) ? MAT.mithril : /coal/.test(L) ? '#55555f' : '#c0a060'];
         if (/logs?\b/.test(L)) return ['logs'];
         if (/bones?\b/.test(L)) return ['bones', /dragon/.test(L) ? '#efe4c0' : MAT.bone];
         if (/^raw (chicken|rabbit)/.test(L)) return ['leg', true, /chicken/.test(L) ? '#f0b8a0' : '#d99a8a'];
@@ -241,6 +263,7 @@
         if (cache[key]) return cache[key];
         const it = (typeof itemDB !== 'undefined' && itemDB[name]) || { name, icon: '' };
         const cv = document.createElement('canvas'); cv.width = cv.height = SZ; g = cv.getContext('2d');
+        if ((it.petId || it.mountId) && window.PetIcon) { const pc = window.PetIcon(it, SZ); if (pc) { g.drawImage(pc, 0, 0); cache[key] = cv; return cv; } }   // pets e selas (pets.js)
         try {
             const p = pick(it), fn = p[0];
             if (fn === 'sack') D.sack(it);
@@ -255,6 +278,7 @@
             else if (fn === 'coins' || fn === 'staff' || fn === 'net' || fn === 'tinderbox' || fn === 'egg' || fn === 'wool' || fn === 'paw' || fn === 'wing' || fn === 'web' || fn === 'slime' || fn === 'ecto' || fn === 'scale' || fn === 'vial' || fn === 'herb' || fn === 'wheat' || fn === 'bread' || fn === 'carrot' || fn === 'logs') D[fn](p[1], it);
             else D[fn](p[1], it);
         } catch (e) { g.clearRect(0, 0, SZ, SZ); D.sack(it); }
+        if (it.mimic && window.Mimic) { try { Mimic.iconOverlay(g, SZ, it); } catch (e) { } }   // itens Mímicos (mimic.js): aura e selo de baú vivo
         cache[key] = cv; return cv;
     }
     const urls = Object.create(null);

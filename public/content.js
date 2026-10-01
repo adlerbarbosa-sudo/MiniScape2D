@@ -149,7 +149,7 @@
         let h = `<h3 style="margin:0 0 4px;color:#e8c469">Mesa de Encantamento</h3><p style="font-size:.74rem;color:#cdbf9b;margin:0 0 8px">Encantamento nível ${lvl}. Cada nível dá +2 de dano em armas ou +1 de defesa em armaduras (máx. 3 níveis). O item precisa estar <b>equipado</b>.</p><div style="max-height:52vh;overflow:auto">`;
         let any = false;
         SLOTS.forEach(([slot, label]) => {
-            const it = player.equipment && player.equipment[slot]; if (!it || it.stackable) return; any = true; const cur = it.ench || 0, nx = ENCH[cur];
+            const it = player.equipment && player.equipment[slot]; if (!it || it.stackable) return; any = true; if (it.mimic) { h += `<div class="shop-item" style="flex-direction:column;align-items:stretch;gap:4px"><div><b>${label}: ${esc(it.icon)} ${esc(it.name)}</b></div><small style="opacity:.75">Itens Mímicos evoluem com XP própria e não podem ser encantados.</small></div>`; return; } const cur = it.ench || 0, nx = ENCH[cur];
             h += `<div class="shop-item" style="flex-direction:column;align-items:stretch;gap:4px"><div><b>${label}: ${esc(it.icon)} ${esc(it.name)}</b> <small>${cur ? '(+' + cur + ')' : ''}</small></div>`;
             if (!nx) h += `<div style="font-size:.74rem;color:#78d08a">Encantamento máximo.</div>`;
             else { const ok = lvl >= nx.lvl && nx.needs.every((n) => getInvCount(n[0]) >= n[1]) && getInvCount('Coins') >= nx.coins; h += `<div style="font-size:.72rem">${nx.needs.map((n) => `<span style="color:${getInvCount(n[0]) >= n[1] ? '#78d08a' : '#e0584a'}">${n[1]}× ${esc(nm(n[0]))}</span>`).join(' · ')} · <span style="color:${getInvCount('Coins') >= nx.coins ? '#78d08a' : '#e0584a'}">${nx.coins} moedas</span></div><button class="shop-btn" ${ok ? '' : 'disabled'} onclick="Content.enchant('${slot}')">${lvl < nx.lvl ? 'Requer nível ' + nx.lvl : 'Encantar +' + (cur + 1)}</button>`; }
@@ -159,7 +159,7 @@
         openModal(h + `</div><button class="dev-save-btn" style="background:#555" onclick="closeModal()">Fechar</button>`);
     }
     function enchant(slot) {
-        const it = player.equipment && player.equipment[slot]; if (!it) return; const cur = it.ench || 0, nx = ENCH[cur];
+        const it = player.equipment && player.equipment[slot]; if (!it) return; if (it.mimic) { setActionText('Itens Mímicos não podem ser encantados.', '#e74c3c'); return; } const cur = it.ench || 0, nx = ENCH[cur];
         if (!nx || player.stats.skills.enchanting.level < nx.lvl || !nx.needs.every((n) => getInvCount(n[0]) >= n[1]) || getInvCount('Coins') < nx.coins) { setActionText('Faltam requisitos.', '#e74c3c'); return; }
         nx.needs.forEach((n) => removeInvItem(n[0], n[1])); removeInvItem('Coins', nx.coins);
         it.ench = cur + 1; if (it.bonusDmg !== undefined || slot === 'weapon') it.bonusDmg = (it.bonusDmg || 0) + 2; else it.defBonus = (it.defBonus || 0) + 1;

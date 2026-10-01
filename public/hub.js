@@ -29,8 +29,10 @@
         #wm-world{position:relative}.wm-lines{position:absolute;left:0;top:0;pointer-events:none}.wm-lines line{stroke:rgba(232,196,105,.32);stroke-width:2;stroke-dasharray:5 4}
         .wm-tile{position:absolute!important;min-height:0!important;margin:0}.wm-tile img{width:100%;height:100%;object-fit:cover;display:block;-webkit-user-drag:none}.wm-tile span{line-height:1.1;max-height:2.3em;overflow:hidden;display:block;padding:1px 3px 2px!important}
         .wm-you{position:absolute;right:3px;top:3px;width:9px;height:9px;border-radius:50%;background:#ffe27a;box-shadow:0 0 0 2px #0008,0 0 8px #ffe27a}.wm-bar{display:flex;gap:6px;align-items:center;margin-bottom:5px}.wm-bar .hb{min-width:38px;min-height:30px}
-        #wb-hud{position:absolute;left:50%;transform:translateX(-50%);top:76px;z-index:84;padding:4px 14px;border-radius:10px;background:rgba(20,10,4,.82);border:1px solid #ff9d3a;color:#ffd9a8;font:.74rem sans-serif;text-align:center;pointer-events:none;display:none}#wb-hud.soon{border-color:#c9a24a;color:#f0e2bd}
-        #wb-hud .wb-bar{position:relative;margin-top:3px;height:12px;min-width:220px;border-radius:6px;background:#3a1208;overflow:hidden}#wb-hud .wb-bar i{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(#ff9d3a,#c4531a)}#wb-hud .wb-bar span{position:relative;font-size:.62rem;line-height:12px;color:#fff}#wb-hud .wb-dead{color:#7bd68f;font-weight:700}`;
+        #wb-hud{position:absolute;left:50%;transform:translateX(-50%);top:3px;z-index:84;max-width:92%;white-space:nowrap;padding:1px 10px;border-radius:999px;background:rgba(20,10,4,.72);border:1px solid #ff9d3a;color:#ffd9a8;font:.64rem sans-serif;line-height:1.5;text-align:center;pointer-events:none;display:none}#wb-hud.soon{border-color:#c9a24a;color:#f0e2bd}
+        #wb-hud .wb-bar{position:relative;display:inline-block;vertical-align:middle;margin-left:6px;height:9px;width:90px;border-radius:5px;background:#3a1208;overflow:hidden}#wb-hud .wb-bar i{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(#ff9d3a,#c4531a)}#wb-hud .wb-bar span{position:relative;font-size:.5rem;line-height:9px;color:#fff}#wb-hud .wb-dead{display:inline;margin-left:6px;color:#7bd68f;font-weight:700}
+        #wb-ann{position:absolute;left:50%;transform:translateX(-50%);top:24px;z-index:130;max-width:80%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:1px 12px;border-radius:999px;background:rgba(20,10,4,.8);border:1px solid #ff9d3a;color:#ffd9a8;font:700 .66rem sans-serif;line-height:1.55;cursor:pointer;opacity:0;pointer-events:none;transition:opacity .45s}#wb-ann.show{opacity:1;pointer-events:auto}
+        html.touch #wb-hud,html.touch #wb-ann{left:50%;right:auto;transform:translateX(-50%);font-size:.54rem;max-width:38vw;overflow:hidden;text-overflow:ellipsis}html.touch #wb-hud{top:27px}html.touch #wb-ann{top:44px}html.touch #wb-hud .wb-bar{width:56px;height:7px}html.touch #wb-hud .wb-bar span{display:none}`;
         document.head.appendChild(s);
     }
     function place() { const c = $('gameCanvas'); const r = c ? c.getBoundingClientRect() : { right: window.innerWidth - 20, top: 10 }; if (btn) { btn.style.left = Math.max(8, Math.min(window.innerWidth - 84, r.right - 208)) + 'px'; btn.style.top = Math.max(8, Math.min(window.innerHeight - 40, r.top + 66)) + 'px'; } }
@@ -110,7 +112,7 @@
         if (!mkData) return h + '<i>Carregando...</i>';
         if (sub === 'buy') {
             h += `<input class="hub-in" id="mk-q" placeholder="Buscar item..." value="${esc(mkQ)}" style="margin-bottom:4px">`;
-            h += mkData.listings.length ? mkData.listings.map((l) => `<div class="hub-row">${ic(l.item, 30)}<div class="g"><b>${esc(l.item)}</b> ×${fn(l.qty)}<small>${l.qty > 1 ? fn(Math.round(l.price / l.qty * 100) / 100) + ' cada · ' : ''}vendedor: ${esc(l.seller)}</small></div><button class="hb go" data-buy="${esc(l.id)}" data-price="${l.price}" ${l.seller === currentUser || coins() < l.price ? 'disabled' : ''}>${fn(l.price)} ${l.seller === currentUser ? '(seu)' : ''}</button></div>`).join('') : '<i>Nenhum anúncio.</i>';
+            h += mkData.listings.length ? mkData.listings.map((l) => `<div class="hub-row">${ic(l.item, 30)}<div class="g"><b>${esc(l.item)}</b> ×${fn(l.qty)}<small>${l.qty > 1 ? fn(Math.round(l.price / l.qty * 100) / 100) + ' cada · ' : ''}vendedor: ${esc(l.seller)}</small></div><button class="hb go" data-buy="${esc(l.id)}" data-price="${l.price}" data-lq="${l.qty}" ${l.seller === currentUser || coins() < (l.qty > 1 && window.Qty ? (Qty.mktCost(l.price, l.qty, 1) || l.price) : l.price) ? 'disabled' : ''}>${l.qty > 1 && window.Qty ? 'Comprar…' : fn(l.price)} ${l.seller === currentUser ? '(seu)' : ''}</button></div>`).join('') : '<i>Nenhum anúncio.</i>';
         } else if (sub === 'sell') {
             const inv = {}; player.inventory.forEach((i) => { if (i.name !== 'Coins' && Net.tradable(i.name)) inv[i.name] = (inv[i.name] || 0) + (i.qty || 1); });
             const names = Object.keys(inv); if (sellSel && !inv[sellSel.name]) sellSel = null;
@@ -133,16 +135,30 @@
             await finishPending(); sellSel = null; await loadMarket();
         } finally { mkBusy = false; }
     }
-    async function doBuy(id, price) {
+    // compra em quantidade: abre o seletor (máximo = o que cabe nas moedas, no estoque do anúncio e na mochila)
+    function askBuy(id) {
+        const l = mkData && mkData.listings.find((x) => x.id === id); if (!l || !window.Qty) return;
+        if (l.seller === currentUser) return note('Esse anúncio é seu.', '#e74c3c');
+        const cap = Qty.capacity(l.item), c = coins(); let byCoins = 0;
+        let lo = 1, hi = l.qty; while (lo <= hi) { const mid = Math.floor((lo + hi) / 2), cs = Qty.mktCost(l.price, l.qty, mid); if (cs !== null && cs <= c) { byCoins = mid; lo = mid + 1; } else hi = mid - 1; }
+        if (byCoins < 1) return note('Moedas insuficientes.', '#e74c3c');
+        if (cap < 1) return note('Mochila cheia: libere espaço para comprar.', '#e74c3c');
+        const max = Math.min(l.qty, byCoins, cap);
+        const canPart = Qty.mktCost(l.price, l.qty, 1) !== null;   // preço 1 não dá para dividir: só o lote inteiro
+        if (!canPart) { if (c < l.price) return note('Moedas insuficientes.', '#e74c3c'); return doBuy(l.id, l.price, l.qty); }
+        Qty.pick({ title: 'Comprar no mercado', name: l.item, max, limits: [['suas moedas', byCoins], ['estoque do anúncio', l.qty], ['espaço na mochila', cap]], cost: (q) => Qty.mktCost(l.price, l.qty, q) || 0, currency: 'moedas', okLabel: 'Comprar', confirmFrom: 100,
+            sub: (q) => (l.qty > 1 ? fn(Math.round(Qty.mktCost(l.price, l.qty, q) / q * 100) / 100) + ' cada · ' : '') + 'estoque ' + fn(l.qty) + ' · vendedor: ' + l.seller, onOk: async (q) => { await doBuy(l.id, Qty.mktCost(l.price, l.qty, q), q); openHub('market'); }, onCancel: () => openHub('market') });
+    }
+    async function doBuy(id, price, qty) {
         if (mkBusy) return; if (coins() < price) return note('Moedas insuficientes.', '#e74c3c'); if (player.mkt && (player.mkt.create || player.mkt.buy)) return note('Aguarde a operação anterior terminar.', '#e74c3c');
         mkBusy = true; try {
-            const inv = JSON.stringify(player.inventory); removeInvItem('Coins', price); player.mkt = { buy: { id, price, nonce: nonce() } }; updateUI();
+            const inv = JSON.stringify(player.inventory); removeInvItem('Coins', price); player.mkt = { buy: qty ? { id, price, qty, nonce: nonce() } : { id, price, nonce: nonce() } }; updateUI();
             if (!(await saveConfirmed())) { player.inventory = JSON.parse(inv); player.mkt = null; updateUI(); return note('Sem conexão para salvar. Nada foi comprado.', '#e74c3c'); }
             await finishPending(); await loadMarket(); await claimMail();
         } finally { mkBusy = false; }
     }
     function refund(what) { try { if (what.create) { const c = what.create; if (!addInvItem(c.item, c.qty)) dropAt(c.item, c.qty); } if (what.buy) { if (!addInvItem('Coins', what.buy.price)) dropAt('Coins', what.buy.price); } } catch (e) { } }
-    function dropAt(item, qty) { try { gameMaps[currentMap].entities.push({ id: newEntId(), type: 'ground_item', item, qty, x: player.x, y: player.y, w: 20, h: 20, active: true, life: 9000 }); } catch (e) { } }
+    function dropAt(item, qty) { try { gameMaps[currentMap].entities.push({ id: newEntId(), type: 'ground_item', item, qty, x: player.x, y: player.y, w: 20, h: 20, active: true, np: 1, life: 9000 }); } catch (e) { } }
     async function finishPending() {   // conclui (ou devolve) uma operação pendente; é seguro repetir
         const p = player.mkt; if (!p || !online()) return;
         if (p.create) {
@@ -150,8 +166,8 @@
             if (r && r.ok) { player.mkt = null; note('Anúncio publicado!', '#2ecc71'); sfxp('coin'); await saveConfirmed(); }
             else if (r && !r._net && r._status < 500 && r._status !== 429 && r._status !== 401) { refund(p); player.mkt = null; note(r.error || 'Não foi possível anunciar. Item devolvido.', '#e74c3c'); updateUI(); await saveConfirmed(); }
         } else if (p.buy) {
-            const r = await mkCall({ a: 'buy', id: p.buy.id, nonce: p.buy.nonce });
-            if (r && r.ok) { player.mkt = null; note('Compra feita! O item chega pelo correio.', '#2ecc71'); sfxp('pickup'); await saveConfirmed(); }
+            const r = await mkCall(p.buy.qty ? { a: 'buy', id: p.buy.id, nonce: p.buy.nonce, qty: p.buy.qty, cost: p.buy.price } : { a: 'buy', id: p.buy.id, nonce: p.buy.nonce, cost: p.buy.price });
+            if (r && r.ok) { player.mkt = null; note('Compra feita! ' + (r.qty > 1 ? 'Os ' + r.qty + ' itens chegam' : 'O item chega') + ' pelo correio.', '#2ecc71'); sfxp('pickup'); await saveConfirmed(); }
             else if (r && !r._net && r._status < 500 && r._status !== 429 && r._status !== 401) { refund(p); player.mkt = null; note(r.error || 'Compra recusada. Moedas devolvidas.', '#e74c3c'); updateUI(); await saveConfirmed(); }
         }
     }
@@ -192,21 +208,22 @@
         const tr = ents.filter((o) => o.type === 'tree').length, rk = ents.filter((o) => typeof o.type === 'string' && o.type.startsWith('rock')).length, fs = ents.filter((o) => o.type === 'fishing_spot').length;
         return `<div class="hub-row"><div class="g"><b>${esc(m.name || id)}</b>${id === currentMap ? ' <span style="color:#e8c469">(você está aqui)</span>' : ''}
             <small>Criaturas: ${Object.keys(mobs).map((k) => esc(k) + ' ×' + mobs[k]).join(', ') || 'nenhuma'}</small><small>NPCs: ${npcs.join(', ') || 'nenhum'}</small>
-            <small>Recursos: ${tr} árvores, ${rk} rochas, ${fs} pontos de pesca</small>${ports.length ? `<small>Portais para: ${[...new Set(ports)].map(esc).join(', ')}</small>` : ''}</div></div>`;
+            <small>Recursos: ${tr} árvores, ${rk} rochas, ${fs} pontos de pesca</small>${ports.length ? `<small>Portais para: ${[...new Set(ports)].map(esc).join(', ')}</small>` : ''}${edgeNames(id)}</div></div>`;
     }
+    function edgeNames(id) { const e = ((gameMaps[id] && gameMaps[id].edges) || []).filter((q) => gameMaps[q.to]); if (!e.length) return ''; const L = { n: 'norte', s: 'sul', e: 'leste', w: 'oeste' }; return `<small>Saídas: ${e.map((q) => esc(gameMaps[q.to].name || q.to) + ' (' + L[q.d] + ')').join(', ')}</small>`; }
     /* Posições do mapa-múndi (x: leste+, y: sul+). Lumbridge no centro; leste = Vila Real/deserto; norte = serra e gelo; oeste = floresta élfica;
-       sul = costa e pântano; sudeste = cemitério, fortaleza, vulcão e dragão. Mapas que não estão aqui usam gridX/gridY (se livres) ou ficam perto de quem se liga a eles. */
+       sul = pântano (e a costa a oeste do Vale do Rio); sudeste = cemitério, fortaleza, vulcão e dragão. Mapas que não estão aqui usam gridX/gridY (se livres) ou ficam perto de quem se liga a eles. */
     const WM_POS = {
         lumbridge: [0, 0], floresta: [-1, 0], trilha_elfica: [-2, 0], silvaluz: [-3, 0], torre_mago: [-4, 0],
         covil: [0, -1], mina: [1, 0], trilha_serra: [1, -1], pedralta: [1, -2], mina_abandonada: [1, -3], passo_gelado: [2, -2], vale_gelado: [3, -2],
         campos: [1, 1], estrada_rei: [2, 1], vila_real: [3, 1], estrada_areias: [4, 1], deserto: [5, 1], oasis: [6, 1], ruinas: [7, 1],
-        rio: [0, 1], pantano: [0, 2], covil_goblins: [0, 3], estrada_costa: [-1, 2], porto_mares: [-1, 3], praia_naufragios: [-2, 3],
+        rio: [0, 1], pantano: [0, 2], covil_goblins: [0, 3], estrada_costa: [-1, 1], porto_mares: [-1, 2], praia_naufragios: [-2, 2],
         estrada_sombria: [3, 2], cemiterio: [3, 3], cripta_real: [4, 3], fortaleza: [2, 3], vulcao: [1, 3], ninho_dragao: [1, 4]
     };
     const WM_W = 120, WM_H = 80, WM_G = 8;
     let wmZoom = null, wmThumbs = {};
     function worldIds() { return Object.keys(gameMaps).filter((k) => gameMaps[k] && gameMaps[k].entities && k !== 'casa' && !/^casa_/.test(k)).sort(); }
-    function portalsOf(id) { const r = []; ((gameMaps[id] && gameMaps[id].entities) || []).forEach((o) => { if (o && o.type === 'portal' && o.destMap && o.destMap !== id && gameMaps[o.destMap]) r.push(o.destMap); }); return r; }
+    function portalsOf(id) { const r = []; ((gameMaps[id] && gameMaps[id].entities) || []).forEach((o) => { if (o && o.type === 'portal' && o.destMap && o.destMap !== id && gameMaps[o.destMap]) r.push(o.destMap); }); (((gameMaps[id] && gameMaps[id].edges) || [])).forEach((e) => { if (e && e.to !== id && gameMaps[e.to]) r.push(e.to); }); return r; }   // portais (entradas de lugares fechados) + saídas pela borda
     function worldLayout() {   // determinístico: cada mapa ganha uma célula própria (sem colisão)
         const ids = worldIds(), cells = {}, used = {}, key = (x, y) => x + ',' + y, isInt = (v) => typeof v === 'number' && isFinite(v) && Math.floor(v) === v && Math.abs(v) < 1000;
         const put = (id, x, y) => { cells[id] = [x, y]; used[key(x, y)] = id; };
@@ -232,7 +249,7 @@
     function thumbCached(id) { const m = gameMaps[id], k = id + '|' + ((m.entities || []).length) + '|' + (id === currentMap ? Math.round(player.x / 25) + ',' + Math.round(player.y / 25) : ''); if (!wmThumbs[id] || wmThumbs[id].k !== k) wmThumbs[id] = { k, u: thumb(id) }; return wmThumbs[id].u; }
     function mapHtml() {
         if (!mapSel || !gameMaps[mapSel]) mapSel = currentMap;
-        return `<div class="wm-hint" style="font-size:.76rem;margin-bottom:4px">Toque num lugar para ver criaturas, NPCs e recursos. Amarelo = NPC, vermelho = criatura, azul = portal, ponto branco = você. Arraste para mover; use + / − para aproximar.</div>
+        return `<div class="wm-hint" style="font-size:.76rem;margin-bottom:4px">Toque num lugar para ver criaturas, NPCs e recursos. Amarelo = NPC, vermelho = criatura, azul = entrada de masmorra/lugar fechado, linha tracejada = caminho pela borda, ponto branco = você. Arraste para mover; use + / − para aproximar.</div>
         <div class="wm-bar"><button class="hb" data-wz="out" aria-label="Afastar">−</button><button class="hb" data-wz="in" aria-label="Aproximar">+</button><button class="hb" data-wz="fit">Ajustar</button><span id="wm-count" style="margin-left:auto;font-size:.72rem;opacity:.75"></span></div>
         <div id="wm-view"><div id="wm-world"></div></div><div id="wm-info">${mapInfo(mapSel)}</div>`;
     }
@@ -274,6 +291,7 @@
         if (d.claim != null) { Life.claim(+d.claim); return render(); }
         if (d.title != null) { player.title = d.title; try { saveDataLogic(); } catch (e) { } return render(); }
         if (d.em) { if (Life.emote(d.em)) closeHub(); return; }
+        if (d.buy && +d.lq > 1 && window.Qty) return askBuy(d.buy);
         if (d.buy) { if (window.ItemSel && !ItemSel.arm('mk:' + d.buy)) { const old = t.textContent; t.textContent = 'Confirmar?'; note('Toque de novo em Confirmar para comprar (' + d.price + ' moedas).', '#f1c40f'); setTimeout(() => { if (t.isConnected && t.textContent === 'Confirmar?') t.textContent = old; }, 4000); return; } return doBuy(d.buy, +d.price); }
         if (d.cancel) return (async () => { const r = await mkCall({ a: 'cancel', id: d.cancel }); note(r.ok ? 'Anúncio retirado. O item volta pelo correio.' : (r.error || 'Erro'), r.ok ? '#2ecc71' : '#e74c3c'); await loadMarket(); await claimMail(); })();
         if (d.sel) { sellSel = { name: d.sel }; return render(); }

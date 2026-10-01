@@ -25,6 +25,7 @@
             if ((item.buff && !item.fishId) || item.mp > 0 || /potion|po[cç][aã]o/i.test(item.name)) return { label: 'Beber' };
             return { label: item.heal > 0 ? 'Comer' : 'Usar' };
         }
+        if (item.petId || item.mountId) return { label: item.petId ? 'Adicionar pet' : 'Aprender montaria' };   // pets.js
         if (item.name === 'Tinderbox') return { label: 'Acender fogueira' };
         if (item.bait && window.Fishing) return { label: player.bait === item.name ? 'Isca automática' : 'Escolher isca' };
         if (item.name === 'Knife') return { label: 'Usar' };
@@ -32,7 +33,7 @@
     }
     function info(item) {
         const a = [];
-        if (item.bonusDmg) a.push('Dano +' + item.bonusDmg); if (item.defBonus) a.push('Defesa +' + item.defBonus); if (item.heal) a.push('Cura ' + item.heal + ' HP'); if (item.mp) a.push('+' + item.mp + ' MP'); if (item.ench) a.push('Encantado +' + item.ench);
+        if (item.bonusDmg) a.push('Dano +' + item.bonusDmg); if (item.defBonus) a.push('Defesa +' + item.defBonus); if (item.heal) a.push('Cura ' + item.heal + ' HP'); if (item.mp) a.push('+' + item.mp + ' MP'); if (item.ench) a.push('Encantado +' + item.ench); if (item.mimic && window.Mimic) { const mb = Mimic.brief(item); if (mb) a.push(mb); } if (window.Stats) Stats.KEYS.forEach((k) => { if (item[k] > 0) a.push(Stats.LABEL[k] + ' ' + (k === 'critDmg' || k === 'moveSpd' || k === 'atkSpd' || k === 'luck' ? '+' : '') + item[k] + (k === 'spellDmg' ? '' : '%')); });
         return a.join(' · ');
     }
 
@@ -59,13 +60,13 @@
             if (c.slot) { const el = $('eq-' + c.slot); if (el && el.parentElement) el.parentElement.classList.add('isel-on'); }
             else { const g = $('inv-grid'); if (g && g.children[c.idx]) g.children[c.idx].classList.add('isel-on'); }
             const bk = !c.slot && bankOpen(), p = c.slot ? { label: 'Desequipar' } : bk ? { label: 'Depositar' } : primary(c.item);
-            const sig = [c.item.name, c.item.qty || 1, p ? p.label : '-', c.slot || 'i', bk ? 'B' : ''].join('|');
+            const rcy = !c.slot && !bk && !!window.Recycle && Recycle.can(c.item), sig = [c.item.name, c.item.qty || 1, p ? p.label : '-', c.slot || 'i', bk ? 'B' : '', rcy ? 'R' : '', c.item.ench || 0].join('|');
             if (bar._sig !== sig || bar.style.display === 'none') {
                 bar._sig = sig; let ic = ''; try { ic = Icons.html(c.item.name, 34); } catch (e) { }
                 const q = c.item.stackable && c.item.qty > 1 ? '×' + (window.fmtNum ? fmtNum(c.item.qty) : c.item.qty) : '', inf = info(c.item);
                 const sub = [q, inf, p ? '' : 'sem uso direto'].filter(Boolean).join(' · ');
                 bar.innerHTML = `<div class="isel-top"><span class="isel-ic">${ic}</span><div class="isel-tx"><b>${esc(c.item.name)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</div></div>` +
-                    `<div class="isel-btns">${p ? `<button type="button" class="isel-go" data-a="${c.slot ? 'unequip' : bk ? 'deposit' : 'use'}">${esc(p.label)}</button>` : ''}${c.slot || bk ? '' : '<button type="button" class="isel-drop" data-a="drop">Jogar fora</button>'}<button type="button" class="isel-x" data-a="cancel">Cancelar</button></div>` +
+                    `<div class="isel-btns">${p ? `<button type="button" class="isel-go" data-a="${c.slot ? 'unequip' : bk ? 'deposit' : 'use'}">${esc(p.label)}</button>` : ''}${c.slot || bk || !rcy ? '' : '<button type="button" class="isel-rc" data-a="recycle">Desmanchar</button>'}${c.slot || bk ? '' : '<button type="button" class="isel-drop" data-a="drop">Jogar fora</button>'}<button type="button" class="isel-x" data-a="cancel">Cancelar</button></div>` +
                     (p && !c.slot ? '<div class="isel-hint">Dica: clique duplo ' + (bk ? 'deposita' : 'usa direto') + '.</div>' : '');
             }
             bar.style.display = '';
@@ -93,6 +94,7 @@
         if (a === 'use') doUse();
         else if (a === 'deposit') { if (window.Bank) Bank.deposit(c.item); }
         else if (a === 'unequip') { const s = c.slot; unequip(s); clear(); }
+        else if (a === 'recycle') { if (window.Recycle) Recycle.ask(c.item); }
         else if (a === 'drop') { if (window.Inv2) Inv2.ask(c.item); else say('Arraste o item para fora do painel para jogá-lo.'); }
     }
     function click(i) {    // clique num slot da mochila
@@ -132,7 +134,7 @@
             '.isel-top{display:flex;align-items:center;gap:9px;margin-bottom:7px}.isel-ic{width:38px;height:38px;flex:none;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.35);border:1px solid #000;border-radius:8px}.isel-ic .ic-item{width:32px;height:32px}' +
             '.isel-tx{min-width:0;display:flex;flex-direction:column}.isel-tx b{color:#f4e3b0;font-size:.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.isel-tx small{color:#bfae86;font-size:.72rem}' +
             '.isel-btns{display:flex;gap:6px}.isel-btns button{flex:1;min-height:44px;padding:6px 8px;border-radius:999px;border:1px solid #000;cursor:pointer;font-weight:700;font-size:.82rem;font-family:inherit;color:#e9dcc0;background:linear-gradient(#4a3520,#2a1c0f)}' +
-            '.isel-btns .isel-go{flex:1.6;color:#2b1a05;background:linear-gradient(#f0cf7c,#b98a2e)}.isel-btns .isel-drop{color:#ffb2a4;background:linear-gradient(#4a1f1a,#2a100d)}.isel-btns button:active{filter:brightness(1.2)}' +
+            '.isel-btns .isel-go{flex:1.6;color:#2b1a05;background:linear-gradient(#f0cf7c,#b98a2e)}.isel-btns .isel-drop{color:#ffb2a4;background:linear-gradient(#4a1f1a,#2a100d)}.isel-btns .isel-rc{color:#cfe6ff;background:linear-gradient(#233a52,#142234)}.isel-btns button:active{filter:brightness(1.2)}' +
             '.isel-hint{margin-top:5px;font-size:.66rem;color:#9d8e6b;text-align:center}' +
             '@media(max-width:850px){.isel{position:fixed;left:8px;right:8px;bottom:64px;margin:0;z-index:103;box-shadow:0 4px 18px rgba(0,0,0,.8)}.isel-hint{display:none}.isel-top{margin-bottom:5px}}';
         document.head.appendChild(st);

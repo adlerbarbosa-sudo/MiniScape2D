@@ -185,13 +185,17 @@
         el.style.display = 'block';
         if (!i.open) { el.innerHTML = `<b>Colosso de Pedra</b> desperta em ${tt}`; el.className = 'soon'; return; }
         const hp = e ? Math.max(0, e.hp) : 0, mx = e ? e.maxHp : 1800;
-        el.className = 'open'; el.innerHTML = `<b>Colosso de Pedra</b> na Vila · termina em ${tt}` + (here && e.active !== false ? `<div class="wb-bar"><i style="width:${Math.round(hp / mx * 100)}%"></i><span>${hp} / ${mx}</span></div>` : e && e.active === false ? '<div class="wb-dead">Derrotado!</div>' : '');
+        el.className = 'open'; el.innerHTML = `<b>Colosso de Pedra</b> na Vila · ${tt}` + (here && e.active !== false ? `<span class="wb-bar"><i style="width:${Math.round(hp / mx * 100)}%"></i><span>${hp} / ${mx}</span></span>` : e && e.active === false ? '<span class="wb-dead">Derrotado!</span>' : '');
+    }
+    function ann(txt) {   // aviso discreto: uma linha fina no topo, some em ~5 s; clique dispensa
+        const gc = $('game-container'); if (!gc) return; let el = $('wb-ann'); if (!el) { el = document.createElement('div'); el.id = 'wb-ann'; el.title = 'Clique para dispensar'; el.addEventListener('click', () => { el.classList.remove('show'); }); gc.appendChild(el); }
+        el.textContent = txt; el.classList.add('show'); clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('show'), 5000);
     }
     let wbAlive = false;
     function bossTick() {
         if (!ok() || !B.info) return; const i = B.info, h = i.h;
         if (i.open) {
-            if (B.announced !== h) { B.announced = h; sfx('thunder'); try { setActionText('O Colosso de Pedra despertou na Vila! Chame seus amigos!', '#ff9d3a'); addFloatingText(player.x, player.y - 50, 'O Colosso despertou!', '#ff9d3a'); } catch (e) { } }
+            if (B.announced !== h) { B.announced = h; sfx('thunder'); try { ann('O Colosso de Pedra despertou na Vila! Chame seus amigos.'); } catch (e) { } }
             if (npcDB.wboss_golem) spawnBoss();
             const e = bossEntity(); if (e) {
                 if (e.active !== false && e.hp > 0) { wbAlive = true; e._wbSeen = true; }
@@ -200,7 +204,7 @@
             }
         } else {
             if (bossEntity()) { removeBoss(); wbAlive = false; }
-            if (i.next < 125000 && B.warned !== h + 1) { B.warned = h + 1; try { setActionText('O Colosso de Pedra desperta em 2 minutos, na Vila!', '#ff9d3a'); } catch (e) { } sfx('click'); }
+            if (i.next < 125000 && B.warned !== h + 1) { B.warned = h + 1; try { ann('O Colosso de Pedra desperta em 2 minutos, na Vila.'); } catch (e) { } sfx('click'); }
         }
         bossHud();
     }
@@ -245,7 +249,7 @@
         }, true);
     }
     window.addEventListener('load', wire);
-    window.Life = { _reward: bossReward, _tick: bossTick, _B: B,
+    window.Life = { ann, _reward: bossReward, _tick: bossTick, _B: B,
         A, cnt, checkAch, daily, dText, claim, rollFish, emote, EM, EM_NAME, onSync, dProg, bossInfo: () => { if (!B.info) return null; const el = NOW() - (B.recv || NOW()); return Object.assign({}, B.info, { left: Math.max(0, B.info.left - el), next: Math.max(0, B.info.next - el) }); }, bossEntity, pendingEmote: () => { const k = emSend; emSend = null; return k; },
         titles: () => A.filter((a) => player.ach && player.ach[a.id]).map((a) => a.title), tier
     };

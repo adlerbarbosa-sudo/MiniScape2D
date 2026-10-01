@@ -43,7 +43,7 @@ Abra http://localhost:3000 e entre com usuário `Admin` e a senha definida.
 - Admin: DEV → Mapas → "Instalar mapas novos" troca os 5 mapas padrão pelo mundo medieval (baixa um backup antes).
 
 ## Conteúdo e sistemas (módulos em `public/`)
-- `env.js`: ciclo de dia e noite (20 min reais por dia), clima por mapa (chuva, neblina, tempestade), luzes de lampiões e cristais. Cavernas e catacumbas ficam sempre escuras; a casa tem luz própria.
+- `env.js`: ciclo de dia e noite (20 min reais por dia), clima e luz por região com transições suaves (chuva, tempestade, neblina, neve, areia, cinzas, calor, névoa sombria; tabela na seção *Clima por região*), luzes de lampiões, tochas e cristais. Interiores (casas, cavernas, catacumbas, torres) nunca têm chuva e ficam escuros, com tochas nas paredes.
 - `sfx.js`: sons e música sintetizados por WebAudio (sem arquivos). Volumes na aba Menu.
 - `quests.js`: missões de NPC com marcador `!`/`?`, entrega segura e integração ao diário. Novas missões: `Quests.add({...})`.
 - `content.js`: carvão e mithril, aço e mithril (fornalha), agricultura (canteiros, sementes do Fazendeiro, crescimento em tempo real), alquimia (caldeirão) e encantamento (mesa). Os itens/peças são colocados uma única vez por mapa (`m.c3`), sem sobrescrever o que o admin editou.
@@ -57,36 +57,82 @@ Abra http://localhost:3000 e entre com usuário `Admin` e a senha definida.
 
 **História.** Aldeburgo prospera, mas o **Rei Esquecido Aldric** despertou na cripta sob o Cemitério das Brumas e o general **Morthak** reergueu a Fortaleza para servi-lo; ao sul, o **Dragão Negro Kharzul** acordou no vulcão. A Coroa abriu a **Vila Real** e chama aventureiros: a oeste o bosque élfico de Silvaluz guarda a torre do **Mago Louco Zarthul**; ao sul o Vale do Rio leva ao Porto de Marés e ao Pântano (covil do chefe goblin **Grakk**); a leste o deserto esconde as ruínas do **Faraó Sahr-Kal**; ao norte a serra leva à mina abandonada (**Grumbak**) e ao Vale Gelado do gigante **Hrimgar**.
 
-**Como funciona.** O admin, ao entrar, cria os mapas que faltam (`World2.placeInWorld` → `Maps2.place`); tudo é idempotente (mapa só nasce se `!maps[id]`; portas em mapas antigos levam a marca `c6` + `Content.mark()`). Os outros jogadores recebem os mapas pelo `worldData` salvo no servidor. Mapas antigos só ganham portais (pilares de luz ao lado, pouso livre ao lado do portal de volta). Dentro das cidades há banco e guardas/mercadores numa zona sem monstros. O nome do portal agora aparece em cima dele e na dica.
+**Como funciona.** O admin, ao entrar, cria os mapas que faltam (`World2.placeInWorld` → `Maps2.place`); tudo é idempotente (mapa só nasce se `!maps[id]`; portas em mapas antigos levam a marca `c6` + `Content.mark()`). Os outros jogadores recebem os mapas pelo `worldData` salvo no servidor. Os mapas externos se ligam **andando até uma abertura de estrada na borda** (seção *Passagens naturais*); só lugares fechados (masmorras, cavernas, torres, túmulos) usam portal, sempre numa entrada física desenhada no cenário. Dentro das cidades há banco e guardas/mercadores numa zona sem monstros. O nome do portal agora aparece em cima dele e na dica.
 
 | id | Nome | Tamanho | Nível sugerido | Liga com |
 |---|---|---|---|---|
-| campos | Campos de Aldeburgo | 2000x1400 | 1-5 | Vila de Aldeburgo, Estrada do Rei |
-| estrada_rei | Estrada do Rei | 1600x700 | 3-6 | Campos, Vila Real |
-| vila_real | Vila Real | 1800x1300 | cidade | Estrada do Rei, Estrada das Areias, Estrada Sombria |
-| trilha_elfica | Trilha Élfica | 700x1600 | 6-10 | Floresta Sombria, Silvaluz |
-| silvaluz | Bosque Élfico de Silvaluz | 2000x1400 | 12-20 | Trilha Élfica, Torre do Mago |
-| torre_mago | Masmorra da Torre do Mago | 1600x1400 | 34-65 | Silvaluz |
-| estrada_costa | Estrada da Costa | 700x1600 | 4-8 | Vale do Rio, Porto de Marés |
-| porto_mares | Porto de Marés | 1800x1300 | cidade | Estrada da Costa, Praia dos Naufrágios |
-| praia_naufragios | Praia dos Naufrágios | 2000x1400 | 9-14 | Porto de Marés |
-| pantano | Pântano de Brejo Negro | 2000x1400 | 10-16 | Vale do Rio, Covil dos Goblins |
-| covil_goblins | Covil dos Goblins | 1600x1200 | 8-28 | Pântano |
-| estrada_areias | Estrada das Areias | 1600x700 | 10-14 | Vila Real, Deserto |
-| deserto | Deserto de Sahr | 2000x1400 | 14-22 | Estrada das Areias, Oásis |
-| oasis | Oásis de Lahur | 1600x1100 | cidade | Deserto, Ruínas |
-| ruinas | Ruínas de Sahr-Kal | 2000x1400 | 28-45 | Oásis |
-| trilha_serra | Trilha da Serra | 700x1600 | 12-18 | Mina de Pedra, Pedralta |
-| pedralta | Pedralta | 1800x1300 | cidade | Trilha da Serra, Mina Abandonada, Passo Gelado |
-| mina_abandonada | Mina Abandonada de Pedralta | 1600x1200 | 20-45 | Pedralta |
-| passo_gelado | Passo Gelado | 1800x800 | 22-32 | Pedralta, Vale Gelado |
+| campos | Campos de Aldeburgo | 2000x1400 | 1-5 | Vale do Rio (oeste), Estrada do Rei (leste) |
+| estrada_rei | Estrada do Rei | 1600x700 | 3-6 | Campos (oeste), Vila Real (leste) |
+| vila_real | Vila Real | 1800x1300 | cidade | Estrada do Rei (oeste), Estrada das Areias (leste), Estrada Sombria (sul) |
+| trilha_elfica | Trilha Élfica | 700x1600 | 6-10 | Floresta Sombria (leste, ponta sul), Silvaluz (oeste, ponta norte) |
+| silvaluz | Bosque Élfico de Silvaluz | 2000x1400 | 12-20 | Trilha Élfica (leste); porta da Torre do Mago |
+| torre_mago | Masmorra da Torre do Mago | 1600x1400 | 34-65 | porta da torre em Silvaluz |
+| estrada_costa | Estrada da Costa | 700x1600 | 4-8 | Vale do Rio (leste), Porto de Marés (sul) |
+| porto_mares | Porto de Marés | 1800x1300 | cidade | Estrada da Costa (norte), Praia dos Naufrágios (oeste) |
+| praia_naufragios | Praia dos Naufrágios | 2000x1400 | 9-14 | Porto de Marés (leste) |
+| pantano | Pântano de Brejo Negro | 2000x1400 | 10-16 | Vale do Rio (norte); caverna do Covil dos Goblins |
+| covil_goblins | Covil dos Goblins | 1600x1200 | 8-28 | caverna no Pântano |
+| estrada_areias | Estrada das Areias | 1600x700 | 10-14 | Vila Real (oeste), Deserto (leste) |
+| deserto | Deserto de Sahr | 2000x1400 | 14-22 | Estrada das Areias (oeste), Oásis (leste) |
+| oasis | Oásis de Lahur | 1600x1100 | cidade | Deserto (oeste); escadaria das Ruínas |
+| ruinas | Ruínas de Sahr-Kal | 2000x1400 | 28-45 | escadaria no Oásis |
+| trilha_serra | Trilha da Serra | 700x1600 | 12-18 | Mina de Pedra (sul), Pedralta (norte) |
+| pedralta | Pedralta | 1800x1300 | cidade | Trilha da Serra (sul), Passo Gelado (leste); entrada da Mina Abandonada |
+| mina_abandonada | Mina Abandonada de Pedralta | 1600x1200 | 20-45 | entrada de mina em Pedralta |
+| passo_gelado | Passo Gelado | 1800x800 | 22-32 | Pedralta (oeste), Vale Gelado (leste) |
 | vale_gelado | Vale Gelado de Hrimgar | 2000x1400 | 32-55 | Passo Gelado |
-| estrada_sombria | Estrada Sombria | 700x1600 | 14-20 | Vila Real, Cemitério |
-| cemiterio | Cemitério das Brumas | 2000x1400 | 18-28 | Estrada Sombria, Catacumba, Fortaleza |
-| cripta_real | Catacumba do Rei Esquecido | 1600x1400 | 30-70 | Cemitério |
-| fortaleza | Fortaleza de Morthak | 2000x1400 | 38-60 | Cemitério, Vulcão |
-| vulcao | Vulcão Brasa-Viva | 2000x1400 | 45-65 | Fortaleza, Ninho do Dragão |
-| ninho_dragao | Ninho do Dragão Negro | 1600x1200 | 50-80 | Vulcão |
+| estrada_sombria | Estrada Sombria | 700x1600 | 14-20 | Vila Real (norte), Cemitério (sul) |
+| cemiterio | Cemitério das Brumas | 2000x1400 | 18-28 | Estrada Sombria (norte), Fortaleza (oeste); túmulo da Catacumba |
+| cripta_real | Catacumba do Rei Esquecido | 1600x1400 | 30-70 | túmulo no Cemitério |
+| fortaleza | Fortaleza de Morthak | 2000x1400 | 38-60 | Cemitério (leste), Vulcão (oeste) |
+| vulcao | Vulcão Brasa-Viva | 2000x1400 | 45-65 | Fortaleza (leste); cratera do Ninho do Dragão |
+| ninho_dragao | Ninho do Dragão Negro | 1600x1200 | 50-80 | cratera no Vulcão |
+
+### Passagens naturais entre mapas (`public/edges.js`)
+Os mapas antigos e novos se ligam como um mundo contínuo: o jogador **anda até uma abertura de estrada na borda** e passa ao mapa vizinho (fade curto), chegando na abertura correspondente do outro lado. Nada de portal no meio do mato.
+- **Dados:** cada mapa de borda tem `m.edges = [{id, d, a, b, to, td, ta, tb}]` (lado `n/s/e/w`, faixa `a..b` na borda, mapa destino, lado e faixa de chegada). `Edges.step` (chamado em `update()`) dispara a 22 px da borda, chega a 72 px do outro lado, com recarga de 40 quadros contra vai-e-volta. Mapa com `edges` ignora a lógica antiga de grade; mapa sem `edges` (casa, masmorras) segue como antes. O editor do admin continua funcionando: `edges` é só dado do mapa e o servidor guarda o `worldData` como veio.
+- **Estrada nos dois lados:** a migração limpa um corredor de árvores, rochas e criaturas e pinta uma estrada (`paint` com id `c7_<ligação>_...`) em ambos os mapas; passagens com portão (Vila Real, Fortaleza, Pedralta) ganham duas torres de vigia.
+- **Migração idempotente:** marca `m.c7[ligação:lado]`, `dg:<masmorra>` e `torches` em cada mapa e chama `Content.mark()`. Roda no admin (`World2.placeInWorld` → `Maps2.place` → `Edges.migrate`); jogadores novos e o segundo login do admin recebem o mundo salvo sem duplicar nada (verificado: mesma contagem de entidades, bordas, portais e tochas em 3 logins).
+- **Geografia (`WM_POS` em hub.js):** Vale do Rio é o cruzamento (norte Aldeburgo, sul Pântano, oeste Estrada da Costa, leste Campos); Estrada da Costa -> Porto de Marés -> Praia dos Naufrágios; Floresta -> Trilha Élfica -> Silvaluz; Mina de Pedra -> Trilha da Serra -> Pedralta -> Passo Gelado -> Vale Gelado; Campos -> Estrada do Rei -> Vila Real -> Estrada das Areias -> Deserto -> Oásis; Vila Real -> Estrada Sombria -> Cemitério -> Fortaleza -> Vulcão. O mapa-múndi mostra as saídas de cada mapa (`m.edges` + portais).
+- **Auditoria:** busca em largura sobre o grafo (bordas + portais) a partir de Aldeburgo alcança os 32 mapas jogáveis (a `casa` é só por porta); toda borda tem volta; os pontos de chegada e de saída de cada mapa estão livres e ligados entre si pelo `pfFind`.
+
+### Masmorras com sentido
+Cada masmorra tem **entrada física** desenhada no mundo (corpos sólidos em código, `Edges.installArt`) e a saída leva ao mesmo ponto. Interiores são escuros (`m.env`: `dark`/`dim`) com tochas a cada ~230 px de parede e ao lado da saída (`decor` `torch`, brilho no `env.js`).
+| Masmorra | Entrada | Onde |
+|---|---|---|
+| Catacumba do Rei | túmulo com escada | ponta leste da estrada do Cemitério |
+| Catacumba (Lich) | túmulo | Covil (Aldeburgo) |
+| Torre do Mago | porta da torre (prédio) | Silvaluz |
+| Covil dos Goblins | boca de caverna | Pântano |
+| Ruínas de Sahr-Kal | arco com escadaria | Oásis (clima nublado) |
+| Mina Abandonada | portão de mina | Pedralta |
+| Ninho do Dragão | borda da cratera | Vulcão |
+
+### Clima por região (`env.js`)
+O clima vem de um relógio global (sem sincronizar com o servidor): um ruído suave em janelas de ~6 min, comparado com um limiar por região. As intensidades (0 a 1) **nunca mudam mais que 12%/s** (`RATE`; medido <= 14%/s) e a luz/escuridão e o fator interior/exterior usam o mesmo limite, então nada vira de repente. Perto da borda o alvo se mistura com a região vizinha (até 50% na própria borda, em 30% do mapa), então a transição acontece andando. Interiores têm alvo 0 de tudo (sem chuva).
+| Região | Mapas | Clima possível |
+|---|---|---|
+| Temperado | Aldeburgo, Campos, Estrada do Rei, Vila Real | chuva, tempestade rara, neblina matinal |
+| Floresta | Floresta, Trilha Élfica, Silvaluz | chuva frequente, neblina |
+| Rio | Vale do Rio | chuva, neblina |
+| Serra | Mina de Pedra (interior ralo), Trilha da Serra, Pedralta | chuva leve, neblina |
+| Gelo | Passo Gelado, Vale Gelado | neve e neblina |
+| Litoral | Estrada da Costa, Porto de Marés, Praia dos Naufrágios | chuva, tempestade (a mais forte do mundo), neblina |
+| Pântano | Pântano de Brejo Negro | neblina densa, chuva |
+| Estrada das Areias / Deserto | Estrada das Areias, Deserto | areia ao vento, calor |
+| Oásis | Oásis de Lahur | calor leve, areia rara |
+| Sombria | Estrada Sombria | neblina sombria |
+| Cemitério | Cemitério das Brumas | neblina sombria, chuva |
+| Fortaleza | Fortaleza de Morthak | chuva, tempestade, neblina, cinzas, névoa sombria |
+| Vulcão | Vulcão Brasa-Viva | cinzas, calor |
+| Interior | casas, cavernas, catacumbas, torre, ninho; Ruínas e Mina Abandonada ficam em penumbra (`dim`) | nenhum, escuro com tochas |
+API compatível: `Env.rainLevel`, `weatherLabel` (pesca e Vida procuram "Neblina"/"Chuva"), `isNight`, `daylight`, `rangeMul`, `setDebugFrac`; novos: `forceWeather('auto'|'clear'|'rain'|'storm'|'fog'|'snow'|'sand'|'ash')`, `state()`, `targets()`, `regionOf(id)`.
+
+### Linha de visão (`public/los.js`)
+Não se ataca (nem se é atacado) através de paredes. `LOS.clear(ax,ay,bx,by)` testa o segmento contra as caixas de colisão (`getHitbox`) dos sólidos altos (casas, muros, rochedos, colunas, árvores, estátuas); objetos baixos (cercas, barris, arbustos, minérios, lápides, caixotes) não bloqueiam. Vale para: ataque corpo a corpo e à distância do jogador (sem linha de visão a mensagem "Sem linha de visão: contorne a parede." aparece e o personagem contorna), projéteis (somem na parede: "O tiro bateu na parede.") e criaturas (só enxergam e golpeiam com linha livre). O servidor não valida alcance nem parede: o dano vem do `combatLogs` do cliente, limitado só por orçamento de dano; a validação de linha de visão é do cliente.
+
+### Aviso do Colosso de Pedra
+Faixa fina de uma linha no topo (`#wb-hud`: "Colosso de Pedra na Vila · mm:ss" com barra de 90 px) e anúncios (`#wb-ann`, `Life.ann`) que somem em ~5 s ou ao clicar. No celular ficam centralizados no topo, em fonte menor, sem cobrir joystick nem botões.
 
 Também adiciona 38 criaturas novas (mescladas em `npcDB` só se ainda não existirem) e 11 decorações novas (rochedo, cacto, palmeira, barco, árvore seca, coluna, sarcófago, lava, juncos, espinho de gelo, rede). O mapa-múndi (`hub.js`) está descrito na seção abaixo.
 
@@ -133,7 +179,7 @@ Servidor de produção: https://miniscape2d.duckdns.org (Oracle Cloud, São Paul
 
 ## Mapa-múndi, moedas e celular
 
-**Mapa-múndi (`hub.js`, tecla M).** Lista *todos* os mapas (menos `casa`/`casa_*`), cada um em uma célula própria: `WM_POS` fixa a geografia dos mapas conhecidos (Aldeburgo no centro; oeste = floresta/Silvaluz/torre; leste = Campos, Vila Real, deserto; norte = serra, Pedralta, gelo; sul = Vale do Rio, costa, pântano; sudeste = Estrada Sombria, cemitério, fortaleza, vulcão, ninho do dragão). Mapas fora da tabela usam `gridX/gridY` se a célula estiver livre; senão ficam na célula livre mais próxima de um mapa ligado por portal (determinístico). A grade se ajusta ao modal, tem botões − / + / Ajustar, arrasto com o mouse, rolagem nativa no toque e linhas tracejadas entre mapas ligados. Tocar num mapa mostra criaturas, NPCs, recursos e portais (não viaja, como antes). `gx/gy` de `maps2.js` foram alinhados a essa geografia.
+**Mapa-múndi (`hub.js`, tecla M).** Lista *todos* os mapas (menos `casa`/`casa_*`), cada um em uma célula própria: `WM_POS` fixa a geografia dos mapas conhecidos (Aldeburgo no centro; oeste = floresta/Silvaluz/torre; leste = Campos, Vila Real, deserto; norte = serra, Pedralta, gelo; sul = Vale do Rio (cruzamento), costa, porto, praia, pântano; sudeste = Estrada Sombria, cemitério, fortaleza, vulcão; masmorras ficam ao lado do mapa da entrada). Mapas fora da tabela usam `gridX/gridY` se a célula estiver livre; senão ficam na célula livre mais próxima de um mapa ligado por portal (determinístico). A grade se ajusta ao modal, tem botões − / + / Ajustar, arrasto com o mouse, rolagem nativa no toque e linhas tracejadas entre mapas ligados (por bordas ou portais; o painel do mapa lista as *Saídas*). Tocar num mapa mostra criaturas, NPCs, recursos e portais (não viaja, como antes). `gx/gy` de `maps2.js` foram alinhados a essa geografia.
 
 **Moedas e pilhas.** O limite antigo (254 por pilha, em `addInvItem`/`invSpaceFor`/banco/fabricação/troca) virou `STACK_MAX = 2.147.483.647` para todo empilhável: Coins ocupa 1 slot só. Exibição: `fmtNum` (1.234.567) na dica/mercado/troca e `fmtQty` na célula (99.999, 100K, 1,2M, 2,1B). Banco junta pilhas e retira o que couber; `mergeStacks` roda no login e junta pilhas repetidas de Coins/empilháveis (mochila e banco) e corrige quantidades inválidas. Servidor: troca (`social.js`) e mercado (`extras.js`) aceitam quantidade/preço até 2.147.483.647; a troca ganhou o campo "Quantidade por clique". `playerData` segue opaco no servidor (só limite de tamanho).
 
@@ -146,3 +192,41 @@ Jogador, NPCs e criaturas escolhem a vista pelo movimento (com histerese de ~8 q
 
 ## Banco
 - O banco é uma **janela à parte** (`public/bank.js`, `#bank-win`) sobre o mapa; a Mochila continua visível e ativa no painel (no celular a gaveta abre ao lado). Depositar: arraste da mochila para a janela, ou selecione o item e use **Depositar** (clique duplo deposita); retirar: clique no item do banco (1 / 10 / Tudo / Qtd) ou arraste para a mochila. Pilhas pedem quantidade (padrão Tudo); 120 slots, busca, **Depositar tudo**; Esc/X/afastar/abrir outra janela fecha; itens encantados e dados extras são preservados e o banco fica bloqueado durante trocas.
+
+## Desmanche, compra em quantidade, conjuntos e atributos (`gear.js`, `stats.js`, `qty.js`, `recycle.js`)
+
+**Desmanchar** (`Recycle`): botão "Desmanchar" no menu do item do inventário (só inventário; não vale para equipado, em troca/escrow ou com o banco aberto). Mostra "Você receberá:" antes de confirmar. Item normal devolve 50% (piso) de cada material da receita; se der 0 e a receita tiver 2+ unidades, devolve 1 do material principal; receita de 1 unidade não pode ser desmanchada (evita loop de XP de ofício). Item **encantado** devolve 35% dos materiais + **Pó Arcano** (1 + 25% do material do encanto por nível). Itens sem receita usam uma tabela de sucata. Pilhas são desmanchadas em lotes de `craftQty`, um lote por vez. Operação atômica com rollback (inventário cheio = nada acontece). Item encantado continua sem poder ser jogado fora: o aviso manda usar Desmanchar. API: `Recycle.can(item)`, `preview(item,lotes)`, `run(item,lotes)`, `ask(item)`, `blockReason`.
+
+**Quantidade** (`Qty`): `Qty.pick({title,name,per,unit,cost,max,limits,onOk,...})` — campo, −/+, 1/10/Máx, total, máximo limitado por moedas/estoque/espaço, confirmação em 2 toques se total ≥ 100. Usado nas lojas de NPC (`Qty.shop`, compra atômica) e no mercado entre jogadores. No mercado, `extras.js` aceita `{a:'buy', id, nonce, qty, cost}`: `cost` precisa bater com `lotCost(price, qty, n)` (BigInt, mesma fórmula do cliente `Qty.mktCost`), senão "O preço mudou". Compra parcial mantém o resto do anúncio; anúncio de preço 1 só é comprado inteiro.
+
+**Conjuntos** (`Gear.SETS`): capacete/corpo/arma/escudo evolutivos para guerreiro (Bronze, Ferro, Aço, Ouro, Mithril, Dragonscale), arqueiro (Couro, Cravejado, Lobo, Patrulheiro, Dragonhide + arcos e flechas Aço/Mithril/Dragão) e mago (Aprendiz, Adepto, Místico, Arcano + cajados Ar/Água/Terra/Fogo/Místico/Arquimago, runas Terra/Fogo). Tiers baixos na loja (ferreiro/mago), altos por forja (Barra de Ouro: 2 Minério de Ouro, ferraria 12) ou drop de chefe. Bônus de conjunto com 3+ peças. Novos slots: amuleto e anel (joias). Campos de item: `crit, critDmg, moveSpd, atkSpd, lifesteal, luck, dr, spellDmg, save, req{skill,lvl}, set, col, hat, robe, gem`.
+
+**Atributos** (`Stats`): teto crit 75%, dano crítico +200%, velocidade +50%, vel. de ataque +50%, roubo de vida 25%, sorte 100%, redução de dano 50%, dano mágico 60%, poupar munição/runa 60%. API: `Stats.addSource(nome, () => ({crit, moveSpd, ...}))`, `removeSource`, `hasSource`, `get()`, `rollAttack(dmg)→{dmg,crit}`, `reduce(dmg)`, `lifestealHeal`, `cd(base)`, `luckMul()`, `canEquip(item)`. Painel compacto na aba de equipamento e linhas no tooltip.
+
+**Correr**: Shift (segurar) ou R (alternar); no celular, botão "CORRER". +45% de velocidade, teto total +80%, gasta energia (barra `#en-bar`, 5/s; recupera 3/s andando e 7/s parado; ao zerar só volta a correr com 12). Passada mais rápida e poeira. `player.energy` (0..100) é salvo; o servidor limita em `cleanStatsData`. O servidor não valida deslocamento no /sync (como antes).
+
+**Classes novas**: arqueiro começa com 250 Flechas de Bronze equipadas; mago com 250 Runas do Ar e 250 Runas da Mente. Contas existentes não mudam.
+
+## Pets e Montarias (`petart.js`, `pets.js`)
+
+- **Itens**: "Pet X" (`type:'pet'`, `petId`) e "Sela X" (`type:'mount'`, `mountId`). Usar o item consome e adiciona a espécie à coleção (`player.pets`, `player.mounts`); duplicata fica no inventário. Estado de montado é só em runtime (`P.mounted`), nunca persistido.
+- **Pets (12)**: gato, cachorro, coelho, raposa, coruja, slime, lobinho, fada, golem, dragãozinho de gelo/fogo e fênix, de comum a lendário, com atributos em % (moedas, XP, dano, crítico, sorte, regen de HP/mana, velocidade). Nível máx. 10 (+6% dos bônus por nível); o pet recebe 35% do XP ganho.
+- **Seguir**: direção por steering com colisão (sólidos estáticos, água para não voadores), teleporte com poeira se preso/longe/troca de mapa; animações idle/andar/dormir, 4 direções, sombra, ordenação por y e culling.
+- **Painel**: ícone abaixo do nível (tecla `P`). Modos: seguir, atacar (nunca mata, só ajuda no alvo do jogador), coletar itens, só moedas, coletar tudo. A coleta usa o mesmo caminho do jogador (`invSpaceFor` + `addInvItem`), raio 160, recarga de 1,2 s; itens soltos pelo jogador (`np`), encantados ou de outro dono são ignorados; inventário cheio deixa o item no chão.
+- **Montarias (9)**: cavalos marrom/branco/de guerra, lobo gigante, cavalo esqueleto, cavalo de fogo, unicórnio, pantera e dragão (+40% a +80% de velocidade). Total de velocidade (pet + montaria) limitado a +80% (`Pets.cfg.SPD_CAP`). Tecla `V` (botão ao lado de Ação no celular). Montado não luta ("Desmonte para lutar"); não monta em interiores/loja/banco; desmonta ao pescar ou interagir. A hitbox do jogador não muda.
+- **Como obter**: drops por monstro/chefe (`Pets.cfg.dropMul`), baús, pesca, lojas (Mercador: Pet Gato, Sela Cavalo Branco; Fazendeiro: Pet Coelho, Sela Cavalo Marrom) e craft (Sela Cavalo Marrom).
+- **Atributos**: crítico e sorte entram como fonte `'pets'` em `Stats.addSource`; demais bônus em `Pets.bonus()`; velocidade via `Pets.speedFactor()` aplicada só durante `update()`.
+- **Rede**: `/api/sync` leva `pet {id,l}` e `mount`; o servidor sanitiza (`extras.cleanPetSync`, `cleanMountId`) e `/api/save` passa por `extras.cleanPetData` (whitelist de ids/modos, nome 14 chars, nível 1..10). Pets de outros jogadores são simulados localmente (máx. 40 por câmera).
+- **Depuração**: `Pets.state()`, `Pets.isMounted()`, `Pets._P`.
+
+## Itens Mímicos (`public/mimic.js`, `mimicnames.js`)
+
+Equipamentos raros e "vivos" (aura roxa/dourada que pulsa, olhinhos e dentes sutis no ícone e no boneco, nas 3 vistas) que **evoluem com o personagem**. Três sets: **Mímico do Guerreiro** (6 peças: Elmo, Peitoral, Espada, Escudo, Anel, Amuleto), **Mímico do Arqueiro** (5: Capuz, Gibão, Arco, Anel, Amuleto) e **Mímico do Mago** (5: Chapéu, Manto, Cajado, Anel, Amuleto). Nome do item: `Elmo Mímico do Guerreiro`, `Arco Mímico do Arqueiro`, `Cajado Mímico do Mago`... (sem nível mínimo: dá para usar desde o início e elas crescem com você).
+
+- **Evolução**: cada peça tem estado próprio `player.mimic[nome] = {lvl 1..50, xp}` (uma de cada por conta). XP para o próximo nível: `round(50 * 1.11^(lvl-1))`. Defesa/dano base (`defBonus`/`bonusDmg`) e os atributos (crítico, dano crítico, vel. de movimento/ataque, roubo de vida, sorte, redução de dano, dano mágico, poupar munição) crescem do nível 1 ao 50 numa curva suave; os atributos entram em `Stats.addSource('mimic', ...)` só enquanto a peça está equipada e aparecem no painel Atributos e na tooltip.
+- **XP desviado** (tecla **N** ou botão "Mímicos" ao lado do pet): `player.mimicPct` (0..100, passos 0/10/20/25/.../100, padrão 0). De todo XP ganho em qualquer perícia, X% vai para os Mímicos equipados (dividido igualmente entre as peças abaixo do nível 50) e o jogador recebe (100-X)%: o painel mostra "Você recebe 70% / Mímicos 30%". Restos de arredondamento são acumulados (nada se perde nem duplica). Sem peça equipada (ou todas no nível 50) o XP fica todo com o jogador. Subir de nível mostra aviso, faíscas e salva.
+- **Bônus de set**: peças do mesmo set equipadas. Parcial (2+ peças) = bônus base × peças/total; completo = bônus cheio + marcos pelo nível médio (10/25/50). O bônus base cresce até +50% com o nível médio. Guerreiro: +10% dano corpo a corpo, 5% redução (marcos: roubo de vida 2%; dano crítico +20% e +3% red.; +10% dano e +5% crítico). Arqueiro: +12% crítico, 15% poupar munição (marcos: +5% vel.; dano crítico +25% e +5% vel. de ataque; +8% dano à distância e +6% crítico). Mago: +12% dano mágico, +8% regen. de mana por 10 s (marcos: +2 dano mágico; 10% poupar runas e +4% crítico; +8% dano mágico e +3 dano mágico). O painel mostra "Set 4/6 · ✔ completo" e os marcos; a tooltip da peça mostra o set.
+- **Ligados à conta**: não vão ao mercado nem à troca (cliente `Net.tradable` e servidor: `extras.market create` e `social trade_offer` recusam), não se desmancham (`Recycle` com aviso), não se encantam (a Mesa de Encantamento mostra aviso e recusa) nem se jogam fora (aviso para guardar no banco). O banco aceita.
+- **Como obter** (raro): chefes (Dragão 10%, Lich Rei 14%; demais chefes 6%, 9,6% se `hp>=500`; "chefes" fracos de `hp<300` só 1%), chefe de mundo (30%), monstros das masmorras profundas (Catacumba do Rei, Torre do Mago, Ruínas de Sahr-Kal, Mina Abandonada, Ninho do Dragão, Catacumbas: 0,4% com `hp>=60`), baús do tesouro da pesca (1,2%) e peixes raros (0,4%) — todos multiplicados pela Sorte; `Mimic.cfg.drop`. A peça sorteada é, em 70%, da classe da perícia mais alta do jogador e prefere peças que ainda não tem. Também há a **Caixa Mímica** (Ofícios: 6 Gold Bar, 4 Dragon Scale, 2 Stone Core, 1 Soul Gem; ligada à conta): ao usar, entrega uma peça aleatória. Peça duplicada vira XP (60% do nível atual) ou 3.000 moedas se já estiver no nível 50.
+- **Servidor**: `mimicnames.js` guarda a lista branca de nomes e `cleanMimicData` (chamado em `/api/save`): nomes inventados saem, `lvl` vira inteiro 1..50, `xp` 0..1e7 (0 no nível 50) e `mimicPct` inteiro 0..100.
+- **Testes/depuração**: `Mimic.grant('Elmo Mímico do Guerreiro')`, `Mimic.addXp(nome, n)`, `Mimic.setPct(50)`, `Mimic.state()`, `Mimic.setInfo('guerreiro')`. Admin: no painel Mímicos há "Admin: dar peça" (também dá a Caixa Mímica). Integração: ganchos em `addXP`, `applyDamage`, `useItem`, `Life.cnt` (como pets.js), `Stats.tipHtml`, ícones (`icons.js`) e desenho do personagem (`art.js`).

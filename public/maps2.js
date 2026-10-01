@@ -879,6 +879,7 @@
         };
         LINKS.forEach((L) => {
             const id = L[0], A = maps[L[1]], B = maps[L[3]]; if (!A || !B) return;
+            if (window.Edges && Edges.EDGE_IDS && Edges.EDGE_IDS.has(id)) return;   // ligações de exterior viram bordas (edges.js), não portais
             const aNew = !!builders[L[1]] && typeof L[2] === 'string', bNew = !!builders[L[3]] && typeof L[4] === 'string';
             const aOld = typeof L[2] !== 'string', bOld = typeof L[4] !== 'string';
             if ((aOld && hasFlag(A, 'lk_' + id)) || (bOld && hasFlag(B, 'lk_' + id))) return;

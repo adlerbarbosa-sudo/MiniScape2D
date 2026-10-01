@@ -54,6 +54,11 @@
         const act = $('mobile-action-btn'), atk = $('mobile-atk-btn');
         if (act) { act.innerHTML = '<svg class="ic"><use href="#i-hand"/></svg><b>AÇÃO</b>'; ctl.appendChild(act); }
         if (atk) { atk.innerHTML = '<svg class="ic"><use href="#i-sword"/></svg>'; atk.setAttribute('aria-label', 'Atacar'); ctl.insertBefore(atk, act); }
+        // correr (liga/desliga): botão discreto ao lado do atacar; a energia aparece como barrinha só quando importa (stats.js)
+        const run = document.createElement('button'); run.type = 'button'; run.id = 'm-run'; run.className = 'mobile-btn'; run.setAttribute('aria-label', 'Correr'); run.innerHTML = '<b>CORRER</b>';
+        run.addEventListener('click', (e) => { e.preventDefault(); if (window.Stats) Stats.setRun(!Stats.isRunToggled()); });
+        ctl.insertBefore(run, atk || act);
+        const rst = document.createElement('style'); rst.textContent = 'html.touch #m-ctl #m-run{width:50px;height:50px;flex:none;margin-bottom:6px!important;background:linear-gradient(#4a3a24,#2a1d10);color:#e8c469;font-size:.52rem}html.touch #m-ctl #m-run.on{background:linear-gradient(#f0cf7c,#b98a2e);color:#2b1a05}'; document.head.appendChild(rst);
         const at = $('action-text'); if (at) gc.appendChild(at);
         // joystick (só aparece enquanto o dedo está na tela)
         const joy = document.createElement('div'); joy.id = 'm-joy'; joy.innerHTML = '<i></i>'; gc.appendChild(joy);

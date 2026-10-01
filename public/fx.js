@@ -3,17 +3,17 @@
     'use strict';
     const ghosts = [];
     const KIND = {
-        hit: { fill: '#fff3c4', line: '#7a1f12', size: 18 }, crit: { fill: '#ffc233', line: '#8a1a0a', size: 26 },
+        hit: { fill: '#fff3c4', line: '#7a1f12', size: 18 }, big: { fill: '#ffd36a', line: '#8a1a0a', size: 22 }, crit: { fill: '#ff9a2a', line: '#5a0a00', size: 28 },
         miss: { fill: '#cfd6de', line: '#2a3038', size: 13 }, hurt: { fill: '#ff6a55', line: '#3a0a06', size: 19 },
         block: { fill: '#7fc3ff', line: '#0c2440', size: 14 }, heal: { fill: '#6ff09a', line: '#0c3a1c', size: 15 }, xp: { fill: '#e6c8ff', line: '#301048', size: 13 }
     };
     // cria o texto flutuante de dano (usa a lista do jogo: floatingTexts)
     function dmg(list, x, y, val, kind) {
-        const k = KIND[kind] || KIND.hit; const text = kind === 'crit' ? val + '!' : kind === 'miss' ? 'Errou' : kind === 'block' ? 'Bloqueou' : kind === 'heal' ? '+' + val : String(val);
-        list.push({ x, y, text, dmg: true, kind, age: 0, life: kind === 'crit' ? 70 : 56, vx: (Math.random() - 0.5) * 0.7, k });
+        const k = KIND[kind] || KIND.hit; const text = kind === 'crit' ? 'CRIT! ' + val : kind === 'big' ? val + '!' : kind === 'miss' ? 'Errou' : kind === 'block' ? 'Bloqueou' : kind === 'heal' ? '+' + val : String(val);
+        list.push({ x, y, text, dmg: true, kind, age: 0, life: kind === 'crit' ? 78 : 56, vx: (Math.random() - 0.5) * 0.7, k });
     }
     function drawDmg(ctx, ft) {
-        const age = ft.age++, k = ft.k, big = ft.kind === 'crit';
+        const age = ft.age++, k = ft.k, big = ft.kind === 'crit' || ft.kind === 'big';
         const rise = age < 16 ? age * 1.5 : 24 + (age - 16) * 0.28, pop = age < 9 ? 1 + (9 - age) * (big ? 0.1 : 0.06) : 1, a = Math.min(1, ft.life / 18);
         const sh = big && age < 12 ? (Math.random() - 0.5) * 2.2 : 0;
         ctx.save(); ctx.globalAlpha = a; ctx.translate(ft.x + ft.vx * age + sh, ft.y - rise); ctx.scale(pop, pop);
@@ -41,7 +41,7 @@
             try {
                 if (typeof player === 'undefined' || !window.Art || !Art.puff) return; if (document.getElementById('login-overlay').style.display !== 'none') return;
                 if (lx != null) { const mv = Math.hypot(player.x - lx, player.y - ly); if (mv < 40) acc += mv; } lx = player.x; ly = player.y;
-                if (acc > 24) { acc = 0; const m = gameMaps[currentMap]; const wet = window.Env && Env.rainLevel && Env.rainLevel() > 0.4; Art.puff(player.x, player.y + 8, wet ? 'rgba(120,150,190,' : 'rgba(165,145,112,', wet ? 1 : 2, wet ? 2 : 3); }
+                if (acc > (window.Stats && Stats.running ? 15 : 24)) { acc = 0; const m = gameMaps[currentMap]; const wet = window.Env && Env.rainLevel && Env.rainLevel() > 0.4; Art.puff(player.x, player.y + 8, wet ? 'rgba(120,150,190,' : 'rgba(165,145,112,', wet ? 1 : 2, wet ? 2 : 3); }
                 if (player.isPerformingAction && player.actionAnim === 10 && lastAnim !== 10) {
                     const t = player.actionTarget, ty = player.actionType; if (t) {
                         const cx = t.x + (t.w || 30) / 2, cy = t.y + (t.h || 30) * 0.55;

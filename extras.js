@@ -4,11 +4,19 @@
    - quem vende tira o item da mochila, grava "pendente" e só então publica (o mesmo "nonce" nunca publica duas vezes);
    - quem compra paga, grava "pendente" e só então compra (o mesmo "nonce" nunca compra duas vezes);
    - o item comprado, o dinheiro da venda e as devoluções chegam pelo correio; o cliente entrega, salva e só depois confirma. */
+const MIMIC = require('./mimicnames');
 const ITEM_RE = /^[\p{L}\p{N}_.'\- ]{1,40}$/u;
 const NONCE_RE = /^[A-Za-z0-9_\-]{6,40}$/;
 const MAX_LISTINGS = 8, LIST_MS = 3 * 86400000, FEE = 0.05, MAX_MAIL = 60;
 const BOSS_PERIOD = 3600000, BOSS_OPEN_MS = 25 * 60000;
 const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+/* preço de n unidades de um anúncio (qty unidades, preço total price): o lote inteiro custa exatamente o preço; uma parte custa o teto proporcional (nunca 0 e nunca o preço todo).
+   BigInt evita estouro de inteiro (preço e quantidade chegam a 2^31). Devolve null se não dá para comprar em partes. */
+function lotCost(price, qty, n) {
+    if (!Number.isSafeInteger(price) || !Number.isSafeInteger(qty) || !Number.isSafeInteger(n) || price < 1 || qty < 1 || n < 1 || n > qty) return null;
+    if (n === qty) return price; if (price < 2) return null;
+    let c = Number((BigInt(price) * BigInt(n) + BigInt(qty) - 1n) / BigInt(qty)); return Math.max(1, Math.min(price - 1, c));
+}
 
 module.exports = function createExtras(ctx) {
     let db = ctx.db; const { markDirty, activePlayers } = ctx;
@@ -39,6 +47,7 @@ module.exports = function createExtras(ctx) {
             case 'create': {
                 const item = b.item, qty = Math.floor(Number(b.qty)), price = Math.floor(Number(b.price));
                 if (typeof item !== 'string' || !ITEM_RE.test(item) || !(qty >= 1 && qty <= 2147483647) || !(price >= 1 && price <= 2147483647)) return err('Anúncio inválido.');
+                if (MIMIC.NAMES.has(item)) return err('Itens Mímicos são ligados à sua conta e não podem ser vendidos.');
                 if (typeof b.nonce !== 'string' || !NONCE_RE.test(b.nonce)) return err('Pedido inválido.');
                 const id = user + ':' + b.nonce;
                 if (m.listings[id] || m.done['c:' + id]) return { ok: true, id };   // repetido: já publicado
@@ -50,11 +59,19 @@ module.exports = function createExtras(ctx) {
                 const dk = 'b:' + user + ':' + b.nonce; if (m.done[dk]) return { ok: true, dup: true };
                 const l = hasOwn(m.listings, b.id) ? m.listings[b.id] : null; if (!l) return err('Esse anúncio já foi vendido ou retirado.');
                 if (l.seller === user) return err('Você não pode comprar o próprio anúncio.');
-                delete m.listings[b.id]; m.done['c:' + b.id] = 1;
-                m.done[dk] = 1; pushMail(user, l.item, l.qty, 'Compra no mercado');
-                const net = l.price - Math.floor(l.price * FEE); if (net > 0) pushMail(l.seller, 'Coins', net, 'Venda de ' + l.qty + '× ' + l.item + ' (taxa de 5%)');
+                // compra em quantidade: qty (inteiro de 1 ao que resta no anúncio); sem qty = o anúncio inteiro. cost = o que o comprador já pagou; tem que bater com a conta do servidor.
+                let n = l.qty;
+                if (b.qty !== undefined) { if (typeof b.qty !== 'number' || !Number.isInteger(b.qty) || b.qty < 1) return err('Quantidade inválida.'); n = b.qty; }
+                if (n > l.qty) return err('O anúncio só tem ' + l.qty + ' unidade(s) agora.');
+                const cost = lotCost(l.price, l.qty, n); if (cost === null) return err('Esse anúncio só pode ser comprado inteiro.');
+                if (b.cost !== undefined && b.cost !== cost) return err('O preço mudou. Atualize a lista e tente de novo.');
+                m.done[dk] = 1; const whole = n === l.qty;
+                if (whole) { delete m.listings[b.id]; m.done['c:' + b.id] = 1; }
+                else { l.qty -= n; l.price -= cost; }   // o resto continua à venda; a soma dos preços se conserva
+                pushMail(user, l.item, n, 'Compra no mercado');
+                const net = cost - Math.floor(cost * FEE); if (net > 0) pushMail(l.seller, 'Coins', net, 'Venda de ' + n + '× ' + l.item + ' (taxa de 5%)');
                 const keys = Object.keys(m.done); if (keys.length > 4000) for (const k of keys.slice(0, keys.length - 3000)) delete m.done[k];
-                markDirty(); return { ok: true, price: l.price };
+                markDirty(); return { ok: true, price: cost, qty: n, left: whole ? 0 : l.qty };
             }
             case 'cancel': {
                 const l = typeof b.id === 'string' && hasOwn(m.listings, b.id) ? m.listings[b.id] : null; if (!l || l.seller !== user) return err('Anúncio não encontrado.');
@@ -125,6 +142,28 @@ module.exports = function createExtras(ctx) {
         return { ok: false, error: 'Pedido inválido.' };
     }
 
+    /* ---------- pets e montarias: só ids conhecidos (lista branca) e números limitados ---------- */
+    const PET_IDS = new Set(['gato', 'cachorro', 'coelho', 'raposa', 'coruja', 'slime', 'lobinho', 'fada', 'golem', 'dragao_fogo', 'dragao_gelo', 'fenix']);
+    const MOUNT_IDS = new Set(['cav_marrom', 'cav_branco', 'cav_guerra', 'lobo_gigante', 'cav_esqueleto', 'cav_fogo', 'unicornio', 'pantera', 'dragao']);
+    const PET_MODES = new Set(['follow', 'attack', 'items', 'coins', 'all']);
+    const pInt = (v, a, b, d) => { v = Math.floor(Number(v)); return Number.isFinite(v) ? Math.max(a, Math.min(b, v)) : d; };
+    function cleanPetSync(p) { if (!p || typeof p !== 'object' || Array.isArray(p) || typeof p.id !== 'string' || !PET_IDS.has(p.id)) return null; return { id: p.id, l: pInt(p.l, 1, 10, 1) }; }
+    function cleanMountId(m) { return typeof m === 'string' && MOUNT_IDS.has(m) ? m : null; }
+    function cleanPetData(pd) {
+        if (!pd || typeof pd !== 'object') return;
+        const nm = (s) => (typeof s === 'string' ? s.replace(/[^\p{L}\p{N} '\-]/gu, '').trim().slice(0, 14) : '');
+        const st = (v) => { if (!v || typeof v !== 'object' || Array.isArray(v)) return null; const o = { lvl: pInt(v.lvl, 1, 10, 1), xp: pInt(v.xp, 0, 1e9, 0) }; const n = nm(v.name); if (n) o.name = n; return o; };
+        if (pd.pets !== undefined) { const out = {}; if (pd.pets && typeof pd.pets === 'object' && !Array.isArray(pd.pets)) for (const k of Object.keys(pd.pets)) { if (!PET_IDS.has(k)) continue; const s = st(pd.pets[k]); if (s) out[k] = s; } pd.pets = out; }
+        if (pd.pet !== undefined) {
+            let o = null; const v = pd.pet;
+            if (v && typeof v === 'object' && !Array.isArray(v) && typeof v.id === 'string' && PET_IDS.has(v.id)) { o = st(v) || { lvl: 1, xp: 0 }; o.id = v.id; o.mode = PET_MODES.has(v.mode) ? v.mode : 'follow'; }
+            pd.pet = o;
+        }
+        if (pd.mounts !== undefined) { const out = {}; if (pd.mounts && typeof pd.mounts === 'object' && !Array.isArray(pd.mounts)) for (const k of Object.keys(pd.mounts)) if (MOUNT_IDS.has(k) && pd.mounts[k]) out[k] = 1; pd.mounts = out; }
+        if (pd.mount !== undefined) pd.mount = cleanMountId(pd.mount);
+        if (pd.petsOpts !== undefined) { const v = pd.petsOpts; pd.petsOpts = (v && typeof v === 'object' && !Array.isArray(v)) ? { auto: v.auto === false ? false : true } : { auto: true }; }
+    }
+
     function rebind(nd) { db = nd; ensure(); rankCache = { t: 0, data: null }; }
-    return { house, market, ranking, rebind, bossInfo, bossHour, bossOpen, cleanTitle: (s) => (typeof s === 'string' ? s.replace(/[^\p{L}\p{N} '\-]/gu, '').trim().slice(0, 28) : '') };
+    return { house, market, ranking, rebind, lotCost, cleanPetSync, cleanMountId, cleanPetData, bossInfo, bossHour, bossOpen, cleanTitle: (s) => (typeof s === 'string' ? s.replace(/[^\p{L}\p{N} '\-]/gu, '').trim().slice(0, 28) : '') };
 };

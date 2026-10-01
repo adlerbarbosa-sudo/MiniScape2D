@@ -330,12 +330,17 @@ function cleanFishData(pd) {
     if (pd.fishMode !== undefined && pd.fishMode !== 'net' && pd.fishMode !== 'rod') delete pd.fishMode;
 }
 
+/* energia de corrida (0 a 100): qualquer outra coisa vira 100 */
+function cleanStatsData(pd) {
+    if (pd.energy !== undefined) { const e = pd.energy; pd.energy = (typeof e === 'number' && isFinite(e)) ? Math.max(0, Math.min(100, Math.round(e * 10) / 10)) : 100; }
+}
+
 app.post('/api/save', rateLimit('save', 90, 60000), (req, res) => {
     const { playerData, worldData, itemDB, npcDB } = req.body || {};
     const u = db.users[req.user]; if (!u) return res.status(401).json({ error: 'Conta não encontrada.', code: 'AUTH' });
     if (playerData !== undefined) {
         if (!playerData || typeof playerData !== 'object' || Array.isArray(playerData) || JSON.stringify(playerData).length > 1500000) return res.status(400).json({ error: 'Dados do jogador inválidos.' });
-        cleanFishData(playerData); u.playerData = playerData;
+        cleanFishData(playerData); cleanStatsData(playerData); extras.cleanPetData(playerData); require('./mimicnames').cleanMimicData(playerData); u.playerData = playerData;
     }
     if (req.role === 'admin') {   // somente admin altera o mundo
         let changed = false;
@@ -376,7 +381,8 @@ function doSync(user, b) {
     const fc = (b.facing && typeof b.facing === 'object') ? { x: num(b.facing.x) | 0, y: num(b.facing.y) | 0 } : { x: 0, y: 1 };
     activePlayers[user] = { x: coord(b.x, 400), y: coord(b.y, 300), map, facing: fc, actionAnim: num(b.actionAnim) | 0, equipment: eq, hp: Math.max(0, Math.min(99999, num(b.hp) | 0)), maxHp: Math.max(0, Math.min(99999, num(b.maxHp) | 0)), lastSeen: now,
         title: typeof b.title === 'string' ? extras.cleanTitle(b.title) : (prev ? prev.title : ''), emote: prev ? prev.emote : null,
-        look: (b.look !== undefined && cleanLook(b.look)) || (prev ? prev.look : null) || savedLook(user) };
+        look: (b.look !== undefined && cleanLook(b.look)) || (prev ? prev.look : null) || savedLook(user),
+        pet: b.pet !== undefined ? extras.cleanPetSync(b.pet) : (prev ? prev.pet : null), mount: b.mount !== undefined ? extras.cleanMountId(b.mount) : (prev ? prev.mount : null) };
     if (typeof b.emote === 'string' && /^[a-z]{2,10}$/.test(b.emote) && (!prev || !prev.emote || now - prev.emote.t > 1500)) activePlayers[user].emote = { k: b.emote, t: now };
     const host = electHost(map); const isHost = host === user;
 

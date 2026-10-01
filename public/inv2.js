@@ -23,14 +23,15 @@
     function doDrop(item, qty) {
         if (dropping || !gameOn()) return false;
         const inv = player.inventory, i = inv.indexOf(item); if (i < 0) { say('Esse item não está mais na mochila.'); return false; }
-        if (enchanted(item)) { say('Item encantado não pode ser jogado fora.'); return false; }
+        if (item.mimic) { say('Itens Mímicos são ligados à sua conta e não podem ser jogados fora. Guarde-os no banco.'); return false; }
+        if (enchanted(item)) { say('Item encantado não pode ser jogado fora. Use Desmanchar.'); return false; }
         const have = item.stackable ? Math.max(1, Math.floor(item.qty) || 1) : 1;
         qty = item.stackable ? Math.min(have, Math.floor(Number(qty))) : 1; if (!(qty >= 1) || !isFinite(qty)) return false;
         dropping = true;
         try {
             const m = gameMaps[currentMap]; if (!m) return false; if (!m.entities) m.entities = [];
             if (item.stackable && qty < have) item.qty = have - qty; else inv.splice(i, 1);
-            m.entities.push({ id: newEntId(), type: 'ground_item', item: item.name, qty, x: player.x + (Math.random() * 16 - 8), y: player.y + (Math.random() * 16 - 8), w: 20, h: 20, active: true, life: 18000 });
+            m.entities.push({ id: newEntId(), type: 'ground_item', item: item.name, qty, x: player.x + (Math.random() * 16 - 8), y: player.y + (Math.random() * 16 - 8), w: 20, h: 20, active: true, np: 1, life: 18000 });
             if (player.actionToolItem === item) { player.isPerformingAction = false; player.pendingAutoAction = null; player.actionToolItem = null; }
             try { hideTooltip(); } catch (e) { }
             say('Você jogou ' + (qty > 1 ? (window.fmtNum ? fmtNum(qty) : qty) + 'x ' : '') + item.name + ' no chão. Aperte Espaço ou clique nele para pegar.', '#f1c40f');
@@ -41,7 +42,8 @@
     function askDrop(item) {
         const r = blockReason(); if (r) { say(r); return; }
         if (player.inventory.indexOf(item) < 0) return;
-        if (enchanted(item)) { say('Item encantado não pode ser jogado fora.'); return; }
+        if (item.mimic) { say('Itens Mímicos são ligados à sua conta e não podem ser jogados fora. Guarde-os no banco.'); return; }
+        if (enchanted(item)) { say('Item encantado não pode ser jogado fora. Use Desmanchar.'); return; }
         const max = item.stackable ? Math.max(1, Math.floor(item.qty) || 1) : 1;
         if (max <= 1) { doDrop(item, 1); return; }
         let ic = ''; try { ic = Icons.html(item.name, 34); } catch (e) { }

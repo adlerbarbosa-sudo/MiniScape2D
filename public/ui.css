@@ -90,7 +90,7 @@ svg.ic.fill { fill: currentColor; stroke: none; }
 #env-badge .fc-t { font-family: var(--serif); font-size: .74rem; margin-bottom: 6px; color: var(--gold-3); } .fc-none { color: #cfc39f; font-size: .72rem; }
 #env-badge .fc-row { display: flex; gap: 6px; } #env-badge .fc-c { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 62px; padding: 5px 4px; border-radius: 8px; background: rgba(255, 255, 255, .04); }
 #env-badge .fc-c.now { background: rgba(232, 196, 105, .16); border: 1px solid rgba(232, 196, 105, .4); } #env-badge .fc-c b { font-size: .68rem; font-weight: 600; color: #f0e6c4; } #env-badge .fc-c small { font-size: .62rem; color: #a99f80; }
-#key-hints { position: absolute; left: 50%; transform: translateX(-50%); top: 12px; max-width: calc(100% - 560px); z-index: 80; font-size: .72rem; color: #eadfc4; text-shadow: 0 1px 2px #000; background: rgba(12, 8, 4, .6); border: 1px solid rgba(232, 196, 105, .3); border-radius: 10px; padding: 6px 10px; line-height: 1.55; transition: opacity 1s; pointer-events: none; }
+#key-hints { position: absolute; left: 50%; transform: translateX(-50%); top: 12px; max-width: calc(100% - 560px); z-index: 80; font-size: .72rem; color: #eadfc4; text-shadow: 0 1px 2px #000; background: rgba(12, 8, 4, .6); border: 1px solid rgba(232, 196, 105, .3); border-radius: 10px; padding: 6px 10px; line-height: 1.55; transition: opacity 1s; pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #key-hints b { color: var(--gold-2); font-family: var(--serif); }
 #key-hints.hide { opacity: 0; }
 

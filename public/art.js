@@ -1572,7 +1572,8 @@
     /* ---------- personagem do jogador ---------- */
     const _pst = {};
     function armorColor(item, fallback) {
-        if (!item || !item.name) return fallback; const n = item.name.toLowerCase();
+        if (!item || !item.name) return fallback; if (typeof item.col === 'string' && /^#[0-9a-fA-F]{6}$/.test(item.col)) return item.col; const n = item.name.toLowerCase();
+        if (n.includes('gold')) return '#e6c24a';
         if (n.includes('mithril')) return '#5aa8ff'; if (n.includes('steel')) return '#c3cbd6'; if (n.includes('bone') || n.includes('lich')) return '#e6e0c8'; if (n.includes('dragon')) return '#8a2a2a'; if (n.includes('iron')) return '#9aa3ad'; if (n.includes('bronze')) return '#b8783a'; if (n.includes('leather')) return '#8b5a2b'; return fallback;
     }
     // estado do quadro atual (funções estáticas abaixo leem daqui: sem closures por quadro)
@@ -1608,8 +1609,8 @@
         ctx.rotate(rot);
         const wood = '#8b5a2b', woodL = '#b07a3f', mc = armorColor(wp, '#c9d1d8'), steel = wp.tool ? '#b9c2cc' : mc;
         const handle = (y0, y1, w) => { limb(ctx, 0, y0, 0, y1, w + 1.4, OUT); limb(ctx, 0, y0, 0, y1, w, wood); ctx.fillStyle = woodL; ctx.fillRect(-w / 2 + 0.3, y1, 0.9, y0 - y1); };
-        if (wp.tool === 'magic') { handle(14, -24, 2.4); ctx.fillStyle = '#4a2f16'; ctx.fillRect(-1.8, -3, 3.6, 3); ell(ctx, 0, -29, anim > 0 ? 6 : 4.6, anim > 0 ? 6 : 4.6, rg(ctx, -1, -30, 0, 7, [[0, '#fff'], [0.4, anim > 0 ? '#1abc9c' : '#6ec8ff'], [1, '#2b56b8']]), OUT, 0.9); glow(ctx, 0, -29, 14, '#6ec8ff', 0.4); }
-        else if (wp.tool === 'ranged') { ctx.strokeStyle = OUT; ctx.lineWidth = 4.4; ctx.beginPath(); ctx.arc(-4, -2, 15, -1.15, 1.15); ctx.stroke(); ctx.strokeStyle = '#a85a1a'; ctx.lineWidth = 2.6; ctx.stroke(); ctx.strokeStyle = 'rgba(240,240,240,0.9)'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(2.2, -15); ctx.lineTo(2.2, 11); ctx.stroke(); }
+        if (wp.tool === 'magic') { handle(14, -24, 2.4); ctx.fillStyle = '#4a2f16'; ctx.fillRect(-1.8, -3, 3.6, 3); ell(ctx, 0, -29, anim > 0 ? 6 : 4.6, anim > 0 ? 6 : 4.6, rg(ctx, -1, -30, 0, 7, [[0, '#fff'], [0.4, anim > 0 ? '#1abc9c' : (/^#[0-9a-fA-F]{6}$/.test(wp.gem || '') ? wp.gem : '#6ec8ff')], [1, '#2b56b8']]), OUT, 0.9); glow(ctx, 0, -29, 14, /^#[0-9a-fA-F]{6}$/.test(wp.gem || '') ? wp.gem : '#6ec8ff', 0.4); }
+        else if (wp.tool === 'ranged') { ctx.strokeStyle = OUT; ctx.lineWidth = 4.4; ctx.beginPath(); ctx.arc(-4, -2, 15, -1.15, 1.15); ctx.stroke(); ctx.strokeStyle = (typeof wp.col === 'string' && /^#[0-9a-fA-F]{6}$/.test(wp.col)) ? wp.col : '#a85a1a'; ctx.lineWidth = 2.6; ctx.stroke(); ctx.strokeStyle = 'rgba(240,240,240,0.9)'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(2.2, -15); ctx.lineTo(2.2, 11); ctx.stroke(); }
         else if (wp.tool === 'axe') {
             handle(13, -21, 2.6);
             ctx.beginPath(); ctx.moveTo(1, -22); ctx.quadraticCurveTo(10, -27, 12, -17); ctx.quadraticCurveTo(11, -9, 3, -11); ctx.closePath(); paint(ctx, lg(ctx, 1, -24, 12, -10, [[0, shade(steel, 0.55)], [0.55, steel], [1, shade(steel, -0.35)]]), OUT, 1.1);
@@ -1638,11 +1639,12 @@
         const D = dimsOf(L.sex, L.race), atk = anim > 0 ? sin((anim / 15) * PI) : 0;
         _W.wp = wp; _W.sh = sh; _W.view = view; _W.anim = anim; _W.skin = L.skin || '#f1c27d'; _W.D = D;
         const o = _baseO; o.view = view; o.t = now; o.seed = 3; o.turn = turn || 0; o.lookX = turn || 0; o.mv = mv; o.ph = ph; o.atk = atk; o.sex = L.sex; o.race = L.race; o.hairStyle = L.hairStyle | 0; o.hair = L.hair; o.skin = L.skin; o.shirt = body ? armorColor(body, L.shirt) : L.shirt; o.pants = L.pants;
-        o.armor = !!body; o.hat = hd ? 'helmet' : null; o.hatColor = armorColor(hd, '#b9c2cc'); o.beard = (L.sex !== 'f' && (L.beard === 1 || (L.beard === undefined && L.race === 'dwarf'))) ? shade(L.hair || '#5a3a1e', -0.08) : null;
-        o.behind = (wp || sh) ? behindFn : null; o.onBack = sh ? onBackFn : null; o.cape = null; o.apron = null; o.robe = null; o.pack = null; o.belt = null; o.boots = null; o.hatColor = o.hatColor;
+        o.armor = !!body && !body.robe; o.hat = hd ? (hd.hat === 'wizard' || hd.hat === 'hood' ? hd.hat : 'helmet') : null; o.hatColor = armorColor(hd, '#b9c2cc'); o.beard = (L.sex !== 'f' && (L.beard === 1 || (L.beard === undefined && L.race === 'dwarf'))) ? shade(L.hair || '#5a3a1e', -0.08) : null;
+        o.behind = (wp || sh) ? behindFn : null; o.onBack = sh ? onBackFn : null; o.cape = null; o.apron = null; o.robe = !!(body && body.robe); o.pack = null; o.belt = null; o.boots = null; o.hatColor = o.hatColor;
         const info = human(ctx, o);
         if (view === 'front' && sh) { const H = info.handL; drawShieldFace(ctx, H.x - 1, H.y - 4.4, 6.6, 7.8, armorColor(sh, '#9aa3ad')); }
         if (wp && view !== 'back') drawWeapon(ctx, wp, info.hand, view, anim, _W.skin);
+        if (equip && root.Mimic && ((hd && hd.mimic) || (body && body.mimic) || (wp && wp.mimic) || (sh && sh.mimic))) { try { root.Mimic.overlay(ctx, view, equip, info, now); } catch (e) { } }   // itens Mímicos (mimic.js)
         return info;
     }
     function drawPlayer(ctx, px, py, facing, anim, equip, name, isMain, extra) {
@@ -1650,7 +1652,7 @@
         const p = _pst[key] || (_pst[key] = { x: px, y: py, mv: 0, ph: 0, view: null, vc: 0, face: 1, fc: 0, turn: 0, lx: 0, still: now });
         const dx = px - p.x, dy = py - p.y, sp = Math.hypot(dx, dy); let moving = false;
         if (sp > 60) { p.x = px; p.y = py; }
-        else { p.x = px; p.y = py; moving = sp > 0.08; p.mv += ((moving ? 1 : 0) - p.mv) * 0.2; p.ph += sp * 0.085; }
+        else { p.x = px; p.y = py; moving = sp > 0.08; p.mv += ((moving ? 1 : 0) - p.mv) * 0.2; p.ph += sp * (isMain && root.Stats && root.Stats.running ? 0.095 : 0.085); }
         if (moving || anim > 0) p.still = now;
         // vista pedida pelo facing; parado/sem agir por alguns segundos volta a olhar para a frente (para baixo)
         let wv = facing.y < 0 ? 'back' : facing.y > 0 ? 'front' : 'side'; const wf = facing.x < 0 ? -1 : 1;
@@ -1663,17 +1665,20 @@
         let tl = moving ? Math.max(-1, Math.min(1, dx * 0.7)) : (view === 'front' ? sin(now * 0.55 + sp) * 0.28 : 0); p.lx += (tl - p.lx) * 0.12;
         const L = extra.look || _defLook, D = dimsOf(L.sex, L.race);
         const bobS = abs(sin(p.ph)) * p.mv;
-        ctx.fillStyle = 'rgba(0,0,0,' + (0.3 - bobS * 0.04) + ')'; ctx.beginPath(); ctx.ellipse(px, py + 8, (10 - bobS * 0.8) * D.sx, 3.6 - bobS * 0.2, 0, 0, TAU); ctx.fill();
+        if (extra.sit) { ctx.save(); ctx.beginPath(); ctx.rect(px - 70, py + 8 - 320, 140, 320 - 12); ctx.clip(); }   // montado (pets.js): só da cintura para cima; as pernas ficam atrás da montaria
+        else { ctx.fillStyle = 'rgba(0,0,0,' + (0.3 - bobS * 0.04) + ')'; ctx.beginPath(); ctx.ellipse(px, py + 8, (10 - bobS * 0.8) * D.sx, 3.6 - bobS * 0.2, 0, 0, TAU); ctx.fill(); }
         ctx.save(); ctx.translate(px, py + 8); ctx.scale(view === 'side' ? flip : 1, 1);
         if (p.turn > 0.03) ctx.scale(1 - 0.18 * p.turn, 1);
         const lean = view === 'side' ? 0.055 * p.mv : sin(p.ph) * 0.03 * p.mv; if (lean) { ctx.translate(0, -9); ctx.rotate(lean); ctx.translate(0, 9); }
         root.__rodOut = !!(isMain && root.Fishing && root.Fishing.rodOut && root.Fishing.rodOut());   // pescando: a linha da vara é desenhada pelo fishing.js
         renderPerson(ctx, view, p.mv, p.ph, anim, equip, L, now, view === 'side' ? 0 : p.lx); root.__rodOut = false;
         ctx.restore();
-        ctx.font = 'bold 11px Arial'; ctx.textAlign = 'center'; ctx.strokeStyle = 'rgba(0,0,0,0.75)'; ctx.lineWidth = 3; const ny = py + 8 - ((equip && equip.head) ? 55 : 51) * D.sy; ctx.strokeText(name, px, ny); ctx.fillStyle = isMain ? '#f1c40f' : '#ffffff'; ctx.fillText(name, px, ny); ctx.textAlign = 'start';
+        ctx.font = 'bold 11px Arial'; ctx.textAlign = 'center'; ctx.strokeStyle = 'rgba(0,0,0,0.75)'; ctx.lineWidth = 3; const ny = py + 8 - ((equip && equip.head) ? (equip.head.hat === 'wizard' ? 68 : 55) : 51) * D.sy; ctx.strokeText(name, px, ny); ctx.fillStyle = isMain ? '#f1c40f' : '#ffffff'; ctx.fillText(name, px, ny); ctx.textAlign = 'start';
         let ty = ny - 4;
         if (extra.title) { ctx.font = 'italic 10px Georgia, serif'; ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.8)'; ty = ny - 13; const tt = '‹' + extra.title + '›'; ctx.strokeText(tt, px, ty); ctx.fillStyle = '#e8c469'; ctx.fillText(tt, px, ty); ctx.textAlign = 'start'; ty -= 6; }
         if (extra.emote && root.Emotes) root.Emotes.draw(ctx, px, ty - 4, extra.emote);
+        if (extra.sit) ctx.restore();
+        return { view: view, flip: flip, mv: p.mv, ph: p.ph, D: D };
     }
     /* prévia sem nome: (x,y) = pés. opts: t, scale, weapon ('sword'|'axe'|'pickaxe'|'bow'|'staff'|'net'), shield, body, head (true), flip, anim, mv, ph */
     const _WPN = { sword: { name: 'Bronze Sword' }, axe: { tool: 'axe', name: 'Bronze Axe' }, pickaxe: { tool: 'pickaxe', name: 'Bronze Pickaxe' }, bow: { tool: 'ranged', name: 'Shortbow' }, staff: { tool: 'magic', name: 'Staff' }, net: { tool: 'net', name: 'Net' } };

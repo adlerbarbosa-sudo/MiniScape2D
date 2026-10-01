@@ -64,7 +64,7 @@
     /* ---------- troca: lógica ---------- */
     const INV = () => (typeof INV_SLOTS !== 'undefined' ? INV_SLOTS : 24), SM = () => window.STACK_MAX || 2147483647;
     function hasEnch(name) { return player.inventory.some((i) => i.name === name && (i.ench || i.enchanted)); }
-    function tradable(name) { const d = itemDB[name]; return !!d && name !== 'Untradable' && !hasEnch(name); }
+    function tradable(name) { const d = itemDB[name]; return !!d && name !== 'Untradable' && !hasEnch(name) && !d.mimic && !d.mimicBox; }   // Mímicos são ligados à conta
     function invCounts() { const m = {}; player.inventory.forEach((i) => { m[i.name] = (m[i.name] || 0) + (i.qty || 1); }); return m; }
     function canCommit(v) {
         const have = invCounts();
