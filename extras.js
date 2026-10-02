@@ -5,9 +5,9 @@
    - quem compra paga, grava "pendente" e só então compra (o mesmo "nonce" nunca compra duas vezes);
    - o item comprado, o dinheiro da venda e as devoluções chegam pelo correio; o cliente entrega, salva e só depois confirma. */
 const MIMIC = require('./mimicnames');
-const ITEM_RE = /^[\p{L}\p{N}_.'\- ]{1,40}$/u;
+const ITEM_RE = /^[\p{L}\p{N}_.'’()+%!:\- ]{1,40}$/u;
 const NONCE_RE = /^[A-Za-z0-9_\-]{6,40}$/;
-const MAX_LISTINGS = 8, LIST_MS = 3 * 86400000, FEE = 0.05, MAX_MAIL = 60;
+const MAX_LISTINGS = 8, LIST_MS = 3 * 86400000, FEE = 0.05, MAX_MAIL = 60, MAIL_HARD = 1000, MAIL_SOFT = 900;   // MAIL_SOFT: acima disso o mercado recusa novas entregas para esse correio (nada é descartado em silêncio)
 const BOSS_PERIOD = 3600000, BOSS_OPEN_MS = 25 * 60000;
 const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 /* preço de n unidades de um anúncio (qty unidades, preço total price): o lote inteiro custa exatamente o preço; uma parte custa o teto proporcional (nunca 0 e nunca o preço todo).
@@ -18,22 +18,42 @@ function lotCost(price, qty, n) {
     let c = Number((BigInt(price) * BigInt(n) + BigInt(qty) - 1n) / BigInt(qty)); return Math.max(1, Math.min(price - 1, c));
 }
 
+/* normaliza o mercado vindo do disco: objetos sem protótipo (um jogador chamado "isPrototypeOf" não pode quebrar nada), só entradas bem formadas, números inteiros seguros */
+const MAXQ = 2147483647;
+function cleanMarket(m) {
+    const out = { listings: Object.create(null), mail: Object.create(null), done: Object.create(null) };
+    if (!m || typeof m !== 'object') return out;
+    if (m.listings && typeof m.listings === 'object') for (const id of Object.keys(m.listings)) {
+        const l = m.listings[id]; if (!l || typeof l !== 'object' || typeof l.seller !== 'string' || typeof l.item !== 'string' || l.item.length > 60) continue;
+        const qty = Math.floor(Number(l.qty)), price = Math.floor(Number(l.price)); if (!(qty >= 1 && qty <= MAXQ && price >= 1 && price <= MAXQ)) continue;
+        out.listings[id] = { id, seller: l.seller, item: l.item, qty, price, t: Number.isFinite(l.t) ? l.t : Date.now() };
+    }
+    if (m.mail && typeof m.mail === 'object') for (const u of Object.keys(m.mail)) {
+        if (!Array.isArray(m.mail[u])) continue; const arr = [];
+        for (const e of m.mail[u].slice(-MAIL_HARD)) { if (!e || typeof e !== 'object' || typeof e.id !== 'string' || typeof e.item !== 'string' || e.item.length > 60) continue; const qty = Math.floor(Number(e.qty)); if (!(qty >= 1)) continue; arr.push({ id: e.id.slice(0, 60), item: e.item, qty: Math.min(MAXQ, qty), why: typeof e.why === 'string' ? e.why.slice(0, 160) : '', t: Number.isFinite(e.t) ? e.t : Date.now() }); }
+        if (arr.length) out.mail[u] = arr;
+    }
+    if (m.done && typeof m.done === 'object') { const ks = Object.keys(m.done).slice(-4000); for (const k of ks) if (k.length <= 120) out.done[k] = 1; }
+    return out;
+}
+
 module.exports = function createExtras(ctx) {
     let db = ctx.db; const { markDirty, activePlayers } = ctx;
     function ensure() {
-        if (!db.market || typeof db.market !== 'object') db.market = {};
-        const m = db.market; if (!m.listings || typeof m.listings !== 'object') m.listings = Object.create(null);
-        if (!m.mail || typeof m.mail !== 'object') m.mail = Object.create(null);
-        if (!m.done || typeof m.done !== 'object') m.done = Object.create(null);
-        return m;
+        if (!db.market || typeof db.market !== 'object' || Object.getPrototypeOf(db.market.listings || {}) !== null || Object.getPrototypeOf(db.market.mail || {}) !== null || Object.getPrototypeOf(db.market.done || {}) !== null) db.market = cleanMarket(db.market);
+        return db.market;
     }
     ensure();
     const err = (e) => ({ error: e });
     const pushMail = (user, item, qty, why) => {
-        const m = ensure(); const arr = m.mail[user] || (m.mail[user] = []);
+        const m = ensure(); const arr = hasOwn(m.mail, user) ? m.mail[user] : (m.mail[user] = []);
         arr.push({ id: 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7), item, qty, why, t: Date.now() });
-        if (arr.length > 300) arr.splice(0, arr.length - 300);
+        if (arr.length > MAIL_HARD) arr.splice(0, arr.length - MAIL_HARD);   // limite de segurança (a entrada normal para antes, em MAIL_SOFT/250)
     };
+    /* o que o jogador JÁ gravou no servidor (último save aceito): o mercado só age sobre operações que o save confirmou, então um save recusado/suspenso nunca duplica nem perde */
+    const savedPD = (user) => { const u = hasOwn(db.users, user) ? db.users[user] : null; return u && u.playerData && typeof u.playerData === 'object' ? u.playerData : null; };
+    const pendingMkt = (user) => { const pd = savedPD(user); return pd && pd.mkt && typeof pd.mkt === 'object' && !Array.isArray(pd.mkt) ? pd.mkt : null; };
+    const mailLen = (u) => (hasOwn(db.market.mail, u) ? db.market.mail[u].length : 0);
     const pub = (l) => ({ id: l.id, seller: l.seller, item: l.item, qty: l.qty, price: l.price, exp: l.t + LIST_MS });
 
     function market(user, b) {
@@ -42,7 +62,7 @@ module.exports = function createExtras(ctx) {
             case 'browse': {
                 const q = typeof b.q === 'string' ? b.q.toLowerCase().slice(0, 30) : '';
                 const list = Object.values(m.listings).filter((l) => !q || l.item.toLowerCase().includes(q)).sort((x, y) => x.price / x.qty - y.price / y.qty).slice(0, 80).map(pub);
-                return { ok: true, listings: list, mine: Object.values(m.listings).filter((l) => l.seller === user).map(pub), mail: (m.mail[user] || []).length };
+                return { ok: true, listings: list, mine: Object.values(m.listings).filter((l) => l.seller === user).map(pub), mail: mailLen(user) };
             }
             case 'create': {
                 const item = b.item, qty = Math.floor(Number(b.qty)), price = Math.floor(Number(b.price));
@@ -50,7 +70,10 @@ module.exports = function createExtras(ctx) {
                 if (MIMIC.NAMES.has(item)) return err('Itens Mímicos são ligados à sua conta e não podem ser vendidos.');
                 if (typeof b.nonce !== 'string' || !NONCE_RE.test(b.nonce)) return err('Pedido inválido.');
                 const id = user + ':' + b.nonce;
-                if (m.listings[id] || m.done['c:' + id]) return { ok: true, id };   // repetido: já publicado
+                if (hasOwn(m.listings, id) || m.done['c:' + id]) return { ok: true, id };   // repetido: já publicado (ou já vendido/retirado: o nonce nunca vale duas vezes)
+                if (ctx.knownItem && !ctx.knownItem(item)) return err('Item desconhecido.');
+                const pc = (pendingMkt(user) || {}).create;   // o cliente tira o item da mochila e GRAVA o pendente antes de anunciar: sem pendente salvo, não há anúncio
+                if (!pc || pc.nonce !== b.nonce || pc.item !== item || pc.qty !== qty || pc.price !== price) return err('Salvamento pendente: aguarde alguns segundos e tente de novo.');
                 if (Object.values(m.listings).filter((l) => l.seller === user).length >= MAX_LISTINGS) return err('Você já tem ' + MAX_LISTINGS + ' anúncios.');
                 m.listings[id] = { id, seller: user, item, qty, price, t: Date.now() }; markDirty(); return { ok: true, id };
             }
@@ -65,6 +88,10 @@ module.exports = function createExtras(ctx) {
                 if (n > l.qty) return err('O anúncio só tem ' + l.qty + ' unidade(s) agora.');
                 const cost = lotCost(l.price, l.qty, n); if (cost === null) return err('Esse anúncio só pode ser comprado inteiro.');
                 if (b.cost !== undefined && b.cost !== cost) return err('O preço mudou. Atualize a lista e tente de novo.');
+                const pb = (pendingMkt(user) || {}).buy;   // pagamento gravado no servidor antes da compra (mesma regra do anúncio)
+                if (!pb || pb.nonce !== b.nonce || pb.id !== b.id || pb.price !== cost || (pb.qty !== undefined ? pb.qty !== n : n !== l.qty)) return err('Salvamento pendente: aguarde alguns segundos e tente de novo.');
+                if (mailLen(user) >= MAIL_SOFT) return err('Seu correio está cheio. Esvazie-o antes de comprar.');
+                if (mailLen(l.seller) >= MAIL_SOFT) return err('O correio do vendedor está cheio. Tente outro anúncio.');
                 m.done[dk] = 1; const whole = n === l.qty;
                 if (whole) { delete m.listings[b.id]; m.done['c:' + b.id] = 1; }
                 else { l.qty -= n; l.price -= cost; }   // o resto continua à venda; a soma dos preços se conserva
@@ -75,12 +102,14 @@ module.exports = function createExtras(ctx) {
             }
             case 'cancel': {
                 const l = typeof b.id === 'string' && hasOwn(m.listings, b.id) ? m.listings[b.id] : null; if (!l || l.seller !== user) return err('Anúncio não encontrado.');
-                delete m.listings[b.id]; pushMail(user, l.item, l.qty, 'Anúncio cancelado'); markDirty(); return { ok: true };
+                delete m.listings[b.id]; m.done['c:' + b.id] = 1; pushMail(user, l.item, l.qty, 'Anúncio cancelado'); markDirty(); return { ok: true };
             }
-            case 'mail': return { ok: true, mail: (m.mail[user] || []).slice(0, MAX_MAIL) };
+            case 'mail': return { ok: true, mail: (hasOwn(m.mail, user) ? m.mail[user] : []).slice(0, MAX_MAIL) };
             case 'ack': {
-                const ids = Array.isArray(b.ids) ? b.ids.filter((x) => typeof x === 'string').slice(0, MAX_MAIL) : []; const set = new Set(ids);
-                if (m.mail[user]) { m.mail[user] = m.mail[user].filter((e) => !set.has(e.id)); if (!m.mail[user].length) delete m.mail[user]; markDirty(); }
+                /* só se confirma o que o save do jogador já traz em mailDone: se o save foi recusado/suspenso, o correio continua guardado e nada se perde */
+                const pd = savedPD(user); const saved = new Set(pd && Array.isArray(pd.mailDone) ? pd.mailDone : []);
+                const ids = Array.isArray(b.ids) ? b.ids.filter((x) => typeof x === 'string' && saved.has(x)).slice(0, MAX_MAIL) : []; const set = new Set(ids);
+                if (hasOwn(m.mail, user) && set.size) { m.mail[user] = m.mail[user].filter((e) => !set.has(e.id)); if (!m.mail[user].length) delete m.mail[user]; markDirty(); }
                 return { ok: true };
             }
             default: return err('Ação desconhecida.');
@@ -99,8 +128,9 @@ module.exports = function createExtras(ctx) {
         for (const u of Object.keys(db.users)) {
             const p = db.users[u].playerData; if (!p || typeof p !== 'object' || !p.stats || !p.stats.skills) continue;
             const sk = p.stats.skills; let total = 0, xp = 0; const per = {};
-            for (const k of Object.keys(sk)) { const s = sk[k]; if (!s || typeof s.level !== 'number') continue; total += s.level | 0; xp += (s.xp | 0); per[k] = { level: s.level | 0, xp: s.xp | 0 }; }
-            let kills = 0; if (p.bestiary && typeof p.bestiary === 'object') for (const k of Object.keys(p.bestiary)) kills += (p.bestiary[k] | 0);
+            const ci = (v) => (typeof v === 'number' && Number.isFinite(v)) ? Math.max(0, Math.min(1e12, Math.floor(v))) : 0;
+            for (const k of Object.keys(sk)) { const s = sk[k]; if (!s || typeof s.level !== 'number') continue; total += ci(s.level); xp += ci(s.xp); per[k] = { level: ci(s.level), xp: ci(s.xp) }; }
+            let kills = 0; if (p.bestiary && typeof p.bestiary === 'object') for (const k of Object.keys(p.bestiary)) kills += ci(p.bestiary[k]);
             rows.push({ u, total, xp, per, kills, title: typeof p.title === 'string' ? p.title.slice(0, 28) : '' });
         }
         return rows;
@@ -137,7 +167,7 @@ module.exports = function createExtras(ctx) {
         if (b.a === 'guests') {
             const h = houseOf(user); if (!h) return { ok: false, error: 'Salve o jogo antes (jogue alguns segundos) e tente de novo.' };
             const list = []; (Array.isArray(b.list) ? b.list : []).slice(0, 30).forEach((n) => { const u = findUser(n); if (u && u !== user && !list.includes(u)) list.push(u); });
-            h.guests = list; markDirty(); return { ok: true, guests: list };
+            h.guests = list; const uu = db.users[user]; if (uu && uu.playerData) uu.playerData = Object.assign({}, uu.playerData); markDirty(); return { ok: true, guests: list };
         }
         return { ok: false, error: 'Pedido inválido.' };
     }
@@ -175,10 +205,11 @@ module.exports = function createExtras(ctx) {
 
     /* presente do admin: entra no mesmo correio do mercado (id único, entrega com confirmação, fica na fila se a mochila estiver cheia) */
     function giveMail(user, item, qty, msg) {
-        const m = ensure(); const arr = m.mail[user] || []; if (arr.length >= 250) return null;
+        const m = ensure(); const arr = hasOwn(m.mail, user) ? m.mail[user] : []; if (arr.length >= 250) return null;
         const why = 'Presente do administrador' + (msg ? ': ' + msg : ''); pushMail(user, item, qty, why); markDirty();
         const a = m.mail[user]; return a[a.length - 1].id;
     }
     function rebind(nd) { db = nd; ensure(); rankCache = { t: 0, data: null }; }
     return { giveMail, findUser, house, market, ranking, rebind, lotCost, cleanPetSync, cleanMountId, cleanMountStage, mountNeed, MOUNT_MAXLVL, cleanPetData, bossInfo, bossHour, bossOpen, cleanTitle: (s) => (typeof s === 'string' ? s.replace(/[^\p{L}\p{N} '\-]/gu, '').trim().slice(0, 28) : '') };
 };
+module.exports.cleanMarket = cleanMarket;

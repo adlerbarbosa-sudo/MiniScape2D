@@ -222,7 +222,7 @@
         let keys = { w: false, a: false, s: false, d: false, arrowup: false, arrowdown: false, arrowleft: false, arrowright: false };
 
         const API_BASE = (window.location.protocol === 'file:') ? 'http://localhost:3000/api' : '/api';
-        let pendingCombatLogs = []; const INV_SLOTS = 30;
+        let pendingCombatLogs = [], pendingLoot = []; const INV_SLOTS = 30;
         // Pilhas: um único slot guarda até STACK_MAX (inteiro seguro de 32 bits) de qualquer item empilhável; Coins nunca se divide em várias pilhas.
         const STACK_MAX = 2147483647; window.STACK_MAX = STACK_MAX;
         function fmtNum(n) { n = Math.floor(Number(n)); return (isFinite(n) ? n : 0).toLocaleString('pt-BR'); }   // 1.234.567
@@ -738,17 +738,21 @@
                 const eqStr = JSON.stringify(player.equipment); if (eqStr !== lastEqStr) { payload.equipment = player.equipment; lastEqStr = eqStr; }
                 if (player.look) { const lkStr = JSON.stringify(player.look); if (lkStr !== lastLookStr || ++lookTick >= 100) { payload.look = player.look; lastLookStr = lkStr; lookTick = 0; } }
                 const sentLogs = pendingCombatLogs; pendingCombatLogs = [];
+                if (window._tpPending) { payload.tp = 1; window._tpPending = false; }   // teleporte legítimo do jogo (portal, renascer): o servidor não conta como excesso de velocidade
+                const lootSnap = pendingLoot.slice(), lootMap = currentMap;   // loot cujos golpes finais viajam neste pedido
                 if (isMapHost) {
                     const mp = {}; const cm = gameMaps[currentMap];
                     if (cm && cm.entities) cm.entities.forEach(o => { if (o.type === 'enemy' && o.id != null) mp[o.id] = { x: o.x, y: o.y }; });
                     payload.mobPos = mp;
                 }
                 let data;
-                try { data = await (window.Net ? Net.sync(payload) : api('/sync', payload)); } catch(e) { pendingCombatLogs = sentLogs.concat(pendingCombatLogs); lastEqStr = ''; lastLookStr = ''; throw e; }
+                try { data = await (window.Net ? Net.sync(payload) : api('/sync', payload)); } catch(e) { pendingCombatLogs = sentLogs.concat(pendingCombatLogs); lastEqStr = ''; lastLookStr = ''; if (payload.tp) window._tpPending = true; throw e; }
                 if (data && data.code === 'session_replaced') { onSessionReplaced(); isSyncing = false; return; }
-                if (data.error) { if (data._status !== 401) pendingCombatLogs = sentLogs.concat(pendingCombatLogs); lastEqStr = ''; lastLookStr = ''; isSyncing = false; return; }
+                if (data.error) { if (data._status !== 401) pendingCombatLogs = sentLogs.concat(pendingCombatLogs); lastEqStr = ''; lastLookStr = ''; if (payload.tp) window._tpPending = true; isSyncing = false; return; }
 
                 if (data.isHost !== undefined) { isMapHost = data.isHost; }
+                try { settleLoot(lootSnap, data.kills, lootMap); } catch (e) { console.error(e); }
+                if (data.lock) noteSaveLock(data.lock); else if (_saveLockUntil && _saveWhy === 'LOCKED') { _saveLockUntil = 0; _saveWhy = ''; }
                 try { if (window.Net) Net.onSync(data); } catch (e) { console.error(e); }
 
                 if(data.players) {
@@ -806,42 +810,84 @@
             for (const _k in tempMaps) { const _m = tempMaps[_k]; if (_m && _m.entities) _m.entities = _m.entities.filter(o => o && !o.wb); }   // o chefe de mundo é temporário   // móveis são pessoais de cada jogador
             // itens no chão: só entram no mundo salvo os colocados pelo Dev (wi). Drops de monstros e itens largados por jogadores (np) são temporários e NUNCA persistem; "pego" (tk) é estado do jogador, não do mundo.
             for (const _k in tempMaps) { const _m = tempMaps[_k]; if (_m && _m.entities) { _m.entities = _m.entities.filter(o => !(o.type === 'ground_item' && (o.np || o.owner || !o.wi))); _m.entities.forEach(o => { if (o.type === 'ground_item') { if (o.tk) o.active = true; delete o.tk; delete o.rt; o.life = 999999; } }); } }
-            for (let map in tempMaps) { if (tempMaps[map] && tempMaps[map].entities) { tempMaps[map].entities.forEach(obj => { if(obj && obj.aggroTarget) obj.aggroTarget = null; if (obj && obj.type === 'enemy') { obj.active = true; if (obj.maxHp > 0) obj.hp = obj.maxHp; delete obj._kd; } }); } }   // monstro mortos nunca vão para o mundo salvo (quem está morto é o servidor)
+            for (let map in tempMaps) { if (tempMaps[map] && tempMaps[map].entities) { tempMaps[map].entities.forEach(obj => { if(obj && obj.aggroTarget) obj.aggroTarget = null; if (obj && obj.type === 'enemy') { obj.active = true; if (obj.maxHp > 0) obj.hp = obj.maxHp; delete obj._kd; delete obj._lootDeferred; } }); } }   // monstro mortos nunca vão para o mundo salvo (quem está morto é o servidor)
             return tempMaps;
         }
-        async function saveDataNow(manual = false) {
-            if (!currentUser || _sessionDead) return;
+        /* ---- salvar online: protocolo com o servidor ----
+           seq crescente (sobrevive a recarregar a página); saves em fila (nunca dois ao mesmo tempo, o seguinte já leva o estado mais novo);
+           423 LOCKED = servidor em pausa (não insiste até acabar); 429 RATE = recua e tenta depois; 400 INVALID = aviso, sem laço;
+           200 com adjusted = o servidor corrigiu valores: avisa e re-sincroniza com GET /api/me. Devolve true só quando o servidor gravou. */
+        let _saveFails = 0, _saveSeq = 0, _saveLockUntil = 0, _saveRateUntil = 0, _saveWhy = '', _saveRun = null, _saveNext = null, _saveNextOpts = null, _saveRetryT = 0, _resyncT = 0, _rateStreak = 0; const _warnAt = {};
+        function nextSaveSeq() { _saveSeq = Math.max(_saveSeq + 1, Date.now() - 1.7e12); return _saveSeq; }   // sempre cresce, também entre recargas da página (o servidor ignora seq <= ao último da sessão)
+        function warnOnce(key, text, color, every) { const n = Date.now(); if (n - (_warnAt[key] || 0) < (every || 30000)) return; _warnAt[key] = n; try { setActionText(text, color); } catch (e) { } }
+        function lockMsg(until) { const m = Math.max(1, Math.ceil((until - Date.now()) / 60000)); return 'Seu progresso está temporariamente em pausa por atividade suspeita (volta em ' + m + ' min).'; }
+        function noteSaveLock(until) { until = Number(until) || 0; if (until <= Date.now()) return; const first = !(_saveLockUntil > Date.now()); _saveLockUntil = until; _saveWhy = 'LOCKED'; warnOnce('lock', lockMsg(until), '#e67e22', first ? 1000 : 90000); }
+        window.saveStatus = () => ({ why: _saveWhy, lockUntil: _saveLockUntil, msg: _saveWhy === 'LOCKED' ? lockMsg(_saveLockUntil) : '' });
+        async function resyncFromServer() {   // depois de "adjusted": aplica o estado do servidor só nos campos que ele costuma corrigir (mochila, banco, equipamento, perícias, Mímicos); o resto do jogo fica como está
+            if (Date.now() - _resyncT < 15000 || _sessionDead) return; _resyncT = Date.now();
+            try {
+                const r = await api('/me'); if (!r || !r.ok || !r.playerData || typeof r.playerData !== 'object') return; const sp = r.playerData;
+                if (Array.isArray(sp.inventory)) player.inventory = sp.inventory; if (Array.isArray(sp.bank)) player.bank = sp.bank; if (sp.equipment && typeof sp.equipment === 'object') player.equipment = Object.assign({ head: null, body: null, weapon: null, shield: null, ammo: null, amulet: null, ring: null }, sp.equipment);
+                if (sp.stats && sp.stats.skills) { Object.keys(sp.stats.skills).forEach((k) => { if (player.stats.skills[k]) Object.assign(player.stats.skills[k], sp.stats.skills[k]); else player.stats.skills[k] = sp.stats.skills[k]; }); if (Number.isFinite(sp.stats.maxHp)) { player.stats.maxHp = sp.stats.maxHp; player.stats.hp = Math.min(player.stats.hp, sp.stats.maxHp); } }
+                if (sp.mimic && typeof sp.mimic === 'object') player.mimic = sp.mimic;
+                try { mergeStacks(player.inventory); mergeStacks(player.bank); } catch (e) { }
+                updateUI(); try { if (window.Stats && Stats.invalidate) Stats.invalidate(); } catch (e) { }
+            } catch (e) { /* sem rede: tenta no próximo aviso */ }
+        }
+        async function saveOnce(manual, opts) {
+            if (!currentUser || _sessionDead) return false;
+            if (!isOfflineMode && window.location.protocol !== 'file:') {
+                if (userRole !== 'admin' && _saveLockUntil > Date.now()) { _saveWhy = 'LOCKED'; if (manual) warnOnce('lock', lockMsg(_saveLockUntil), '#e67e22', 20000); return false; }
+                const wait = _saveRateUntil - Date.now();
+                if (wait > 0) { if (opts && opts.wait && wait <= 6000) await new Promise((r) => setTimeout(r, wait + 60)); else { _saveWhy = 'RATE'; if (!_saveRetryT) _saveRetryT = setTimeout(() => { _saveRetryT = 0; saveDataLogic(); }, wait + 300); return false; } }
+            }
             const sendWorldNow = !isOfflineMode && window.location.protocol !== 'file:' && userRole === 'admin' && worldDirty;
             const needMaps = isOfflineMode || window.location.protocol === 'file:' || sendWorldNow;
             let tempMaps = needMaps ? buildWorldCopy() : null;
-            
+
             player.currentMap = currentMap;
             const pd = Object.assign({}, player, { _em: undefined, actionTarget: null, actionToolItem: null, pendingAutoAction: null, isPerformingAction: false });
 
             if (isOfflineMode || window.location.protocol === 'file:') {
-                try { localStorage.setItem('miniscape_save_v58_' + currentUser, JSON.stringify({ playerData: pd, worldData: tempMaps, itemDB: itemDB, npcDB: npcDB })); if(manual) setActionText("Salvo Localmente!", "#f1c40f"); }
-                catch (e) { if(manual) setActionText("Não foi possível salvar neste aparelho.", "#e74c3c"); }
-            } else {
-                try {
-                    const sendWorld = sendWorldNow; if (sendWorld) worldDirty = false;
-                    const body = { playerData: pd }; if (sendWorld) { body.worldData = tempMaps; body.itemDB = itemDB; body.npcDB = npcDB; }
-                    if (userRole === 'admin' && !window._itemNamesSent) { body.itemNames = Object.keys(itemDB); window._itemNamesSent = true; }   // o servidor aprende os nomes do catálogo completo (lista de itens válidos)
-                    let data = await api('/save', body);
-                    if (data.error) { if (sendWorld) worldDirty = true; throw new Error(data.error); }
-                    if (sendWorld && data.mapVersion) currentMapVersion = data.mapVersion;
-                    _saveFails = 0; if(manual) setActionText("Progresso salvo online!", "#3498db");
-                } catch (e) { if (sendWorldNow) worldDirty = true; if (++_saveFails === 3) setActionText("Sem conexão para salvar. Tentando de novo...", "#e74c3c"); if(manual) setActionText("Erro ao salvar no servidor.", "#e74c3c"); }
+                try { localStorage.setItem('miniscape_save_v58_' + currentUser, JSON.stringify({ playerData: pd, worldData: tempMaps, itemDB: itemDB, npcDB: npcDB })); if(manual) setActionText("Salvo Localmente!", "#f1c40f"); return true; }
+                catch (e) { if(manual) setActionText("Não foi possível salvar neste aparelho.", "#e74c3c"); return false; }
             }
+            const sendWorld = sendWorldNow; if (sendWorld) worldDirty = false;
+            try {
+                const body = { playerData: pd, seq: nextSaveSeq() }; if (sendWorld) { body.worldData = tempMaps; body.itemDB = itemDB; body.npcDB = npcDB; }
+                if (userRole === 'admin' && !window._itemNamesSent) { body.itemNames = Object.keys(itemDB); window._itemNamesSent = true; }   // o servidor aprende os nomes do catálogo completo (lista de itens válidos)
+                const data = await api('/save', body);
+                if (data.code === 'session_replaced') return false;
+                if (data._status === 423 || data.code === 'LOCKED') { if (sendWorld) worldDirty = true; noteSaveLock(data.until || (Date.now() + (data.retryAfter || 60) * 1000)); return false; }
+                if (data._status === 429 || data.code === 'RATE') { if (sendWorld) worldDirty = true; _saveWhy = 'RATE'; _rateStreak = Math.min(4, _rateStreak + 1) /* recuo crescente: 3 s, 6 s, 12 s (a janela do servidor é 10 s) */; _saveRateUntil = Date.now() + Math.min(20, Math.max(1, Math.min(60, data.retryAfter || 3)) * Math.pow(2, _rateStreak - 1)) * 1000; if (manual) warnOnce('rate', 'Salvando rápido demais: vou tentar de novo já já.', '#f1c40f', 8000); if (!_saveRetryT) _saveRetryT = setTimeout(() => { _saveRetryT = 0; saveDataLogic(); }, _saveRateUntil - Date.now() + 300); return false; }
+                if (data.error) { if (sendWorld) worldDirty = true; _saveWhy = data.code || 'ERR'; if (data.code === 'INVALID' || (data._status >= 400 && data._status < 500)) { warnOnce('inv', 'O servidor recusou este salvamento: ' + data.error, '#e74c3c', 60000); return false; } throw new Error(data.error); }
+                if (sendWorld && data.mapVersion) currentMapVersion = data.mapVersion;
+                _saveFails = 0; _saveWhy = ''; _saveLockUntil = 0; _rateStreak = 0; if(manual) setActionText("Progresso salvo online!", "#3498db");
+                if (data.warn === 'ADJUSTED' || (Array.isArray(data.adjusted) && data.adjusted.length)) { warnOnce('adj', 'Alguns valores foram ajustados pelo servidor.', '#f1c40f', 20000); resyncFromServer(); }
+                if (Array.isArray(data.warnings) && data.warnings.length) { window.lastWorldWarnings = data.warnings; console.warn('[mundo] avisos do servidor:', data.warnings); warnOnce('wwarn', 'Mundo salvo com ' + data.warnings.length + ' aviso(s): ' + String(data.warnings[0]).slice(0, 90) + (data.warnings.length > 1 ? ' (+' + (data.warnings.length - 1) + ', veja o console)' : ''), '#f1c40f', 8000); try { if (typeof showWorldWarnings === 'function') showWorldWarnings(data.warnings); } catch (e) { } }
+                return true;
+            } catch (e) { if (sendWorldNow) worldDirty = true; _saveWhy = 'NET'; if (++_saveFails === 3) setActionText("Sem conexão para salvar. Tentando de novo...", "#e74c3c"); if(manual) setActionText("Erro ao salvar no servidor.", "#e74c3c"); return false; }
         }
-        let _saveFails = 0;
+        function showWorldWarnings(list) {   // Dev: lista os avisos que o servidor devolveu ao validar o mundo salvo
+            const host = document.getElementById('dev-map-manager'); if (!host) return;
+            let box = document.getElementById('dev-world-warns'); if (!box) { box = document.createElement('div'); box.id = 'dev-world-warns'; box.style.cssText = 'background:#2a2010;border:1px solid #c9a24a;border-radius:4px;padding:6px 8px;margin-bottom:8px;font-size:.72rem;color:#f1c40f;max-height:140px;overflow:auto'; host.insertBefore(box, host.firstChild); }
+            box.textContent = ''; const h = document.createElement('b'); h.textContent = 'Avisos do servidor ao salvar o mundo (' + list.length + '):'; box.appendChild(h);
+            list.slice(0, 30).forEach((w) => { const d = document.createElement('div'); d.textContent = '• ' + String(w).slice(0, 200); box.appendChild(d); });
+        }
+        function saveDataNow(manual = false, opts) {   // em fila: se já há um save em andamento, o próximo sai quando ele terminar (com o estado mais novo) e quem chamou espera por ele
+            if (!_saveRun) { _saveRun = saveOnce(manual, opts).catch(() => false).finally(() => { _saveRun = null; }); return _saveRun; }
+            _saveNextOpts = { manual: manual || (_saveNextOpts && _saveNextOpts.manual), wait: (opts && opts.wait) || (_saveNextOpts && _saveNextOpts.wait) };
+            if (!_saveNext) _saveNext = _saveRun.then(() => { const o = _saveNextOpts; _saveNext = null; _saveNextOpts = null; return saveDataNow(!!o.manual, { wait: !!o.wait }); });
+            return _saveNext;
+        }
         setInterval(() => { if(currentUser) saveDataLogic(); }, 60000);
         // ao fechar/minimizar a aba: grava o progresso do jogador (keepalive sobrevive ao fechamento da página)
         function flushOnHide() {
             try {
-                if (!currentUser || !authToken || isOfflineMode || _sessionDead) return;
+                if (!currentUser || !authToken || isOfflineMode || _sessionDead || (userRole !== 'admin' && _saveLockUntil > Date.now())) return;
                 player.currentMap = currentMap;
                 const pd = Object.assign({}, player, { actionTarget: null, actionToolItem: null, pendingAutoAction: null });
-                fetch(API_BASE + '/save', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, body: JSON.stringify({ playerData: pd }) }).catch(() => {});
+                fetch(API_BASE + '/save', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, body: JSON.stringify({ playerData: pd, seq: nextSaveSeq() }) }).catch(() => {});
             } catch (e) {}
         }
         window.addEventListener('pagehide', flushOnHide);
@@ -1148,7 +1194,7 @@
             cm.entities.push({ id: newEntId(), type: 'portal', name: 'Portal', x: x, y: y, w: w, h: h, active: true, destMap: d, destX: isFinite(dx) ? dx : 400, destY: isFinite(dy) ? dy : 300 });
             closeModal(); saveDataLogic(false, true); setActionText('Portal criado!');
         }
-        function switchMap(targetMap, nx, ny) { if(!gameMaps[targetMap]) return; rangedTarget = null; currentMap = targetMap; player.x = nx; player.y = ny; player.destX = nx; player.destY = ny; player.isPerformingAction = false; player.pendingAutoAction = null; player.actionTarget = null; player.actionToolItem = null; projectiles = []; try { const mm = gameMaps[currentMap]; player.x = Math.max(20, Math.min((mm.width || 800) - 20, player.x)); player.y = Math.max(20, Math.min((mm.height || 600) - 20, player.y)); player.destX = player.x; player.destY = player.y; ensurePlayerFree(); } catch (e) {} setActionText(`Viajou: ${gameMaps[currentMap].name}`); saveDataLogic(); loadDevMapManager(); }
+        function switchMap(targetMap, nx, ny) { if(!gameMaps[targetMap]) return; window._tpPending = true; rangedTarget = null; currentMap = targetMap; player.x = nx; player.y = ny; player.destX = nx; player.destY = ny; player.isPerformingAction = false; player.pendingAutoAction = null; player.actionTarget = null; player.actionToolItem = null; projectiles = []; try { const mm = gameMaps[currentMap]; player.x = Math.max(20, Math.min((mm.width || 800) - 20, player.x)); player.y = Math.max(20, Math.min((mm.height || 600) - 20, player.y)); player.destX = player.x; player.destY = player.y; ensurePlayerFree(); } catch (e) {} setActionText(`Viajou: ${gameMaps[currentMap].name}`); saveDataLogic(); loadDevMapManager(); }
         
         // --- SISTEMAS DE FÍSICA DE ATAQUE E COLISÃO ---
         function getHitbox(o) {
@@ -1307,6 +1353,21 @@
             updateUI();
         }
 
+        /* loot de monstro: sai uma vez só. Offline cai na hora; online só quando o sync devolve o id em kills[] (o servidor decide quem matou: sem loot duplicado em mortes simultâneas) */
+        function dropLootNow(e, post) {
+            const d = npcDB[e.dbKey], m = gameMaps[e.map]; if (!d || !d.lootStr || !m) return;
+            if (!m.entities) m.entities = []; const cur = m.entities, n0 = cur.length;
+            d.lootStr.split('|').forEach((p) => { const q = p.split(','); if (q.length >= 3 && Math.random() <= parseFloat(q[1]) * (window.Stats ? Stats.luckMul() : 1)) cur.push({ id: newEntId(), type: 'ground_item', item: q[0].trim(), qty: Math.floor(Math.random() * parseInt(q[2])) + 1, x: e.x + (Math.random() * 20) - 10, y: e.y, w: 20, h: 20, active: true, life: 3000 }); });
+            if (post) { try { if (window.Pets && Pets.postKill) Pets.postKill({ dbKey: e.dbKey, x: e.x, y: e.y }, cur, n0); } catch (er) { console.error(er); } }
+            saveDataLogic();
+        }
+        function settleLoot(snap, kills, mapId) {   // snap: pedidos de loot que viajaram neste sync; kills: ids que o servidor deu como mortos por este jogador; mapId: mapa em que o pedido saiu
+            const ks = {}; (Array.isArray(kills) ? kills : []).forEach((k) => { const key = String(k); ks[key] = (ks[key] || 0) + 1; });
+            snap.forEach((e) => { const i = pendingLoot.indexOf(e); if (i >= 0) pendingLoot.splice(i, 1); const key = String(e.id); if (ks[key] > 0) { ks[key]--; try { dropLootNow(e, true); } catch (er) { console.error(er); } } });
+            // o servidor deu o golpe final a este jogador, mas a vida local do monstro estava defasada (outro jogador bateu junto) e o cliente não viu a morte: o loot é dele mesmo assim
+            const m = gameMaps[mapId];
+            Object.keys(ks).forEach((key) => { if (!(ks[key] > 0) || !m || !m.entities) return; const o = m.entities.find((x) => x && x.type === 'enemy' && String(x.id) === key); if (!o || !o.dbKey) return; o._kd = Date.now(); try { dropLootNow({ dbKey: o.dbKey, x: o.x, y: o.y, map: mapId }, true); } catch (er) { console.error(er); } });
+        }
         function applyDamage(t, dmg, sT, maxHit) {
             let _cr = false; if (window.Stats && dmg > 0) { const _r = Stats.rollAttack(dmg); dmg = _r.dmg; _cr = _r.crit; const _h = Stats.lifestealHeal(dmg); if (_h > 0 && player.stats.hp < player.stats.maxHp) { player.stats.hp = Math.min(player.stats.maxHp, player.stats.hp + _h); Fx.dmg(floatingTexts, player.x, player.y - 50, _h, 'heal'); } }
             t.hp -= dmg; t.aggroTarget = currentUser; const crit = _cr, big = !_cr && dmg > 0 && maxHit >= 4 && dmg >= maxHit * 0.9; Fx.dmg(floatingTexts, t.x + (t.w||30)/2, t.y + 2, dmg, dmg > 0 ? (crit ? 'crit' : big ? 'big' : 'hit') : 'miss'); if (dmg > 0) { Art.burst(t.x + (t.w||30)/2, t.y + (t.h||30)/2, '#d33', (crit || big) ? 12 : 6, (crit || big) ? 1.6 : 1); if (crit || big) Art.burst(t.x + (t.w||30)/2, t.y + (t.h||30)/2, '#ffe27a', 8, 1.8); }
@@ -1314,7 +1375,11 @@
             if(t.hp <= 0) { 
                 Fx.ghost(t); t.active = false; t._kd = Date.now(); t.aggroTarget = null; Art.poof(t.x + (t.w||30)/2, t.y + (t.h||30)/2);
                 let bXP = (t.dbKey && npcDB[t.dbKey]) ? npcDB[t.dbKey].xp : 15; let cXP = Math.floor(bXP * 0.3) || 1; let hXP = bXP - cXP; addXP(sT, cXP); addXP('hp', hXP);
-                if(t.dbKey && npcDB[t.dbKey] && npcDB[t.dbKey].lootStr){ let pts = npcDB[t.dbKey].lootStr.split('|'); pts.forEach((p, i) => { let d = p.split(','); if(d.length >= 3 && Math.random() <= parseFloat(d[1]) * (window.Stats ? Stats.luckMul() : 1)){ let curM = gameMaps[currentMap]; if(curM) { if(!curM.entities) curM.entities = []; curM.entities.push({ id: newEntId(), type: 'ground_item', item: d[0].trim(), qty: Math.floor(Math.random()*parseInt(d[2]))+1, x: t.x+(Math.random()*20)-10, y: t.y, w: 20, h: 20, active: true, life: 3000 }); } } }); } saveDataLogic(); 
+                t._lootDeferred = false;
+                if(t.dbKey && npcDB[t.dbKey] && npcDB[t.dbKey].lootStr){
+                    if (isOfflineMode) dropLootNow({ dbKey: t.dbKey, x: t.x, y: t.y, map: currentMap }, false);
+                    else { t._lootDeferred = true; pendingLoot.push({ id: t.id, dbKey: t.dbKey, x: t.x, y: t.y, map: currentMap }); if (pendingLoot.length > 100) pendingLoot.shift(); }   // online: o loot só cai quando o servidor confirma que ESTE jogador deu o golpe final (sync.kills)
+                } saveDataLogic(); 
             }
         }
 

@@ -8,7 +8,7 @@ const path = require('path');
 
 const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 const MAXQ = 2147483647;
-const ITEM_RE = /^[\p{L}\p{N}_.'\- ]{1,40}$/u;
+const ITEM_RE = /^[\p{L}\p{N}_.'’()+%!:\- ]{1,40}$/u;   // letras, números e pontuação comum de nomes de item (nunca < > " & ` nem barras)
 const BAD_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
 module.exports = function createSecurity(opts) {
@@ -17,15 +17,19 @@ module.exports = function createSecurity(opts) {
     const STRICT = () => String(process.env.SECURITY_STRICT == null ? '1' : process.env.SECURITY_STRICT) !== '0';
 
     /* ---------------- log rotativo (sem senhas) ---------------- */
-    const LOG = path.join(DATA_DIR, 'security.log'), LOG_MAX = 1024 * 1024;
+    const LOG = path.join(DATA_DIR, 'security.log'), LOG_MAX = 1024 * 1024, LOG_KEEP = 8;
     const lastLog = new Map();
+    function rotate(file, keep) {   // file -> file.1 -> file.2 ... (descarta só o mais antigo)
+        for (let i = keep - 1; i >= 1; i--) { try { fs.renameSync(file + '.' + i, file + '.' + (i + 1)); } catch (e) { } }
+        fs.renameSync(file, file + '.1');
+    }
     function slog(kind, user, ip, detail, always) {
         try {
             const key = kind + '|' + user; const now = Date.now(), l = lastLog.get(key);
             if (!always && l && now - l < 3000) return;   // não inunda o disco com a mesma coisa
             lastLog.set(key, now); if (lastLog.size > 2000) lastLog.clear();
             fs.mkdirSync(DATA_DIR, { recursive: true });
-            try { if (fs.statSync(LOG).size > LOG_MAX) fs.renameSync(LOG, LOG + '.1'); } catch (e) { }
+            try { if (fs.statSync(LOG).size > LOG_MAX) rotate(LOG, LOG_KEEP); } catch (e) { }
             const d = typeof detail === 'string' ? detail : JSON.stringify(detail || '');
             fs.appendFileSync(LOG, new Date().toISOString() + ' [' + kind + '] user=' + String(user || '-').replace(/[\r\n]/g, ' ').slice(0, 40) + ' ip=' + String(ip || '-').slice(0, 45) + ' ' + d.replace(/[\r\n]/g, ' ').slice(0, 400) + '\n');
         } catch (e) { }
@@ -70,15 +74,19 @@ module.exports = function createSecurity(opts) {
     setInterval(() => { const n = Date.now(); for (const [k, b] of buckets) if (n - b.t > 3600000) buckets.delete(k); }, 600000).unref();
 
     /* ---------------- strikes ---------------- */
-    const strikes = new Map();   // user -> {list:[ts...], lock:0}
-    const LOCK_AT = +process.env.SEC_LOCK_STRIKES || 40, LOCK_WINDOW = 30 * 60000, LOCK_MS = 10 * 60000;
+    const strikes = new Map();   // user -> {list:[ts...], lock:0, last:{kind:ts}}
+    const LOCK_AT = +process.env.SEC_LOCK_STRIKES || 40, LOCK_WINDOW = 30 * 60000, LOCK_MS = 10 * 60000, STRIKE_GAP = 20000;
+    /* Uma infração do MESMO tipo só soma 1 strike a cada 20 s: um falso positivo persistente (o cliente reenvia o mesmo save a cada 2,5 s) não tranca a conta em 2 minutos.
+       A correção em si (voltar o campo suspeito ao valor anterior) vale sempre; o bloqueio é só para atividade suspeita sustentada. */
     function strike(user, ip, kind, n, detail) {
-        let s = strikes.get(user); if (!s) { s = { list: [], lock: 0 }; strikes.set(user, s); }
-        const now = Date.now(); for (let i = 0; i < (n || 1); i++) s.list.push(now);
+        let s = strikes.get(user); if (!s) { s = { list: [], lock: 0, last: Object.create(null) }; strikes.set(user, s); }
+        const now = Date.now(); slog('STRIKE:' + kind, user, ip, detail);
+        if (s.last[kind] && now - s.last[kind] < STRIKE_GAP) return; s.last[kind] = now;
+        for (let i = 0; i < Math.min(10, n || 1); i++) s.list.push(now);
         s.list = s.list.filter(t => now - t < LOCK_WINDOW).slice(-500);
-        slog('STRIKE:' + kind, user, ip, detail);
         if (s.list.length >= LOCK_AT && s.lock < now && kind !== 'speed') { s.lock = now + LOCK_MS; s.list = []; slog('LOCK', user, ip, 'saves bloqueados por ' + (LOCK_MS / 60000) + ' min (muitas violações)', true); }
     }
+    function clearLock(user) { const s = strikes.get(user); if (!s) return false; s.lock = 0; s.list = []; s.last = Object.create(null); return true; }
     const strikeCount = (u) => { const s = strikes.get(u); return s ? s.list.length : 0; };
     const lockedUntil = (u) => { const s = strikes.get(u); return s && s.lock > Date.now() ? s.lock : 0; };
     setInterval(() => { const n = Date.now(); for (const [u, s] of strikes) { s.list = s.list.filter(t => n - t < LOCK_WINDOW); if (!s.list.length && s.lock < n) strikes.delete(u); } }, 300000).unref();
@@ -91,11 +99,26 @@ module.exports = function createSecurity(opts) {
             if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
             if (typeof v === 'string') return v.length > 4000 ? v.slice(0, 4000) : v;
             if (typeof v !== 'object') return undefined;
-            if (depth > 12 || ++nodes > 200000) throw new Error('deep');
+            if (depth > 16 || ++nodes > 200000) throw new Error('deep');
             if (Array.isArray(v)) { const out = []; for (let i = 0; i < v.length; i++) { const x = go(v[i], depth + 1); out.push(x === undefined ? null : x); } return out; }
             const out = {};
             for (const k of Object.keys(v)) { if (BAD_KEYS.has(k) || k.length > 60) continue; const x = go(v[k], depth + 1); if (x !== undefined) out[k] = x; }
             return out;
+        }
+        try { return go(root, 0); } catch (e) { return undefined; }
+    }
+
+    /* cópia limpa para dados do ADMIN (mundo, catálogo de itens, NPCs): sem chaves de protótipo, números finitos, profundidade e tamanho limitados; strings longas são mantidas (ícones em data:) */
+    function scrubDeep(root, maxNodes) {
+        let nodes = 0; const lim = maxNodes || 3000000;
+        function go(v, d) {
+            if (v === null || typeof v === 'boolean') return v;
+            if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
+            if (typeof v === 'string') return v.length > 2000000 ? v.slice(0, 2000000) : v;
+            if (typeof v !== 'object') return undefined;
+            if (d > 24 || ++nodes > lim) throw new Error('deep');
+            if (Array.isArray(v)) { const a = []; for (let i = 0; i < v.length; i++) { const y = go(v[i], d + 1); a.push(y === undefined ? null : y); } return a; }
+            const out = {}; for (const k of Object.keys(v)) { if (BAD_KEYS.has(k) || k.length > 120) continue; const x = go(v[k], d + 1); if (x !== undefined) out[k] = x; } return out;
         }
         try { return go(root, 0); } catch (e) { return undefined; }
     }
@@ -163,15 +186,17 @@ module.exports = function createSecurity(opts) {
     }
 
     /* itens/moedas que o SERVIDOR entregou ao jogador e que o cliente ainda vai gravar: correio (mercado/presentes) e trocas concluídas */
-    function credits(user) {
+    function credits(user, prev) {
         const db = getDB(), c = new Map(); const add = (n, q) => { if (typeof n === 'string' && Number.isFinite(q) && q > 0) c.set(n, (c.get(n) || 0) + q); };
+        /* um crédito vale UMA vez: depois que um save aceito já traz o id em mailDone/tradeDone, o item faz parte da linha de base (prev) e deixa de ser crédito.
+           Sem isso, quem não confirma o correio poderia "regravar" o mesmo item várias vezes e duplicá-lo. */
+        const mdone = new Set(prev && Array.isArray(prev.mailDone) ? prev.mailDone : []), tdone = new Set(prev && Array.isArray(prev.tradeDone) ? prev.tradeDone : []);
         try {
-            const mail = db.market && db.market.mail && db.market.mail[user]; if (Array.isArray(mail)) for (const e of mail) add(e.item, e.qty);
+            const mail = db.market && db.market.mail && db.market.mail[user]; if (Array.isArray(mail)) for (const e of mail) if (e && !mdone.has(e.id)) add(e.item, e.qty);
             if (db.trades) for (const id of Object.keys(db.trades)) {
-                const t = db.trades[id]; if (!t || (t.st !== 'done' && t.st !== 'cancel')) continue;
+                const t = db.trades[id]; if (!t || t.st !== 'done' || tdone.has(t.id)) continue;   // troca concluída: só o que o OUTRO lado ofereceu (a devolução de depósito já está contada no escrow)
                 const s = t.a === user ? 'a' : t.b === user ? 'b' : null; if (!s || (t.applied && t.applied[s])) continue; const o = s === 'a' ? 'b' : 'a';
                 for (const e of (t.offer && t.offer[o]) || []) add(e[0], e[1]);
-                for (const e of (t.offer && t.offer[s]) || []) add(e[0], e[1]);   // devolução do depósito
             }
         } catch (e) { }
         return c;
@@ -186,7 +211,7 @@ module.exports = function createSecurity(opts) {
         const admin = role === 'admin', strict = STRICT() && !admin;
         const ctx = { prevNames: new Set(), clamped: 0, badQty: 0, dropped: 0 };
         if (prev) { for (const l of [prev.inventory, prev.bank]) if (Array.isArray(l)) for (const it of l) if (it && typeof it.name === 'string') ctx.prevNames.add(it.name); if (prev.equipment) for (const s of Object.keys(prev.equipment)) if (prev.equipment[s] && prev.equipment[s].name) ctx.prevNames.add(prev.equipment[s].name); }
-        const notes = []; let n = 0;
+        const notes = [], env = []; let n = 0;
         /* 1) envelope: listas de itens, equipamento, posição, stats */
         if (admin) { /* admin: mantém o conteúdo, só passou pela varredura profunda */ }
         else {
@@ -248,7 +273,7 @@ module.exports = function createSecurity(opts) {
             }
             /* 2) progressão: itens e moedas contra o save anterior (+ créditos entregues pelo servidor) */
             if (strict) {
-                const cr = credits(user); const a = totals(prev || { inventory: [], bank: [], equipment: {} }), b = totals(pd); let newDistinct = 0;
+                const cr = credits(user, prev); const a = totals(prev || { inventory: [], bank: [], equipment: {} }), b = totals(pd); let newDistinct = 0;
                 for (const [name, q] of b.t) {
                     const before = a.t.get(name) || 0; let gain = q - before - (cr.get(name) || 0);
                     if (before === 0 && q > 0 && b.ns.has(name) && !cr.has(name)) newDistinct++;
@@ -260,7 +285,7 @@ module.exports = function createSecurity(opts) {
                     if (allow < gain) { const ex = gain - allow; trim(pd, name, ex); notes.push('item:' + name + '+' + ex); n++; }
                 }
                 if (newDistinct > 0) {
-                    const allow = spend(user, 'distinct', newDistinct, 40, 4, now);
+                    const allow = spend(user, 'distinct', newDistinct, 60, 6, now);
                     if (allow < newDistinct) { notes.push('distinct+' + (newDistinct - allow)); n++; let over = newDistinct - allow; for (const [name] of b.t) { if (over <= 0) break; if ((a.t.get(name) || 0) === 0 && b.ns.has(name) && !cr.has(name)) { trim(pd, name, 1e9); over--; } } }
                 }
                 /* Itens Mímicos são EXCLUSIVOS DO ADMIN: só podem aparecer se já estavam na conta (save anterior) ou chegaram pelo correio (presente / missão especial). Qualquer outra "origem" é revertida. */
@@ -273,12 +298,14 @@ module.exports = function createSecurity(opts) {
                 }
             }
         }
-        if (ctx.dropped) { n += ctx.dropped; notes.push('itens-invalidos:' + ctx.dropped); }
-        if (ctx.badQty) notes.push('qty-invalida:' + ctx.badQty);
-        if (ctx.clamped) { n += ctx.clamped; notes.push('stats-item-clamp:' + ctx.clamped); }
-        if (notes.length) { strike(user, ip, 'save', Math.max(1, n), notes.join(' ')); }
+        /* correções de ENVELOPE (item inventado, quantidade inválida, campo fora do limite) são só registradas: sem strike, para um dado "estranho" legítimo nunca virar bloqueio */
+        if (ctx.dropped) env.push('itens-invalidos:' + ctx.dropped);
+        if (ctx.badQty) env.push('qty-invalida:' + ctx.badQty);
+        if (ctx.clamped) env.push('stats-item-clamp:' + ctx.clamped);
+        if (env.length) slog('SAVE-FIX', user, ip, env.join(' '));
+        if (notes.length) strike(user, ip, 'save', Math.max(1, notes.length), notes.join(' '));
         pd._sv = { t: now };
-        return { pd, notes };
+        return { pd, notes: notes.concat(env) };
     }
     /* depois de limpar pets/mímicos/montarias (extras/mimicnames): limita quantas coleções novas aparecem num intervalo curto */
     function checkCollections(user, role, pd, prev, ip) {
@@ -308,7 +335,7 @@ module.exports = function createSecurity(opts) {
         }
         if (Array.isArray(pd.mimicSkins)) {   // aparências especiais: só com o item de presente (já na mochila/banco do save anterior ou ainda no correio)
             const MM = require('./mimicnames'), had = new Set(Array.isArray(prev && prev.mimicSkins) ? prev.mimicSkins : []);
-            const pt = totals(prev || { inventory: [], bank: [], equipment: {} }).t, cr = credits(user);
+            const pt = totals(prev || { inventory: [], bank: [], equipment: {} }).t, cr = credits(user, prev);
             const keep = pd.mimicSkins.filter((id) => had.has(id) || (MM.SPECIAL[id] && ((pt.get(MM.SPECIAL[id]) || 0) > 0 || (cr.get(MM.SPECIAL[id]) || 0) > 0)));
             if (keep.length !== pd.mimicSkins.length) { strike(user, ip, 'mimicskin', 1, 'aparência sem presente revertida: ' + pd.mimicSkins.filter((x) => !keep.includes(x)).join(',')); pd.mimicSkins = keep; if (pd.mimic) for (const k of Object.keys(pd.mimic)) if (pd.mimic[k].skin && !keep.includes(pd.mimic[k].skin) && !(MM.SKINS[pd.mimic[k].skin] > 0)) delete pd.mimic[k].skin; }
         }
@@ -339,8 +366,10 @@ module.exports = function createSecurity(opts) {
     const MAX_SPEED = 270;   // px/s: 2,5 px por quadro x 60 + 80% (teto global de velocidade)
     const farMap = new Map();   // user -> {x,y,n}: posição "distante" que se repete (respawn/teleporte legítimo)
     setInterval(() => { farMap.clear(); }, 600000).unref();
-    function checkMove(user, role, prev, map, x, y, now, ip) {
+    const tpAt = new Map();   // último teleporte avisado pelo cliente (no máx. 1 por segundo por jogador: quem exagera volta a ser contado)
+    function checkMove(user, role, prev, map, x, y, now, ip, tp) {
         if (!prev || role === 'admin' || !STRICT() || prev.map !== map || now - prev.lastSeen > 6000) { farMap.delete(user); return { x, y, ok: true, reset: true }; }
+        if (tp && now - (tpAt.get(user) || 0) > 1000) { tpAt.set(user, now); farMap.delete(user); return { x, y, ok: true, tele: true }; }
         const dt = Math.min(30, Math.max(0, (now - prev.lastSeen) / 1000)); const allowed = 3 * MAX_SPEED * (dt + 0.4) + 80;
         const dist = Math.hypot(x - prev.x, y - prev.y);
         if (dist <= allowed) { farMap.delete(user); return { x, y, ok: true }; }
@@ -355,7 +384,7 @@ module.exports = function createSecurity(opts) {
     function hitCap(user) {
         const db = getDB(); const u = db.users[user]; const sk = u && u.playerData && u.playerData.stats && u.playerData.stats.skills;
         let L = 1; if (sk) for (const k of ['combat', 'ranged', 'magic']) if (sk[k] && Number.isFinite(sk[k].level)) L = Math.max(L, Math.min(99, sk[k].level));
-        return Math.min(500, Math.round((L * 0.5 + 100) * 3.6));
+        return Math.min(500, Math.round((L * 0.5 + 150) * 3.6));   // folga para críticos de armas encantadas: na prática 500 (o teto absoluto de um golpe)
     }
     const dmgRate = new Map();
     function dmgOk(user, now) {   // no máximo 20 relatórios de dano por segundo
@@ -392,5 +421,5 @@ module.exports = function createSecurity(opts) {
         return null;
     }
 
-    return { slog, STRICT, knownItem, learnItems, strike, strikeCount, lockedUntil, checkSave, checkCollections, cleanSyncEquip, checkMove, hitCap, dmgOk, expectedMaxHp, chatCheck, weakPassword, scrub, spend, totals, credits, _known: known };
+    return { slog, rotate, STRICT, knownItem, learnItems, strike, strikeCount, lockedUntil, clearLock, checkSave, checkCollections, cleanSyncEquip, checkMove, hitCap, dmgOk, expectedMaxHp, chatCheck, weakPassword, scrub, scrubDeep, spend, totals, credits, _known: known };
 };

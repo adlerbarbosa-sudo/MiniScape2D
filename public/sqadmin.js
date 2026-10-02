@@ -46,7 +46,7 @@
         editing = q; const t = q ? q.type : 'code';
         const mobs = Object.keys(npcDB || {}).filter((k) => npcDB[k] && npcDB[k].hp > 0).sort().map((k) => [k, (npcDB[k].name || k) + ' (' + k + ')']);
         const maps = Object.keys(gameMaps || {}).filter((k) => !/^casa_/.test(k)).sort().map((k) => [k, (gameMaps[k].name || k) + ' (' + k + ')']);
-        const items = Object.keys(itemDB || {}).sort();
+        const items = Object.keys(itemDB || {}).filter((k) => !window.ItemInput || ItemInput.valid(k)).sort();
         openModal(`<div id="sq-form" style="width:min(92vw,460px);max-height:84vh;overflow:auto;color:#eadfc4;font-size:.8rem">
 <h3 style="margin:0 0 6px;color:#c58bff">${q ? 'Editar' : 'Nova'} missão especial</h3>
 <label>Nome (2 a 40):</label><input id="sqf-name" class="dev-input" maxlength="40" value="${esc(q ? q.name : '')}">
@@ -66,6 +66,7 @@
 <div id="sqf-err" style="color:#e74c3c;min-height:1em"></div>
 <div style="display:flex;gap:6px;justify-content:flex-end"><button class="dev-save-btn" id="sqf-cancel" style="width:auto;background:#555;margin:0">Cancelar</button><button class="dev-save-btn" id="sqf-save" style="width:auto;background:#8e44ad;margin:0">Salvar</button></div></div>`);
         const sync = () => { const ty = $('sqf-type').value; $('sqf-code').style.display = ty === 'code' ? '' : 'none'; $('sqf-kill').style.display = ty === 'kill' ? '' : 'none'; $('sqf-map').style.display = ty === 'map' ? '' : 'none'; $('sqf-deliver').style.display = ty === 'deliver' ? '' : 'none'; $('sqf-n').style.display = (ty === 'kill' || ty === 'deliver') ? '' : 'none'; };
+        try { if (window.ItemInput) { ItemInput.attach($('sqf-ditem')); ItemInput.attach($('sqf-ritem')); } } catch (e) { }
         $('sqf-type').onchange = sync; sync();
         $('sqf-cancel').onclick = () => closeModal();
         $('sqf-save').onclick = async () => {

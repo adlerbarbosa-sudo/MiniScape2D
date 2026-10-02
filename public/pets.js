@@ -1,7 +1,7 @@
 /* MiniScape 2D — Pets e Montarias.
    PETS: 12 companheiros (itens "Pet X": drop raro, pesca/baús, loja). Um pet equipado segue o dono (steering suave, colisão simples, teletransporte com poeira se ficar preso),
    dá bônus em % e tem modos: Seguir / Atacar / Coletar itens / Coletar moedas / Coletar tudo. Ganha XP quando o jogador ganha XP (nível máx. 10).
-   MONTARIAS: 9 selas ("Sela X"): velocidade em % (tecla V ou botão). Só visual + velocidade (a hitbox do jogador não muda). Não luta montado; desmonta em interior/loja/banco/pesca.
+   MONTARIAS: 9 selas ("Sela X"): velocidade em % (tecla V ou botão). Velocidade + bônus; LUTA montado (melee, arco e magia). Pets nível 10+ também são montáveis, mas NÃO se luta montado no pet. Desmonta em interior/loja/banco/pesca.
    Dados no jogador: player.pet {id,name,lvl,xp,mode}, player.pets {id:{lvl,xp,name}}, player.mounts {id:{lvl 1..30,xp,name?}} (formato antigo 1 é migrado), player.mount (id escolhido). Nada disso é fonte de verdade no servidor
    (cleanPetData/cleanPetSync em extras.js só sanitizam). O pet roda 100% no cliente; os outros jogadores veem `pet` {id,l} e `mount` pelo /sync e desenham o seguidor localmente.
    Integração com atributos: Pets.bonus() -> {xp,luck,spd,crit,dmg,coins,regen,mregen} em %. Crítico e sorte de drop entram no sistema de atributos como fonte 'pets'
@@ -258,13 +258,17 @@
     function mount() { const why = mountBlock(); if (why) { if (why !== 'x') say(why, '#e74c3c'); return false; } if (P.mounted) return true; if (P.pm) dismountPet(); P.mounted = true; bump(); puffAt(player.x, player.y + 6, 7); sfx('click'); say('Montou: ' + mountName(player.mount) + ' (Nv ' + mLvl(player.mount) + ', +' + String(mountSpd(player.mount, mLvl(player.mount))).replace('.', ',') + '% velocidade).', '#6ff09a'); renderChips(); return true; }
     function dismount(msg) { if (!P.mounted) return; P.mounted = false; bump(); puffAt(player.x, player.y + 6, 6); if (msg) say(msg, '#e67e22'); renderChips(); }
     function toggleMount() { ensure(); if (P.mounted) dismount('Desmontou.'); else mount(); }
-    /* ---- montar no PET (nível 10+): o jogador senta no pet (que cresce), ganha os atributos dele e PODE atacar; desmontado o pet volta a seguir/coletar/atacar mas sem dar atributos ---- */
+    /* ---- montar no PET (nível 10+): o jogador senta no pet (que cresce), ganha os atributos dele mas NÃO pode atacar montado ("Desmonte do pet para lutar"; ao ser atingido desmonta); desmontado o pet volta a seguir/coletar/atacar mas sem dar atributos ---- */
     function mountPet() {
         const why = mountBlock(true); if (why) { if (why !== 'x') say(why, '#e74c3c'); return false; } if (P.pm) return true;
         if (P.mounted) dismount(); P.pm = true; P.tgt = null; delete P.fol.me; bump(); puffAt(player.x, player.y + 6, 7); sfx('click');
-        const id = player.pet.id; say('Montou em ' + (player.pet.name || PETS[id][0]) + '! Atributos ativos (x' + String(PM_MUL).replace('.', ',') + ') e +' + pmSpd(id) + '% de velocidade. Você pode atacar montado.', '#6ff09a'); renderChips(); if (P.ui.open) renderPanel(true); return true;
+        const id = player.pet.id; say('Montou em ' + (player.pet.name || PETS[id][0]) + '! Atributos ativos (x' + String(PM_MUL).replace('.', ',') + ') e +' + pmSpd(id) + '% de velocidade. Não dá para lutar montado no pet.', '#6ff09a'); renderChips(); if (P.ui.open) renderPanel(true); return true;
     }
     function dismountPet(msg) { if (!P.pm) return; P.pm = false; delete P.fol.me; bump(); puffAt(player.x, player.y + 6, 6); if (msg) say(msg, '#e67e22'); renderChips(); if (P.ui.open) renderPanel(true); }   // o seguidor reaparece ao lado no próximo tick
+    function petNoFight() {   // montado no pet não se luta: só aviso curto (sem acumular), cancela perseguição/mira
+        try { rangedTarget = null; player.pendingAutoAction = null; } catch (e) { }
+        const n = performance.now(); if (!P.nfT || n - P.nfT > 1200) { P.nfT = n; say('Desmonte do pet para lutar.', '#e67e22'); }
+    }
     function togglePetMount() { ensure(); if (P.pm) dismountPet('Desmontou do pet.'); else mountPet(); }
     function ride() {   // tecla V / botão: desmonta o que estiver montado; senão monta a montaria comum (se houver) ou o pet nível 10+
         ensure(); if (P.mounted) return dismount('Desmontou.'); if (P.pm) return dismountPet('Desmontou do pet.');
@@ -392,6 +396,8 @@
         if (P.lastMap !== currentMap) { const was = P.lastMap; P.lastMap = currentMap; P.solidsT = 0; if (was && P.mounted && indoor()) dismount('Desmontou: não dá para montar aqui dentro.'); if (P.pm && indoor()) dismountPet('Desmontou: não dá para montar aqui dentro.'); P.tgt = null; P.skip = Object.create(null); }
         if (P.mounted && (player.stats.hp <= 0 || !player.mount || !MOUNTS[player.mount])) dismount('Desmontou.');
         if (P.pm && (player.stats.hp <= 0 || !petCan())) dismountPet('Desmontou.');
+        if (P.pm && P.hp0 !== undefined && player.stats.hp < P.hp0 && player.stats.hp > 0) dismountPet('Você foi atingido e desmontou do pet.');
+        P.hp0 = player.stats.hp;
         if (P.pm) { try { if ((window.Fishing && Fishing.busy && Fishing.busy()) || player.isPerformingAction) dismountPet('Desmontou para agir.'); } catch (e) { } }
         if (P.mounted) { try { if ((window.Fishing && Fishing.busy && Fishing.busy()) || player.isPerformingAction) dismount('Desmontou para agir.'); } catch (e) { } }
         // montaria: estado de animação e poeira
@@ -413,7 +419,7 @@
                 if (hyp(F.x - goal.x, F.y - goal.y) < 11 && P.cd <= 0) { if (petCollect(P.tgt)) { P.cd = COLLECT_CD; sfx('pickup'); try { Art.burst(F.x, F.y - 8, '#ffe27a', 6, 1); } catch (e) { } } P.tgt = null; }
                 else if (F.giveUp) { P.skip[P.tgt.id] = performance.now() + 12000; P.tgt = null; F.giveUp = false; }
             }
-        } else if (!P.mounted && mode === 'attack') {
+        } else if (mode === 'attack') {   // também ajuda quando o dono luta montado na montaria comum
             const t = P.hit; if (t && t.active && t.hp > 1 && P.hitT > 0 && hyp(player.x - (t.x + (t.w || 30) / 2), player.y - (t.y + (t.h || 30) / 2)) < 280) {
                 const cx = t.x + (t.w || 30) / 2, cy = t.y + (t.h || 30) + 2, d = hyp(F.x - cx, F.y - cy);
                 // fica de lado do inimigo (do lado do dono) e ataca em intervalos
@@ -548,17 +554,20 @@
                     was = !!(t && t.active !== false && t.hp > 0); const m = gameMaps[currentMap]; cur = m && m.entities; n0 = cur ? cur.length : -1;
                 } catch (e) { }
                 const r = o.call(this, t, d2, sT, crit ? Math.max(maxHit || 0, d2) : maxHit);
-                try { if (was && t && t.hp <= 0) { postKill(t, cur, n0); onKill(t); } } catch (e) { console.error(e); }
+                try { if (was && t && t.hp <= 0) { if (!t._lootDeferred) postKill(t, cur, n0); onKill(t); } } catch (e) { console.error(e); }   // online: o loot só sai quando o servidor confirma a morte (index.html: dropLootNow chama Pets.postKill)
                 return r;
             }; W.applyDamage._pets = 1;
         }
         if (typeof W.switchMap === 'function' && !W.switchMap._pets) { const o = W.switchMap; W.switchMap = function (id, x, y) { const r = o.apply(this, arguments); try { ensure(); if (P.mounted && indoor()) dismount('Desmontou: não dá para montar aqui dentro.'); if (P.pm && indoor()) dismountPet('Desmontou: não dá para montar aqui dentro.'); P.tgt = null; const F = P.fol.me; if (F) { F.map = ''; } } catch (e) { } return r; }; W.switchMap._pets = 1; }
         if (typeof W.useItem === 'function' && !W.useItem._pets) { const o = W.useItem; W.useItem = function (i) { try { if (!(typeof isBankOpen !== 'undefined' && isBankOpen)) { const it = player.inventory[i]; if (it && (it.petId || it.mountId || (itemDB[it.name] && (itemDB[it.name].petId || itemDB[it.name].mountId)))) { if (useItem(i)) return; } } } catch (e) { console.error(e); } return o.apply(this, arguments); }; W.useItem._pets = 1; }
-        if (typeof W.tryAttack === 'function' && !W.tryAttack._pets) { const o = W.tryAttack; W.tryAttack = function () { if (P.mounted) { say('Desmonte para lutar.', '#e67e22'); return; } return o.apply(this, arguments); }; W.tryAttack._pets = 1; }
+        if (typeof W.beginAttack === 'function' && !W.beginAttack._pets) { const o = W.beginAttack; W.beginAttack = function (obj) { if (P.pm && obj && obj.type === 'enemy') { petNoFight(); return true; } return o.apply(this, arguments); }; W.beginAttack._pets = 1; }
+        if (typeof W.respawnAtVillage === 'function' && !W.respawnAtVillage._pets) { const o = W.respawnAtVillage; W.respawnAtVillage = function () { try { if (P.pm) dismountPet('Você caiu e desmontou do pet.'); } catch (e) { } return o.apply(this, arguments); }; W.respawnAtVillage._pets = 1; }
+        if (typeof W.tryAttack === 'function' && !W.tryAttack._pets) { const o = W.tryAttack; W.tryAttack = function () { if (P.pm) { petNoFight(); return; } return o.apply(this, arguments); }; W.tryAttack._pets = 1; }
         if (typeof W.tryInteract === 'function' && !W.tryInteract._pets) {
             const o = W.tryInteract; W.tryInteract = function (t) {
+                if (P.pm && t && t.type === 'enemy') { petNoFight(); return; }
                 try { if (P.pm && t && t.active !== false && t.type !== 'enemy' && t.type !== 'ground_item' && t.type !== 'portal' && t.type !== 'paint' && t.type !== 'decor') dismountPet('Desmontou do pet.'); } catch (e) { }
-                try { if (P.mounted && t && t.active !== false) { const ty = t.type; if (ty === 'enemy') { say('Desmonte para lutar.', '#e67e22'); return; } if (ty !== 'ground_item' && ty !== 'portal' && ty !== 'paint' && ty !== 'decor') dismount('Desmontou.'); } } catch (e) { }
+                try { if (P.mounted && t && t.active !== false) { const ty = t.type; if (ty === 'enemy') { /* montaria comum luta normalmente */ } else if (ty !== 'ground_item' && ty !== 'portal' && ty !== 'paint' && ty !== 'decor') dismount('Desmontou.'); } } catch (e) { }
                 return o.apply(this, arguments);
             }; W.tryInteract._pets = 1;
         }
@@ -683,7 +692,7 @@ html.touch #pet-row .mnt{display:none}
                 const nameEl = P.ui.renaming ? '<input class="pw-in" id="pw-name" maxlength="14" value="' + esc(pet.name || '') + '" placeholder="' + esc(d[0]) + '"><button class="pw-b go" data-a="rnok">OK</button>' : '<b>' + esc(pet.name || d[0]) + '</b> <button class="pw-b" data-a="ren" style="min-height:24px;padding:0 8px;font-size:.66rem">Nome</button>';
                 h += '<div class="pw-card">' + img(pet.id, 'pet', 128) + '<div class="pw-ct"><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">' + nameEl + '</div><small>' + esc(d[0]) + ' · <span style="color:' + RARC[d[1]] + '">' + RARN[d[1]] + '</span> · Nível ' + pet.lvl + (pet.lvl >= MAXLVL ? ' (máx.)' : '') + '</small><div class="pw-bar"><i style="width:' + pct + '%"></i></div><small>' + (pet.lvl >= MAXLVL ? 'Nível máximo' : pet.xp + ' / ' + need + ' XP') + '</small></div></div>';
                 h += '<div class="pw-sec">Atributos <small style="color:#ffd27a">(só montado)</small></div><div class="pw-st">' + (pet.lvl >= PET_MLVL ? petStatLinesM(pet.id, pet.lvl) + '<span>+' + pmSpd(pet.id) + '% Velocidade</span>' : statLines(pet.id, pet.lvl)) + '</div>';
-                h += pet.lvl >= PET_MLVL ? '<div class="pw-hint" style="color:#ffd27a">Bônus ativos só montado: ' + (P.pm ? 'ATIVOS agora.' : 'inativos agora (desmontado).') + ' Montado, o pet cresce, você ganha os atributos acima (x' + String(PM_MUL).replace('.', ',') + ') e pode atacar normalmente.</div><div><button class="pw-b go" data-a="pmnt">' + (P.pm ? 'Desmontar do pet' : 'Montar no pet') + (player.mount ? '' : ' (V)') + '</button></div>' : '<div class="pw-hint">No <b>nível ' + PET_MLVL + '</b> o pet fica grande o bastante para você montar nele. Montado você ganha os atributos acima (x' + String(PM_MUL).replace('.', ',') + ') e ainda pode atacar. Desmontado, o pet só ajuda a coletar e lutar, sem dar atributos.</div>';
+                h += pet.lvl >= PET_MLVL ? '<div class="pw-hint" style="color:#ffd27a">Bônus ativos só montado: ' + (P.pm ? 'ATIVOS agora.' : 'inativos agora (desmontado).') + ' Montado, o pet cresce, você ganha os atributos acima (x' + String(PM_MUL).replace('.', ',') + ') e <b>não pode lutar</b> montado: desmonte para atacar (e ao ser atingido você desmonta).</div><div><button class="pw-b go" data-a="pmnt">' + (P.pm ? 'Desmontar do pet' : 'Montar no pet') + (player.mount ? '' : ' (V)') + '</button></div>' : '<div class="pw-hint">No <b>nível ' + PET_MLVL + '</b> o pet fica grande o bastante para você montar nele. Montado você ganha os atributos acima (x' + String(PM_MUL).replace('.', ',') + ') mas não luta montado. Desmontado, o pet só ajuda a coletar e lutar, sem dar atributos.</div>';
                 h += '<div class="pw-sec">O que o pet faz</div>' + Object.keys(MODES).map((k) => '<div class="pw-mode' + (pet.mode === k ? ' on' : '') + '" data-a="mode" data-id="' + k + '"><i></i>' + MODES[k] + '</div>').join('');
                 h += '<div class="pw-hint">Coleta itens e moedas do chão num raio de ' + COLLECT_R + ' px (1 a cada 1,2 s) e só se houver espaço na mochila. Atacar: ajuda com dano pequeno, nunca dá o golpe final. Enquanto você está montado nele o pet só carrega você.</div><div><button class="pw-b bad" data-a="unp">Guardar pet</button></div>';
             } else h += '<div class="pw-hint">Nenhum pet equipado. Pets são raros: caem de monstros e chefes, de baús de pesca e há alguns à venda. Use o item <b>Pet ...</b> da mochila e escolha abaixo.</div>';
@@ -738,7 +747,7 @@ html.touch #pet-row .mnt{display:none}
     window.Pets = {
         PETS, MOUNTS, PET_IDS, MOUNT_IDS, MODES, RARN, RARC, cfg: { dropMul, COLLECT_R, SPD_CAP, MAXLVL },
         bonus, speedFactor, merge, tick, queue, mountOf, drawMounted, itemIcon, fill, onSync, onXP, useItem, equip: equipPet, unequip: unequipPet, setMode, rename, renameMount, mountSpd, mStage, mNeed, mLvl, mount, dismount, toggleMount, choose: chooseMount,
-        open: openPanel, close: closePanel, indoor, petItem, mountItem, petStats, grant, rollSource, onKill,
+        open: openPanel, close: closePanel, indoor, petItem, mountItem, petStats, grant, rollSource, onKill, postKill,
         mountPet, dismountPet, togglePetMount, ride, petCan, PET_MLVL, PM_MUL, isMounted: () => P.mounted, isPetMounted: () => P.pm, state: () => ({ mounted: P.mounted, pm: P.pm, pet: player && player.pet, fol: P.fol.me && { x: P.fol.me.x, y: P.fol.me.y, view: P.fol.me.view, sleep: !!P.fol.me.sleep, mv: P.fol.me.mv }, tgt: !!P.tgt, others: P.others }),
         _P: P
     };

@@ -163,7 +163,18 @@
         }
         return h;
     }
-    async function saveConfirmed() { try { await saveDataNow(false); } catch (e) { } return typeof _saveFails === 'number' ? _saveFails === 0 : true; }
+    /* salvar e CONFIRMAR: devolve true só se o servidor gravou (o mercado só age sobre o que o save já trouxe). Espera um 429 curto passar. */
+    async function saveConfirmed() { try { return (await saveDataNow(false, { wait: true })) === true; } catch (e) { return false; } }
+    function saveFailText(tail) { const st = window.saveStatus ? saveStatus() : {}; return (st.why === 'LOCKED' ? st.msg + ' ' : st.why === 'RATE' ? 'Salvando rápido demais, tente de novo em instantes. ' : 'Sem conexão para salvar. ') + tail; }
+    /* chamada de 2ª fase (criar/comprar): se o servidor ainda não viu o pendente salvo ("Salvamento pendente"), salva de novo e repete UMA vez */
+    async function mkPending(body) {
+        let r = await mkCall(body);
+        if (r && !r._net && typeof r.error === 'string' && /^Salvamento pendente/.test(r.error)) {
+            if (!(await saveConfirmed())) return { error: 'Salvamento pendente', _wait: true };
+            r = await mkCall(body);
+        }
+        return r;
+    }
     let mkBusy = false;
     async function doList() {
         if (mkBusy) return; const q = Math.floor(Number(($('mk-qty') || {}).value)), pr = Math.floor(Number(($('mk-price') || {}).value)), name = sellSel && sellSel.name;
@@ -171,7 +182,7 @@
         if (player.mkt && (player.mkt.create || player.mkt.buy)) return note('Aguarde a operação anterior terminar.', '#e74c3c');
         mkBusy = true; try {
             const inv = JSON.stringify(player.inventory); removeInvItem(name, q); player.mkt = { create: { item: name, qty: q, price: pr, nonce: nonce() } }; updateUI();
-            if (!(await saveConfirmed())) { player.inventory = JSON.parse(inv); player.mkt = null; updateUI(); return note('Sem conexão para salvar. Nada foi anunciado.', '#e74c3c'); }
+            if (!(await saveConfirmed())) { player.inventory = JSON.parse(inv); player.mkt = null; updateUI(); return note(saveFailText('Nada foi anunciado.'), '#e74c3c'); }
             await finishPending(); sellSel = null; await loadMarket();
         } finally { mkBusy = false; }
     }
@@ -193,7 +204,7 @@
         if (mkBusy) return; if (coins() < price) return note('Moedas insuficientes.', '#e74c3c'); if (player.mkt && (player.mkt.create || player.mkt.buy)) return note('Aguarde a operação anterior terminar.', '#e74c3c');
         mkBusy = true; try {
             const inv = JSON.stringify(player.inventory); removeInvItem('Coins', price); player.mkt = { buy: qty ? { id, price, qty, nonce: nonce() } : { id, price, nonce: nonce() } }; updateUI();
-            if (!(await saveConfirmed())) { player.inventory = JSON.parse(inv); player.mkt = null; updateUI(); return note('Sem conexão para salvar. Nada foi comprado.', '#e74c3c'); }
+            if (!(await saveConfirmed())) { player.inventory = JSON.parse(inv); player.mkt = null; updateUI(); return note(saveFailText('Nada foi comprado.'), '#e74c3c'); }
             await finishPending(); await loadMarket(); await claimMail();
         } finally { mkBusy = false; }
     }
@@ -202,11 +213,13 @@
     async function finishPending() {   // conclui (ou devolve) uma operação pendente; é seguro repetir
         const p = player.mkt; if (!p || !online()) return;
         if (p.create) {
-            const r = await mkCall(Object.assign({ a: 'create' }, p.create));
+            const r = await mkPending(Object.assign({ a: 'create' }, p.create));
+            if (r && r._wait) return;   // o servidor ainda não tem o pendente salvo: continua pendente e tenta de novo depois (nada é devolvido nem duplicado)
             if (r && r.ok) { player.mkt = null; note('Anúncio publicado!', '#2ecc71'); sfxp('coin'); await saveConfirmed(); }
             else if (r && !r._net && r._status < 500 && r._status !== 429 && r._status !== 401) { refund(p); player.mkt = null; note(r.error || 'Não foi possível anunciar. Item devolvido.', '#e74c3c'); updateUI(); await saveConfirmed(); }
         } else if (p.buy) {
-            const r = await mkCall(p.buy.qty ? { a: 'buy', id: p.buy.id, nonce: p.buy.nonce, qty: p.buy.qty, cost: p.buy.price } : { a: 'buy', id: p.buy.id, nonce: p.buy.nonce, cost: p.buy.price });
+            const r = await mkPending(p.buy.qty ? { a: 'buy', id: p.buy.id, nonce: p.buy.nonce, qty: p.buy.qty, cost: p.buy.price } : { a: 'buy', id: p.buy.id, nonce: p.buy.nonce, cost: p.buy.price });
+            if (r && r._wait) return;
             if (r && r.ok) { player.mkt = null; note('Compra feita! ' + (r.qty > 1 ? 'Os ' + r.qty + ' itens chegam' : 'O item chega') + ' pelo correio.', '#2ecc71'); sfxp('pickup'); await saveConfirmed(); }
             else if (r && !r._net && r._status < 500 && r._status !== 429 && r._status !== 401) { refund(p); player.mkt = null; note(r.error || 'Compra recusada. Moedas devolvidas.', '#e74c3c'); updateUI(); await saveConfirmed(); }
         }

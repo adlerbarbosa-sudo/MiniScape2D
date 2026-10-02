@@ -7,7 +7,7 @@
 
 const MIMIC = require('./mimicnames');
 const MAX_PARTY = 5, INVITE_MS = 60000, OPEN_IDLE_MS = 10 * 60000, COMMIT_MS = 20000, OFFLINE_MS = 120000, STALE_MS = 30 * 86400000;
-const ITEM_RE = /^[\p{L}\p{N}_.'\- ]{1,40}$/u;
+const ITEM_RE = /^[\p{L}\p{N}_.'’()+%!:\- ]{1,40}$/u;
 const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 
 module.exports = function createSocial(ctx) {
@@ -70,13 +70,21 @@ module.exports = function createSocial(ctx) {
             else if ((t.st === 'done' || t.st === 'cancel') && n - t.t > STALE_MS) { delete db.trades[id]; if (tradeOf[t.a] === id) delete tradeOf[t.a]; if (tradeOf[t.b] === id) delete tradeOf[t.b]; markDirty(); }
         }
     }
-    setInterval(tick, 2000).unref();
+    setInterval(() => { try { tick(); } catch (e) { console.error('[social.tick]', e); } }, 2000).unref();
 
     function view(u) {
         const inv = invites[u];
         return { party: partyView(u), invite: inv && parties[inv.pid] ? { from: inv.from } : null, trade: tradeView(u) };
     }
     const err = (m) => ({ error: m });
+    const savedPD = (u) => { const x = hasOwn(db.users, u) ? db.users[u] : null; return x && x.playerData && typeof x.playerData === 'object' ? x.playerData : null; };
+    /* o depósito só vale se o save do jogador (já aceito pelo servidor) o traz: id da troca + todas as peças oferecidas */
+    function escrowSaved(u, t, s) {
+        const pd = savedPD(u); const e = pd && pd.escrow; if (!e || typeof e !== 'object' || e.id !== t.id || !Array.isArray(e.items)) return false;
+        const have = new Map(); for (const x of e.items) if (Array.isArray(x) && typeof x[0] === 'string' && Number.isFinite(x[1])) have.set(x[0], (have.get(x[0]) || 0) + x[1]);
+        for (const x of t.offer[s]) if ((have.get(x[0]) || 0) < x[1]) return false;
+        return true;
+    }
 
     function act(u, b) {
         if (!b || typeof b.a !== 'string') return err('Pedido inválido.');
@@ -125,12 +133,15 @@ module.exports = function createSocial(ctx) {
             case 'trade_ready': {   // o cliente conferiu itens/espaço e (se passou) já tirou as peças da mochila
                 if (t.st !== 'commit') return err('Fora de fase.'); if (t.ready[s] !== null) return { ok: true };
                 t.ready[s] = !!b.pass; t.esc[s] = !!b.pass;
+                if (t.ready[s] === true && !escrowSaved(u, t, s)) { t.ready[s] = false; t.esc[s] = true; endTrade(t, 'depósito de ' + u + ' não foi salvo (a troca foi desfeita e nada se perdeu)'); markDirty(); return { ok: true }; }   // esc=true: o cliente devolve o depósito local
                 if (t.ready[s] === false) endTrade(t, u + ' não pôde concluir');
                 else if (t.ready[o] === true) { t.st = 'done'; t.t = now(); }
                 markDirty(); return { ok: true };
             }
             case 'trade_ack': {   // o cliente já aplicou (recebeu / devolveu o depósito)
-                if (t.st !== 'done' && t.st !== 'cancel') return err('Fora de fase.'); t.applied[s] = true; settle(t); markDirty(); return { ok: true };
+                if (t.st !== 'done' && t.st !== 'cancel') return err('Fora de fase.');
+                if (t.st === 'done' && !t.applied[s]) { const pd = savedPD(u); if (!(pd && Array.isArray(pd.tradeDone) && pd.tradeDone.includes(t.id))) return err('Salvamento pendente.'); }   // só confirma o recebimento depois que o save com o item chegou ao servidor
+                t.applied[s] = true; settle(t); markDirty(); return { ok: true };
             }
             default: return err('Ação desconhecida.');
         }

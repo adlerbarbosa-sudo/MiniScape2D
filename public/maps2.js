@@ -201,6 +201,7 @@
     const R5 = (v) => Math.round(v);
     const LANDING = { down: [0, 100], up: [0, -100], left: [-100, 0], right: [100, 0] };
 
+    const hbox = (o) => { try { if (typeof getHitbox === 'function') { const h = getHitbox(o); if (h) return h; if (o.type === 'decor' || o.type === 'house') return null; } } catch (e) { } return { x: o.x, y: o.y, w: o.w || 30, h: o.h || 30 }; };   // mesma caixa de colisão do jogo (árvore = só o tronco)
     function Builder(idx, id, name, W, H, color, seed) {
         const b = { id, name, W, H, color, E: [], ports: {}, safe: [], spawn: null };
         const rnd = mulberry(seed * 7919 + idx * 131 + 17); b.rnd = rnd;
@@ -320,9 +321,26 @@
         };
         b.scatter = (n2, fn, reg, tries) => { reg = reg || [40, 40, W - 40, H - 40]; let ok = 0; const out = []; for (let t = 0; t < (tries || n2 * 40) && ok < n2; t++) { const o = fn(R5(reg[0] + rnd() * (reg[2] - reg[0])), R5(reg[1] + rnd() * (reg[3] - reg[1]))); if (o) { ok++; out.push(o); } } return out; };
         b.forest = (n2, reg, o) => { o = o || {}; return b.scatter(n2, (x, y) => b.tree(x, y, o.v ? o.v() : undefined, { pad: o.pad === undefined ? 12 : o.pad, padT: o.padT === undefined ? -34 : o.padT }), reg, n2 * 50); };
-        b.mobs = (key, n2, reg, opt) => b.scatter(n2, (x, y) => b.mob(key, x, y, opt), reg, n2 * 80);
+        b.mreq = []; b.extra = [];   // pedidos de criaturas (para completar as que não couberam: floresta/salas lotadas de cenário)
+        b.mobs = (key, n2, reg, opt) => { const r = b.scatter(n2, (x, y) => b.mob(key, x, y, opt), reg, n2 * 80); b.mreq.push({ key, n: n2, got: r.length, reg: reg || [40, 40, W - 40, H - 40], opt }); return r; };
+        // completa as criaturas que não acharam lugar: pode pisar em cenário NÃO sólido (ossos, flores, itens), nunca em sólido, água, zona segura ou fora do mapa
+        b.topUp = () => {
+            const solidAt = (x, y, w, h) => b.E.some((o) => { if (!o || o.active === false) return false; const t = o.type; if (t === 'paint' || t === 'ground_item' || t === 'fishing_spot' || t === 'farm_plot' || t === 'fire' || t === 'portal' || t === 'house_door') return false; if (t === 'decor' && !(CD()[o.kind] || {}).solid) return false; const hb = hbox(o); if (!hb) return false; const p = t === 'enemy' || t === 'npc' ? 14 : 8; return x - p < hb.x + hb.w && x + w + p > hb.x && y - p < hb.y + hb.h && y + h + p > hb.y; });
+            for (const q of b.mreq) {
+                const d = npcDB[q.key]; if (!d) continue; const w = d.w || 30, h = d.h || 30;
+                for (let need = q.n - q.got, tries = 0; need > 0 && tries < 1500; tries++) {
+                    const grow = Math.floor(tries / 300) * 150, r0 = q.reg, x0 = Math.max(40, r0[0] - grow), y0 = Math.max(40, r0[1] - grow), x1 = Math.min(W - 40 - w, r0[2] + grow), y1 = Math.min(H - 40 - h, r0[3] + grow);
+                    if (x1 <= x0 || y1 <= y0) continue;
+                    const x = R5(x0 + rnd() * (x1 - x0)), y = R5(y0 + rnd() * (y1 - y0));
+                    if (b.safe.some((s) => Math.hypot(x + w / 2 - s[0], y + h / 2 - s[1]) < s[2])) continue;
+                    if (hitM(WATER, x, y + h * 0.5, w, h * 0.5) || solidAt(x, y, w, h)) continue;
+                    const o = { id: nid(), type: 'enemy', dbKey: q.key, name: d.name, x, y, w, h, hp: d.hp, maxHp: d.hp, attackCooldown: 0, active: true };
+                    b.E.push(o); b.extra.push(o); occAdd({ x, y, w, h, t: 'enemy' }); need--; q.got++;
+                }
+            }
+        };
         b.decors = (kind, n2, reg, opt) => b.scatter(n2, (x, y) => b.decor(kind, x, y, opt), reg, n2 * 50);
-        b.finish = (gx, gy) => ({ id, name, catalogV: 2, width: W, height: H, color, gridX: gx, gridY: gy, spawn: b.spawn || { x: R5(W / 2), y: R5(H / 2) }, entities: b.E });
+        b.finish = (gx, gy) => { try { b.topUp(); } catch (e) { console.error('[maps2] topUp ' + id, e); } return { id, name, catalogV: 2, width: W, height: H, color, gridX: gx, gridY: gy, spawn: b.spawn || { x: R5(W / 2), y: R5(H / 2) }, entities: b.E }; };
         return b;
     }
 
@@ -860,6 +878,30 @@
         const hz = p.face === 'up' || p.face === 'down', mk2 = (x, y) => { const s = dsz('lamp'); return { id: nextId(), type: 'decor', kind: 'lamp', name: 'Poste de Luz', x, y, w: s[0], h: s[1], active: true }; };
         if (hz) { ents.push(mk2(p.px - 34, p.py + 8), mk2(p.px + 78, p.py + 8)); } else { ents.push(mk2(p.px + 22, p.py - 88), mk2(p.px + 22, p.py + 74)); }
     }
+    /* Mundo já salvo: mapas feitos antes do b.topUp ficaram sem parte das criaturas (cenário lotado, ex.: o Dragão Negro, trolls e aranhas venenosas).
+       A reconstrução é determinística (mesma semente), então dá para saber quais faltaram e colocá-las (uma vez por mapa, c6.mtu) em lugar livre do mapa salvo. */
+    function refill(maps) {
+        let n = 0;
+        Object.keys(MAPS).forEach((id) => {
+            const m = maps[id], sp = MAPS[id]; if (!m || !Array.isArray(m.entities) || (m.c6 && m.c6.mtu)) return;
+            try {
+                const b = Builder(sp.idx, id, sp.name, sp.w, sp.h, sp.color, sp.idx * 97 + 5); sp.build(b, sp); b.topUp();
+                const W = m.width || sp.w, H = m.height || sp.h, ids = new Set(m.entities.map((o) => o && o.id));
+                const isSolid = (o) => { if (!o || o.active === false) return false; const t = o.type; if (t === 'paint' || t === 'ground_item' || t === 'fishing_spot' || t === 'farm_plot' || t === 'fire' || t === 'portal' || t === 'house_door') return false; if (t === 'decor' && !(CD()[o.kind] || {}).solid) return false; return true; };
+                const blocked = (x, y, w, h) => m.entities.some((o) => { if (!isSolid(o)) return false; const hb = hbox(o); if (!hb) return false; const p2 = o.type === 'enemy' || o.type === 'npc' ? 14 : 8; return x - p2 < hb.x + hb.w && x + w + p2 > hb.x && y - p2 < hb.y + hb.h && y + h + p2 > hb.y; });
+                b.extra.forEach((o) => {
+                    if (ids.has(o.id)) return;
+                    for (let k = 0; k < 40; k++) {
+                        const ang = k * 2.4, r = k * 14, x = R5(o.x + Math.cos(ang) * r), y = R5(o.y + Math.sin(ang) * r);
+                        if (x < 40 || y < 40 || x + o.w > W - 40 || y + o.h > H - 40 || blocked(x, y, o.w, o.h)) continue;
+                        m.entities.push(Object.assign({}, o, { x, y })); ids.add(o.id); n++; break;
+                    }
+                });
+                flag(m, 'mtu');
+            } catch (e) { console.error('[maps2] refill ' + id, e); }
+        });
+        return n;
+    }
     function place(maps) {
         if (!maps || typeof maps !== 'object' || !maps.lumbridge) return { built: 0, links: 0 };
         try { mergeCreatures(); } catch (e) {}
@@ -870,7 +912,7 @@
             try {
                 const b = Builder(sp.idx, id, sp.name, sp.w, sp.h, sp.color, sp.idx * 97 + 5); sp.build(b, sp);
                 const used = Object.keys(maps).some((k) => maps[k] && maps[k].gridX === sp.gx && maps[k].gridY === sp.gy);
-                maps[id] = b.finish(used ? null : sp.gx, used ? null : sp.gy); builders[id] = b; out.built++; mark();
+                maps[id] = b.finish(used ? null : sp.gx, used ? null : sp.gy); flag(maps[id], 'mtu'); builders[id] = b; out.built++; mark();
             } catch (e) { out.errors.push(id + ': ' + (e && e.message)); console.error('[maps2] ' + id, e); }
         });
         const portEnd = (mapId, key) => {
@@ -893,11 +935,12 @@
             if (bOld) { lampsFor(B.entities, pb, () => 'c6_' + id + '_lb' + (seq++)); flag(B, 'lk_' + id); }
             out.links++; mark();
         });
+        try { out.refilled = refill(maps); } catch (e) { console.error(e); }
         return out;
     }
 
     /* ============================ LIGAÇÃO COM O JOGO ============================ */
     function wrapMerge() { const W2 = window.World2; if (!W2 || W2.merge._m2) return; const om = W2.merge; W2.merge = function () { const r = om.apply(this, arguments); try { mergeCreatures(); } catch (e) {} return r; }; W2.merge._m2 = true; }
     wrapMerge();
-    window.Maps2 = { place, MAPS, LINKS, CREATURES, NEWDECOR, Builder, mergeCreatures, installArt, slotFor, bsz, dsz, version: 1 };
+    window.Maps2 = { place, refill, MAPS, LINKS, CREATURES, NEWDECOR, Builder, mergeCreatures, installArt, slotFor, bsz, dsz, version: 1 };
 })();

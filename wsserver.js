@@ -52,13 +52,14 @@ function makeConn(socket, maxPayload) {
     socket.on('data', (d) => { buf = buf.length ? Buffer.concat([buf, d]) : d; parse(); });
     socket.on('close', finish); socket.on('error', finish);
     const pinger = setInterval(() => { if (!alive) return finish(); alive = false; try { socket.write(frame(0x9, Buffer.alloc(0))); } catch (e) { } }, 25000); pinger.unref();
-    conn._feed = (d) => { buf = Buffer.concat([buf, d]); parse(); };
+    conn._feed = (d) => { buf = buf.length ? Buffer.concat([buf, d]) : d; parse(); };
     return conn;
 }
 
 function attach(server, opts) {
     const path = opts.path || '/ws', maxPayload = opts.maxPayload || 131072; let count = 0;
-    server.on('upgrade', (req, socket) => {
+    server.on('upgrade', (req, socket, head) => {
+        socket.on('error', () => { });   // ECONNRESET etc. nunca podem virar exceção não tratada (o makeConn registra o seu próprio depois)
         let pathname = ''; try { pathname = new URL(req.url, 'http://x').pathname; } catch (e) { }
         const key = req.headers['sec-websocket-key'];
         if (pathname !== path || String(req.headers.upgrade || '').toLowerCase() !== 'websocket' || !key || req.headers['sec-websocket-version'] !== '13') { socket.write('HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n'); return socket.destroy(); }
@@ -69,6 +70,7 @@ function attach(server, opts) {
         socket.setNoDelay(true); count++;
         const conn = makeConn(socket, maxPayload); conn.on('close', () => { count--; });
         opts.onConnect(conn, req);
+        if (head && head.length) { try { conn._feed(Buffer.from(head)); } catch (e) { conn.close(1002); } }   // bytes que chegaram junto com o pedido de upgrade
     });
 }
 module.exports = { attach, frame };

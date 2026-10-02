@@ -5,6 +5,11 @@
     const esc = (t) => String(t == null ? '' : t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const $ = (id) => document.getElementById(id);
     let target = '', item = '', built = false, searchT = 0, busy = false;
+    /* nomes de item aceitos pelo servidor (ITEM_RE em security.js): letras, números, espaço e _ . ' ’ ( ) + % ! : - ; até 40 caracteres. Os campos de texto do Dev tiram o resto na hora. */
+    const ITEM_RE = /^[\p{L}\p{N}_.'’()+%!:\- ]{1,40}$/u, ITEM_BAD = /[^\p{L}\p{N}_.'’()+%!:\- ]/gu;
+    const itemClean = (v) => String(v == null ? '' : v).replace(ITEM_BAD, '').slice(0, 40);
+    function itemAttach(el) { if (!el || el._itemClean) return; el._itemClean = 1; el.maxLength = 40; el.addEventListener('input', () => { const c = itemClean(el.value); if (c !== el.value) { const p = el.selectionStart; el.value = c; try { el.setSelectionRange(Math.min(p, c.length), Math.min(p, c.length)); } catch (e) { } } }); }
+    window.ItemInput = { RE: ITEM_RE, clean: itemClean, attach: itemAttach, valid: (n) => typeof n === 'string' && ITEM_RE.test(n) };
 
     function build() {
         if (built) return; const tab = $('tab-dev'); const bar = tab && tab.querySelector('.dev-sub-tabs'); if (!bar) return; built = true;
@@ -28,7 +33,7 @@
         try { if (window.SQAdmin) SQAdmin.init(tab, bar); } catch (e) { console.error(e); }   // Missões Especiais (sqadmin.js)
         const qb = $('gf-qb'); [1, 10, 100, 1000, 100000].forEach((n) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'dev-save-btn'; b.style.cssText = 'margin:0;padding:3px 8px;width:auto;background:#3d2e24'; b.textContent = n.toLocaleString('pt-BR'); b.onclick = () => { $('gf-qty').value = n; }; qb.appendChild(b); });
         $('gf-user').addEventListener('input', () => { clearTimeout(searchT); searchT = setTimeout(searchUsers, 200); }); $('gf-user').addEventListener('focus', searchUsers);
-        $('gf-item').addEventListener('input', renderItems);
+        itemAttach($('gf-item')); itemAttach($('di-name')); $('gf-item').addEventListener('input', renderItems);
         $('gf-users').addEventListener('click', (e) => { const r = e.target.closest('[data-u]'); if (!r) return; target = r.dataset.u; $('gf-user').value = target; $('gf-users').innerHTML = ''; render(); });
         $('gf-items').addEventListener('click', (e) => { const r = e.target.closest('[data-i]'); if (!r) return; item = r.dataset.i; render(); renderItems(); });
         $('gf-send').onclick = send; render(); renderItems();
@@ -42,14 +47,14 @@
     }
     function renderItems() {
         const q = ($('gf-item').value || '').trim().toLowerCase(); const box = $('gf-items'); if (!box || typeof itemDB === 'undefined') return;
-        const names = Object.keys(itemDB).filter((k) => !q || k.toLowerCase().includes(q) || String(itemDB[k].desc || '').toLowerCase().includes(q)).sort().slice(0, 80);
+        const names = Object.keys(itemDB).filter((k) => ITEM_RE.test(k) && (!q || k.toLowerCase().includes(q) || String(itemDB[k].desc || '').toLowerCase().includes(q))).sort().slice(0, 80);
         box.innerHTML = names.map((k) => `<div class="dev-ent-item${k === item ? ' selected' : ''}" data-i="${esc(k)}" style="cursor:pointer;display:flex;align-items:center;gap:6px">${window.Icons ? Icons.html(k, 20) : ''}<span>${esc(k)}</span></div>`).join('') || '<small style="opacity:.6;padding:4px">Nenhum item.</small>';
     }
     function render() { const s = $('gf-sel'); if (s) s.innerHTML = 'Para: <b>' + esc(target || '(escolha um jogador)') + '</b> · Item: <b>' + esc(item || '(escolha um item)') + '</b>'; }
     function status(t, c) { const s = $('gf-status'); if (s) { s.textContent = t; s.style.color = c || '#bdc3c7'; } }
     async function send() {
         if (busy) return; const qty = Math.floor(Number($('gf-qty').value));
-        if (!target) return status('Escolha um jogador na lista.', '#e74c3c'); if (!item) return status('Escolha um item na lista.', '#e74c3c');
+        if (!target) return status('Escolha um jogador na lista.', '#e74c3c'); if (!item) return status('Escolha um item na lista.', '#e74c3c'); if (!ITEM_RE.test(item)) return status('Esse nome de item tem caracteres que o servidor não aceita.', '#e74c3c');
         if (!(qty >= 1 && qty <= 2147483647)) return status('Quantidade inválida (1 a 2.147.483.647).', '#e74c3c');
         busy = true; status('Enviando...');
         try {

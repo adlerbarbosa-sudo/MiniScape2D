@@ -57,7 +57,7 @@ app.use(['/api/login', '/api/register'], express.json({ limit: '4kb' }));
 app.use(['/api/chat', '/api/rank', '/api/logout'], express.json({ limit: '4kb' }));
 app.use(['/api/house', '/api/market', '/api/social'], express.json({ limit: '16kb' }));
 app.use('/api/sync', express.json({ limit: '64kb' }));
-app.use('/api/save', (req, res, next) => auth(req, res, next), express.json({ limit: '8mb' }));
+app.use('/api/save', (req, res, next) => auth(req, res, next), (req, res, next) => userLimit('save', 150, 60000)(req, res, next), express.json({ limit: '8mb' }));   // login e limite por usuário ANTES de ler o corpo grande
 app.use('/api/restore', (req, res, next) => auth(req, res, () => adminOnly(req, res, next)), express.json({ limit: '30mb' }));
 app.use(express.json({ limit: '64kb' }));
 app.use(express.static(path.join(__dirname, 'public'), { dotfiles: 'ignore', index: 'index.html' }));
@@ -97,7 +97,7 @@ function normalizeDB(d) {
     if (Array.isArray(d.chat)) out.chat = d.chat.slice(-50).filter(c => c && typeof c.msg === 'string').map(c => ({ sender: String(c.sender || '?').slice(0, 40), msg: c.msg.slice(0, 200), color: /^#[0-9a-f]{3,8}$/i.test(c.color) ? c.color : '#ecf0f1' }));
     out.trades = Object.create(null);
     if (d.trades && typeof d.trades === 'object') for (const id of Object.keys(d.trades)) { const t = d.trades[id]; if (t && typeof t === 'object' && typeof t.a === 'string' && typeof t.b === 'string' && t.offer && t.ok && t.applied) out.trades[id] = t; }
-    if (d.market && typeof d.market === 'object') out.market = d.market;
+    out.market = createExtras.cleanMarket(d.market);   // mercado/correio validados e sem protótipo (extras.js)
     out.mobDeaths = Object.create(null);   // map -> id -> instante da morte (respawn autoritativo do servidor, sobrevive a reinício)
     if (d.mobDeaths && typeof d.mobDeaths === 'object') for (const mk of Object.keys(d.mobDeaths)) {
         const m = d.mobDeaths[mk]; if (!MAP_RE.test(mk) || /^casa_/.test(mk) || !m || typeof m !== 'object') continue; const o = Object.create(null);
@@ -111,20 +111,37 @@ function normalizeDB(d) {
     if (out.worldData) healWorld(out.worldData);
     if (Number.isFinite(d.mapVersion)) out.mapVersion = d.mapVersion;
     if (d.sessions && typeof d.sessions === 'object') {
-        for (const h of Object.keys(d.sessions)) { const s = d.sessions[h]; if (s && typeof s.user === 'string' && s.exp > Date.now()) out.sessions[h] = { user: s.user, exp: s.exp, sid: Number.isFinite(s.sid) ? s.sid : 0, rep: s.rep ? 1 : 0 }; }
+        for (const h of Object.keys(d.sessions)) { const s = d.sessions[h]; if (s && typeof s.user === 'string' && Number.isFinite(s.exp) && s.exp > Date.now() && /^[0-9a-f]{64}$/.test(h)) out.sessions[h] = { user: s.user, exp: s.exp, sid: Number.isFinite(s.sid) ? s.sid : 0, rep: s.rep ? 1 : 0 }; }
     }
     return out;
 }
+let recoveredFromBackup = false;   // true se o banco foi lido de uma cópia (o 1º flush não pode copiar o arquivo principal ruim por cima do .bak)
+const readJson = (f) => JSON.parse(fs.readFileSync(f, 'utf8'));
+function backupCandidates() {   // do mais novo para o mais antigo: .tmp (se estiver completo), .bak, snapshots de hora em hora
+    const c = [DB_FILE + '.tmp', DB_FILE + '.bak'];
+    try { const dir = path.join(DATA_DIR, 'backups'); for (const f of fs.readdirSync(dir).filter(f => /^database-.*\.json$/.test(f)).sort().reverse()) c.push(path.join(dir, f)); } catch (e) { }
+    return c;
+}
+function recoverFromCopies(why) {
+    for (const f of backupCandidates()) {
+        try { if (!fs.existsSync(f)) continue; const d = normalizeDB(readJson(f)); recoveredFromBackup = true; console.error('[DB] ' + why + ' -> restaurado de ' + f + ' (' + Object.keys(d.users).length + ' conta(s))'); return d; }
+        catch (e) { console.error('[DB] ' + f + ' ilegível:', e.message); }
+    }
+    return null;
+}
 function loadJsonDB() {
-    try {
-        if (fs.existsSync(DB_FILE)) return normalizeDB(JSON.parse(fs.readFileSync(DB_FILE, 'utf8')));
-    } catch (e) {
+    if (!fs.existsSync(DB_FILE)) {
+        const r = recoverFromCopies('database.json ausente'); if (r) return r;
+        if (!sql && fs.existsSync(path.join(DATA_DIR, 'database.sqlite'))) { console.error('[DB] existe database.sqlite em ' + DATA_DIR + ' mas STORAGE=sqlite não está definido: NÃO vou iniciar vazio. Defina STORAGE=sqlite (ou mova o arquivo se quiser mesmo recomeçar).'); process.exit(1); }
+        return emptyDB();   // sem nenhuma cópia: instalação nova
+    }
+    try { return normalizeDB(readJson(DB_FILE)); }
+    catch (e) {
         console.error('[DB] database.json ilegível:', e.message);
-        try { fs.copyFileSync(DB_FILE, DB_FILE + '.corrompido-' + Date.now()); } catch (_) { }
-        try { if (fs.existsSync(DB_FILE + '.bak')) { console.error('[DB] restaurando de database.json.bak'); return normalizeDB(JSON.parse(fs.readFileSync(DB_FILE + '.bak', 'utf8'))); } } catch (e2) { console.error('[DB] .bak também ilegível:', e2.message); }
+        try { const n = fs.readdirSync(DATA_DIR).filter(f => f.startsWith('database.json.corrompido-')).length; if (n < 3) fs.copyFileSync(DB_FILE, DB_FILE + '.corrompido-' + Date.now()); } catch (_) { }   // guarda até 3 cópias do arquivo ruim (um loop de reinício não enche o disco)
+        const r = recoverFromCopies('database.json corrompido'); if (r) return r;
         console.error('[DB] NÃO vou iniciar com banco vazio para não apagar suas contas. Restaure um arquivo da pasta backups/ ou corrija database.json.'); process.exit(1);
     }
-    return emptyDB();
 }
 /* STORAGE=sqlite grava em SQLite (node:sqlite, Node 22.5+); o padrão continua sendo database.json. Na 1ª vez, o JSON existente é importado (o arquivo original é mantido). */
 let sql = null;
@@ -147,38 +164,66 @@ const SEC_IP = (req) => String(req.ip || '').replace(/^::ffff:/, '');
 let worldStr = db.worldData ? JSON.stringify(db.worldData) : '';
 let dbStr = JSON.stringify([db.itemDB, db.npcDB]);
 
-let dirty = false, flushTimer = null, lastSnap = 0;
-function markDirty() { dirty = true; if (!flushTimer) flushTimer = setTimeout(flushDB, 1500); }
-/* grava de forma atômica (arquivo temporário + fsync + rename) e mantém cópias: .bak (último save bom) e snapshots de hora em hora (últimos 12) */
-function flushDB() {
+let dirty = false, flushTimer = null, lastSnap = 0, lastFlushMs = 0, lastBak = 0, flushErrs = 0;
+/* O banco é regravado inteiro (JSON). Com milhares de contas isso custa CPU: o intervalo cresce com a duração da última gravação (8x), sem nunca passar de 30 s. STORAGE=sqlite só grava o que mudou. */
+function markDirty() { dirty = true; if (!flushTimer) flushTimer = setTimeout(flushDB, Math.min(30000, Math.max(1500, lastFlushMs * 8))); }
+/* operações que mexem em itens/moedas (mercado, troca, presente, missão, save com pendência) gravam NA HORA antes de responder: uma queda logo depois não faz o servidor "esquecer" algo que o cliente já viu.
+   Se o banco for grande (gravação lenta), cai para um atraso curto (50 ms) para não travar o servidor. */
+function persistNow() {
+    dirty = true;
+    if (lastFlushMs < 150) { flushDB(true); dirty = true; if (!flushTimer) flushTimer = setTimeout(flushDB, 1500); }   // grava já (sem fsync: sobrevive a kill -9) e confirma com fsync logo depois
+    else { if (flushTimer) clearTimeout(flushTimer); flushTimer = setTimeout(flushDB, 50); }
+}
+/* grava de forma atômica (arquivo temporário + fsync + rename + fsync da pasta) e mantém cópias: .bak (a cada gravação se o banco é pequeno; no máx. 1 por minuto se é grande) e snapshots de hora em hora (últimos 12) */
+function flushDB(fast) {
     if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
     if (!dirty) return; dirty = false;
+    const t0 = Date.now(); let syncMs = 0; const fsyncOk = fast !== true;   // fast: sem fsync (a pasta e o arquivo vão ao disco na próxima gravação normal)
     if (sql) {
         try {
-            sql.save(db);
+            sql.save(db); flushErrs = 0;
             if (Date.now() - lastSnap > 3600000) { lastSnap = Date.now(); const dir = path.join(DATA_DIR, 'backups'); fs.mkdirSync(dir, { recursive: true }); sql.snapshot(path.join(dir, 'database-' + new Date().toISOString().replace(/[:.]/g, '-') + '.sqlite')); fs.readdirSync(dir).filter(f => f.startsWith('database-') && f.endsWith('.sqlite')).sort().slice(0, -12).forEach(f => { try { fs.unlinkSync(path.join(dir, f)); } catch (_) { } }); }
-        } catch (e) { console.error('[DB] erro ao gravar (SQLite):', e.message); dirty = true; if (!flushTimer) flushTimer = setTimeout(flushDB, 5000); }
-        return;
+        } catch (e) { flushErrs++; console.error('[DB] erro ao gravar (SQLite):', e.message); dirty = true; if (!flushTimer) flushTimer = setTimeout(flushDB, Math.min(60000, 2000 * flushErrs)); }
+        lastFlushMs = Date.now() - t0; return;
     }
     try {
         fs.mkdirSync(DATA_DIR, { recursive: true });
         const tmp = DB_FILE + '.tmp', json = JSON.stringify(db);
-        const fd = fs.openSync(tmp, 'w'); fs.writeSync(fd, json, 0, 'utf8'); try { fs.fsyncSync(fd); } catch (_) { } fs.closeSync(fd);
-        if (fs.existsSync(DB_FILE)) { try { fs.copyFileSync(DB_FILE, DB_FILE + '.bak'); } catch (_) { } }
-        fs.renameSync(tmp, DB_FILE);
+        const fd = fs.openSync(tmp, 'w'); try { fs.writeSync(fd, json, 0, 'utf8'); if (fsyncOk) { const a = Date.now(); try { fs.fsyncSync(fd); } catch (_) { } syncMs += Date.now() - a; } } finally { fs.closeSync(fd); }
+        if (!recoveredFromBackup && t0 - lastBak > (lastFlushMs < 100 ? 0 : 60000) && fs.existsSync(DB_FILE)) { try { fs.copyFileSync(DB_FILE, DB_FILE + '.bak'); lastBak = t0; } catch (_) { } }
+        fs.renameSync(tmp, DB_FILE); recoveredFromBackup = false; flushErrs = 0;
+        if (fsyncOk) { const a = Date.now(); try { const dfd = fs.openSync(DATA_DIR, 'r'); try { fs.fsyncSync(dfd); } finally { fs.closeSync(dfd); } } catch (_) { } syncMs += Date.now() - a; }   // grava a entrada do diretório (sobrevive a queda de energia logo após o rename)
         if (Date.now() - lastSnap > 3600000) {
             lastSnap = Date.now();
             const dir = path.join(DATA_DIR, 'backups'); fs.mkdirSync(dir, { recursive: true });
             fs.writeFileSync(path.join(dir, 'database-' + new Date().toISOString().replace(/[:.]/g, '-') + '.json'), json, 'utf8');
-            fs.readdirSync(dir).filter(f => f.startsWith('database-')).sort().slice(0, -12).forEach(f => { try { fs.unlinkSync(path.join(dir, f)); } catch (_) { } });
+            fs.readdirSync(dir).filter(f => /^database-.*\.json$/.test(f)).sort().slice(0, -12).forEach(f => { try { fs.unlinkSync(path.join(dir, f)); } catch (_) { } });
         }
-    } catch (e) { console.error('[DB] erro ao gravar:', e.message); dirty = true; if (!flushTimer) flushTimer = setTimeout(flushDB, 5000); }
+    } catch (e) { flushErrs++; console.error('[DB] erro ao gravar:', e.message); dirty = true; if (!flushTimer) flushTimer = setTimeout(flushDB, Math.min(60000, 2000 * flushErrs)); }
+    lastFlushMs = Math.max(0, Date.now() - t0 - syncMs);   // custo de CPU/E-S de gravar (o tempo de fsync não conta: espera de disco, não de processamento)
 }
 setInterval(() => { if (dirty) flushDB(); }, 10000).unref();
-['SIGINT', 'SIGTERM'].forEach(sig => process.on(sig, () => { flushDB(); process.exit(0); }));
-process.on('exit', flushDB);
-process.on('unhandledRejection', e => console.error('[unhandledRejection]', e));
-process.on('uncaughtException', e => { console.error('[uncaughtException]', e); });
+/* encerramento limpo: SIGTERM/SIGINT salvam tudo antes de sair (systemd usa SIGTERM no restart/stop) */
+let shuttingDown = false, srv = null;
+function shutdown(sig, code) {
+    if (shuttingDown) return; shuttingDown = true;
+    console.log('[' + sig + '] salvando e encerrando...');
+    try { if (srv) srv.close(); } catch (e) { }
+    try { dirty = true; flushDB(); } catch (e) { console.error('[DB] falha no salvamento final:', e.message); }
+    try { if (sql && sql.close) sql.close(); } catch (e) { }
+    process.exit(code || 0);
+}
+['SIGINT', 'SIGTERM'].forEach(sig => process.on(sig, () => shutdown(sig, 0)));
+process.on('exit', () => { try { flushDB(); } catch (e) { } });
+/* exceções não tratadas são registradas e o jogo continua (uma rota com defeito não derruba todo mundo); se virar enxurrada (30 em 1 min) ou faltar memória, salva e sai para o systemd reiniciar */
+const crashTimes = [];
+function fatalGuard(kind, e) {
+    console.error('[' + kind + ']', (e && e.stack) || e);
+    const now = Date.now(); crashTimes.push(now); while (crashTimes.length && now - crashTimes[0] > 60000) crashTimes.shift();
+    if (crashTimes.length > 30 || (e && (e.code === 'ERR_OUT_OF_MEMORY' || /out of memory/i.test(String(e.message))))) { console.error('[fatal] erros demais; salvando e saindo para o supervisor reiniciar'); shutdown(kind, 1); }
+}
+process.on('unhandledRejection', e => fatalGuard('unhandledRejection', e));
+process.on('uncaughtException', e => fatalGuard('uncaughtException', e));
 
 /* ---------------- SENHAS ---------------- */
 async function hashPw(pw) {
@@ -230,7 +275,7 @@ async function ensureAdmin() {
 }
 
 /* ---------------- SESSÕES ---------------- */
-const SESSION_MS = 30 * 24 * 3600 * 1000, MAX_TOMBS = 50;   // 30 dias, renovável a cada uso; tokens "derrubados" guardados por conta (para avisar o cliente antigo)
+const SESSION_MS = 30 * 24 * 3600 * 1000, MAX_TOMBS = 10, TOMB_MS = 7 * 24 * 3600 * 1000;   // 30 dias, renovável a cada uso; tokens "derrubados" guardados por conta (para avisar o cliente antigo)
 const sha = t => crypto.createHash('sha256').update(t).digest('hex');
 /* SESSÃO ÚNICA: cada conta tem no máximo UM token válido. Um novo login marca o(s) anterior(es) como derrubados (rep=1, motivo 'outro_login') e só esse "túmulo" resta
    (para o cliente antigo receber 401 session_replaced em vez de "expirou"). `sid` cresce a cada login da conta e nunca volta. Tudo aqui é síncrono: não há janela com dois tokens válidos. */
@@ -239,7 +284,7 @@ function newSession(user, ip) {
     const token = crypto.randomBytes(32).toString('hex'); const now = Date.now();
     let maxSid = 0, hadLive = false; const mine = [];
     for (const h of Object.keys(db.sessions)) { const s = db.sessions[h]; if (s.user !== user) continue; mine.push(h); if ((s.sid | 0) > maxSid) maxSid = s.sid | 0; if (!s.rep && s.exp > now) hadLive = true; }
-    for (const h of mine) if (!db.sessions[h].rep) { db.sessions[h].rep = 1; db.sessions[h].repAt = now; }
+    for (const h of mine) { const t = db.sessions[h]; if (!t.rep) { t.rep = 1; t.repAt = now; } t.exp = Math.min(t.exp, now + TOMB_MS); }   // o túmulo só serve para avisar o cliente antigo: some em 7 dias
     const tombs = mine.sort((a, b) => (db.sessions[b].sid | 0) - (db.sessions[a].sid | 0));
     for (const h of tombs.slice(MAX_TOMBS)) delete db.sessions[h];
     const sid = maxSid + 1; db.sessions[sha(token)] = { user, exp: now + SESSION_MS, sid, rep: 0 };
@@ -307,7 +352,7 @@ const mobPos = Object.create(null);          // map -> id -> {x,y}  (enviado pel
 const hostByMap = Object.create(null);       // map -> username do host
 const lastChat = Object.create(null);        // user -> timestamp
 const social = createSocial({ db, activePlayers, markDirty });
-const extras = createExtras({ db, activePlayers, markDirty });
+const extras = createExtras({ db, activePlayers, markDirty, knownItem: (n) => sec.knownItem(n) });
 const sq = createSQ({ getDB: () => db, extras, sec, markDirty, giftLog: (o) => giftLog(o) });   // missões especiais do admin (specialquests.js)
 function chatFor(user) { return db.chat.filter(c => social.chatVisible(user, c)).map(c => { if (!c.party) return c; const { sender, msg, color } = c; return { sender, msg, color }; }); }
 
@@ -349,7 +394,9 @@ function hydrateDeaths() {   // depois de um reinício: quem estava morto contin
 setInterval(() => { try { tickRespawns(Date.now()); } catch (e) { console.error('[respawn]', e); } }, 1000).unref();
 
 const num = (v, d = 0) => Number.isFinite(v) ? v : d;
-const RESERVED = new Set(['__proto__', 'constructor', 'prototype', 'hasownproperty', 'tostring', 'valueof', 'sistema']);
+const OBJ_PROPS = Object.getOwnPropertyNames(Object.prototype).map(x => x.toLowerCase());   // __proto__, constructor, hasOwnProperty, isPrototypeOf, toString, valueOf, __defineGetter__...
+const RESERVED = new Set([...OBJ_PROPS, 'prototype', 'sistema']);
+const NAME_BLOCK = new Set(['sistema', 'system', 'servidor', 'server', 'administrador', 'admin', 'adm', 'moderador', 'suporte', 'staff', 'gm', 'null', 'undefined']);   // ninguém se passa por staff/sistema
 const ID_RE = /^[A-Za-z0-9_\-]{1,30}$/;
 const coord = (v, d) => Math.max(0, Math.min(20000, num(v, d)));
 const dmgBudget = Object.create(null);   // user -> {t,d}
@@ -380,11 +427,11 @@ app.post('/api/register', rateLimit('reg', 10, 60000), async (req, res) => {
     const username = typeof rb.username === 'string' ? rb.username.trim() : '';
     const password = typeof rb.password === 'string' ? rb.password : '';
     const ip = SEC_IP(req);
-    if (RESERVED.has(username.toLowerCase())) return res.status(400).json({ error: 'Nome não permitido.' });
+    if (RESERVED.has(username.toLowerCase()) || NAME_BLOCK.has(username.toLowerCase())) return res.status(400).json({ error: 'Nome não permitido.' });
     if (!NAME_RE.test(username)) return res.status(400).json({ error: 'Nome inválido (2 a 20 letras, números, espaço, _ . -).' });
     if (password.length > 100) return res.status(400).json({ error: 'A senha deve ter de 6 a 100 caracteres.' });
     const weak = sec.weakPassword(password, username); if (weak) return res.status(400).json({ error: weak });
-    if (Object.keys(db.users).some(n => n.toLowerCase() === username.toLowerCase())) return res.status(400).json({ error: 'Usuário já existe!' });
+    if (Object.keys(db.users).some(n => n.toLowerCase() === username.toLowerCase() || houseKeyOf(n) === houseKeyOf(username))) return res.status(400).json({ error: 'Usuário já existe (ou nome parecido demais)!' });   // casa_<nome> precisa ser única
     if (Object.keys(db.users).length >= 5000) return res.status(400).json({ error: 'Servidor cheio.' });
     if (REG_PER_IP_HOUR > 0) {
         const now = Date.now(), arr = (regByIp.get(ip) || []).filter(t => now - t < 3600000);
@@ -392,7 +439,7 @@ app.post('/api/register', rateLimit('reg', 10, 60000), async (req, res) => {
     }
     if (hashing >= 12) return res.status(429).json({ error: 'Servidor ocupado. Tente de novo em instantes.' });
     hashing++; let pwHash; try { pwHash = await hashPw(password); } finally { hashing--; }
-    if (Object.keys(db.users).some(n => n.toLowerCase() === username.toLowerCase())) return res.status(400).json({ error: 'Usuário já existe!' });   // rechecagem: outro pedido pode ter criado o nome durante o hash
+    if (Object.keys(db.users).some(n => n.toLowerCase() === username.toLowerCase() || houseKeyOf(n) === houseKeyOf(username))) return res.status(400).json({ error: 'Usuário já existe (ou nome parecido demais)!' });   // rechecagem: outro pedido pode ter criado o nome durante o hash
     db.users[username] = { password: pwHash, role: 'player', playerData: null };   // nunca cria admin por aqui
     if (REG_PER_IP_HOUR > 0) { const arr = regByIp.get(ip) || []; arr.push(Date.now()); regByIp.set(ip, arr); }
     markDirty(); flushDB(); res.json({ success: true });   // conta nova é gravada na hora
@@ -440,7 +487,7 @@ app.post('/api/login', rateLimit('login', 20, 60000), async (req, res) => {
     });
 });
 
-app.post('/api/logout', auth, (req, res) => { delete db.sessions[req.tokenKey]; delete activePlayers[req.user]; markDirty(); res.json({ success: true }); });
+app.post('/api/logout', auth, (req, res) => { delete db.sessions[req.tokenKey]; delete activePlayers[req.user]; try { social.dropUser(req.user, 'jogador saiu'); } catch (e) { console.error('[logout]', e); } const set = wsByUser[req.user]; if (set) for (const c of [...set]) { try { c.close(1000); } catch (e) { } } delete wsByUser[req.user]; markDirty(); res.json({ success: true }); });
 
 /* diário de pesca e bônus temporários: só estruturas pequenas e válidas (qualquer outra coisa é descartada) */
 function cleanFishData(pd) {
@@ -498,47 +545,130 @@ function cleanWorld(w) {
     }
     return w;
 }
+/* ---------- validação do mundo / catálogos enviados pelo admin ----------
+   Estrutura inválida é recusada (400) ou corrigida; problemas "de conteúdo" (portal para mapa que não existe, NPC sem catálogo...) só viram AVISOS na resposta e no log, para nunca travar o trabalho do admin. */
+const MAX_MAPS = 300, MAX_ENT = 6000, MAX_CATALOG = 6000, ENT_TYPE_RE = /^[\w\-]{1,32}$/;
+let _entSeq = 0; const freshEntId = () => Date.now() * 100 + (_entSeq++ % 100);   // mesmo formato do cliente
+function vetWorld(raw, npcCat, itemCat) {
+    const w0 = sec.scrubDeep(raw); const warns = [];
+    if (!w0 || typeof w0 !== 'object' || Array.isArray(w0)) return { error: 'Mundo inválido.' };
+    const world = {}; let nMaps = 0;
+    for (const mk of Object.keys(w0)) {
+        if (!MAP_RE.test(mk) || /^casa_/.test(mk) || RESERVED.has(mk.toLowerCase())) { warns.push('mapa "' + String(mk).slice(0, 30) + '" ignorado (nome inválido ou casa de jogador)'); continue; }
+        const m = w0[mk]; if (!m || typeof m !== 'object' || Array.isArray(m)) { warns.push('mapa "' + mk + '" inválido: ignorado'); continue; }
+        if (++nMaps > MAX_MAPS) return { error: 'Mapas demais (máximo ' + MAX_MAPS + ').' };
+        if (!Array.isArray(m.entities)) m.entities = [];
+        if (m.entities.length > MAX_ENT) return { error: 'O mapa "' + mk + '" tem entidades demais (máximo ' + MAX_ENT + ').' };
+        for (const k of ['width', 'height']) if (m[k] !== undefined && !(Number.isFinite(m[k]) && m[k] >= 100 && m[k] <= 20000)) { warns.push('mapa "' + mk + '": ' + k + ' fora de 100..20000 (ajustado)'); m[k] = Math.max(100, Math.min(20000, Number.isFinite(m[k]) ? m[k] : 2000)); }
+        const ids = new Set(); let dropped = 0, reid = 0;
+        m.entities = m.entities.filter(o => {
+            if (!o || typeof o !== 'object' || Array.isArray(o) || typeof o.type !== 'string' || !ENT_TYPE_RE.test(o.type)) { dropped++; return false; }
+            for (const k of ['x', 'y', 'w', 'h']) if (o[k] !== undefined && typeof o[k] !== 'number') o[k] = 0;
+            if (o.type === 'enemy' || o.type === 'npc') {   // ids de monstro: únicos no mapa e no formato que o servidor aceita nos relatórios de dano
+                let id = o.id; const okId = (typeof id === 'number' && Number.isFinite(id) && id >= 0 && ID_RE.test(String(id))) || (typeof id === 'string' && ID_RE.test(id) && !RESERVED.has(id.toLowerCase()));
+                if (!okId || ids.has(String(id))) { id = freshEntId(); while (ids.has(String(id))) id = freshEntId(); o.id = id; reid++; }
+                ids.add(String(id));
+            }
+            return true;
+        });
+        if (dropped) warns.push('mapa "' + mk + '": ' + dropped + ' entidade(s) inválida(s) descartada(s)');
+        if (reid) warns.push('mapa "' + mk + '": ' + reid + ' monstro/NPC com id repetido ou inválido receberam id novo');
+        world[mk] = m;
+    }
+    if (!nMaps) return { error: 'O mundo precisa ter ao menos um mapa.' };
+    if (!hasOwn(world, 'lumbridge')) warns.push('não existe o mapa "lumbridge" (ponto de entrada/retorno dos jogadores)');
+    for (const mk of Object.keys(world)) {   // referências entre mapas e catálogos
+        const m = world[mk]; let badPortal = 0, badNpc = 0, badItem = 0;
+        for (const o of m.entities) {
+            if (o.type === 'portal' && typeof o.destMap === 'string' && !hasOwn(world, o.destMap) && !/^casa/.test(o.destMap)) badPortal++;
+            if ((o.type === 'enemy' || o.type === 'npc') && o.dbKey !== undefined && npcCat && !(typeof o.dbKey === 'string' && hasOwn(npcCat, o.dbKey))) badNpc++;
+            if (o.type === 'ground_item' && typeof o.item === 'string' && !sec.knownItem(o.item) && !(itemCat && hasOwn(itemCat, o.item))) badItem++;
+        }
+        if (Array.isArray(m.edges)) for (const e of m.edges) if (e && typeof e.to === 'string' && !hasOwn(world, e.to)) badPortal++;
+        if (badPortal) warns.push('mapa "' + mk + '": ' + badPortal + ' portal/borda aponta(m) para mapa inexistente');
+        if (badNpc) warns.push('mapa "' + mk + '": ' + badNpc + ' monstro/NPC com dbKey fora do catálogo');
+        if (badItem) warns.push('mapa "' + mk + '": ' + badItem + ' item(ns) de chão desconhecido(s)');
+    }
+    return { world, warns };
+}
+function vetCatalog(raw, what, extra) {
+    const c = sec.scrubDeep(raw, 2000000); if (!c || typeof c !== 'object' || Array.isArray(c)) return { error: what + ' inválido.' };
+    const keys = Object.keys(c); if (keys.length > MAX_CATALOG) return { error: what + ': itens demais (máximo ' + MAX_CATALOG + ').' };
+    const out = {}; for (const k of keys) { if (k.length > 60 || !c[k] || typeof c[k] !== 'object' || Array.isArray(c[k])) continue; out[k] = c[k]; }
+    if (extra) extra(out); return { cat: out };
+}
+let lastWorldBak = 0;
+function backupWorld(old, why) {   // antes de substituir o mundo, guarda o anterior (no máx. 1 a cada 5 min, últimos 20)
+    try {
+        if (!old || Date.now() - lastWorldBak < 300000) return; lastWorldBak = Date.now();
+        const dir = path.join(DATA_DIR, 'backups'); fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(path.join(dir, 'world-' + new Date().toISOString().replace(/[:.]/g, '-') + '.json'), JSON.stringify({ worldData: old, itemDB: db.itemDB, npcDB: db.npcDB, why }), 'utf8');
+        fs.readdirSync(dir).filter(f => /^world-.*\.json$/.test(f)).sort().slice(0, -20).forEach(f => { try { fs.unlinkSync(path.join(dir, f)); } catch (_) { } });
+    } catch (e) { console.error('[mundo] backup falhou:', e.message); }
+}
 const lastSaveAt = Object.create(null), saveBurst = Object.create(null);
-app.post('/api/save', rateLimit('save', 90, 60000), (req, res) => {
+app.post('/api/save', (req, res) => {
     /* sessão única: o corpo grande é lido DEPOIS do auth; se outro login derrubou esta sessão nesse meio tempo, o save velho é descartado (nunca sobrescreve o da sessão nova) */
     if (db.sessions[req.tokenKey] !== req.sess || req.sess.rep) { sec.slog('SAVE-STALE', req.user, SEC_IP(req), 'save de sessão derrubada ignorado'); return res.status(401).json({ error: REPLACED_MSG, code: 'session_replaced' }); }
-    const { playerData, worldData, itemDB, npcDB } = req.body || {};
-    const u = db.users[req.user]; if (!u) return res.status(401).json({ error: 'Conta não encontrada.', code: 'AUTH' });
+    const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+    /* numeração opcional dos saves (body.seq, crescente por sessão): um save mais antigo que chega atrasado (rede fora de ordem) é ignorado em vez de sobrescrever o mais novo */
+    if (Number.isInteger(body.seq) && body.seq >= 0 && body.seq <= 1e12) { if (body.seq <= (req.sess.seq === undefined ? -1 : req.sess.seq)) { sec.slog('SAVE-OLD', req.user, SEC_IP(req), 'seq ' + body.seq + ' <= ' + req.sess.seq); return res.json({ success: true, stale: true, mapVersion: db.mapVersion }); } req.sess.seq = body.seq; }
+    const { playerData, worldData, itemDB, npcDB } = body;
+    const u = hasOwn(db.users, req.user) ? db.users[req.user] : null; if (!u) return res.status(401).json({ error: 'Conta não encontrada.', code: 'AUTH' });
     const ip = SEC_IP(req), now = Date.now(), isAdmin = req.role === 'admin';
+    /* admin: valida o mundo/catálogos ANTES de aplicar qualquer coisa (um pedido inválido não aplica nada) */
+    let wv = null, iv = null, nv = null;
+    if (isAdmin) {
+        if (itemDB !== undefined && itemDB !== null) { iv = vetCatalog(itemDB, 'itemDB', (o) => { delete o['Caixa Mímica']; }); if (iv.error) return res.status(400).json({ error: iv.error }); }
+        if (npcDB !== undefined && npcDB !== null) { nv = vetCatalog(npcDB, 'npcDB'); if (nv.error) return res.status(400).json({ error: nv.error }); }
+        if (iv && !Object.keys(iv.cat).length && db.itemDB && Object.keys(db.itemDB).length) return res.status(400).json({ error: 'itemDB vazio: recusado para não apagar o catálogo.' });
+        if (nv && !Object.keys(nv.cat).length && db.npcDB && Object.keys(db.npcDB).length) return res.status(400).json({ error: 'npcDB vazio: recusado para não apagar o catálogo.' });
+        if (worldData !== undefined && worldData !== null) { wv = vetWorld(worldData, nv ? nv.cat : db.npcDB, iv ? iv.cat : db.itemDB); if (wv.error) return res.status(400).json({ error: wv.error }); }
+    }
+    let adjusted = null, pendChanged = false;
     if (playerData !== undefined) {
         if (!isAdmin) {
             const lu = sec.lockedUntil(req.user);
-            if (lu) return res.status(423).json({ error: 'Salvamento suspenso por alguns minutos por atividade suspeita. Se isso for um engano, avise o administrador.', code: 'LOCKED', until: lu });
+            if (lu) return res.status(423).json({ error: 'Salvamento suspenso por alguns minutos por atividade suspeita. Seu progresso continua no jogo, mas NÃO está sendo gravado até o fim da suspensão. Se isso for um engano, avise o administrador.', code: 'LOCKED', until: lu, retryAfter: Math.max(1, Math.ceil((lu - now) / 1000)) });
             const sb = saveBurst[req.user] || (saveBurst[req.user] = []); while (sb.length && now - sb[0] > 10000) sb.shift();   // no máximo 12 saves em 10 s (o jogo salva a cada 2,5 s no máximo, mais salvamentos manuais)
-            if (sb.length >= 12) { sec.slog('RATE:save-burst', req.user, ip, '12 saves em 10s'); return res.status(429).json({ error: 'Devagar! Salvando rápido demais.', code: 'RATE' }); }
+            if (sb.length >= 12) { sec.slog('RATE:save-burst', req.user, ip, '12 saves em 10s'); return res.status(429).json({ error: 'Devagar! Salvando rápido demais.', code: 'RATE', retryAfter: 3 }); }
             sb.push(now);
         }
         let pdLen = 0; try { pdLen = (playerData && typeof playerData === 'object' && !Array.isArray(playerData)) ? JSON.stringify(playerData).length : -1; } catch (e) { pdLen = -1; }   // JSON profundo demais estoura a pilha: tratado como inválido
-        if (pdLen < 0 || pdLen > 1500000) { sec.slog('SAVE-REJECT', req.user, ip, 'playerData inválido/grande (' + pdLen + ')', true); return res.status(400).json({ error: 'Dados do jogador inválidos.' }); }
+        if (pdLen < 0 || pdLen > 1500000) { sec.slog('SAVE-REJECT', req.user, ip, 'playerData inválido/grande (' + pdLen + ')', true); return res.status(400).json({ error: 'Dados do jogador inválidos.', code: 'INVALID' }); }
         const r = sec.checkSave(req.user, req.role, playerData, ip);
-        if (r.error) { sec.slog('SAVE-REJECT', req.user, ip, r.error, true); return res.status(400).json({ error: r.error }); }
-        const pd = r.pd;
+        if (r.error) { sec.slog('SAVE-REJECT', req.user, ip, r.error, true); return res.status(400).json({ error: r.error, code: 'INVALID' }); }
+        const pd = r.pd; const pendSig = (x) => x ? JSON.stringify([x.mkt || null, x.escrow || null, (x.mailDone || []).length, (x.tradeDone || []).length, (x.mailDone || []).slice(-1)[0] || '', (x.tradeDone || []).slice(-1)[0] || '']) : '';
+        pendChanged = pendSig(pd) !== pendSig(u.playerData);
         cleanFishData(pd); cleanStatsData(pd); extras.cleanPetData(pd); require('./mimicnames').cleanMimicData(pd);
         sec.checkCollections(req.user, req.role, pd, u.playerData, ip);
         u.playerData = pd; lastSaveAt[req.user] = now;
-        if (isAdmin && Array.isArray(req.body.itemNames)) sec.learnItems(req.body.itemNames);
+        if (r.notes.length) adjusted = r.notes.slice(0, 12);   // o cliente deve avisar: o servidor corrigiu parte do progresso enviado
+        if (isAdmin && Array.isArray(body.itemNames)) sec.learnItems(body.itemNames);
     }
+    let warnings = null;
     if (isAdmin) {   // somente admin altera o mundo
         let changed = false;
-        if (worldData && typeof worldData === 'object' && !Array.isArray(worldData)) {
-            cleanWorld(worldData);
-            const s = JSON.stringify(worldData);
-            if (s !== worldStr) { db.worldData = worldData; worldStr = s; changed = true; }
+        if (iv) { db.itemDB = iv.cat; sec.learnItems(Object.keys(iv.cat)); }
+        if (nv) db.npcDB = nv.cat;
+        if (wv) {
+            cleanWorld(wv.world);
+            const s = JSON.stringify(wv.world);
+            if (s !== worldStr) {
+                backupWorld(db.worldData, 'antes do save de ' + req.user);
+                const nOld = db.worldData ? Object.keys(db.worldData).length : 0, nNew = Object.keys(wv.world).length;
+                db.worldData = wv.world; worldStr = s; changed = true;
+                sec.slog('ADMIN-WORLD', req.user, ip, 'mundo salvo: ' + nNew + ' mapa(s) (antes ' + nOld + '), ' + Math.round(s.length / 1024) + ' KB, ' + wv.warns.length + ' aviso(s)', true);
+            }
+            if (wv.warns.length) { warnings = wv.warns.slice(0, 30); sec.slog('WORLD-WARN', req.user, ip, wv.warns.slice(0, 8).join(' | ')); }
         }
-        if ((itemDB && typeof itemDB === 'object') || (npcDB && typeof npcDB === 'object')) {
-            if (itemDB && typeof itemDB === 'object') { db.itemDB = itemDB; sec.learnItems(Object.keys(itemDB)); }
-            if (npcDB && typeof npcDB === 'object') db.npcDB = npcDB;
-            const s = JSON.stringify([db.itemDB, db.npcDB]); if (s !== dbStr) { dbStr = s; changed = true; }
-        }
+        if (iv || nv) { const s = JSON.stringify([db.itemDB, db.npcDB]); if (s !== dbStr) { dbStr = s; changed = true; sec.slog('ADMIN-CATALOG', req.user, ip, 'catálogo de itens/NPCs salvo', true); } }
         if (changed) db.mapVersion = Math.max(Date.now(), db.mapVersion + 1);
     }
-    markDirty(); res.json({ success: true, mapVersion: db.mapVersion });
+    if (pendChanged) persistNow(); else markDirty(); const out = { success: true, mapVersion: db.mapVersion }; if (adjusted) { out.adjusted = adjusted; out.warn = 'ADJUSTED'; } if (warnings) out.warnings = warnings; res.json(out);
 });
+/* estado salvo da conta (o cliente pode re-sincronizar depois de um aviso "adjusted") */
+app.get('/api/me', auth, userLimit('me', 20, 60000), (req, res) => { const u = db.users[req.user]; const lu = sec.lockedUntil(req.user); res.json({ ok: true, username: req.user, role: req.role, playerData: u ? u.playerData : null, locked: lu || 0 }); });
 
 /* aparência do personagem (look): só aceita campos conhecidos com valores válidos; qualquer coisa fora disso é descartada */
 const LOOK_RACES = new Set(['human', 'elf', 'dwarf', 'orc']);
@@ -562,12 +692,13 @@ function houseMapAllowed(user, map) {
         const owner = Object.keys(db.users).find(n => houseKeyOf(n) === map); if (!owner) return false; if (owner === user) return true;
         const h = db.users[owner].playerData && db.users[owner].playerData.house; const me = user.toLowerCase();
         return !!(h && Array.isArray(h.guests) && h.guests.some(g => String(g).toLowerCase() === me));
-    } catch (e) { return true; }
+    } catch (e) { return false; }   // na dúvida, NÃO entra (antes falhava aberto)
 }
+let lastTick = 0;
 function doSync(user, b, ip) {
     b = b || {}; const now = Date.now(); ip = ip || '-';
     let map = (typeof b.map === 'string' && MAP_RE.test(b.map) && !RESERVED.has(b.map.toLowerCase())) ? b.map : 'lumbridge';
-    if (!/^casa_/.test(map) && db.worldData && !hasOwn(db.worldData, map)) map = hasOwn(db.worldData, 'lumbridge') ? 'lumbridge' : map;
+    if (!/^casa_/.test(map) && db.worldData && !hasOwn(db.worldData, map)) map = hasOwn(db.worldData, 'lumbridge') ? 'lumbridge' : (Object.keys(db.worldData)[0] || map);   // mapa inexistente nunca cria estado novo
     if (/^casa_/.test(map) && sec.STRICT() && !houseMapAllowed(user, map)) { sec.slog('HOUSE-DENY', user, ip, 'sync em ' + map + ' sem convite'); map = 'lumbridge'; }
     const prev = activePlayers[user];
     const eq = (b.equipment !== undefined && b.equipment && typeof b.equipment === 'object' && JSON.stringify(b.equipment).length < 6000) ? sec.cleanSyncEquip(b.equipment) : (prev ? prev.equipment : null);
@@ -577,7 +708,7 @@ function doSync(user, b, ip) {
     let px = coord(b.x, 400), py = coord(b.y, 300);
     const sz = (!/^casa_/.test(map) && db.worldData && hasOwn(db.worldData, map) && db.worldData[map]) || (db.worldData && db.worldData.casa);   // limites do mapa (as casas usam o tamanho do mapa "casa")
     if (sz && Number.isFinite(sz.width) && Number.isFinite(sz.height)) { px = Math.min(px, sz.width + 40); py = Math.min(py, sz.height + 40); }
-    const mv = sec.checkMove(user, role, prev, map, px, py, now, ip); px = mv.x; py = mv.y;
+    const mv = sec.checkMove(user, role, prev, map, px, py, now, ip, b.tp === 1);   // tp: o cliente avisa um teleporte do próprio jogo (portal/renascer) px = mv.x; py = mv.y;
     activePlayers[user] = { x: px, y: py, map, facing: fc, actionAnim: Math.max(0, Math.min(60, num(b.actionAnim) | 0)), equipment: eq, hp: Math.max(0, Math.min(99999, num(b.hp) | 0)), maxHp: Math.max(0, Math.min(99999, num(b.maxHp) | 0)), lastSeen: now,
         title: typeof b.title === 'string' ? extras.cleanTitle(b.title) : (prev ? prev.title : ''), emote: prev ? prev.emote : null,
         look: (b.look !== undefined && cleanLook(b.look)) || (prev ? prev.look : null) || savedLook(user),
@@ -587,6 +718,7 @@ function doSync(user, b, ip) {
     const host = electHost(map); const isHost = host === user;
 
     if (!serverMobs[map]) serverMobs[map] = Object.create(null);
+    const killed = [];   // mortes decididas por ESTE pedido (o cliente só deve soltar o loot dos monstros que aparecem aqui)
     if (Array.isArray(b.combatLogs)) {
         const cap = sec.hitCap(user);
         for (const log of b.combatLogs.slice(0, 20)) {
@@ -598,6 +730,7 @@ function doSync(user, b, ip) {
                 if (dmg > 0 && !sec.dmgOk(user, now)) { sec.slog('RATE:dmg', user, ip, 'mais de 20 relatórios de dano por segundo'); continue; }
                 const ex = sec.expectedMaxHp(map, id); if (ex > 0) maxHp = ex;   // a vida máxima vem do catálogo do servidor, não do cliente
             }
+            if (dmg > 0 && sec.STRICT() && role !== 'admin' && mobPos[map] && mobPos[map][id] && Math.hypot(mobPos[map][id].x - px, mobPos[map][id].y - py) > 1400) { sec.slog('FAR-HIT', user, ip, 'golpe em mob ' + id + ' a ' + Math.round(Math.hypot(mobPos[map][id].x - px, mobPos[map][id].y - py)) + 'px (ignorado)'); continue; }   // o alcance máximo do jogo é ~220 px; 1400 cobre atraso de rede com folga
             if (dmg > 0) { const bd = dmgBudget[user] || (dmgBudget[user] = { t: now, d: 0 }); if (now - bd.t > 1000) { bd.t = now; bd.d = 0; } bd.d += dmg; if (bd.d > 1500) continue; }   // teto de dano por segundo
             let sm = serverMobs[map][id];
             if (!sm) {
@@ -608,18 +741,18 @@ function doSync(user, b, ip) {
             if (!sm.isDead) {
                 if (dmg === 0 && sm.aggro && sm.aggro !== user && activePlayers[sm.aggro] && activePlayers[sm.aggro].map === map) continue;   // "vi você" (dano 0) não rouba o alvo de outro jogador
                 sm.hp -= dmg; sm.aggro = user;   // o monstro foca em quem bateu por último
-                if (sm.hp <= 0) { sm.hp = 0; sm.isDead = true; sm.deadTime = now; sm.aggro = null; noteDeath(map, id, now); try { sq.onKill(user, mobSpecies(map, id), map, id); } catch (e) { } }
+                if (sm.hp <= 0) { sm.hp = 0; sm.isDead = true; sm.deadTime = now; sm.aggro = null; noteDeath(map, id, now); killed.push(id); try { sq.onKill(user, mobSpecies(map, id), map, id); } catch (e) { } }
             }
         }
     }
-    tickRespawns(now);   // o relógio global também roda aqui (não custa nada); o respawn não depende de quem está no mapa
+    if (now - lastTick > 250) { lastTick = now; try { tickRespawns(now); } catch (e) { console.error('[respawn]', e); } }   // o relógio global também roda aqui (no máx. 4x/s); o respawn não depende de quem está no mapa
     for (const id of Object.keys(serverMobs[map])) {
         const sm = serverMobs[map][id];
         if (sm.aggro && (!activePlayers[sm.aggro] || activePlayers[sm.aggro].map !== map)) sm.aggro = null;
     }
     if (isHost && b.mobPos && typeof b.mobPos === 'object') {
         const mp = Object.create(null); let n = 0;
-        for (const id of Object.keys(b.mobPos)) { if (++n > 400) break; if (!ID_RE.test(id) || RESERVED.has(id.toLowerCase())) continue; const p = b.mobPos[id]; if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) mp[id] = { x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10 }; }
+        for (const id of Object.keys(b.mobPos)) { if (++n > 400) break; if (!ID_RE.test(id) || RESERVED.has(id.toLowerCase())) continue; const p = b.mobPos[id]; if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) mp[id] = { x: Math.round(Math.max(-1000, Math.min(21000, p.x)) * 10) / 10, y: Math.round(Math.max(-1000, Math.min(21000, p.y)) * 10) / 10 }; }
         mobPos[map] = mp;
     }
     if (mobPos[map]) {   // "leash": o monstro desiste se o alvo ficou muito longe
@@ -633,23 +766,25 @@ function doSync(user, b, ip) {
     for (const u of Object.keys(activePlayers)) if (u !== user && activePlayers[u].map === map) players[u] = activePlayers[u];
     const out = { t: now, boss: extras.bossInfo(), players, mapVersion: db.mapVersion, serverMobs: serverMobs[map], isHost, chatVer: db.chatVer, social: social.view(user) };
     if (b.chatVer !== db.chatVer) out.chat = chatFor(user);
+    if (killed.length) out.kills = killed;
+    const lk = sec.lockedUntil(user); if (lk) out.lock = lk;   // salvamento suspenso: o cliente deve avisar o jogador
     if (!isHost && mobPos[map]) out.mobPos = mobPos[map];
     return out;
 }
 /* sync: no máximo ~25/s por jogador (o jogo manda 10/s) e 150/s por IP (várias pessoas na mesma rede); acima disso o pedido é ignorado e o cliente tenta de novo */
-const syncBucket = Object.create(null), syncIp = Object.create(null);
+const syncBucket = Object.create(null), syncIp = Object.create(null); const SYNC_IP_MAX = +process.env.SYNC_IP_MAX || 600;   // por IP: comunidade inteira atrás do mesmo NAT/escola
 function syncAllowed(user, ip) {
     const now = Date.now(); let u = syncBucket[user]; if (!u || now - u.t > 1000) u = syncBucket[user] = { t: now, n: 0 }; u.n++;
     let i = syncIp[ip]; if (!i || now - i.t > 1000) i = syncIp[ip] = { t: now, n: 0 }; i.n++;
-    if (u.n > 25 || i.n > 150) { sec.slog('RATE:sync', user, ip, (u.n > 25 ? 'usuário ' + u.n : 'ip ' + i.n) + ' syncs/s'); return false; }
+    if (u.n > 25 || i.n > SYNC_IP_MAX) { sec.slog('RATE:sync', user, ip, (u.n > 25 ? 'usuário ' + u.n : 'ip ' + i.n) + ' syncs/s'); return false; }
     return true;
 }
-setInterval(() => { const n = Date.now(); for (const k of Object.keys(syncBucket)) if (n - syncBucket[k].t > 5000) delete syncBucket[k]; for (const k of Object.keys(syncIp)) if (n - syncIp[k].t > 5000) delete syncIp[k]; for (const k of Object.keys(lastSaveAt)) if (n - lastSaveAt[k] > 3600000) { delete lastSaveAt[k]; delete saveBurst[k]; } }, 60000).unref();
+setInterval(() => { const n = Date.now(); for (const k of Object.keys(syncBucket)) if (n - syncBucket[k].t > 5000) delete syncBucket[k]; for (const k of Object.keys(syncIp)) if (n - syncIp[k].t > 5000) delete syncIp[k]; for (const k of Object.keys(lastSaveAt)) if (n - lastSaveAt[k] > 3600000) { delete lastSaveAt[k]; delete saveBurst[k]; } for (const k of Object.keys(saveBurst)) { const a = saveBurst[k]; if (!a.length || n - a[a.length - 1] > 60000) delete saveBurst[k]; } for (const k of Object.keys(dmgBudget)) if (n - dmgBudget[k].t > 60000) delete dmgBudget[k]; for (const k of Object.keys(lastChat)) if (n - lastChat[k] > 3600000) delete lastChat[k]; }, 60000).unref();
 app.post('/api/sync', auth, (req, res) => { if (!syncAllowed(req.user, SEC_IP(req))) return res.status(429).json({ error: 'rate', code: 'RATE' }); res.json(doSync(req.user, req.body, SEC_IP(req))); });
-app.post('/api/social', auth, userLimit('social', 120, 60000), (req, res) => { const r = social.act(req.user, req.body); res.json(Object.assign({}, r, { social: social.view(req.user) })); });
+app.post('/api/social', auth, userLimit('social', 120, 60000), (req, res) => { const r = social.act(req.user, req.body); if (r && !r.error && req.body && typeof req.body.a === 'string' && req.body.a.startsWith('trade_')) persistNow(); res.json(Object.assign({}, r, { social: social.view(req.user) })); });
 
 app.post('/api/house', auth, userLimit('house', 60, 60000), (req, res) => { res.json(extras.house(req.user, req.body)); });
-app.post('/api/market', auth, userLimit('market', 90, 60000), (req, res) => { res.json(extras.market(req.user, req.body)); });
+app.post('/api/market', auth, userLimit('market', 90, 60000), (req, res) => { const r = extras.market(req.user, req.body); if (r && r.ok && req.body && req.body.a !== 'browse' && req.body.a !== 'mail') persistNow(); res.json(r); });
 app.post('/api/rank', auth, userLimit('rank', 30, 60000), (req, res) => { res.json(extras.ranking(req.user, req.body || {})); });
 
 app.get('/api/map', auth, userLimit('map', 30, 60000), (req, res) => res.json({ worldData: db.worldData, itemDB: db.itemDB, npcDB: db.npcDB, mapVersion: db.mapVersion }));
@@ -696,15 +831,17 @@ function onWsConnect(conn, req) {
             return void conn.send(JSON.stringify({ t: 'auth', ok: true }));
         }
         const s = db.sessions[key]; if (!s || s.exp < Date.now() || s.rep) { conn.send(JSON.stringify(s && s.rep ? { t: 'replaced' } : { t: 'auth', ok: false })); return conn.close(1008); }
-        if (m.t === 'sync') { if (!syncAllowed(user, conn.ip || '-')) return void conn.send(JSON.stringify({ t: 'sync', i: m.i, d: { error: 'rate', code: 'RATE' } })); conn.send(JSON.stringify({ t: 'sync', i: m.i, d: doSync(user, m.d, conn.ip) })); }
-        else if (m.t === 'social') { const r = social.act(user, m.d); conn.send(JSON.stringify({ t: 'social', i: m.i, d: Object.assign({}, r, { social: social.view(user) }) })); }
+        try {   // um defeito num pedido não pode derrubar o servidor nem a conexão dos outros
+            if (m.t === 'sync') { if (!syncAllowed(user, conn.ip || '-')) return void conn.send(JSON.stringify({ t: 'sync', i: m.i, d: { error: 'rate', code: 'RATE' } })); conn.send(JSON.stringify({ t: 'sync', i: m.i, d: doSync(user, m.d, conn.ip) })); }
+            else if (m.t === 'social') { const r = social.act(user, m.d); conn.send(JSON.stringify({ t: 'social', i: m.i, d: Object.assign({}, r, { social: social.view(user) }) })); }
+        } catch (e) { console.error('[ws]', e); try { conn.send(JSON.stringify({ t: String(m.t || 'x').slice(0, 10), i: m.i, d: { error: 'Erro interno.' } })); } catch (_) { } }
     });
 }
 
 /* ---------- administração ---------- */
-/* presentes do admin (todas as rotas /api/admin/* exigem sessão admin verificada no servidor) */
+/* presentes do admin; o log é trilha de auditoria: 20 arquivos de 2 MB, nunca sobrescreve o histórico (todas as rotas /api/admin/* exigem sessão admin verificada no servidor) */
 const GIFT_LOG = path.join(DATA_DIR, 'admin-gifts.log');
-function giftLog(obj) { try { fs.mkdirSync(DATA_DIR, { recursive: true }); try { if (fs.statSync(GIFT_LOG).size > 2 * 1024 * 1024) fs.renameSync(GIFT_LOG, GIFT_LOG + '.1'); } catch (e) { } fs.appendFileSync(GIFT_LOG, JSON.stringify(obj) + '\n'); } catch (e) { } }
+function giftLog(obj) { try { fs.mkdirSync(DATA_DIR, { recursive: true }); try { if (fs.statSync(GIFT_LOG).size > 2 * 1024 * 1024) sec.rotate(GIFT_LOG, 20); } catch (e) { } fs.appendFileSync(GIFT_LOG, JSON.stringify(obj) + '\n'); } catch (e) { } }
 app.post('/api/admin/give', auth, adminOnly, userLimit('give', 60, 60000), (req, res) => {
     const b = req.body || {}; const to = extras.findUser(b.to);
     if (!to) return res.status(404).json({ error: 'Jogador não encontrado.' });
@@ -715,8 +852,13 @@ app.post('/api/admin/give', auth, adminOnly, userLimit('give', 60, 60000), (req,
     const id = extras.giveMail(to, item, qty, msg);
     if (!id) return res.status(400).json({ error: 'O correio de ' + to + ' está cheio (peça para ele esvaziar).' });
     const rec = { t: new Date().toISOString(), admin: req.user, to, item, qty, msg, id, ip: SEC_IP(req) };
-    giftLog(rec); sec.slog('ADMIN-GIVE', req.user, SEC_IP(req), to + ' <- ' + qty + 'x ' + item + ' (' + id + ')', true);
+    giftLog(rec); sec.slog('ADMIN-GIVE', req.user, SEC_IP(req), to + ' <- ' + qty + 'x ' + item + ' (' + id + ')', true); persistNow();
     res.json({ success: true, id, to, online: !!activePlayers[to] && Date.now() - activePlayers[to].lastSeen < 6000 });
+});
+/* destrava o salvamento de um jogador (suspensão automática por atividade suspeita) — só admin, registrado no log */
+app.post('/api/admin/unlock', auth, adminOnly, userLimit('unlock', 30, 60000), (req, res) => {
+    const to = extras.findUser((req.body || {}).user); if (!to) return res.status(404).json({ error: 'Jogador não encontrado.' });
+    const was = sec.clearLock(to); sec.slog('ADMIN-UNLOCK', req.user, SEC_IP(req), to + (was ? ' destravado' : ' (não estava suspenso)'), true); res.json({ success: true, was });
 });
 app.get('/api/admin/gifts', auth, adminOnly, userLimit('gifts', 30, 60000), (req, res) => {
     let rows = []; try { rows = fs.readFileSync(GIFT_LOG, 'utf8').trim().split('\n').slice(-40).map(l => { try { return JSON.parse(l); } catch (e) { return null; } }).filter(Boolean).reverse(); } catch (e) { }
@@ -730,16 +872,16 @@ app.get('/api/admin/search', auth, adminOnly, userLimit('search', 120, 60000), (
 
 /* missões especiais: jogadores listam e resgatam; só o admin cria/edita (specialquests.js) */
 app.get('/api/specialquest/list', auth, userLimit('sqlist', 60, 60000), (req, res) => res.json({ ok: true, quests: sq.list(req.user) }));
-app.post('/api/specialquest/claim', auth, userLimit('sqclaim', 20, 60000), (req, res) => res.json(sq.claim(req.user, req.body, SEC_IP(req))));
+app.post('/api/specialquest/claim', auth, userLimit('sqclaim', 20, 60000), (req, res) => { const r = sq.claim(req.user, req.body, SEC_IP(req)); if (r && r.ok) persistNow(); res.json(r); });
 app.get('/api/admin/specialquest', auth, adminOnly, userLimit('sqadm', 60, 60000), (req, res) => res.json({ ok: true, quests: sq.adminList(req.user) }));
 app.post('/api/admin/specialquest', auth, adminOnly, userLimit('sqadm', 60, 60000), (req, res) => res.json(sq.adminAct(req.user, req.body, SEC_IP(req))));
 
-app.get('/api/users', auth, adminOnly, (req, res) => {
+app.get('/api/users', auth, adminOnly, userLimit('users', 30, 60000), (req, res) => {
     const users = {}; for (const u of Object.keys(db.users)) users[u] = { role: db.users[u].role };
     res.json({ users, activePlayers: Object.keys(activePlayers) });
 });
 
-app.post('/api/users/role', auth, adminOnly, (req, res) => {
+app.post('/api/users/role', auth, adminOnly, userLimit('role', 30, 60000), (req, res) => {
     const { targetUser, newRole } = req.body || {};
     if (typeof targetUser !== 'string' || !hasOwn(db.users, targetUser)) return res.status(404).json({ error: 'Usuário não encontrado.' });
     if (!ROLES.includes(newRole)) return res.status(400).json({ error: 'Cargo inválido.' });
@@ -748,12 +890,12 @@ app.post('/api/users/role', auth, adminOnly, (req, res) => {
     db.users[targetUser].role = newRole; markDirty(); sec.slog('ADMIN-ROLE', req.user, SEC_IP(req), targetUser + ' -> ' + newRole, true); res.json({ success: true });
 });
 
-app.get('/api/backup', auth, adminOnly, (req, res) => {
+app.get('/api/backup', auth, adminOnly, userLimit('backup', 6, 60000), (req, res) => {
     sec.slog('ADMIN-BACKUP', req.user, SEC_IP(req), 'download do banco', true);
     const copy = { ...db }; delete copy.sessions; res.json(copy);
 });
 
-app.post('/api/restore', auth, adminOnly, (req, res) => {
+app.post('/api/restore', auth, adminOnly, userLimit('restore', 4, 60000), (req, res) => {
     const { dbData } = req.body || {};
     if (!dbData || typeof dbData !== 'object' || !dbData.users) return res.status(400).json({ error: 'Backup inválido.' });
     try { const dir = path.join(DATA_DIR, 'backups'); fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(path.join(dir, 'antes-do-restore-' + Date.now() + '.json'), JSON.stringify(db), 'utf8'); } catch (e) { console.error('[DB] snapshot pré-restore falhou:', e.message); }
@@ -769,6 +911,7 @@ app.post('/api/restore', auth, adminOnly, (req, res) => {
 /* ---------- erros ---------- */
 app.use('/api', (req, res) => res.status(404).json({ error: 'Rota não encontrada.' }));
 app.use((err, req, res, next) => {
+    if (res.headersSent) { try { res.end(); } catch (e) { } return; }
     if (err && err.type === 'entity.parse.failed') return res.status(400).json({ error: 'JSON inválido.' });
     if (err && err.type === 'entity.too.large') return res.status(413).json({ error: 'Dados grandes demais.' });
     if (err instanceof URIError || (err && (err.status === 400 || err.statusCode === 400)) || (err instanceof RangeError)) return res.status(400).json({ error: 'Pedido inválido.' });
@@ -776,9 +919,13 @@ app.use((err, req, res, next) => {
     console.error('[erro]', err); res.status(500).json({ error: 'Erro interno.' });
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3000, HOST = process.env.HOST || undefined;   // HOST=127.0.0.1 quando há um proxy (Caddy/nginx) na frente: ninguém acessa a porta do jogo direto nem forja X-Forwarded-For
 hydrateDeaths();
 ensureAdmin().then(() => {
-    const srv = app.listen(PORT, () => console.log(`MiniScape rodando na porta ${PORT} (dados em ${sql ? path.join(DATA_DIR, "database.sqlite") : DB_FILE})`));
-    if (srv && typeof srv.on === 'function') wsServer.attach(srv, { path: '/ws', onConnect: onWsConnect });
-});
+    const onUp = () => console.log(`MiniScape rodando na porta ${PORT}${HOST ? ' (' + HOST + ')' : ''} (dados em ${sql ? path.join(DATA_DIR, "database.sqlite") : DB_FILE})`);
+    srv = HOST ? app.listen(PORT, HOST, onUp) : app.listen(PORT, onUp);
+    srv.on('error', (e) => { console.error('[http] não consegui abrir a porta ' + PORT + ':', e.message); process.exit(1); });   // ex.: EADDRINUSE: sai (o supervisor tenta de novo) em vez de ficar "vivo" sem atender
+    srv.on('clientError', (e, sock) => { try { if (sock.writable) sock.end('HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n'); else sock.destroy(); } catch (_) { } });
+    srv.headersTimeout = 20000; srv.requestTimeout = 300000; srv.keepAliveTimeout = 65000;
+    if (typeof srv.on === 'function') wsServer.attach(srv, { path: '/ws', onConnect: onWsConnect });
+}).catch((e) => { console.error('[start]', e); process.exit(1); });

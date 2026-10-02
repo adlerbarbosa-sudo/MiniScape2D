@@ -277,8 +277,9 @@
         opt = opt || {}; if (typeof userRole === 'undefined' || userRole !== 'admin') return false;
         const p = PIECES[name]; if (!p || !ensure() || !itemDB[name]) return false;
         if (owned(name)) { absorb(name); return true; }
+        if (!(typeof addInvItem === 'function' && addInvItem(name, 1))) return false;   // mochila cheia: nada é registrado (evita peça "possuída" sem item)
         if (!player.mimic[name]) player.mimic[name] = { lvl: 1, xp: 0 };
-        if (typeof addInvItem === 'function' && addInvItem(name, 1)) { try { addPickupText(name, 1); } catch (e) { } } else return false;
+        try { addPickupText(name, 1); } catch (e) { }
         if (!opt.quiet) announce(name);
         syncAll(); saveSoon(); S.lastSig = ''; return true;
     }

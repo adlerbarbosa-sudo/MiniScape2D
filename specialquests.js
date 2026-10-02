@@ -12,7 +12,7 @@ const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 const TYPES = ['code', 'kill', 'deliver', 'map'];
 const ID_RE = /^q[a-z0-9]{4,14}$/;
 const KEY_RE = /^[A-Za-z0-9_\-]{1,40}$/;
-const ITEM_RE = /^[\p{L}\p{N}_.'\- ]{1,40}$/u;
+const ITEM_RE = /^[\p{L}\p{N}_.'’()+%!:\- ]{1,40}$/u;
 const MAXQ = 2147483647;
 const txt = (v, n) => (typeof v === 'string' ? v.replace(/[\u0000-\u001f\u007f​-‏‪-‮⁦-⁩<>]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, n) : '');
 const posInt = (v, a, b, d) => { v = Math.floor(Number(v)); return Number.isFinite(v) ? Math.max(a, Math.min(b, v)) : d; };
@@ -73,6 +73,8 @@ module.exports = function createSQ(ctx) {
     }
 
     const fail = (error, code) => ({ ok: false, error, code });
+    const badCodes = new Map();   // usuário -> instantes de códigos errados (no máximo 8 em 10 min: ninguém "adivinha" um código por força bruta)
+    setInterval(() => { const n = Date.now(); for (const [u, a] of badCodes) { const b = a.filter((t) => n - t < 600000); if (b.length) badCodes.set(u, b); else badCodes.delete(u); } }, 300000).unref();
     function claim(user, b, ip) {
         const db = getDB(); b = b || {}; const id = typeof b.id === 'string' ? b.id : '';
         const q = ID_RE.test(id) && hasOwn(db.specialQuests, id) ? db.specialQuests[id] : null;
@@ -80,7 +82,11 @@ module.exports = function createSQ(ctx) {
         if (claimedBy(id, user)) return fail('Você já resgatou essa missão.', 'DONE');
         if (q.max > 0 && claimCount(id) >= q.max) return fail('Essa recompensa já acabou.', 'SOLD');
         let take = null;
-        if (q.type === 'code') { if (norm(b.code) !== norm(q.code)) { sec.slog('SQ-BADCODE', user, ip, 'código errado em ' + id); return fail('Código incorreto.', 'CODE'); } }
+        if (q.type === 'code') {
+            const now = Date.now(), bad = (badCodes.get(user) || []).filter((t) => now - t < 600000);
+            if (bad.length >= 8) return fail('Muitas tentativas erradas. Aguarde alguns minutos.', 'RATE');
+            if (norm(b.code) !== norm(q.code)) { bad.push(now); badCodes.set(user, bad); sec.slog('SQ-BADCODE', user, ip, 'código errado em ' + id); return fail('Código incorreto.', 'CODE'); }
+        }
         else if (q.type === 'kill' || q.type === 'map') { if (progOf(id, user) < (q.type === 'map' ? 1 : q.n)) return fail('Objetivo ainda não cumprido (' + progOf(id, user) + '/' + (q.type === 'map' ? 1 : q.n) + ').', 'PROG'); }
         else if (q.type === 'deliver') { if (have(user, q.item) < q.n) return fail('Você precisa de ' + q.n + '× ' + q.item + ' (salvos na conta).', 'PROG'); take = { item: q.item, qty: q.n }; }
         if (!hasOwn(db.specialClaims, id)) db.specialClaims[id] = Object.create(null);

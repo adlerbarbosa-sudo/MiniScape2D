@@ -36,12 +36,12 @@
         if (wsReady) { try { return await wsCall('sync', payload); } catch (e) { throw e; } }
         connect(); return api('/sync', payload);
     }
-    async function socialCall(a, extra) {
+    async function socialCall(a, extra, quiet) {
         const body = Object.assign({ a }, extra || {}); let r;
         if (wsReady) { try { r = await wsCall('social', body); } catch (e) { r = null; } }
         if (!r) r = await api('/social', body);
         if (r && r.social) onState(r.social);
-        if (r && r.error) note(r.error, '#e74c3c');
+        if (r && r.error && !quiet) note(r.error, '#e74c3c');
         return r;
     }
     function note(t, c) { try { setActionText(t, c || '#2ecc71'); } catch (e) { } }
@@ -91,27 +91,52 @@
         const e = player.escrow; if (!e) return; player.escrow = null;
         (e.items || []).forEach((it) => giveOrDrop(it[0], it[1])); updateUI();
     }
+    /* salvar e CONFIRMAR (true só se o servidor gravou). O servidor só aceita "pronto"/"confirmado" de uma troca depois de ver o save com o depósito / o recebimento. */
+    async function saveOk(tries) {
+        for (let k = 0; k < (tries || 2); k++) { let ok = false; try { ok = (await saveDataNow(false, { wait: true })) === true; } catch (x) { } if (ok) return true; const st = window.saveStatus ? saveStatus() : {}; if (st.why === 'LOCKED') return false; await new Promise((r) => setTimeout(r, 900)); }
+        return false;
+    }
+    /* confirmação de recebimento: salva antes; se o servidor ainda disser "Salvamento pendente", salva de novo e repete UMA vez */
+    async function ackTrade(needSave) {
+        if (needSave && !(await saveOk(2))) return { error: 'Salvamento pendente.', _nosave: true };
+        let r = await socialCall('trade_ack', null, true);
+        if (r && typeof r.error === 'string' && /^Salvamento pendente/.test(r.error)) { if (!(await saveOk(2))) return r; r = await socialCall('trade_ack', null, true); }
+        if (r && r.error && !(r.social && r.social.trade === null)) note(r.error, '#e74c3c');
+        return r;
+    }
+    const retryAt = {};   // id da fase -> quando tentar de novo (evita laço a cada sync se o save/ack falhar)
     async function handleTrade(v) {
         const e = player.escrow;
-        if (!v) { if (e && !busy['ret']) { busy['ret'] = 1; returnEscrow(); try { await saveDataNow(true); } catch (x) { } delete busy['ret']; note('Troca cancelada: seus itens voltaram.', '#f1c40f'); } return; }
+        if (!v) { if (e && !busy['ret'] && Date.now() >= (retryAt['ret'] || 0)) { busy['ret'] = 1; returnEscrow(); const ok = await saveOk(1); if (!ok) retryAt['ret'] = Date.now() + 8000; delete busy['ret']; note('Troca cancelada: seus itens voltaram.', '#f1c40f'); } return; }
         if (v.st === 'commit' && v.readyMine === null && !busy[v.id]) {
             busy[v.id] = 1;
             let pass = false;
-            try { pass = canCommit(v); if (pass) { for (const [n, q] of v.mine) removeInvItem(n, q); player.escrow = { id: v.id, items: v.mine.map((x) => [x[0], x[1]]) }; updateUI(); await saveDataNow(true); } } catch (x) { pass = false; }
+            try {
+                pass = canCommit(v);
+                if (pass) {
+                    for (const [n, q] of v.mine) removeInvItem(n, q); player.escrow = { id: v.id, items: v.mine.map((x) => [x[0], x[1]]) }; updateUI();
+                    if (!(await saveOk(2))) { pass = false; returnEscrow(); note('Não deu para salvar a troca agora. Seus itens ficaram com você.', '#e74c3c'); }   // sem depósito salvo o servidor não deixa concluir: devolve já e avisa que não pode
+                }
+            } catch (x) { pass = false; }
             await socialCall('trade_ready', { pass });
-        } else if (v.st === 'done' && !v.applied && !busy['ap' + v.id]) {
+        } else if (v.st === 'done' && !v.applied && !busy['ap' + v.id] && Date.now() >= (retryAt['ap' + v.id] || 0)) {
             busy['ap' + v.id] = 1;
-            const done = player.tradeDone || (player.tradeDone = []);
-            if (done.indexOf(v.id) < 0) {
-                v.theirs.forEach((it) => giveOrDrop(it[0], it[1])); player.escrow = null; done.push(v.id); if (done.length > 20) done.shift();
-                updateUI(); try { await saveDataNow(true); } catch (x) { } note('Troca concluída com ' + v.other + '!', '#2ecc71'); try { Sfx && Sfx.play('quest'); } catch (x) { }
-            }
-            await socialCall('trade_ack'); delete busy['ap' + v.id];
-        } else if (v.st === 'cancel' && !v.applied && !busy['cn' + v.id]) {
+            try {
+                const done = player.tradeDone || (player.tradeDone = []); let fresh = false;
+                if (done.indexOf(v.id) < 0) {
+                    v.theirs.forEach((it) => giveOrDrop(it[0], it[1])); player.escrow = null; done.push(v.id); if (done.length > 20) done.shift(); fresh = true;
+                    updateUI(); note('Troca concluída com ' + v.other + '!', '#2ecc71'); try { Sfx && Sfx.play('quest'); } catch (x) { }
+                }
+                const r = await ackTrade(true);   // salva (com tradeDone) e só então confirma
+                if (r && r.error) retryAt['ap' + v.id] = Date.now() + (r._nosave ? 6000 : 3000);
+            } finally { delete busy['ap' + v.id]; }
+        } else if (v.st === 'cancel' && !v.applied && !busy['cn' + v.id] && Date.now() >= (retryAt['cn' + v.id] || 0)) {
             busy['cn' + v.id] = 1;
-            if (e && e.id === v.id) { returnEscrow(); try { await saveDataNow(true); } catch (x) { } }
-            note('Troca cancelada' + (v.why ? ' (' + v.why + ')' : '') + '.', '#f1c40f');
-            await socialCall('trade_ack'); delete busy['cn' + v.id];
+            try {
+                if (e && e.id === v.id) { returnEscrow(); await saveOk(1); }
+                note('Troca cancelada' + (v.why ? ' (' + v.why + ')' : '') + '.', '#f1c40f');
+                const r = await ackTrade(false); if (r && r.error) retryAt['cn' + v.id] = Date.now() + 3000;
+            } finally { delete busy['cn' + v.id]; }
         }
     }
 
@@ -189,7 +214,7 @@
         b.onclick = async (ev) => {
             if (v.st !== 'open') return; const rm = ev.target.closest('[data-rm]'); const ad = ev.target.closest('[data-add]');
             if (rm) { ev.preventDefault(); await socialCall('trade_offer', { items: v.mine.filter((x) => x[0] !== rm.dataset.rm) }); }
-            else if (ad && !ad.disabled) { const n = ad.dataset.add; const cur = mineMap[n] || 0; const step = Math.max(1, Math.floor(Number(String(trQty).replace(/\D/g, ''))) || 1); const q = ev.shiftKey ? have[n] : cur + step; const items = v.mine.filter((x) => x[0] !== n).concat([[n, Math.min(q, have[n])]]); if (items.length > 8) { note('No máximo 8 tipos de item.', '#e74c3c'); return; } await socialCall('trade_offer', { items }); }
+            else if (ad && !ad.disabled) { const n = ad.dataset.add; const cur = mineMap[n] || 0; const step = Math.max(1, Math.floor(Number(String(trQty).replace(/\D/g, ''))) || 1); const q = ev.shiftKey ? have[n] : cur + step; const items = v.mine.filter((x) => x[0] !== n).concat([[n, Math.min(q, have[n], 2147483647)]]); if (items.length > 8) { note('No máximo 8 tipos de item.', '#e74c3c'); return; } await socialCall('trade_offer', { items }); }
         };
         const tq = $('tr-q'); if (tq) tq.addEventListener('input', () => { trQty = tq.value.replace(/\D/g, '').slice(0, 10) || '1'; });
         const ok = $('tr-ok'); if (ok) ok.onclick = () => socialCall('trade_ok', { v: !v.okMine }); $('tr-cancel').onclick = () => socialCall('trade_cancel');

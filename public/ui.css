@@ -92,6 +92,7 @@ svg.ic.fill { fill: currentColor; stroke: none; }
 #env-badge .fc-c.now { background: rgba(232, 196, 105, .16); border: 1px solid rgba(232, 196, 105, .4); } #env-badge .fc-c b { font-size: .68rem; font-weight: 600; color: #f0e6c4; } #env-badge .fc-c small { font-size: .62rem; color: #a99f80; }
 #key-hints { position: absolute; left: 50%; transform: translateX(-50%); top: 12px; max-width: calc(100% - 560px); z-index: 80; font-size: .72rem; color: #eadfc4; text-shadow: 0 1px 2px #000; background: rgba(12, 8, 4, .6); border: 1px solid rgba(232, 196, 105, .3); border-radius: 10px; padding: 6px 10px; line-height: 1.55; transition: opacity 1s; pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #key-hints b { color: var(--gold-2); font-family: var(--serif); }
+@media (min-width: 851px) and (max-width: 1300px) { #key-hints { display: none; } }   /* canvas estreito: sobraria uma faixa de ~120 px, que cortava o texto */
 #key-hints.hide { opacity: 0; }
 
 .mobile-btn { display: none; width: 100%; padding: 14px; margin-bottom: 4px; align-items: center; justify-content: center; gap: 8px; color: #fff; border: 2px solid rgba(0, 0, 0, .55); border-radius: var(--r); font-size: 1.05rem; font-weight: 700; cursor: pointer; text-shadow: 0 1px 2px #000; font-family: var(--serif); letter-spacing: .5px; box-shadow: var(--bevel); }
@@ -298,7 +299,7 @@ html.touch #tab-buttons-container { flex: none; } html.touch .tab-btn { padding:
 html.touch .tab-content { padding: 8px; min-height: 0; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: pan-y; }
 html.touch .grid-container { grid-template-columns: repeat(auto-fill, minmax(46px, 1fr)); gap: 4px; }
 html.touch .item-qty { font-size: .6rem; left: 3px; } html.touch .rc-list { max-height: 40vh; }
-html.touch #action-text { position: absolute; left: 50%; transform: translateX(-50%); top: max(6px, env(safe-area-inset-top)); z-index: 96; max-width: 46vw; margin: 0; padding: 2px 10px; min-height: 0; font-size: .74rem; line-height: 1.25; border-radius: 999px; background: rgba(12, 8, 4, .6); pointer-events: none; }
+html.touch #action-text { position: absolute; left: 50%; transform: translateX(-50%); top: max(6px, env(safe-area-inset-top)); z-index: 96; max-width: min(46vw, max(120px, calc(100vw - 600px))); margin: 0; padding: 2px 10px; min-height: 0; font-size: .74rem; line-height: 1.25; border-radius: 999px; background: rgba(12, 8, 4, .6); pointer-events: none; }
 html.touch #action-text:empty { display: none; }
 html.touch .isel { position: fixed; right: max(6px, env(safe-area-inset-right)); left: auto; bottom: 6px; width: calc(min(420px, 60vw) - 12px); margin: 0; z-index: 210; }
 
