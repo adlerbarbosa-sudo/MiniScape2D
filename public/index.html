@@ -190,6 +190,7 @@
     <script src="petart.js"></script>
     <script src="pets.js"></script>
     <script src="mimic.js"></script>
+    <script src="sqadmin.js"></script>
     <script src="gift.js"></script>
     <script>
         // === 1. DECLARAÇÕES GLOBAIS ÚNICAS ===
@@ -247,13 +248,30 @@
         let _errN = 0; function logErr(e) { if (_errN++ < 5) console.error('[MiniScape]', e); }
         let lastLookStr = '', lookTick = 0; let lastEqStr = ''; let authToken = null; let worldDirty = false; let lastChatVer = 0; let mobPosFromHost = {};
         function esc(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+        /* SESSÃO ÚNICA: outro login na mesma conta derrubou esta sessão. Para tudo (sync, loop, save, reconexão), NÃO salva de volta e mostra o aviso. */
+        let _sessionDead = false; const SESSION_DEAD_MSG = 'Sua conta foi conectada em outro lugar. Você foi desconectado.';
+        function onSessionReplaced() {
+            if (_sessionDead) return; _sessionDead = true; authToken = null;
+            try { clearInterval(window._syncTimer); window._syncTimer = null; } catch (e) {}
+            try { if (window.Net && Net.stop) Net.stop(); } catch (e) {}
+            try { for (const k in keys) keys[k] = false; } catch (e) {}
+            try { if (typeof closeModal === 'function') closeModal(); } catch (e) {}
+            const ov = document.createElement('div'); ov.id = 'session-dead-overlay';
+            ov.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(10,6,2,.86)';
+            ov.innerHTML = '<div role="alertdialog" aria-modal="true" aria-labelledby="sd-t" style="max-width:380px;margin:16px;padding:22px 24px;text-align:center;background:#2a1c0d;border:3px solid #c9a24a;border-radius:10px;color:#f0e2bd;font-family:serif;box-shadow:0 8px 40px #000"><h3 id="sd-t" style="margin:0 0 10px;color:#f1c40f">Sessão encerrada</h3><p style="margin:0 0 16px;line-height:1.4">' + SESSION_DEAD_MSG + '</p><button id="sd-again" style="padding:8px 22px;font:700 1rem serif;color:#f0e2bd;background:linear-gradient(#5a3d1e,#3a2410);border:2px solid #c9a24a;border-radius:8px;cursor:pointer">Entrar novamente</button></div>';
+            document.body.appendChild(ov);
+            const b = document.getElementById('sd-again'); b.onclick = () => { location.reload(); }; try { b.focus(); } catch (e) {}
+        }
+        window.onSessionReplaced = onSessionReplaced;
         async function api(path, body, method) {
             const opts = { method: method || (body === undefined ? 'GET' : 'POST'), headers: {} };
             if (authToken) opts.headers['Authorization'] = 'Bearer ' + authToken;
             if (body !== undefined) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
             const ac = new AbortController(); const to = setTimeout(() => ac.abort(), 8000); opts.signal = ac.signal;
+            if (_sessionDead && path !== '/login' && path !== '/register') return { error: SESSION_DEAD_MSG, code: 'session_replaced', _status: 401 };   // sessão derrubada: nenhuma chamada sai mais daqui
             let res; try { res = await fetch(API_BASE + path, opts); } finally { clearTimeout(to); }
             let data = {}; try { data = await res.json(); } catch (e) {}
+            if (res.status === 401 && data.code === 'session_replaced') { onSessionReplaced(); data._status = 401; return data; }
             if (res.status === 401 && data.code === 'AUTH' && authToken) { authToken = null; alert('Sua sessão expirou. Entre novamente.'); location.reload(); }
             data._status = res.status; return data;
         }
@@ -693,6 +711,7 @@
                 
                 if(!isOfflineMode && !window._syncTimer) window._syncTimer = setInterval(syncMultiplayer, 100);
                 if(!gameLoopStarted) { gameLoopStarted = true; requestAnimationFrame(gameLoop); }
+                if (data.replaced) setTimeout(() => { try { setActionText('Você desconectou outra sessão desta conta.', '#f1c40f'); } catch (e) {} }, 1200);
             }, 100);
         }
 
@@ -712,7 +731,7 @@
         window.resizeCanvas = resizeCanvas; window.resizeCanvasSoon = resizeCanvasSoon;
 
         async function syncMultiplayer() {
-            if(!currentUser || isOfflineMode || isSyncing || !authToken) return;
+            if(!currentUser || isOfflineMode || isSyncing || !authToken || _sessionDead) return;
             isSyncing = true;
             try {
                 let payload = { x: player.x, y: player.y, map: (currentMap === 'casa' && window.World2 && World2.houseKey && World2.houseKey()) || currentMap, facing: player.facing, actionAnim: player.actionAnim, combatLogs: pendingCombatLogs, chatVer: lastChatVer, title: player.title || '' }; if (window.Life) { const _em = Life.pendingEmote(); if (_em) payload.emote = _em; }
@@ -726,6 +745,7 @@
                 }
                 let data;
                 try { data = await (window.Net ? Net.sync(payload) : api('/sync', payload)); } catch(e) { pendingCombatLogs = sentLogs.concat(pendingCombatLogs); lastEqStr = ''; lastLookStr = ''; throw e; }
+                if (data && data.code === 'session_replaced') { onSessionReplaced(); isSyncing = false; return; }
                 if (data.error) { if (data._status !== 401) pendingCombatLogs = sentLogs.concat(pendingCombatLogs); lastEqStr = ''; lastLookStr = ''; isSyncing = false; return; }
 
                 if (data.isHost !== undefined) { isMapHost = data.isHost; }
@@ -752,7 +772,10 @@
                         curM.entities.forEach(o => {
                             if (o.type === 'enemy' || o.type === 'npc') {
                                 let sm = data.serverMobs[o.id];
-                                if (sm) { let pend = 0; for (let li = 0; li < pendingCombatLogs.length; li++) if (pendingCombatLogs[li].id === o.id) pend += pendingCombatLogs[li].dmg || 0; if (pend > 0) { o.hp = sm.hp - pend; o.active = o.hp > 0 && !sm.isDead; } else { o.hp = sm.hp; o.active = !sm.isDead; } o.aggroTarget = pend > 0 ? o.aggroTarget : sm.aggro; }
+                                if (sm) { let pend = 0; for (let li = 0; li < pendingCombatLogs.length; li++) if (pendingCombatLogs[li].id === o.id) pend += pendingCombatLogs[li].dmg || 0; const wasOn = o.active !== false; if (pend > 0) { o.hp = sm.hp - pend; o.active = o.hp > 0 && !sm.isDead; } else { o.hp = sm.hp; o.active = !sm.isDead; } o.aggroTarget = pend > 0 ? o.aggroTarget : sm.aggro; if (!wasOn && o.active && o.type === 'enemy') { o._kd = 0; if (o.homeX !== undefined && !o.wb) { o.x = o.homeX; o.y = o.homeY; } } }
+                                else if (o.type === 'enemy' && o.active === false && !o.wb && o.id != null && Date.now() - (o._kd || 0) > 4000 && !pendingCombatLogs.some(l => l.id === o.id)) {   // o servidor não tem registro de morte (já renasceu, ou o mapa ficou vazio): volta inteiro e em casa
+                                    o.active = true; o.hp = o.maxHp || (npcDB[o.dbKey] && npcDB[o.dbKey].hp) || o.hp || 1; o.aggroTarget = null; o._kd = 0; if (o.homeX !== undefined) { o.x = o.homeX; o.y = o.homeY; }
+                                }
                                 if (!isMapHost && o.type === 'enemy' && mobPosFromHost[o.id]) { if (o.netX !== mobPosFromHost[o.id].x || o.netY !== mobPosFromHost[o.id].y || !o._nb) { o.netX = mobPosFromHost[o.id].x; o.netY = mobPosFromHost[o.id].y; netPush(o, o.netX, o.netY); } }
                             }
                         });
@@ -770,6 +793,7 @@
         // salvar é agrupado: vários pedidos em sequência viram um só (o "manual" e o logout salvam na hora)
         let _saveTimer = null;
         function saveDataLogic(manual = false, worldChanged = false) {
+            if (_sessionDead) return;
             if (worldChanged && userRole === 'admin') worldDirty = true;
             if (manual) { if (_saveTimer) { clearTimeout(_saveTimer); _saveTimer = null; } return saveDataNow(true); }
             if (!_saveTimer) _saveTimer = setTimeout(() => { _saveTimer = null; saveDataNow(false); }, 2500);
@@ -782,11 +806,11 @@
             for (const _k in tempMaps) { const _m = tempMaps[_k]; if (_m && _m.entities) _m.entities = _m.entities.filter(o => o && !o.wb); }   // o chefe de mundo é temporário   // móveis são pessoais de cada jogador
             // itens no chão: só entram no mundo salvo os colocados pelo Dev (wi). Drops de monstros e itens largados por jogadores (np) são temporários e NUNCA persistem; "pego" (tk) é estado do jogador, não do mundo.
             for (const _k in tempMaps) { const _m = tempMaps[_k]; if (_m && _m.entities) { _m.entities = _m.entities.filter(o => !(o.type === 'ground_item' && (o.np || o.owner || !o.wi))); _m.entities.forEach(o => { if (o.type === 'ground_item') { if (o.tk) o.active = true; delete o.tk; delete o.rt; o.life = 999999; } }); } }
-            for (let map in tempMaps) { if (tempMaps[map] && tempMaps[map].entities) { tempMaps[map].entities.forEach(obj => { if(obj && obj.aggroTarget) obj.aggroTarget = null; }); } }
+            for (let map in tempMaps) { if (tempMaps[map] && tempMaps[map].entities) { tempMaps[map].entities.forEach(obj => { if(obj && obj.aggroTarget) obj.aggroTarget = null; if (obj && obj.type === 'enemy') { obj.active = true; if (obj.maxHp > 0) obj.hp = obj.maxHp; delete obj._kd; } }); } }   // monstro mortos nunca vão para o mundo salvo (quem está morto é o servidor)
             return tempMaps;
         }
         async function saveDataNow(manual = false) {
-            if (!currentUser) return;
+            if (!currentUser || _sessionDead) return;
             const sendWorldNow = !isOfflineMode && window.location.protocol !== 'file:' && userRole === 'admin' && worldDirty;
             const needMaps = isOfflineMode || window.location.protocol === 'file:' || sendWorldNow;
             let tempMaps = needMaps ? buildWorldCopy() : null;
@@ -814,7 +838,7 @@
         // ao fechar/minimizar a aba: grava o progresso do jogador (keepalive sobrevive ao fechamento da página)
         function flushOnHide() {
             try {
-                if (!currentUser || !authToken || isOfflineMode) return;
+                if (!currentUser || !authToken || isOfflineMode || _sessionDead) return;
                 player.currentMap = currentMap;
                 const pd = Object.assign({}, player, { actionTarget: null, actionToolItem: null, pendingAutoAction: null });
                 fetch(API_BASE + '/save', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken }, body: JSON.stringify({ playerData: pd }) }).catch(() => {});
@@ -1288,7 +1312,7 @@
             t.hp -= dmg; t.aggroTarget = currentUser; const crit = _cr, big = !_cr && dmg > 0 && maxHit >= 4 && dmg >= maxHit * 0.9; Fx.dmg(floatingTexts, t.x + (t.w||30)/2, t.y + 2, dmg, dmg > 0 ? (crit ? 'crit' : big ? 'big' : 'hit') : 'miss'); if (dmg > 0) { Art.burst(t.x + (t.w||30)/2, t.y + (t.h||30)/2, '#d33', (crit || big) ? 12 : 6, (crit || big) ? 1.6 : 1); if (crit || big) Art.burst(t.x + (t.w||30)/2, t.y + (t.h||30)/2, '#ffe27a', 8, 1.8); }
             if (!isOfflineMode) { pendingCombatLogs.push({ id: t.id, dmg: dmg, aggro: currentUser, maxHp: t.maxHp }); if (pendingCombatLogs.length > 200) pendingCombatLogs.splice(0, pendingCombatLogs.length - 200); }
             if(t.hp <= 0) { 
-                Fx.ghost(t); t.active = false; t.aggroTarget = null; Art.poof(t.x + (t.w||30)/2, t.y + (t.h||30)/2);
+                Fx.ghost(t); t.active = false; t._kd = Date.now(); t.aggroTarget = null; Art.poof(t.x + (t.w||30)/2, t.y + (t.h||30)/2);
                 let bXP = (t.dbKey && npcDB[t.dbKey]) ? npcDB[t.dbKey].xp : 15; let cXP = Math.floor(bXP * 0.3) || 1; let hXP = bXP - cXP; addXP(sT, cXP); addXP('hp', hXP);
                 if(t.dbKey && npcDB[t.dbKey] && npcDB[t.dbKey].lootStr){ let pts = npcDB[t.dbKey].lootStr.split('|'); pts.forEach((p, i) => { let d = p.split(','); if(d.length >= 3 && Math.random() <= parseFloat(d[1]) * (window.Stats ? Stats.luckMul() : 1)){ let curM = gameMaps[currentMap]; if(curM) { if(!curM.entities) curM.entities = []; curM.entities.push({ id: newEntId(), type: 'ground_item', item: d[0].trim(), qty: Math.floor(Math.random()*parseInt(d[2]))+1, x: t.x+(Math.random()*20)-10, y: t.y, w: 20, h: 20, active: true, life: 3000 }); } } }); } saveDataLogic(); 
             }
@@ -1853,6 +1877,7 @@
         // passo fixo de 60Hz com acumulador (em monitor 120/144Hz o jogo NÃO acelera) + interpolação visual do jogador
         let _acc = 0, _lastTs = 0, prevPX = 0, prevPY = 0, renderPX = 0, renderPY = 0;
         function gameLoop(timestamp) {
+            if (_sessionDead) return;   // sessão derrubada: o jogo para (quadro final fica congelado atrás do aviso)
             requestAnimationFrame(gameLoop);
             if (!timestamp) timestamp = performance.now();
             if (!_lastTs) _lastTs = timestamp;

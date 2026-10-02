@@ -1686,7 +1686,7 @@
     function drawLook(ctx, x, y, look, view, opts) {
         opts = opts || {}; const L = look || _defLook, sc = opts.scale || 1, t = opts.t !== undefined ? opts.t : performance.now() / 1000; view = view || 'front';
         const D = dimsOf(L.sex, L.race);
-        const eq = { weapon: _WPN[opts.weapon] || null, shield: opts.shield ? _EQ.shield : null, body: opts.body ? _EQ.body : null, head: opts.head ? _EQ.head : null };
+        const eq = opts.equip || { weapon: _WPN[opts.weapon] || null, shield: opts.shield ? _EQ.shield : null, body: opts.body ? _EQ.body : null, head: opts.head ? _EQ.head : null };
         ctx.save(); ctx.translate(x, y); ctx.scale(sc, sc);
         ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(0, 0, 10 * D.sx, 3.6, 0, 0, TAU); ctx.fill();
         if (view === 'side' && opts.flip) ctx.scale(-1, 1);

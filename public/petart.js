@@ -412,6 +412,20 @@
         g.restore(); return seat;
     }
 
+
+    /* ---- PET MONTADO (nível 10+): o pet cresce (>= 1,5x) e o jogador senta nele; a hitbox do jogo não muda (só visual) ---- */
+    // altura (em px do desenho do pet, sem escala) do dorso onde o cavaleiro senta
+    const SEATH = { gato: 11.2, cachorro: 12.1, coelho: 10.5, raposa: 11.8, lobinho: 13.5, dragao_fogo: 10.8, dragao_gelo: 10.8, slime: 11, golem: 16, coruja: 12, fada: 10, fenix: 13 };
+    function petScale(id) { const h = SEATH[id] || 11; return Math.max(1.5, Math.min(2.6, 21 / h)); }
+    function petMount(ctx, id, x, y, o, rider) {
+        const f = PET[id]; if (!f) return { x: 0, y: -24 }; g = ctx; o = o || {};
+        const v = o.view || 'side', fl = v === 'side' && o.flip < 0 ? -1 : 1, sc = petScale(id) * (o.scale || 1), h = (SEATH[id] || 11) * sc;
+        const seat = { x: x + (v === 'side' ? -0.6 * fl * sc : 0), y: y - h };
+        const body = () => pet(ctx, id, x, y, { view: v, flip: o.flip, t: o.t, ph: o.ph, mv: o.mv, scale: sc });
+        const cloth = () => { g = ctx; ctx.save(); ctx.translate(seat.x, seat.y + 1.5); ell(0, 0, v === 'side' ? 5.6 : 7.4, 2.2, '#7a2f26', 0, 0.8); ctx.restore(); };
+        if (v === 'front') { if (rider) rider(seat); body(); } else { body(); cloth(); if (rider) rider(seat); }
+        return { x: seat.x - x, y: seat.y - y };
+    }
     const NAMES = { pet: Object.keys(PET), mount: Object.keys(MOUNT_FN) };
     const _pc = Object.create(null);
     function portrait(id, kind, size, stage) {
@@ -424,5 +438,5 @@
         } catch (e) { }
         return (_pc[key] = cv);
     }
-    root.PetArt = { pet, mount, portrait, NAMES, shade: sh };
+    root.PetArt = { pet, mount, petMount, petScale, portrait, NAMES, shade: sh };
 })(window);

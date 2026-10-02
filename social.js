@@ -135,7 +135,14 @@ module.exports = function createSocial(ctx) {
             default: return err('Ação desconhecida.');
         }
     }
+    /* sessão única: outro login derrubou a sessão de u. Convites/trocas abertas ou em andamento viram "cancel" (o depósito volta para quem já tinha tirado da mochila);
+       trocas já concluídas (done) seguem o curso normal, cada lado recebe uma única vez. */
+    function dropUser(u, why) {
+        const id = tradeOf[u]; const t = id && db.trades[id];
+        if (t && (t.st === 'invite' || t.st === 'open' || t.st === 'commit')) endTrade(t, why || 'jogador saiu');
+        delete invites[u];
+    }
     function chatVisible(u, c) { return !c.party || c.party === partyOf[u]; }
     function rebind(nd) { db = nd; if (!db.trades || typeof db.trades !== 'object') db.trades = Object.create(null); rebuildTrades(); }
-    return { act, view, chatVisible, rebind, partyOf: (u) => partyOf[u] || null, tick, _t: { parties, invites, tradeOf } };
+    return { act, view, dropUser, chatVisible, rebind, partyOf: (u) => partyOf[u] || null, tick, _t: { parties, invites, tradeOf } };
 };

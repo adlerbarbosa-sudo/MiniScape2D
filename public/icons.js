@@ -259,7 +259,7 @@
     }
     const cache = Object.create(null);
     function canvas(name) {
-        const key = name + '|' + ((typeof itemDB !== 'undefined' && itemDB[name] && itemDB[name].icon) || '');
+        const key = name + '|' + ((typeof itemDB !== 'undefined' && itemDB[name] && itemDB[name].icon) || '') + ((typeof itemDB !== 'undefined' && itemDB[name] && itemDB[name].mimic && window.Mimic) ? '|' + Mimic.iconKey(name) : '');   // Mímicos: a aparência/estágio faz parte da chave
         if (cache[key]) return cache[key];
         const it = (typeof itemDB !== 'undefined' && itemDB[name]) || { name, icon: '' };
         const cv = document.createElement('canvas'); cv.width = cv.height = SZ; g = cv.getContext('2d');
@@ -282,7 +282,7 @@
         cache[key] = cv; return cv;
     }
     const urls = Object.create(null);
-    function url(name) { const key = name + '|' + ((typeof itemDB !== 'undefined' && itemDB[name] && itemDB[name].icon) || ''); return urls[key] || (urls[key] = canvas(name).toDataURL()); }
+    function url(name) { const key = name + '|' + ((typeof itemDB !== 'undefined' && itemDB[name] && itemDB[name].icon) || '') + ((typeof itemDB !== 'undefined' && itemDB[name] && itemDB[name].mimic && window.Mimic) ? '|' + Mimic.iconKey(name) : ''); return urls[key] || (urls[key] = canvas(name).toDataURL()); }
     function html(name, px) { return '<img class="ic-item" alt="" draggable="false" src="' + url(name) + '"' + (px ? ' style="width:' + px + 'px;height:' + px + 'px"' : '') + '>'; }
     window.Icons = { canvas, url, html, pick, SZ };
 })();

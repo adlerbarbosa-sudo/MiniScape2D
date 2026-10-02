@@ -54,13 +54,13 @@
     function refresh() { if (open) render(true); }
 
     /* ============ janela ============ */
-    const TABS = [['daily', 'Diárias'], ['ach', 'Conquistas'], ['market', 'Mercado'], ['rank', 'Ranking'], ['map', 'Mapa'], ['emote', 'Emotes']];
+    const TABS = [['daily', 'Diárias'], ['special', 'Especiais'], ['ach', 'Conquistas'], ['market', 'Mercado'], ['rank', 'Ranking'], ['map', 'Mapa'], ['emote', 'Emotes']];
     function render(soft) {
         const box = $('custom-modal-box'); if (!box) return; const ov = $('custom-modal-overlay');
         if (soft && (ov.style.display === 'none' || !box.querySelector('#hub-box'))) { open = false; return; }
         const sc = box.querySelector('#hub-box') ? box.querySelector('#hub-box').scrollTop : 0;
-        let body = ''; try { body = tab === 'daily' ? dailyHtml() : tab === 'ach' ? achHtml() : tab === 'market' ? marketHtml() : tab === 'rank' ? rankHtml() : tab === 'map' ? mapHtml() : emoteHtml(); } catch (e) { body = '<i>Erro ao montar esta aba.</i>'; console.error(e); }
-        openModal(`<div id="hub-box"><h3>Diário do Aventureiro</h3><div class="hub-tabs">${TABS.map((t) => `<b data-t="${t[0]}" class="${tab === t[0] ? 'on' : ''}">${t[1]}${t[0] === 'daily' && claimable() ? ' •' : t[0] === 'market' && mailN ? ' •' : ''}</b>`).join('')}</div><div id="hub-body">${body}</div><div style="text-align:right;margin-top:8px"><button class="hb" data-close="1">Fechar (Esc)</button></div></div>`);
+        let body = ''; try { body = tab === 'daily' ? dailyHtml() : tab === 'special' ? specialHtml() : tab === 'ach' ? achHtml() : tab === 'market' ? marketHtml() : tab === 'rank' ? rankHtml() : tab === 'map' ? mapHtml() : emoteHtml(); } catch (e) { body = '<i>Erro ao montar esta aba.</i>'; console.error(e); }
+        openModal(`<div id="hub-box"><h3>Diário do Aventureiro</h3><div class="hub-tabs">${TABS.map((t) => `<b data-t="${t[0]}" class="${tab === t[0] ? 'on' : ''}">${t[1]}${t[0] === 'daily' && claimable() ? ' •' : t[0] === 'special' && sqReady() ? ' •' : t[0] === 'market' && mailN ? ' •' : ''}</b>`).join('')}</div><div id="hub-body">${body}</div><div style="text-align:right;margin-top:8px"><button class="hb" data-close="1">Fechar (Esc)</button></div></div>`);
         const nb = $('custom-modal-box'); nb.dataset.social = '0'; nb.dataset.hub = '1'; nb.style.width = tab === 'map' ? 'min(96vw, 1040px)' : 'min(94vw, 680px)'; nb.style.maxWidth = 'none'; nb.style.boxSizing = 'border-box'; nb.style.padding = '16px'; const el = nb.querySelector('#hub-box'); if (el && soft) el.scrollTop = sc;
         nb.onclick = onClick; afterRender();
     }
@@ -74,6 +74,46 @@
         h += d.q.map((q, i) => `<div class="hub-row ${q.done ? 'done' : ''}"><div class="g"><b>${esc(Life.dText(q))}</b><small>Recompensa: ${fn(q.coins)} moedas + ${q.xp} XP</small>${bar(q.p, q.need)}<small>${Math.min(q.p, q.need)}/${q.need}</small></div>${q.claimed ? '<span style="color:#7bd68f">✔ recebida</span>' : `<button class="hb go" data-claim="${i}" ${q.done ? '' : 'disabled'}>Receber</button>`}</div>`).join('');
         const b = Life.bossInfo(); h += `<h4 style="margin:12px 0 4px;color:#e8c469">Chefe de mundo</h4><div class="hub-row"><div class="g"><b>Colosso de Pedra</b><small>${b ? (b.open ? 'Está na Vila agora! Chame seus amigos.' : 'Desperta na Vila daqui a ' + fmtMs(b.next) + '.') : 'Indisponível offline.'} Todo dia, toda hora cheia, por 25 minutos.</small></div></div>`;
         return h;
+    }
+
+    /* ---------- missões especiais (criadas pelo admin; objetivo e resgate validados no servidor) ---------- */
+    let sqData = null, sqBusy = false;
+    const sqReady = () => !!(sqData && sqData.some((q) => !q.claimed && q.active && q.prog >= q.need && q.type !== 'code'));
+    async function loadSpecial() { if (!online()) return; try { const r = await api('/specialquest/list'); if (r && r.ok) { sqData = r.quests; if (open && tab === 'special') render(true); } } catch (e) { } }
+    function sqObj(q) {
+        if (q.type === 'code') return 'Descubra e digite o código secreto.';
+        if (q.type === 'kill') return 'Derrote ' + q.need + '× ' + esc((npcDB[q.species] && npcDB[q.species].name) || q.species) + '.';
+        if (q.type === 'map') return 'Chegue a ' + esc((gameMaps[q.map] && gameMaps[q.map].name) || q.map) + '.';
+        return 'Entregue ' + q.need + '× ' + esc(q.item) + '.';
+    }
+    function specialHtml() {
+        if (!online()) return '<i>As missões especiais precisam de conexão com o servidor.</i>';
+        if (!sqData) return '<i>Carregando...</i>';
+        let h = '<div style="font-size:.78rem;opacity:.85;margin-bottom:4px">Missões criadas pelo administrador, com recompensas exclusivas. Cada uma pode ser resgatada <b>uma vez</b> por jogador; o prêmio chega pelo correio.</div>';
+        if (!sqData.length) return h + '<i>Nenhuma missão especial ativa agora.</i>';
+        return h + sqData.map((q) => {
+            const done = q.claimed, ok = q.active && q.prog >= q.need && q.left !== 0;
+            const rw = '<span style="display:inline-flex;align-items:center;gap:4px">' + ic(q.reward.item, 22) + esc(q.reward.item) + (q.reward.qty > 1 ? ' ×' + fn(q.reward.qty) : '') + '</span>';
+            let act = '';
+            if (done) act = '<span style="color:#7bd68f">✔ resgatada</span>';
+            else if (q.left === 0) act = '<span style="color:#e67e22">esgotada</span>';
+            else if (q.type === 'code') act = '<input class="hub-in" data-sqcode="' + esc(q.id) + '" maxlength="30" placeholder="Código" style="width:110px;margin-right:4px"><button class="hb go" data-sqc="' + esc(q.id) + '">Resgatar</button>';
+            else act = '<button class="hb go" data-sqc="' + esc(q.id) + '" ' + (ok ? '' : 'disabled') + '>Resgatar</button>';
+            return '<div class="hub-row ' + (done ? 'done' : '') + '"><div class="g"><b>' + esc(q.name) + '</b>' + (q.desc ? '<small>' + esc(q.desc) + '</small>' : '') + '<small>Objetivo: ' + sqObj(q) + '</small>' + (q.type === 'code' ? '' : bar(q.prog, q.need) + '<small>' + Math.min(q.prog, q.need) + '/' + q.need + '</small>') + '<small>Recompensa: ' + rw + (q.left > 0 ? ' · restam ' + q.left : '') + '</small></div><div style="display:flex;align-items:center;flex-wrap:wrap;justify-content:flex-end;gap:4px">' + act + '</div></div>';
+        }).join('');
+    }
+    async function sqClaim(id) {
+        if (sqBusy) return; const q = (sqData || []).find((x) => x.id === id); if (!q) return; sqBusy = true;
+        try {
+            const inp = document.querySelector('[data-sqcode="' + id + '"]'); const r = await api('/specialquest/claim', { id, code: inp ? inp.value : undefined });
+            if (!r || !r.ok) { note((r && r.error) || 'Não foi possível resgatar.', '#e74c3c'); }
+            else {
+                if (r.take) { try { removeInvItem(r.take.item, r.take.qty); updateUI(); saveDataLogic(); } catch (e) { } }
+                note('Missão especial concluída: ' + r.name + '! A recompensa chega pelo correio.', '#2ecc71'); try { Sfx.play('quest'); } catch (e) { }
+                await claimMail();
+            }
+        } catch (e) { note('Sem conexão.', '#e74c3c'); }
+        sqBusy = false; await loadSpecial(); if (open) render(true);
     }
 
     /* ---------- conquistas ---------- */
@@ -178,7 +218,8 @@
             const done = new Set(player.mailDone); const ack = [], got = []; let changed = false;
             for (const e of r.mail) {
                 if (done.has(e.id)) { ack.push(e.id); continue; }
-                if (!itemDB[e.item] || !addInvItem(e.item, e.qty)) continue;   // sem espaço: tenta de novo depois
+                if (!itemDB[e.item]) continue;
+                if (!(window.Mimic && Mimic.takeMail && Mimic.takeMail(e.item)) && !addInvItem(e.item, e.qty)) continue;   // sem espaço: tenta de novo depois (Mímico repetido vira XP em Mimic.takeMail)
                 player.mailDone.push(e.id); ack.push(e.id); got.push(e); changed = true;
             }
             if (player.mailDone.length > 200) player.mailDone.splice(0, player.mailDone.length - 200);
@@ -284,9 +325,10 @@
 
     /* ============ eventos ============ */
     function onClick(ev) {
-        const t = ev.target.closest('[data-t],[data-sub],[data-claim],[data-title],[data-em],[data-buy],[data-cancel],[data-sel],[data-list],[data-map],[data-wz],[data-close]'); if (!t) return; const d = t.dataset;
+        const t = ev.target.closest('[data-t],[data-sub],[data-claim],[data-title],[data-em],[data-buy],[data-cancel],[data-sel],[data-list],[data-map],[data-wz],[data-close],[data-sqc]'); if (!t) return; const d = t.dataset;
         if (d.close) return closeHub();
-        if (d.t) { tab = d.t; if (tab === 'market') { loadMarket(); claimMail(); } if (tab === 'rank') loadRank(); return render(); }
+        if (d.sqc) return sqClaim(d.sqc);
+        if (d.t) { tab = d.t; if (tab === 'market') { loadMarket(); claimMail(); } if (tab === 'rank') loadRank(); if (tab === 'special') loadSpecial(); return render(); }
         if (d.sub) { sub = d.sub; return render(); }
         if (d.claim != null) { Life.claim(+d.claim); return render(); }
         if (d.title != null) { player.title = d.title; try { saveDataLogic(); } catch (e) { } return render(); }
@@ -307,6 +349,7 @@
         ['mk-qty', 'mk-price'].forEach((id) => { const e = $(id); if (e) e.addEventListener('input', upd); }); upd();
         b.querySelectorAll('canvas[data-emc]').forEach((c) => { const g = c.getContext('2d'); g.scale(1.3, 1.3); try { Emotes.draw(g, 15, 30, { k: c.dataset.emc, until: Date.now() + 999999 }); } catch (e) { } });
         if (tab === 'rank' && !rankData) loadRank();
+        if (tab === 'special' && !sqData) loadSpecial();
         if (tab === 'map') { wmInit(); wmBuild(false); }
     }
 
@@ -314,6 +357,7 @@
     let lastPoll = 0, noMarket = false;
     async function background() {
         if (!ready() || !online() || noMarket) return; const n = Date.now(); if (n - lastPoll < 20000) return; lastPoll = n;
+        try { if (!background.sq || n - background.sq > 60000) { background.sq = n; loadSpecial(); } } catch (e) { }
         try { if (player.mkt) await finishPending(); await claimMail(); if (!mkData || open) { /* nada */ } } catch (e) { }
     }
     function wire() { const om = window.openModal; if (typeof om === 'function') window.openModal = function () { const b = $('custom-modal-box'); if (b) { b.style.width = ''; b.style.maxWidth = ''; b.style.boxSizing = ''; b.style.padding = ''; } return om.apply(this, arguments); }; mkBtn(); setInterval(() => { try { tick(); background(); } catch (e) { } }, 1000); }

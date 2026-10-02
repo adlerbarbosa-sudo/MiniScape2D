@@ -147,7 +147,7 @@ module.exports = function createExtras(ctx) {
     const MOUNT_IDS = new Set(['cav_marrom', 'cav_branco', 'cav_guerra', 'lobo_gigante', 'cav_esqueleto', 'cav_fogo', 'unicornio', 'pantera', 'dragao']);
     const PET_MODES = new Set(['follow', 'attack', 'items', 'coins', 'all']);
     const pInt = (v, a, b, d) => { v = Math.floor(Number(v)); return Number.isFinite(v) ? Math.max(a, Math.min(b, v)) : d; };
-    function cleanPetSync(p) { if (!p || typeof p !== 'object' || Array.isArray(p) || typeof p.id !== 'string' || !PET_IDS.has(p.id)) return null; return { id: p.id, l: pInt(p.l, 1, 10, 1) }; }
+    function cleanPetSync(p) { if (!p || typeof p !== 'object' || Array.isArray(p) || typeof p.id !== 'string' || !PET_IDS.has(p.id)) return null; const l = pInt(p.l, 1, 10, 1); return { id: p.id, l, m: (p.m && l >= 10) ? 1 : 0 }; }   // m: 1 = o jogador está montado no pet (só nível 10+)
     const MOUNT_MAXLVL = 30, mountNeed = (l) => Math.round(250 * Math.pow(1.2, l - 1));   // mesma curva do cliente (pets.js)
     function cleanMountStage(v) { return pInt(v, 0, 3, 0); }
     function cleanMountId(m) { return typeof m === 'string' && MOUNT_IDS.has(m) ? m : null; }

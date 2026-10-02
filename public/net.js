@@ -7,15 +7,16 @@
     const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
     /* ============================ TRANSPORTE ============================ */
-    let ws = null, wsReady = false, everReady = false, failUntil = 0, seq = 0, fails = 0; const pending = new Map();
+    let stopped = false, ws = null, wsReady = false, everReady = false, failUntil = 0, seq = 0, fails = 0; const pending = new Map();
     function connect() {
         let tok = null; try { tok = authToken; } catch (e) { return; }
-        if (ws || !tok || Date.now() < failUntil || location.protocol === 'file:' || typeof WebSocket === 'undefined') return;
+        if (stopped || ws || !tok || Date.now() < failUntil || location.protocol === 'file:' || typeof WebSocket === 'undefined') return;
         try {
             const w = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws'); ws = w;
             w.onopen = () => w.send(JSON.stringify({ t: 'auth', token: tok }));
             w.onmessage = (e) => {
                 let m; try { m = JSON.parse(e.data); } catch (x) { return; }
+                if (m.t === 'replaced' || (m.t === 'auth' && m.code === 'session_replaced')) { stopped = true; try { window.onSessionReplaced && window.onSessionReplaced(); } catch (x) { } return; }
                 if (m.t === 'auth') { wsReady = !!m.ok; if (m.ok) everReady = true; else failUntil = Date.now() + 30000; return; }
                 const p = pending.get(m.i); if (p) { pending.delete(m.i); clearTimeout(p.to); p.res(m.d); }
             };
@@ -23,6 +24,7 @@
             w.onclose = drop; w.onerror = () => { try { w.close(); } catch (x) { } };
         } catch (e) { failUntil = Date.now() + 60000; }
     }
+    function stop() { stopped = true; wsReady = false; const w = ws; ws = null; pending.forEach((p) => { clearTimeout(p.to); p.rej(new Error('stopped')); }); pending.clear(); try { w && w.close(); } catch (e) { } }   // sessão derrubada: sem reconexão
     function wsCall(t, d) {
         return new Promise((res, rej) => {
             const i = ++seq; const to = setTimeout(() => { pending.delete(i); rej(new Error('timeout')); try { ws && ws.close(); } catch (x) { } }, 2500);
@@ -64,7 +66,7 @@
     /* ---------- troca: lógica ---------- */
     const INV = () => (typeof INV_SLOTS !== 'undefined' ? INV_SLOTS : 24), SM = () => window.STACK_MAX || 2147483647;
     function hasEnch(name) { return player.inventory.some((i) => i.name === name && (i.ench || i.enchanted)); }
-    function tradable(name) { const d = itemDB[name]; return !!d && name !== 'Untradable' && !hasEnch(name) && !d.mimic && !d.mimicBox; }   // Mímicos são ligados à conta
+    function tradable(name) { const d = itemDB[name]; return !!d && name !== 'Untradable' && !hasEnch(name) && !d.mimic && !d.mimicBox && !d.mimicSkin; }   // Mímicos são ligados à conta
     function invCounts() { const m = {}; player.inventory.forEach((i) => { m[i.name] = (m[i.name] || 0) + (i.qty || 1); }); return m; }
     function canCommit(v) {
         const have = invCounts();
@@ -199,5 +201,5 @@
         setInterval(() => { try { if (btn) btn.style.display = (typeof currentUser !== 'undefined' && currentUser && !isOfflineMode && document.getElementById('game-wrapper').style.display !== 'none') ? '' : 'none'; if (btn && btn.style.display === '') place(); } catch (e) { } }, 700);
     }
     window.addEventListener('load', wire);
-    window.Net = { sync, onSync, socialCall, connect, state: () => S, open: () => wsReady, canCommit, tradable, openSocial, _returnEscrow: returnEscrow };
+    window.Net = { stop, sync, onSync, socialCall, connect, state: () => S, open: () => wsReady, canCommit, tradable, openSocial, _returnEscrow: returnEscrow };
 })();

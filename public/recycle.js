@@ -37,7 +37,7 @@
 
     function blockReason(item) {
         if (!ready()) return 'Jogo ainda não carregou.';
-        if (item && (item.mimic || item.mimicBox)) return 'Itens Mímicos não podem ser desmanchados: evoluem com você.';
+        if (item && (item.mimic || item.mimicBox || item.mimicSkin)) return 'Itens Mímicos não podem ser desmanchados: evoluem com você.';
         if (!eligible(item)) return 'Este item não pode ser desmanchado.';
         if (player.equipment && Object.keys(player.equipment).some((k) => player.equipment[k] === item)) return 'Desequipe o item antes de desmanchar.';
         if (player.inventory.indexOf(item) < 0) return 'Esse item não está na mochila.';
@@ -71,7 +71,7 @@
         if (!r.give.length) { r.why = mats.length ? 'Rende menos de 1 material: não vale desmanchar (se não quiser, jogue fora).' : 'Este item não tem receita nem material conhecido: não dá para desmanchar.'; return r; }
         r.ok = true; r.fromScrap = fromScrap; return r;
     }
-    const can = (item) => eligible(item) && !(item.mimic || item.mimicBox);
+    const can = (item) => eligible(item) && !(item.mimic || item.mimicBox || item.mimicSkin);
 
     // desmancha de verdade (tudo ou nada). Devolve { ok, give, msg }
     function run(item, batches) {

@@ -15,7 +15,7 @@
 <p style="font-size:.72rem;color:#bdc3c7;margin:4px 0">O item chega pelo correio do jogador (online: em até ~20 s; offline: ao entrar). Fica na fila se a mochila estiver cheia e nunca duplica.</p>
 <label style="font-size:.75rem">Jogador:</label><input id="gf-user" class="dev-input" placeholder="Buscar jogador pelo nome..." autocomplete="off" maxlength="30">
 <div id="gf-users" style="max-height:110px;overflow-y:auto;margin:4px 0"></div>
-<label style="font-size:.75rem">Item (catálogo inteiro: Mímicos, pets, montarias, iscas...):</label><input id="gf-item" class="dev-input" placeholder="Buscar item..." autocomplete="off" maxlength="40">
+<label style="font-size:.75rem">Item (catálogo inteiro: peças e aparências Mímicas, pets, montarias, iscas...):</label><input id="gf-item" class="dev-input" placeholder="Buscar item..." autocomplete="off" maxlength="40">
 <div id="gf-items" style="max-height:150px;overflow-y:auto;margin:4px 0;border:1px solid #3d2e24"></div>
 <div class="dev-row" style="margin-top:4px"><div style="flex:1"><label style="font-size:.75rem">Quantidade:</label><input id="gf-qty" class="dev-input" type="number" min="1" max="2147483647" value="1"></div></div>
 <div id="gf-qb" style="display:flex;gap:4px;margin:4px 0"></div>
@@ -25,6 +25,7 @@
 <div id="gf-status" style="font-size:.75rem;margin-top:4px"></div>
 <h4 style="color:#f39c12;margin:12px 0 4px">Últimos presentes</h4><div id="gf-hist" style="font-size:.7rem;color:#bdc3c7;max-height:140px;overflow-y:auto"></div>`;
         tab.appendChild(box);
+        try { if (window.SQAdmin) SQAdmin.init(tab, bar); } catch (e) { console.error(e); }   // Missões Especiais (sqadmin.js)
         const qb = $('gf-qb'); [1, 10, 100, 1000, 100000].forEach((n) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'dev-save-btn'; b.style.cssText = 'margin:0;padding:3px 8px;width:auto;background:#3d2e24'; b.textContent = n.toLocaleString('pt-BR'); b.onclick = () => { $('gf-qty').value = n; }; qb.appendChild(b); });
         $('gf-user').addEventListener('input', () => { clearTimeout(searchT); searchT = setTimeout(searchUsers, 200); }); $('gf-user').addEventListener('focus', searchUsers);
         $('gf-item').addEventListener('input', renderItems);

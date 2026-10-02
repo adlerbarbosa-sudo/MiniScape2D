@@ -263,7 +263,14 @@ module.exports = function createSecurity(opts) {
                     const allow = spend(user, 'distinct', newDistinct, 40, 4, now);
                     if (allow < newDistinct) { notes.push('distinct+' + (newDistinct - allow)); n++; let over = newDistinct - allow; for (const [name] of b.t) { if (over <= 0) break; if ((a.t.get(name) || 0) === 0 && b.ns.has(name) && !cr.has(name)) { trim(pd, name, 1e9); over--; } } }
                 }
-                for (const [nm, t] of totals(pd).t) { if (/Mímic[ao]/.test(nm) && nm !== 'Caixa Mímica' && t > 1) { trim(pd, nm, t - 1); notes.push('mimic-dup:' + nm); n++; } }
+                /* Itens Mímicos são EXCLUSIVOS DO ADMIN: só podem aparecer se já estavam na conta (save anterior) ou chegaram pelo correio (presente / missão especial). Qualquer outra "origem" é revertida. */
+                const MM = require('./mimicnames'), tt = totals(pd).t;
+                for (const [nm, t] of tt) {
+                    if (!MM.NAMES.has(nm)) continue;
+                    const allowed = (a.t.get(nm) || 0) + (cr.get(nm) || 0);
+                    if (t > allowed) { trim(pd, nm, t - allowed); notes.push('mimic-sem-presente:' + nm); n++; if (t - allowed >= t && pd.mimic && typeof pd.mimic === 'object' && !(a.t.get(nm) || 0)) delete pd.mimic[nm]; }   // peça forjada some inteira, inclusive o estado
+                    else if (MM.PIECES.has(nm) && t > 1) { trim(pd, nm, t - 1); notes.push('mimic-dup:' + nm); n++; }
+                }
             }
         }
         if (ctx.dropped) { n += ctx.dropped; notes.push('itens-invalidos:' + ctx.dropped); }
@@ -278,7 +285,7 @@ module.exports = function createSecurity(opts) {
         if (role === 'admin' || !STRICT()) return;
         const now = Date.now(); const cnt = (o) => (o && typeof o === 'object') ? Object.keys(o).length : 0;
         const keys = (o) => (o && typeof o === 'object') ? Object.keys(o) : [];
-        for (const k of ['pets', 'mounts', 'mimic']) {
+        for (const k of ['pets', 'mounts']) {   // Mímicos fora daqui: só chegam por presente (conferido item a item no checkSave), então um set inteiro de uma vez é legítimo
             const before = new Set(keys(prev && prev[k])); const added = keys(pd[k]).filter(x => !before.has(x));
             if (!added.length) continue;
             const allow = spend(user, 'coll', added.length, 12, 0.5, now);
@@ -299,6 +306,12 @@ module.exports = function createSecurity(opts) {
                 }
             }
         }
+        if (Array.isArray(pd.mimicSkins)) {   // aparências especiais: só com o item de presente (já na mochila/banco do save anterior ou ainda no correio)
+            const MM = require('./mimicnames'), had = new Set(Array.isArray(prev && prev.mimicSkins) ? prev.mimicSkins : []);
+            const pt = totals(prev || { inventory: [], bank: [], equipment: {} }).t, cr = credits(user);
+            const keep = pd.mimicSkins.filter((id) => had.has(id) || (MM.SPECIAL[id] && ((pt.get(MM.SPECIAL[id]) || 0) > 0 || (cr.get(MM.SPECIAL[id]) || 0) > 0)));
+            if (keep.length !== pd.mimicSkins.length) { strike(user, ip, 'mimicskin', 1, 'aparência sem presente revertida: ' + pd.mimicSkins.filter((x) => !keep.includes(x)).join(',')); pd.mimicSkins = keep; if (pd.mimic) for (const k of Object.keys(pd.mimic)) if (pd.mimic[k].skin && !keep.includes(pd.mimic[k].skin) && !(MM.SKINS[pd.mimic[k].skin] > 0)) delete pd.mimic[k].skin; }
+        }
         if (pd.mimic && prev && prev.mimic) {   // níveis dos Mímicos
             let up = 0; for (const k of Object.keys(pd.mimic)) { const p = prev.mimic[k]; if (p && pd.mimic[k].lvl > p.lvl) up += pd.mimic[k].lvl - p.lvl; }
             if (up) { const allow = spend(user, 'mimiclv', up, 25, 3, now); if (allow < up) { for (const k of Object.keys(pd.mimic)) { const p = prev.mimic[k]; if (p) pd.mimic[k] = { lvl: p.lvl, xp: p.xp }; } strike(user, ip, 'mimiclv', up - allow, 'níveis de Mímico revertidos'); } }
@@ -314,6 +327,7 @@ module.exports = function createSecurity(opts) {
             for (const k of ['tool', 'hat', 'slot', 'type', 'set']) if (typeof it[k] === 'string' && /^[\w\-]{1,24}$/.test(it[k])) o[k] = it[k];
             for (const k of ['col', 'gem']) if (typeof it[k] === 'string' && HEX.test(it[k])) o[k] = it[k];
             for (const k of ['robe', 'mimic', 'stackable']) if (it[k] === true) o[k] = true;
+            if (Number.isFinite(it.mst)) o.mst = int(it.mst, 0, 3, 0); if (typeof it.msk === 'string' && /^[a-z]{3,10}$/.test(it.msk)) o.msk = it.msk;
             if (Number.isFinite(it.ench)) o.ench = int(it.ench, 0, 12, 0); if (Number.isFinite(it.qty)) o.qty = int(it.qty, 0, MAXQ, 0);
             if (typeof it.icon === 'string' && it.icon.length <= 16 && !/[<>&"']/.test(it.icon)) o.icon = it.icon;
             out[s] = o;
