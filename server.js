@@ -640,7 +640,7 @@ app.post('/api/save', (req, res) => {
         if (r.error) { sec.slog('SAVE-REJECT', req.user, ip, r.error, true); return res.status(400).json({ error: r.error, code: 'INVALID' }); }
         const pd = r.pd; const pendSig = (x) => x ? JSON.stringify([x.mkt || null, x.escrow || null, (x.mailDone || []).length, (x.tradeDone || []).length, (x.mailDone || []).slice(-1)[0] || '', (x.tradeDone || []).slice(-1)[0] || '']) : '';
         pendChanged = pendSig(pd) !== pendSig(u.playerData);
-        cleanFishData(pd); cleanStatsData(pd); extras.cleanPetData(pd); require('./mimicnames').cleanMimicData(pd);
+        cleanFishData(pd); cleanStatsData(pd); sec.cleanTree(req.user, ip, pd, req.role); extras.cleanPetData(pd); require('./mimicnames').cleanMimicData(pd);
         sec.checkCollections(req.user, req.role, pd, u.playerData, ip);
         u.playerData = pd; lastSaveAt[req.user] = now;
         if (r.notes.length) adjusted = r.notes.slice(0, 12);   // o cliente deve avisar: o servidor corrigiu parte do progresso enviado
@@ -724,14 +724,14 @@ function doSync(user, b, ip) {
         for (const log of b.combatLogs.slice(0, 20)) {
             if (!log || (typeof log.id !== 'number' && typeof log.id !== 'string')) continue;
             const id = String(log.id); if (!ID_RE.test(id) || RESERVED.has(id.toLowerCase())) continue;
-            const rawDmg = num(log.dmg); let dmg = Math.max(0, Math.min(500, rawDmg)); let maxHp = Math.max(1, Math.min(100000, num(log.maxHp, 10)));
+            const rawDmg = num(log.dmg); let dmg = Math.max(0, Math.min(900, rawDmg)); let maxHp = Math.max(1, Math.min(100000, num(log.maxHp, 10)));
             if (sec.STRICT() && role !== 'admin') {
                 if (dmg > cap) { sec.strike(user, ip, 'dmg', 1, 'golpe ' + Math.round(rawDmg) + ' acima do teto ' + cap + ' (mob ' + id + ' em ' + map + ')'); dmg = cap; }
                 if (dmg > 0 && !sec.dmgOk(user, now)) { sec.slog('RATE:dmg', user, ip, 'mais de 20 relatórios de dano por segundo'); continue; }
                 const ex = sec.expectedMaxHp(map, id); if (ex > 0) maxHp = ex;   // a vida máxima vem do catálogo do servidor, não do cliente
             }
             if (dmg > 0 && sec.STRICT() && role !== 'admin' && mobPos[map] && mobPos[map][id] && Math.hypot(mobPos[map][id].x - px, mobPos[map][id].y - py) > 1400) { sec.slog('FAR-HIT', user, ip, 'golpe em mob ' + id + ' a ' + Math.round(Math.hypot(mobPos[map][id].x - px, mobPos[map][id].y - py)) + 'px (ignorado)'); continue; }   // o alcance máximo do jogo é ~220 px; 1400 cobre atraso de rede com folga
-            if (dmg > 0) { const bd = dmgBudget[user] || (dmgBudget[user] = { t: now, d: 0 }); if (now - bd.t > 1000) { bd.t = now; bd.d = 0; } bd.d += dmg; if (bd.d > 1500) continue; }   // teto de dano por segundo
+            if (dmg > 0) { const bd = dmgBudget[user] || (dmgBudget[user] = { t: now, d: 0 }); if (now - bd.t > 1000) { bd.t = now; bd.d = 0; } bd.d += dmg; if (bd.d > 3000) continue; }   // teto de dano por segundo (era 1500: habilidades da árvore dão golpes maiores; o cliente limita a si mesmo a ~1100/s)
             let sm = serverMobs[map][id];
             if (!sm) {
                 if (Object.keys(serverMobs[map]).length >= 400) continue;

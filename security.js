@@ -10,6 +10,7 @@ const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 const MAXQ = 2147483647;
 const ITEM_RE = /^[\p{L}\p{N}_.'’()+%!:\- ]{1,40}$/u;   // letras, números e pontuação comum de nomes de item (nunca < > " & ` nem barras)
 const BAD_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+const SN = require('./public/skillnodes.js');   // dados compartilhados das árvores de habilidades (ids, ranks, custos)
 
 module.exports = function createSecurity(opts) {
     const DATA_DIR = opts.dataDir, ROOT = opts.root;
@@ -202,6 +203,17 @@ module.exports = function createSecurity(opts) {
         return c;
     }
 
+    /* ---------------- árvore de habilidades (playerData.skillTree) ---------------- */
+    function cleanTree(user, ip, pd, role, skillsOverride) {   // limpa pd.skillTree no lugar (idempotente) e devolve {hp, mp} (vida/mana máx. permitidas pela árvore)
+        if (pd.skillTree === undefined) return { hp: 0, mp: 0 };
+        const src = skillsOverride || (pd.stats && pd.stats.skills) || {}, lv = {};
+        for (const k of ['combat', 'ranged', 'magic']) lv[k] = int(src[k] && src[k].level, 1, 99, 1);
+        const r = SN.clean(pd.skillTree, lv, Date.now());
+        if (r.forged > 0) { if (role !== 'admin') strike(user, ip, 'skilltree', 1, 'skillTree forjada: ' + r.forged + ' entrada(s) inválida(s) (nó inexistente, rank impossível ou tipo errado)'); else slog('SKILLTREE', user, ip, 'admin: ' + r.forged + ' entrada(s) inválida(s) descartada(s)'); }
+        else if (r.trimmed > 0) slog('SKILLTREE', user, ip, 'árvore ajustada: ' + r.trimmed + ' rank(s) removido(s) (pré-requisito ou pontos acima do permitido pelas perícias)');
+        pd.skillTree = r.tree; return r.tree.ap;
+    }
+
     /* ---------------- validação do save ---------------- */
     const MAP_RE = /^[\w\-]{1,40}$/;
     function mapSize(map) { const db = getDB(); const m = db.worldData && hasOwn(db.worldData, map) ? db.worldData[map] : null; return m ? [num(m.width, 100, 20000, 2000), num(m.height, 100, 20000, 2000)] : null; }
@@ -264,11 +276,12 @@ module.exports = function createSecurity(opts) {
                     }
                 }
                 st.skills = sk;
+                const tb = cleanTree(user, ip, pd, role, sk);   // a árvore de habilidades pode somar vida/mana máx. (já embutidas no maxHp/maxMp salvos)
                 const hpL = sk.hp ? sk.hp.level : 10;
-                const maxHp = num(st.maxHp, 1, 40 + 2 * hpL, prev && prev.stats ? num(prev.stats.maxHp, 1, 40 + 2 * hpL, 15) : 15);
+                const maxHp = num(st.maxHp, 1, 40 + 2 * hpL + tb.hp, prev && prev.stats ? num(prev.stats.maxHp, 1, 40 + 2 * hpL + tb.hp, 15) : 15);
                 if (st.maxHp !== maxHp && strict) { n++; notes.push('maxHp'); }
                 st.maxHp = strict ? maxHp : st.maxHp; st.hp = num(st.hp, 0, st.maxHp, st.maxHp);
-                st.maxMp = num(st.maxMp, 1, 100, 10); st.mp = num(st.mp, 0, st.maxMp, st.maxMp);
+                st.maxMp = num(st.maxMp, 1, 100 + tb.mp, 10); st.mp = num(st.mp, 0, st.maxMp, st.maxMp);
                 pd.stats = st;
             }
             /* 2) progressão: itens e moedas contra o save anterior (+ créditos entregues pelo servidor) */
@@ -381,10 +394,11 @@ module.exports = function createSecurity(opts) {
     }
 
     /* ---------------- dano ---------------- */
+    const HIT_ABS = 900;   // teto absoluto de UM golpe (antes 500): habilidades ativas x crítico chegam a ~800 em nível 99; o cliente limita o dano base para ficar abaixo disso
     function hitCap(user) {
         const db = getDB(); const u = db.users[user]; const sk = u && u.playerData && u.playerData.stats && u.playerData.stats.skills;
         let L = 1; if (sk) for (const k of ['combat', 'ranged', 'magic']) if (sk[k] && Number.isFinite(sk[k].level)) L = Math.max(L, Math.min(99, sk[k].level));
-        return Math.min(500, Math.round((L * 0.5 + 150) * 3.6));   // folga para críticos de armas encantadas: na prática 500 (o teto absoluto de um golpe)
+        return Math.min(HIT_ABS, Math.round((L * 0.5 + 150) * 3.6 * 1.3));   // folga para críticos e habilidades da árvore (golpe forte x crítico): na prática HIT_ABS (o teto absoluto de um golpe)
     }
     const dmgRate = new Map();
     function dmgOk(user, now) {   // no máximo 20 relatórios de dano por segundo
@@ -421,5 +435,5 @@ module.exports = function createSecurity(opts) {
         return null;
     }
 
-    return { slog, rotate, STRICT, knownItem, learnItems, strike, strikeCount, lockedUntil, clearLock, checkSave, checkCollections, cleanSyncEquip, checkMove, hitCap, dmgOk, expectedMaxHp, chatCheck, weakPassword, scrub, scrubDeep, spend, totals, credits, _known: known };
+    return { slog, rotate, STRICT, knownItem, learnItems, strike, strikeCount, lockedUntil, clearLock, checkSave, cleanTree, checkCollections, cleanSyncEquip, checkMove, hitCap, dmgOk, expectedMaxHp, chatCheck, weakPassword, scrub, scrubDeep, spend, totals, credits, _known: known };
 };

@@ -50,8 +50,10 @@
     const critChance = () => get().crit / 100;
     const critMul = () => 1.5 + get().critDmg / 100;
     // sorteia o crítico: devolve { dmg, crit }. Dano 0 nunca vira crítico.
+    let force = null;   // Stats.force('crit'|'none'): vale só para o PRÓXIMO rollAttack (habilidades da árvore: crítico garantido ou sem sorteio)
     function rollAttack(dmg) {
         dmg = Math.max(0, Math.floor(Number(dmg)) || 0); if (dmg <= 0) return { dmg: 0, crit: false };
+        if (force) { const f = force; force = null; if (f === 'none') return { dmg, crit: false }; if (f === 'crit') return { dmg: Math.max(dmg + 1, Math.round(dmg * critMul())), crit: true }; }
         if (Math.random() < critChance()) return { dmg: Math.max(dmg + 1, Math.round(dmg * critMul())), crit: true };
         return { dmg, crit: false };
     }
@@ -169,6 +171,6 @@
     document.addEventListener('visibilitychange', () => { if (document.hidden) E.shift = false; });
     setInterval(renderHud, 250);
 
-    window.Stats = { KEYS, CAPS, LABEL, addSource, removeSource, hasSource: (n) => !!sources[n], invalidate, get, critChance, critMul, rollAttack, lifestealHeal, reduce, cd, luckMul, spellDmg, saves, reqOf, canEquip, tipHtml, tick, spd, moveBonus, energy, setRun, isRunToggled: () => E.toggle,
+    window.Stats = { force: (m) => { force = m || null; }, KEYS, CAPS, LABEL, addSource, removeSource, hasSource: (n) => !!sources[n], invalidate, get, critChance, critMul, rollAttack, lifestealHeal, reduce, cd, luckMul, spellDmg, saves, reqOf, canEquip, tipHtml, tick, spd, moveBonus, energy, setRun, isRunToggled: () => E.toggle,
         get running() { return E.running; }, get exhausted() { return E.exhausted; }, E_MAX, RUN_BONUS, TOTAL_CAP, state: () => ({ running: E.running, want: E.want, exhausted: E.exhausted, toggle: E.toggle, shift: E.shift, energy: energy() }), _setShift: (v) => { E.shift = !!v; } };
 })();

@@ -229,5 +229,5 @@
         }, 60);
     }
     window.addEventListener('load', wire);
-    window.Sfx = { _master: () => master, _ctx: () => ctx, _amb: () => A, _mood: () => mood, play, init, setMood, settings: S, ready: () => !!ctx, state: () => ctx && ctx.state };
+    window.Sfx = { def: DEF, tone, noise, _master: () => master, _ctx: () => ctx, _amb: () => A, _mood: () => mood, play, init, setMood, settings: S, ready: () => !!ctx, state: () => ctx && ctx.state };
 })();
