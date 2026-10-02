@@ -44,7 +44,7 @@ module.exports = function createExtras(ctx) {
         return db.market;
     }
     ensure();
-    const err = (e) => ({ error: e });
+    const err = (e, code) => (code ? { error: e, code } : { error: e });
     const pushMail = (user, item, qty, why) => {
         const m = ensure(); const arr = hasOwn(m.mail, user) ? m.mail[user] : (m.mail[user] = []);
         arr.push({ id: 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7), item, qty, why, t: Date.now() });
@@ -57,7 +57,7 @@ module.exports = function createExtras(ctx) {
     const pub = (l) => ({ id: l.id, seller: l.seller, item: l.item, qty: l.qty, price: l.price, exp: l.t + LIST_MS });
 
     function market(user, b) {
-        const m = ensure(); if (!b || typeof b.a !== 'string') return err('Pedido inválido.');
+        const m = ensure(); if (!b || typeof b.a !== 'string') return err('Não foi possível concluir. Tente de novo.');
         switch (b.a) {
             case 'browse': {
                 const q = typeof b.q === 'string' ? b.q.toLowerCase().slice(0, 30) : '';
@@ -66,19 +66,19 @@ module.exports = function createExtras(ctx) {
             }
             case 'create': {
                 const item = b.item, qty = Math.floor(Number(b.qty)), price = Math.floor(Number(b.price));
-                if (typeof item !== 'string' || !ITEM_RE.test(item) || !(qty >= 1 && qty <= 2147483647) || !(price >= 1 && price <= 2147483647)) return err('Anúncio inválido.');
-                if (MIMIC.NAMES.has(item)) return err('Itens Mímicos são ligados à sua conta e não podem ser vendidos.');
-                if (typeof b.nonce !== 'string' || !NONCE_RE.test(b.nonce)) return err('Pedido inválido.');
+                if (typeof item !== 'string' || !ITEM_RE.test(item) || !(qty >= 1 && qty <= 2147483647) || !(price >= 1 && price <= 2147483647)) return err('Anúncio inválido. Confira o item, a quantidade e o preço.');
+                if (MIMIC.NAMES.has(item)) return err('Itens Mímicos são pessoais e não podem ser vendidos.');
+                if (typeof b.nonce !== 'string' || !NONCE_RE.test(b.nonce)) return err('Não foi possível concluir. Tente de novo.');
                 const id = user + ':' + b.nonce;
                 if (hasOwn(m.listings, id) || m.done['c:' + id]) return { ok: true, id };   // repetido: já publicado (ou já vendido/retirado: o nonce nunca vale duas vezes)
-                if (ctx.knownItem && !ctx.knownItem(item)) return err('Item desconhecido.');
+                if (ctx.knownItem && !ctx.knownItem(item)) return err('Esse item não pode ser anunciado.');
                 const pc = (pendingMkt(user) || {}).create;   // o cliente tira o item da mochila e GRAVA o pendente antes de anunciar: sem pendente salvo, não há anúncio
-                if (!pc || pc.nonce !== b.nonce || pc.item !== item || pc.qty !== qty || pc.price !== price) return err('Salvamento pendente: aguarde alguns segundos e tente de novo.');
+                if (!pc || pc.nonce !== b.nonce || pc.item !== item || pc.qty !== qty || pc.price !== price) return err('Guardando o seu progresso. Tente de novo em instantes.', 'PENDING');
                 if (Object.values(m.listings).filter((l) => l.seller === user).length >= MAX_LISTINGS) return err('Você já tem ' + MAX_LISTINGS + ' anúncios.');
                 m.listings[id] = { id, seller: user, item, qty, price, t: Date.now() }; markDirty(); return { ok: true, id };
             }
             case 'buy': {
-                if (typeof b.nonce !== 'string' || !NONCE_RE.test(b.nonce) || typeof b.id !== 'string') return err('Pedido inválido.');
+                if (typeof b.nonce !== 'string' || !NONCE_RE.test(b.nonce) || typeof b.id !== 'string') return err('Não foi possível concluir. Tente de novo.');
                 const dk = 'b:' + user + ':' + b.nonce; if (m.done[dk]) return { ok: true, dup: true };
                 const l = hasOwn(m.listings, b.id) ? m.listings[b.id] : null; if (!l) return err('Esse anúncio já foi vendido ou retirado.');
                 if (l.seller === user) return err('Você não pode comprar o próprio anúncio.');
@@ -89,14 +89,14 @@ module.exports = function createExtras(ctx) {
                 const cost = lotCost(l.price, l.qty, n); if (cost === null) return err('Esse anúncio só pode ser comprado inteiro.');
                 if (b.cost !== undefined && b.cost !== cost) return err('O preço mudou. Atualize a lista e tente de novo.');
                 const pb = (pendingMkt(user) || {}).buy;   // pagamento gravado no servidor antes da compra (mesma regra do anúncio)
-                if (!pb || pb.nonce !== b.nonce || pb.id !== b.id || pb.price !== cost || (pb.qty !== undefined ? pb.qty !== n : n !== l.qty)) return err('Salvamento pendente: aguarde alguns segundos e tente de novo.');
+                if (!pb || pb.nonce !== b.nonce || pb.id !== b.id || pb.price !== cost || (pb.qty !== undefined ? pb.qty !== n : n !== l.qty)) return err('Guardando o seu progresso. Tente de novo em instantes.', 'PENDING');
                 if (mailLen(user) >= MAIL_SOFT) return err('Seu correio está cheio. Esvazie-o antes de comprar.');
                 if (mailLen(l.seller) >= MAIL_SOFT) return err('O correio do vendedor está cheio. Tente outro anúncio.');
                 m.done[dk] = 1; const whole = n === l.qty;
                 if (whole) { delete m.listings[b.id]; m.done['c:' + b.id] = 1; }
                 else { l.qty -= n; l.price -= cost; }   // o resto continua à venda; a soma dos preços se conserva
                 pushMail(user, l.item, n, 'Compra no mercado');
-                const net = cost - Math.floor(cost * FEE); if (net > 0) pushMail(l.seller, 'Coins', net, 'Venda de ' + n + '× ' + l.item + ' (taxa de 5%)');
+                const net = cost - Math.floor(cost * FEE); if (net > 0) pushMail(l.seller, 'Coins', net, 'Venda de ' + n + '× ' + l.item + ' (já descontada a taxa do mercado)');
                 const keys = Object.keys(m.done); if (keys.length > 4000) for (const k of keys.slice(0, keys.length - 3000)) delete m.done[k];
                 markDirty(); return { ok: true, price: cost, qty: n, left: whole ? 0 : l.qty };
             }
@@ -112,7 +112,7 @@ module.exports = function createExtras(ctx) {
                 if (hasOwn(m.mail, user) && set.size) { m.mail[user] = m.mail[user].filter((e) => !set.has(e.id)); if (!m.mail[user].length) delete m.mail[user]; markDirty(); }
                 return { ok: true };
             }
-            default: return err('Ação desconhecida.');
+            default: return err('Não foi possível concluir. Tente de novo.');
         }
     }
     setInterval(() => {   // anúncios vencidos voltam pelo correio
@@ -157,19 +157,19 @@ module.exports = function createExtras(ctx) {
     function house(user, b) {
         b = b || {};
         if (b.a === 'enter') {
-            const owner = findUser(b.owner); if (!owner) return { ok: false, error: 'Esta casa ainda não tem um dono válido.' };
-            const h = houseOf(owner); if (!h) return owner === user ? { ok: true, owner, items: [], guests: [] } : { ok: false, error: 'O dono ainda não montou a casa.' };
+            const owner = findUser(b.owner); if (!owner) return { ok: false, error: 'Esta casa ainda não tem morador.' };
+            const h = houseOf(owner); if (!h) return owner === user ? { ok: true, owner, items: [], guests: [] } : { ok: false, error: 'O morador ainda não arrumou a casa.' };
             const me = user.toLowerCase();
             const isAdmin = db.users[user] && db.users[user].role === 'admin';
             if (owner !== user && !isAdmin && !h.guests.some((g) => String(g).toLowerCase() === me)) return { ok: false, error: 'Casa de ' + owner + ': você não foi convidado.' };
             return { ok: true, owner, items: h.items.slice(0, 60), guests: owner === user ? h.guests.slice(0, 30) : undefined };
         }
         if (b.a === 'guests') {
-            const h = houseOf(user); if (!h) return { ok: false, error: 'Salve o jogo antes (jogue alguns segundos) e tente de novo.' };
+            const h = houseOf(user); if (!h) return { ok: false, error: 'Aguarde alguns segundos e tente de novo.' };
             const list = []; (Array.isArray(b.list) ? b.list : []).slice(0, 30).forEach((n) => { const u = findUser(n); if (u && u !== user && !list.includes(u)) list.push(u); });
             h.guests = list; const uu = db.users[user]; if (uu && uu.playerData) uu.playerData = Object.assign({}, uu.playerData); markDirty(); return { ok: true, guests: list };
         }
-        return { ok: false, error: 'Pedido inválido.' };
+        return { ok: false, error: 'Não foi possível concluir. Tente de novo.' };
     }
 
     /* ---------- pets e montarias: só ids conhecidos (lista branca) e números limitados ---------- */
@@ -206,7 +206,7 @@ module.exports = function createExtras(ctx) {
     /* presente do admin: entra no mesmo correio do mercado (id único, entrega com confirmação, fica na fila se a mochila estiver cheia) */
     function giveMail(user, item, qty, msg) {
         const m = ensure(); const arr = hasOwn(m.mail, user) ? m.mail[user] : []; if (arr.length >= 250) return null;
-        const why = 'Presente do administrador' + (msg ? ': ' + msg : ''); pushMail(user, item, qty, why); markDirty();
+        const why = 'Presente' + (msg ? ': ' + msg : ''); pushMail(user, item, qty, why); markDirty();
         const a = m.mail[user]; return a[a.length - 1].id;
     }
     function rebind(nd) { db = nd; ensure(); rankCache = { t: 0, data: null }; }

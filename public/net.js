@@ -98,9 +98,9 @@
     }
     /* confirmação de recebimento: salva antes; se o servidor ainda disser "Salvamento pendente", salva de novo e repete UMA vez */
     async function ackTrade(needSave) {
-        if (needSave && !(await saveOk(2))) return { error: 'Salvamento pendente.', _nosave: true };
+        if (needSave && !(await saveOk(2))) return { error: 'Guardando o seu progresso. Tente de novo em instantes.', _nosave: true };
         let r = await socialCall('trade_ack', null, true);
-        if (r && typeof r.error === 'string' && /^Salvamento pendente/.test(r.error)) { if (!(await saveOk(2))) return r; r = await socialCall('trade_ack', null, true); }
+        if (r && typeof r.error === 'string' && (r.code === 'PENDING' || /^(Salvamento pendente|Guardando o seu progresso)/.test(r.error))) { if (!(await saveOk(2))) return r; r = await socialCall('trade_ack', null, true); }
         if (r && r.error && !(r.social && r.social.trade === null)) note(r.error, '#e74c3c');
         return r;
     }

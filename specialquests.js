@@ -87,8 +87,8 @@ module.exports = function createSQ(ctx) {
             if (bad.length >= 8) return fail('Muitas tentativas erradas. Aguarde alguns minutos.', 'RATE');
             if (norm(b.code) !== norm(q.code)) { bad.push(now); badCodes.set(user, bad); sec.slog('SQ-BADCODE', user, ip, 'código errado em ' + id); return fail('Código incorreto.', 'CODE'); }
         }
-        else if (q.type === 'kill' || q.type === 'map') { if (progOf(id, user) < (q.type === 'map' ? 1 : q.n)) return fail('Objetivo ainda não cumprido (' + progOf(id, user) + '/' + (q.type === 'map' ? 1 : q.n) + ').', 'PROG'); }
-        else if (q.type === 'deliver') { if (have(user, q.item) < q.n) return fail('Você precisa de ' + q.n + '× ' + q.item + ' (salvos na conta).', 'PROG'); take = { item: q.item, qty: q.n }; }
+        else if (q.type === 'kill' || q.type === 'map') { if (progOf(id, user) < (q.type === 'map' ? 1 : q.n)) return fail('Você ainda não cumpriu o objetivo (' + progOf(id, user) + '/' + (q.type === 'map' ? 1 : q.n) + ').', 'PROG'); }
+        else if (q.type === 'deliver') { if (have(user, q.item) < q.n) return fail('Você precisa de ' + q.n + '× ' + q.item + ' para entregar.', 'PROG'); take = { item: q.item, qty: q.n }; }
         if (!hasOwn(db.specialClaims, id)) db.specialClaims[id] = Object.create(null);
         db.specialClaims[id][user] = Date.now();   // marca ANTES de entregar: o resgate nunca duplica
         const mid = extras.giveMail(user, q.reward.item, q.reward.qty, 'Missão especial: ' + q.name);

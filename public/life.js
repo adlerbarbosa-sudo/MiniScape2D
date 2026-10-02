@@ -10,7 +10,7 @@
     /* ---------- itens e criatura novos (entram pelo catálogo, que o jogo já mescla) ---------- */
     const NEW_ITEMS = {
         'Raw Salmon': { name: 'Raw Salmon', icon: '🐟', type: 'resource', stackable: true, weight: 0.6, desc: 'Salmão pescado na chuva.', cooksInto: 'Cooked Salmon', cookXp: 34, value: 30 },
-        'Cooked Salmon': { name: 'Cooked Salmon', icon: '🍣', type: 'consumable', heal: 14, stackable: true, weight: 0.5, desc: 'Cura muito HP.', value: 40 },
+        'Cooked Salmon': { name: 'Cooked Salmon', icon: '🍣', type: 'consumable', heal: 14, stackable: true, weight: 0.5, desc: 'Recupera bastante vida.', value: 40 },
         'Raw Eel': { name: 'Raw Eel', icon: '🐍', type: 'resource', stackable: true, weight: 0.6, desc: 'Enguia escorregadia. Só aparece na neblina.', cooksInto: 'Cooked Eel', cookXp: 44, value: 45 },
         'Cooked Eel': { name: 'Cooked Eel', icon: '🍣', type: 'consumable', heal: 17, stackable: true, weight: 0.5, desc: 'Enguia grelhada.', value: 60 },
         'Raw Moonfish': { name: 'Raw Moonfish', icon: '🐟', type: 'resource', stackable: true, weight: 0.5, desc: 'Peixe raro que brilha. Só morde à noite.', cooksInto: 'Cooked Moonfish', cookXp: 60, value: 90 },
@@ -112,7 +112,7 @@
     }
     function claim(i) {
         const d = daily(); const q = d && d.q[i]; if (!q || !q.done || q.claimed) return false;
-        const inv = JSON.stringify(player.inventory); if (!addInvItem('Coins', q.coins)) { setActionText('Inventário cheio!', '#e74c3c'); return false; }
+        const inv = JSON.stringify(player.inventory); if (!addInvItem('Coins', q.coins)) { setActionText('Mochila cheia!', '#e74c3c'); return false; }
         addXP(bestSkill(q), q.xp); q.claimed = true; cnt('daily'); sfx('coin'); setActionText(`+${q.coins} moedas`, '#f1c40f');
         if (d.q.every((x) => x.claimed) && !d.bonus) {
             d.bonus = true; d.streak = (d.last === yesterdayKey() ? d.streak : 0) + 1; d.last = dayKey(); d.best = Math.max(d.best | 0, d.streak);

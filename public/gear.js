@@ -130,8 +130,8 @@
         } catch (e) { console.error('Gear.merge', e); }
         try {   // magias novas (as runas novas servem para algo). No 1º merge o spellbookDB ainda não existe (zona morta do let): tenta de novo no login.
             if (!spellbookDB.some((s) => s.id === 'earth_strike')) {
-                spellbookDB.push({ id: 'earth_strike', name: 'Earth Strike', lvl: 9, req: { 'Earth Rune': 1, 'Air Rune': 1, 'Mind Rune': 1 }, dmg: 6, color: '#b08a4a' });
-                spellbookDB.push({ id: 'fire_strike', name: 'Fire Strike', lvl: 14, req: { 'Fire Rune': 1, 'Air Rune': 1, 'Mind Rune': 1 }, dmg: 8, color: '#ff7a3a' });
+                spellbookDB.push({ id: 'earth_strike', name: 'Golpe de Terra', lvl: 9, req: { 'Earth Rune': 1, 'Air Rune': 1, 'Mind Rune': 1 }, dmg: 6, color: '#b08a4a' });
+                spellbookDB.push({ id: 'fire_strike', name: 'Golpe de Fogo', lvl: 14, req: { 'Fire Rune': 1, 'Air Rune': 1, 'Mind Rune': 1 }, dmg: 8, color: '#ff7a3a' });
             }
         } catch (e) { }
     }

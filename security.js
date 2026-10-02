@@ -219,7 +219,7 @@ module.exports = function createSecurity(opts) {
     function mapSize(map) { const db = getDB(); const m = db.worldData && hasOwn(db.worldData, map) ? db.worldData[map] : null; return m ? [num(m.width, 100, 20000, 2000), num(m.height, 100, 20000, 2000)] : null; }
     function checkSave(user, role, pd0, ip) {
         const db = getDB(); const now = Date.now(); const u = db.users[user]; const prev = u && u.playerData && typeof u.playerData === 'object' ? u.playerData : null;
-        const pd = scrub(pd0); if (pd === undefined || !pd || typeof pd !== 'object' || Array.isArray(pd)) return { error: 'Dados do jogador inválidos.' };
+        const pd = scrub(pd0); if (pd === undefined || !pd || typeof pd !== 'object' || Array.isArray(pd)) return { error: 'Não foi possível salvar o seu progresso agora. Tente de novo em instantes.' };
         const admin = role === 'admin', strict = STRICT() && !admin;
         const ctx = { prevNames: new Set(), clamped: 0, badQty: 0, dropped: 0 };
         if (prev) { for (const l of [prev.inventory, prev.bank]) if (Array.isArray(l)) for (const it of l) if (it && typeof it.name === 'string') ctx.prevNames.add(it.name); if (prev.equipment) for (const s of Object.keys(prev.equipment)) if (prev.equipment[s] && prev.equipment[s].name) ctx.prevNames.add(prev.equipment[s].name); }
@@ -418,10 +418,10 @@ module.exports = function createSecurity(opts) {
     const chatState = new Map();
     function chatCheck(user, msg, now) {
         let s = chatState.get(user); if (!s) { s = { last: 0, win: [], rep: [] }; chatState.set(user, s); }
-        if (now - s.last < 700) return 'Devagar!';
+        if (now - s.last < 700) return 'Calma! Fale mais devagar.';
         s.win = s.win.filter(t => now - t < 60000); if (s.win.length >= 20) return 'Você está falando demais. Aguarde um pouco.';
         const k = msg.toLowerCase().replace(/\s+/g, ' ').trim(); s.rep = s.rep.filter(r => now - r.t < 20000);
-        if (s.rep.filter(r => r.k === k).length >= 2) return 'Mensagem repetida.';
+        if (s.rep.filter(r => r.k === k).length >= 2) return 'Mensagem repetida. Tente algo diferente.';
         s.last = now; s.win.push(now); s.rep.push({ k, t: now }); return null;
     }
     setInterval(() => { const n = Date.now(); for (const [u, s] of chatState) if (n - s.last > 300000) chatState.delete(u); }, 300000).unref();

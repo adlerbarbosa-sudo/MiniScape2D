@@ -72,7 +72,7 @@
     function finishSmelt() {
         const r = smeltRec; player.isPerformingAction = false; smeltRec = null; if (!r || !hasNeeds(r)) return;
         const snap = JSON.stringify(player.inventory); r.needs.forEach((n) => removeInvItem(n[0], n[1]));
-        if (addInvItem(r.out, 1)) { addXP('smithing', r.xp); addFloatingText(player.x, player.y - 18, '+' + r.out, '#f1c40f'); } else { player.inventory = JSON.parse(snap); setActionText('Inventário cheio!', '#e74c3c'); }
+        if (addInvItem(r.out, 1)) { addXP('smithing', r.xp); addFloatingText(player.x, player.y - 18, '+' + r.out, '#f1c40f'); } else { player.inventory = JSON.parse(snap); setActionText('Mochila cheia!', '#e74c3c'); }
     }
 
     /* ============================ AGRICULTURA ============================ */
@@ -106,7 +106,7 @@
     }
     function harvest(o, st) {
         const c = st.c; const n = 2 + Math.floor(Math.random() * 3) + (player.stats.skills.farming.level >= 10 ? 1 : 0);
-        if (!invSpaceFor(c.out, n)) { setActionText('Inventário cheio!', '#e74c3c'); return; }
+        if (!invSpaceFor(c.out, n)) { setActionText('Mochila cheia!', '#e74c3c'); return; }
         addInvItem(c.out, n); delete farm()[o.id]; addXP('farming', c.xp);
         if (Math.random() < 0.4 && invSpaceFor(c.seed, 1)) { addInvItem(c.seed, 1); addFloatingText(o.x + o.w / 2, o.y - 14, '+semente', '#78d08a'); }
         if (window.Sfx) Sfx.play('harvest'); addFloatingText(o.x + o.w / 2, o.y, '+' + n + ' ' + c.out, '#f1c40f'); saveDataLogic(); updateUI();
@@ -133,7 +133,7 @@
     function brew(i) {
         const r = BREW[i]; if (!r || player.stats.skills.alchemy.level < r.lvl || !r.needs.every((n) => getInvCount(n[0]) >= n[1])) { setActionText('Faltam ingredientes.', '#e74c3c'); return; }
         const snap = JSON.stringify(player.inventory); r.needs.forEach((n) => removeInvItem(n[0], n[1]));
-        if (!addInvItem(r.out, 1)) { player.inventory = JSON.parse(snap); setActionText('Inventário cheio!', '#e74c3c'); return; }
+        if (!addInvItem(r.out, 1)) { player.inventory = JSON.parse(snap); setActionText('Mochila cheia!', '#e74c3c'); return; }
         addXP('alchemy', r.xp); if (window.Sfx) Sfx.play('brew'); addFloatingText(player.x, player.y - 18, '+' + r.out, '#7aa8ff'); saveDataLogic(); updateUI(); openCauldron();
     }
 

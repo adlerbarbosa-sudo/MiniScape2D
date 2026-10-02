@@ -65,21 +65,26 @@
     const petItem = (id) => 'Pet ' + PETS[id][0], mountItem = (id) => 'Sela ' + MOUNTS[id][0];
     const dropMul = { v: 1 };   // multiplicador global de chance (balanceamento)
 
-    // chances de drop por criatura (dbKey): ['pet:id'|'mount:id', chance]
+    // Drops: pets e montarias são RAROS. Por morte/evento há no máximo UMA rolagem de "pet ou montaria" com a chance-base do nível (abaixo);
+    // a sorte multiplica no máximo 1,5x; lendários (raridade 4) só saem em metade das vezes em que a rolagem acerta. Nada é garantido.
+    const DROP_CH = { boss: 0.001, wboss: 0.003, mob: 0.0001, chest: 0.001, fish: 0.001 }, LUCK_CAP = 1.5, LEG_HALF = 0.5;
+    // criatura (dbKey) -> [nível, [candidatos 'pet:id'|'mount:id']]
     const DROP = {
-        rat_base: [['pet:gato', 0.006]], rabbit_base: [['pet:coelho', 0.008]], chicken_base: [['pet:coelho', 0.002]], goblin_base: [['pet:cachorro', 0.004]],
-        wolf_base: [['pet:lobinho', 0.008], ['mount:lobo_gigante', 0.003]], boar_base: [['pet:cachorro', 0.003]], bat_base: [['pet:coruja', 0.006]], spider_base: [['pet:coruja', 0.003]],
-        slime_base: [['pet:slime', 0.01]], snake_base: [['pet:raposa', 0.004]], deer_base: [['pet:raposa', 0.005]], ghost_base: [['pet:fada', 0.012]],
-        darkmage_base: [['pet:coruja', 0.012], ['pet:fada', 0.006]], skeleton_base: [['mount:cav_esqueleto', 0.002]], orc_base: [['mount:cav_guerra', 0.004]],
-        skeleton_knight: [['mount:cav_esqueleto', 0.01], ['mount:cav_guerra', 0.006]], troll_base: [['pet:lobinho', 0.03], ['mount:lobo_gigante', 0.02], ['mount:cav_guerra', 0.01]],
-        golem_base: [['pet:golem', 0.07]], whelp_base: [['pet:dragao_fogo', 0.04], ['pet:dragao_gelo', 0.04], ['mount:cav_fogo', 0.01]],
-        dragon_boss: [['pet:dragao_fogo', 0.15], ['pet:fenix', 0.04], ['mount:dragao', 0.06], ['mount:cav_fogo', 0.08]],
-        lich_boss: [['mount:cav_esqueleto', 0.3], ['pet:dragao_gelo', 0.1], ['mount:pantera', 0.12]],
-        wboss_golem: [['pet:golem', 0.4], ['mount:cav_fogo', 0.12], ['pet:fenix', 0.05], ['mount:unicornio', 0.04]]
+        rat_base: ['mob', ['pet:gato']], rabbit_base: ['mob', ['pet:coelho']], chicken_base: ['mob', ['pet:coelho']], goblin_base: ['mob', ['pet:cachorro']],
+        wolf_base: ['mob', ['pet:lobinho', 'mount:lobo_gigante']], boar_base: ['mob', ['pet:cachorro']], bat_base: ['mob', ['pet:coruja']], spider_base: ['mob', ['pet:coruja']],
+        slime_base: ['mob', ['pet:slime']], snake_base: ['mob', ['pet:raposa']], deer_base: ['mob', ['pet:raposa']], ghost_base: ['mob', ['pet:fada']],
+        darkmage_base: ['mob', ['pet:coruja', 'pet:fada']], skeleton_base: ['mob', ['mount:cav_esqueleto']], orc_base: ['mob', ['mount:cav_guerra']],
+        skeleton_knight: ['mob', ['mount:cav_esqueleto', 'mount:cav_guerra']],
+        troll_base: ['boss', ['pet:lobinho', 'mount:lobo_gigante', 'mount:cav_guerra']],
+        golem_base: ['boss', ['pet:golem']],
+        whelp_base: ['boss', ['pet:dragao_fogo', 'pet:dragao_gelo', 'mount:cav_fogo']],
+        dragon_boss: ['boss', ['pet:dragao_fogo', 'mount:cav_fogo', 'mount:dragao', 'pet:fenix']],
+        lich_boss: ['boss', ['mount:cav_esqueleto', 'pet:dragao_gelo', 'mount:pantera']],
+        wboss_golem: ['wboss', ['pet:golem', 'mount:cav_fogo', 'pet:fenix', 'mount:unicornio']]
     };
     const SRC = {
-        chest: [['pet:raposa', 0.04], ['pet:fada', 0.02], ['mount:cav_branco', 0.03], ['mount:unicornio', 0.01]],
-        fish: [['pet:gato', 0.03], ['pet:slime', 0.02], ['pet:fenix', 0.004]]
+        chest: ['chest', ['pet:raposa', 'pet:fada', 'mount:cav_branco', 'mount:unicornio']],
+        fish: ['fish', ['pet:gato', 'pet:slime', 'pet:fenix']]
     };
 
     /* ============================ ESTADO ============================ */
@@ -514,19 +519,30 @@
         const rar = (kind === 'pet' ? PETS : MOUNTS)[id][1]; say('Raro! Você encontrou: ' + name + ' (' + RARN[rar] + ')', RARC[rar]); sfx('levelup'); try { Art.burst(player.x, player.y - 14, RARC[rar], 18, 1.6); } catch (e) { }
         try { saveDataLogic(); updateUI(); } catch (e) { } return true;
     }
-    function rollList(list, mult) {
-        for (const [what, ch] of list) { if (rnd() < ch * mult * dropMul.v) { const [k, id] = what.split(':'); if ((k === 'pet' && PETS[id]) || (k === 'mount' && MOUNTS[id])) return grant(k, id); } }
-        return false;
+    // chance real de cada candidato (para testes/documentação): base do nível x (lendário = metade) / nº de candidatos
+    function dropTable(key) {
+        const e = DROP[key] || SRC[key]; if (!e) return null; const base = DROP_CH[e[0]] || 0;
+        return e[1].map((w) => { const [k, id] = w.split(':'); const rar = ((k === 'pet' ? PETS : MOUNTS)[id] || [0, 0])[1]; return { what: w, rar, p: base * (rar >= 4 ? LEG_HALF : 1) / e[1].length }; });
+    }
+    function rollList(entry, mult) {
+        if (!entry) return false; const base = DROP_CH[entry[0]] || 0, cand = entry[1]; if (!base || !cand.length) return false;
+        const m = Math.min(LUCK_CAP, Math.max(0, mult || 1)) * dropMul.v;   // sorte limitada a 1,5x; dropMul é só um botão de balanceamento/teste (padrão 1)
+        if (!(rnd() < base * m)) return false;
+        const what = cand[Math.floor(rnd() * cand.length)], [k, id] = what.split(':'); const T = k === 'pet' ? PETS : MOUNTS; if (!T[id]) return false;
+        if (T[id][1] >= 4 && rnd() >= LEG_HALF) return false;
+        return grant(k, id);
     }
     function onKill(t) {
         try {
             const key = t.dbKey || ''; const d = (typeof npcDB !== 'undefined' && npcDB[key]) || {}; const mult = luckMul();
-            let list = DROP[key];
-            if (!list) { if (d.group === 'chefe' || (d.hp || 0) >= 80) { const pool = PET_IDS.filter((i) => PETS[i][1] >= 1); list = [['pet:' + pool[Math.floor(rnd() * pool.length)], 0.025]]; } else if (d.hp > 0 && d.xp >= 20) { const pool = PET_IDS.filter((i) => PETS[i][1] === 0); list = [['pet:' + pool[Math.floor(rnd() * pool.length)], 0.0012]]; } }
-            if (list) rollList(list, mult);
+            let e = DROP[key];
+            if (!e) { if (d.group === 'chefe') { const pool = PET_IDS.filter((i) => PETS[i][1] >= 1 && PETS[i][1] < 4); e = ['boss', ['pet:' + pool[Math.floor(rnd() * pool.length)]]]; } else if (d.hp > 0 && (d.xp >= 20 || d.hp >= 80)) { const pool = PET_IDS.filter((i) => PETS[i][1] === 0); e = ['mob', ['pet:' + pool[Math.floor(rnd() * pool.length)]]]; } }
+            if (e) rollList(e, mult);
         } catch (e) { console.error(e); }
     }
-    function rollSource(k) { try { rollList(SRC[k] || [], luckMul()); } catch (e) { } }
+    function rollSource(k) { try { rollList(SRC[k], luckMul()); } catch (e) { } }
+    // trava para itens de pet/montaria que o admin ponha em tabela de loot: nunca mais que 0,1% (e sorte até 1,5x)
+    const capItemChance = (nm, ch) => { try { const it = itemDB[nm]; if (it && (it.petId || it.mountId)) return Math.min(ch, DROP_CH.boss); } catch (e) { } return ch; };
 
     /* ============================ WRAPPERS (sem editar o código do jogo) ============================ */
     function wrapAll() {
@@ -575,7 +591,7 @@
         const d = (typeof npcDB !== 'undefined' && npcDB[t.dbKey]) || null;
         for (let i = n0; i < cur.length; i++) { const o = cur[i]; if (o && o.type === 'ground_item' && o.item === 'Coins' && b.coins > 0) o.qty = Math.max(o.qty, sr(o.qty * (1 + b.coins / 100))); }
         if (b.luck > 0 && !viaStats() && d && d.lootStr) {   // +x% de chance relativa nos itens que não são garantidos
-            d.lootStr.split('|').forEach((p) => { const q = p.split(','); const ch = parseFloat(q[1]); const nm = (q[0] || '').trim(); if (q.length >= 3 && ch < 1 && itemDB[nm] && rnd() < ch * b.luck / 100) cur.push({ id: newEntId(), type: 'ground_item', item: nm, qty: Math.floor(rnd() * parseInt(q[2])) + 1, x: t.x + (rnd() * 20) - 10, y: t.y, w: 20, h: 20, active: true, life: 3000 }); });
+            d.lootStr.split('|').forEach((p) => { const q = p.split(','); const ch = parseFloat(q[1]); const nm = (q[0] || '').trim(); if (q.length >= 3 && ch < 1 && itemDB[nm] && rnd() < capItemChance(nm, ch) * Math.min(LUCK_CAP - 1, b.luck / 100)) cur.push({ id: newEntId(), type: 'ground_item', item: nm, qty: Math.floor(rnd() * parseInt(q[2])) + 1, x: t.x + (rnd() * 20) - 10, y: t.y, w: 20, h: 20, active: true, life: 3000 }); });
         }
     }
 
@@ -685,8 +701,8 @@ html.touch #pet-row .mnt{display:none}
                 h += '<div class="pw-sec">Bônus do pet <small style="color:#ffd27a">(' + (P.pm ? 'montado: ATIVO' : 'base: ATIVO') + ')</small></div><div class="pw-st rows">' + statRows(pet.id, pet.lvl) + '</div>';
                 h += '<div class="pw-hint" style="color:#ffd27a">Equipado, o pet dá sempre o bônus <b>base</b> (' + Math.round(baseScale(pet.lvl) * 100) + '% do valor no nível ' + pet.lvl + '; sobe de 40% no nível 1 a 100% no nível ' + PET_MLVL + '). ' + (pet.lvl >= PET_MLVL ? 'Montado nele, os bônus sobem (x' + String(PM_MUL).replace('.', ',') + ') e você ganha velocidade extra, mas <b>não pode lutar</b>: desmonte para atacar.' : 'No <b>nível ' + PET_MLVL + '</b> dá para montar nele: os bônus sobem (x' + String(PM_MUL).replace('.', ',') + ') e vem velocidade extra, mas não se luta montado no pet.') + '</div>' + (pet.lvl >= PET_MLVL ? '<div><button class="pw-b go" data-a="pmnt">' + (P.pm ? 'Desmontar do pet' : 'Montar no pet') + (player.mount ? '' : ' (V)') + '</button></div>' : '');
                 h += '<div class="pw-sec">O que o pet faz</div>' + Object.keys(MODES).map((k) => '<div class="pw-mode' + (pet.mode === k ? ' on' : '') + '" data-a="mode" data-id="' + k + '"><i></i>' + MODES[k] + '</div>').join('');
-                h += '<div class="pw-hint">Coleta itens e moedas do chão num raio de ' + COLLECT_R + ' px (1 a cada 1,2 s) e só se houver espaço na mochila. Atacar: ajuda com dano pequeno, nunca dá o golpe final. Montado nele, o pet só carrega você (em qualquer mapa).</div><div><button class="pw-b bad" data-a="unp">Guardar pet</button></div>';
-            } else h += '<div class="pw-hint">Nenhum pet equipado. Pets são raros: caem de monstros e chefes, de baús de pesca e há alguns à venda. Use o item <b>Pet ...</b> da mochila e escolha abaixo.</div>';
+                h += '<div class="pw-hint">Coleta itens e moedas do chão por perto, um de cada vez, e só se houver espaço na mochila. Atacar: ajuda com dano pequeno, nunca dá o golpe final. Montado nele, o pet só carrega você (em qualquer mapa).</div><div><button class="pw-b bad" data-a="unp">Guardar pet</button></div>';
+            } else h += '<div class="pw-hint">Nenhum pet equipado. Pets são raríssimos: podem ser encontrados com monstros e chefes, em baús e na pesca, e alguns estão à venda. Use o item <b>Pet ...</b> da mochila e escolha abaixo.</div>';
             h += '<div class="pw-sec">Coleção de pets</div><div class="pw-grid">' + PET_IDS.map((id) => cell('pet', id, !!player.pets[id], !!(pet && pet.id === id))).join('') + '</div>';
         } else {
             const cm = player.mount && MOUNTS[player.mount];
@@ -699,9 +715,9 @@ html.touch #pet-row .mnt{display:none}
                     + '<div><button class="pw-b go" data-a="mnt">' + (P.mounted ? 'Desmontar' : 'Montar') + ' (V)</button></div></div></div>';
                 h += '<div class="pw-sec">Bônus atuais</div><div class="pw-st"><span>+' + String(spd).replace('.', ',') + '% Velocidade</span>' + (sc && sc.v > 0 ? '<span>' + fmtPct(sc.v) + ' ' + sc.label + '</span>' : '') + '</div>';
                 h += '<div class="pw-sec">Próximo</div><div class="pw-hint">' + (lv < MLVL ? 'Nível ' + (lv + 1) + ': velocidade +' + String(nxt).replace('.', ',') + '%.' : 'Nível máximo alcançado.') + (nst ? ' No nível ' + nst + ' (fase ' + STAGEN[st + 1] + '): ' + esc(MSTAGE_DESC[id][st]) + (sd ? ' e +' + sd[1] + '% ' + sd[2] + ' (só montado)' : '') + '.' : '') + '</div>';
-                h += '<div class="pw-hint">A montaria ganha XP enquanto você cavalga (1 XP a cada ' + MXP_PX + ' px, mais um pouco pelo tempo). A velocidade cresce até +20% sobre a base no nível 30, sempre dentro do teto de +' + SPD_CAP + '% (pets + montaria). Montado você não luta; ela some em casas, cavernas, lojas e banco.</div>';
+                h += '<div class="pw-hint">A montaria ganha XP enquanto você cavalga. A velocidade cresce até +20% sobre a base no nível 30, sempre dentro do limite de +' + SPD_CAP + '% (pets + montaria). Montado em uma montaria comum você luta normalmente; montado no pet, não.</div>';
             }
-            else h += '<div class="pw-hint">Nenhuma montaria ainda. Compre uma <b>Sela Cavalo...</b> no Fazendeiro/Mercador, crie a sela de couro, ou encontre selas raras com chefes. Use a sela da mochila para aprender a montaria.</div>';
+            else h += '<div class="pw-hint">Nenhuma montaria ainda. Compre uma <b>Sela Cavalo...</b> no Fazendeiro/Mercador, crie a sela de couro, ou, com muita sorte, encontre selas raríssimas com chefes e em tesouros. Use a sela da mochila para aprender a montaria.</div>';
             h += '<div class="pw-sec">Coleção de montarias</div><div class="pw-grid">' + MOUNT_IDS.map((id) => cell('mount', id, !!player.mounts[id], player.mount === id)).join('') + '</div>';
         }
         h += '</div>';
@@ -736,9 +752,9 @@ html.touch #pet-row .mnt{display:none}
     window.addEventListener('load', () => { wire(); setTimeout(() => { wrapAll(); registerStats(); }, 1500); });
 
     window.Pets = {
-        PETS, MOUNTS, PET_IDS, MOUNT_IDS, MODES, RARN, RARC, cfg: { dropMul, COLLECT_R, SPD_CAP, MAXLVL },
+        PETS, MOUNTS, PET_IDS, MOUNT_IDS, MODES, RARN, RARC, cfg: { dropMul, DROP_CH, LUCK_CAP, LEG_HALF, COLLECT_R, SPD_CAP, MAXLVL },
         bonus, speedFactor, merge, tick, queue, mountOf, drawMounted, itemIcon, fill, onSync, onXP, useItem, equip: equipPet, unequip: unequipPet, setMode, rename, renameMount, mountSpd, mStage, mNeed, mLvl, mount, dismount, toggleMount, choose: chooseMount,
-        open: openPanel, close: closePanel, petBase, petItem, mountItem, petStats, grant, rollSource, onKill, postKill,
+        open: openPanel, close: closePanel, petBase, petItem, mountItem, petStats, grant, rollSource, onKill, postKill, dropTable, capItemChance,
         mountPet, dismountPet, togglePetMount, ride, petCan, PET_MLVL, PM_MUL, isMounted: () => P.mounted, isPetMounted: () => P.pm, state: () => ({ mounted: P.mounted, pm: P.pm, pet: player && player.pet, fol: P.fol.me && { x: P.fol.me.x, y: P.fol.me.y, view: P.fol.me.view, sleep: !!P.fol.me.sleep, mv: P.fol.me.mv }, tgt: !!P.tgt, others: P.others }),
         _P: P
     };

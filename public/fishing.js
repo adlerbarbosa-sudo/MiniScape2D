@@ -458,7 +458,7 @@
                 if (sp.rar >= 2 || res.rec) { try { saveDataLogic(); } catch (e) { } }
             }
         }
-        if (!ok) { addFloatingText(player.x, player.y - 15, 'Inventário cheio!', '#e74c3c'); say('Inventário cheio!', '#e74c3c'); S.stop = true; }
+        if (!ok) { addFloatingText(player.x, player.y - 15, 'Mochila cheia!', '#e74c3c'); say('Mochila cheia!', '#e74c3c'); S.stop = true; }
         S.fish = null; S.mg = null; enter('result'); S.resT = 0.7; S.catchIcon = (f.kind === 'fish' && ok) ? f.sp.raw : null; S.from = tip;
         try { updateUI(); } catch (e) { }
     }
@@ -472,7 +472,7 @@
             got++; addXP('fishing', Math.round(5 * xpMult())); addPickupText(name, 1);
             if (sp) { const z2 = sizeRoll(sp, null); z2.t *= 0.7; const cm = Math.round(lerp(sp.cm[0], sp.cm[1], z2.t)), kg = Math.round(lerp(sp.kg[0], sp.kg[1], Math.pow(z2.t, 1.5)) * 100) / 100, r = recordFish(sp, cm, kg); lines.push(sp.n + ' ' + cm + ' cm' + (r.first ? ' (nova espécie!)' : '')); }
         }
-        if (!got) { say('Inventário cheio!', '#e74c3c'); return false; }
+        if (!got) { say('Mochila cheia!', '#e74c3c'); return false; }
         addFloatingText(player.x, player.y - 28, got > 1 ? 'Pescado x' + got : 'Pescado', '#3498db'); if (lines.length) say(lines.join(' · '), '#9fd8ff');
         if (L >= 3 && rnd() < 0.07) { const k = 1 + Math.floor(rnd() * 3); if (addInvItem('Isca de Camarão', k)) { say('Camarões na rede! +' + k + ' Isca de Camarão', '#e8c469'); addPickupText('Isca de Camarão', k); } }
         S.catches++; return true;

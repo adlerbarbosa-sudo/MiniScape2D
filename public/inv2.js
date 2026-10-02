@@ -23,7 +23,7 @@
     function doDrop(item, qty) {
         if (dropping || !gameOn()) return false;
         const inv = player.inventory, i = inv.indexOf(item); if (i < 0) { say('Esse item não está mais na mochila.'); return false; }
-        if (item.mimic || item.mimicSkin) { say('Itens Mímicos são ligados à sua conta e não podem ser jogados fora. Guarde-os no banco.'); return false; }
+        if (item.mimic || item.mimicSkin) { say('Itens Mímicos são pessoais e não podem ser jogados fora. Guarde-os no Banco.'); return false; }
         if (enchanted(item)) { say('Item encantado não pode ser jogado fora. Use Desmanchar.'); return false; }
         const have = item.stackable ? Math.max(1, Math.floor(item.qty) || 1) : 1;
         qty = item.stackable ? Math.min(have, Math.floor(Number(qty))) : 1; if (!(qty >= 1) || !isFinite(qty)) return false;
@@ -42,7 +42,7 @@
     function askDrop(item) {
         const r = blockReason(); if (r) { say(r); return; }
         if (player.inventory.indexOf(item) < 0) return;
-        if (item.mimic || item.mimicSkin) { say('Itens Mímicos são ligados à sua conta e não podem ser jogados fora. Guarde-os no banco.'); return; }
+        if (item.mimic || item.mimicSkin) { say('Itens Mímicos são pessoais e não podem ser jogados fora. Guarde-os no Banco.'); return; }
         if (enchanted(item)) { say('Item encantado não pode ser jogado fora. Use Desmanchar.'); return; }
         const max = item.stackable ? Math.max(1, Math.floor(item.qty) || 1) : 1;
         if (max <= 1) { doDrop(item, 1); return; }

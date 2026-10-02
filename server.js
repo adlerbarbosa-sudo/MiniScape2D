@@ -31,7 +31,7 @@ const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
-app.use((req, res, next) => { if (/%00|\0|%5c|\\|%2e%2e%2f|%2e%2e\//i.test(req.url)) return res.status(400).end('Pedido inválido.'); next(); });   // bytes nulos e tentativas de sair da pasta
+app.use((req, res, next) => { if (/%00|\0|%5c|\\|%2e%2e%2f|%2e%2e\//i.test(req.url)) return res.status(400).end('Não foi possível concluir. Tente de novo.'); next(); });   // bytes nulos e tentativas de sair da pasta
 app.use((req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'no-referrer');
@@ -49,7 +49,7 @@ app.use('/api', (req, res, next) => {
     const o = req.headers.origin; if (!o) return next();
     let ok = false; try { ok = new URL(o).host === req.headers.host; } catch (e) { ok = false; }
     if (!ok && o === 'null' && /^(::1|::ffff:127\.0\.0\.1|127\.0\.0\.1)$/.test(req.socket.remoteAddress || '')) { res.setHeader('Access-Control-Allow-Origin', 'null'); res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization'); res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS'); if (req.method === 'OPTIONS') return res.status(204).end(); ok = true; }
-    if (!ok) return res.status(403).json({ error: 'Origem não permitida.' });
+    if (!ok) return res.status(403).json({ error: 'Acesso não permitido.' });
     next();
 });
 /* limites de corpo por rota: leves aceitam pouco; save exige login antes de ler corpo grande; restauração só admin */
@@ -72,7 +72,7 @@ const MAP_RE = /^[\w\-]{1,40}$/;
 function emptyDB() {
     return {
         users: Object.create(null), worldData: null, itemDB: null, npcDB: null,
-        chat: [{ sender: 'Sistema', msg: 'Servidor online!', color: '#2ecc71' }], chatVer: 1,
+        chat: [{ sender: 'Sistema', msg: 'O reino está aberto. Boa aventura!', color: '#2ecc71' }], chatVer: 1,
         mapVersion: Date.now(), sessions: Object.create(null),
         mobDeaths: Object.create(null), specialQuests: Object.create(null), specialClaims: Object.create(null), specialProg: Object.create(null)
     };
@@ -337,7 +337,7 @@ function userLimit(name, max, windowMs) {
     return (req, res, next) => {
         const key = name + '|' + req.user; const now = Date.now();
         let e = userHits.get(key); if (!e || e.reset < now) { e = { n: 0, reset: now + windowMs }; userHits.set(key, e); }
-        if (++e.n > max) { sec.slog('RATE:' + name, req.user, SEC_IP(req), 'excedeu ' + max + '/' + windowMs + 'ms'); return res.status(429).json({ error: 'Devagar! Muitas ações seguidas.', code: 'RATE' }); }
+        if (++e.n > max) { sec.slog('RATE:' + name, req.user, SEC_IP(req), 'excedeu ' + max + '/' + windowMs + 'ms'); return res.status(429).json({ error: 'Calma, aventureiro! Muitas ações seguidas.', code: 'RATE' }); }
         next();
     };
 }
@@ -431,15 +431,15 @@ app.post('/api/register', rateLimit('reg', 10, 60000), async (req, res) => {
     if (!NAME_RE.test(username)) return res.status(400).json({ error: 'Nome inválido (2 a 20 letras, números, espaço, _ . -).' });
     if (password.length > 100) return res.status(400).json({ error: 'A senha deve ter de 6 a 100 caracteres.' });
     const weak = sec.weakPassword(password, username); if (weak) return res.status(400).json({ error: weak });
-    if (Object.keys(db.users).some(n => n.toLowerCase() === username.toLowerCase() || houseKeyOf(n) === houseKeyOf(username))) return res.status(400).json({ error: 'Usuário já existe (ou nome parecido demais)!' });   // casa_<nome> precisa ser única
-    if (Object.keys(db.users).length >= 5000) return res.status(400).json({ error: 'Servidor cheio.' });
+    if (Object.keys(db.users).some(n => n.toLowerCase() === username.toLowerCase() || houseKeyOf(n) === houseKeyOf(username))) return res.status(400).json({ error: 'Esse nome já está em uso (ou é parecido demais com outro). Escolha outro.' });   // casa_<nome> precisa ser única
+    if (Object.keys(db.users).length >= 5000) return res.status(400).json({ error: 'O reino está lotado no momento. Tente mais tarde.' });
     if (REG_PER_IP_HOUR > 0) {
         const now = Date.now(), arr = (regByIp.get(ip) || []).filter(t => now - t < 3600000);
         if (arr.length >= REG_PER_IP_HOUR) { sec.slog('REG-LIMIT', username, ip, 'limite de contas por IP/hora atingido'); return res.status(429).json({ error: 'Muitas contas criadas deste endereço. Tente novamente mais tarde.' }); }
     }
-    if (hashing >= 12) return res.status(429).json({ error: 'Servidor ocupado. Tente de novo em instantes.' });
+    if (hashing >= 12) return res.status(429).json({ error: 'O reino está movimentado. Tente de novo em instantes.' });
     hashing++; let pwHash; try { pwHash = await hashPw(password); } finally { hashing--; }
-    if (Object.keys(db.users).some(n => n.toLowerCase() === username.toLowerCase() || houseKeyOf(n) === houseKeyOf(username))) return res.status(400).json({ error: 'Usuário já existe (ou nome parecido demais)!' });   // rechecagem: outro pedido pode ter criado o nome durante o hash
+    if (Object.keys(db.users).some(n => n.toLowerCase() === username.toLowerCase() || houseKeyOf(n) === houseKeyOf(username))) return res.status(400).json({ error: 'Esse nome já está em uso (ou é parecido demais com outro). Escolha outro.' });   // rechecagem: outro pedido pode ter criado o nome durante o hash
     db.users[username] = { password: pwHash, role: 'player', playerData: null };   // nunca cria admin por aqui
     if (REG_PER_IP_HOUR > 0) { const arr = regByIp.get(ip) || []; arr.push(Date.now()); regByIp.set(ip, arr); }
     markDirty(); flushDB(); res.json({ success: true });   // conta nova é gravada na hora
@@ -467,7 +467,7 @@ app.post('/api/login', rateLimit('login', 20, 60000), async (req, res) => {
         // busca sem diferenciar maiúsculas/minúsculas (contas antigas continuam funcionando)
         const real = hasOwn(db.users, username) ? username : Object.keys(db.users).find(n => n.toLowerCase() === lk);
         const user = real ? db.users[real] : null;
-        if (hashing >= 12) return res.status(429).json({ error: 'Servidor ocupado. Tente de novo em instantes.' });
+        if (hashing >= 12) return res.status(429).json({ error: 'O reino está movimentado. Tente de novo em instantes.' });
         hashing++; let okPw = false;
         try { if (!user) await checkPw(password, DUMMY_HASH); okPw = !!user && await checkPw(password, user.password); } finally { hashing--; }   // sem usuário: gasta o mesmo tempo (não revela se existe)
         if (!okPw) {
@@ -629,13 +629,13 @@ app.post('/api/save', (req, res) => {
     if (playerData !== undefined) {
         if (!isAdmin) {
             const lu = sec.lockedUntil(req.user);
-            if (lu) return res.status(423).json({ error: 'Salvamento suspenso por alguns minutos por atividade suspeita. Seu progresso continua no jogo, mas NÃO está sendo gravado até o fim da suspensão. Se isso for um engano, avise o administrador.', code: 'LOCKED', until: lu, retryAfter: Math.max(1, Math.ceil((lu - now) / 1000)) });
+            if (lu) return res.status(423).json({ error: 'Atividade suspeita detectada. Seu progresso fica em pausa por alguns minutos; tente novamente mais tarde.', code: 'LOCKED', until: lu, retryAfter: Math.max(1, Math.ceil((lu - now) / 1000)) });
             const sb = saveBurst[req.user] || (saveBurst[req.user] = []); while (sb.length && now - sb[0] > 10000) sb.shift();   // no máximo 12 saves em 10 s (o jogo salva a cada 2,5 s no máximo, mais salvamentos manuais)
-            if (sb.length >= 12) { sec.slog('RATE:save-burst', req.user, ip, '12 saves em 10s'); return res.status(429).json({ error: 'Devagar! Salvando rápido demais.', code: 'RATE', retryAfter: 3 }); }
+            if (sb.length >= 12) { sec.slog('RATE:save-burst', req.user, ip, '12 saves em 10s'); return res.status(429).json({ error: 'Calma! O jogo está salvando rápido demais.', code: 'RATE', retryAfter: 3 }); }
             sb.push(now);
         }
         let pdLen = 0; try { pdLen = (playerData && typeof playerData === 'object' && !Array.isArray(playerData)) ? JSON.stringify(playerData).length : -1; } catch (e) { pdLen = -1; }   // JSON profundo demais estoura a pilha: tratado como inválido
-        if (pdLen < 0 || pdLen > 1500000) { sec.slog('SAVE-REJECT', req.user, ip, 'playerData inválido/grande (' + pdLen + ')', true); return res.status(400).json({ error: 'Dados do jogador inválidos.', code: 'INVALID' }); }
+        if (pdLen < 0 || pdLen > 1500000) { sec.slog('SAVE-REJECT', req.user, ip, 'playerData inválido/grande (' + pdLen + ')', true); return res.status(400).json({ error: 'Não foi possível salvar o seu progresso agora. Tente de novo em instantes.', code: 'INVALID' }); }
         const r = sec.checkSave(req.user, req.role, playerData, ip);
         if (r.error) { sec.slog('SAVE-REJECT', req.user, ip, r.error, true); return res.status(400).json({ error: r.error, code: 'INVALID' }); }
         const pd = r.pd; const pendSig = (x) => x ? JSON.stringify([x.mkt || null, x.escrow || null, (x.mailDone || []).length, (x.tradeDone || []).length, (x.mailDone || []).slice(-1)[0] || '', (x.tradeDone || []).slice(-1)[0] || '']) : '';
@@ -780,7 +780,7 @@ function syncAllowed(user, ip) {
     return true;
 }
 setInterval(() => { const n = Date.now(); for (const k of Object.keys(syncBucket)) if (n - syncBucket[k].t > 5000) delete syncBucket[k]; for (const k of Object.keys(syncIp)) if (n - syncIp[k].t > 5000) delete syncIp[k]; for (const k of Object.keys(lastSaveAt)) if (n - lastSaveAt[k] > 3600000) { delete lastSaveAt[k]; delete saveBurst[k]; } for (const k of Object.keys(saveBurst)) { const a = saveBurst[k]; if (!a.length || n - a[a.length - 1] > 60000) delete saveBurst[k]; } for (const k of Object.keys(dmgBudget)) if (n - dmgBudget[k].t > 60000) delete dmgBudget[k]; for (const k of Object.keys(lastChat)) if (n - lastChat[k] > 3600000) delete lastChat[k]; }, 60000).unref();
-app.post('/api/sync', auth, (req, res) => { if (!syncAllowed(req.user, SEC_IP(req))) return res.status(429).json({ error: 'rate', code: 'RATE' }); res.json(doSync(req.user, req.body, SEC_IP(req))); });
+app.post('/api/sync', auth, (req, res) => { if (!syncAllowed(req.user, SEC_IP(req))) return res.status(429).json({ error: 'Muitas ações seguidas. Aguarde um instante.', code: 'RATE' }); res.json(doSync(req.user, req.body, SEC_IP(req))); });
 app.post('/api/social', auth, userLimit('social', 120, 60000), (req, res) => { const r = social.act(req.user, req.body); if (r && !r.error && req.body && typeof req.body.a === 'string' && req.body.a.startsWith('trade_')) persistNow(); res.json(Object.assign({}, r, { social: social.view(req.user) })); });
 
 app.post('/api/house', auth, userLimit('house', 60, 60000), (req, res) => { res.json(extras.house(req.user, req.body)); });
@@ -832,7 +832,7 @@ function onWsConnect(conn, req) {
         }
         const s = db.sessions[key]; if (!s || s.exp < Date.now() || s.rep) { conn.send(JSON.stringify(s && s.rep ? { t: 'replaced' } : { t: 'auth', ok: false })); return conn.close(1008); }
         try {   // um defeito num pedido não pode derrubar o servidor nem a conexão dos outros
-            if (m.t === 'sync') { if (!syncAllowed(user, conn.ip || '-')) return void conn.send(JSON.stringify({ t: 'sync', i: m.i, d: { error: 'rate', code: 'RATE' } })); conn.send(JSON.stringify({ t: 'sync', i: m.i, d: doSync(user, m.d, conn.ip) })); }
+            if (m.t === 'sync') { if (!syncAllowed(user, conn.ip || '-')) return void conn.send(JSON.stringify({ t: 'sync', i: m.i, d: { error: 'Muitas ações seguidas. Aguarde um instante.', code: 'RATE' } })); conn.send(JSON.stringify({ t: 'sync', i: m.i, d: doSync(user, m.d, conn.ip) })); }
             else if (m.t === 'social') { const r = social.act(user, m.d); conn.send(JSON.stringify({ t: 'social', i: m.i, d: Object.assign({}, r, { social: social.view(user) }) })); }
         } catch (e) { console.error('[ws]', e); try { conn.send(JSON.stringify({ t: String(m.t || 'x').slice(0, 10), i: m.i, d: { error: 'Erro interno.' } })); } catch (_) { } }
     });
@@ -909,12 +909,12 @@ app.post('/api/restore', auth, adminOnly, userLimit('restore', 4, 60000), (req, 
 });
 
 /* ---------- erros ---------- */
-app.use('/api', (req, res) => res.status(404).json({ error: 'Rota não encontrada.' }));
+app.use('/api', (req, res) => res.status(404).json({ error: 'Não foi possível concluir. Tente de novo.' }));
 app.use((err, req, res, next) => {
     if (res.headersSent) { try { res.end(); } catch (e) { } return; }
-    if (err && err.type === 'entity.parse.failed') return res.status(400).json({ error: 'JSON inválido.' });
-    if (err && err.type === 'entity.too.large') return res.status(413).json({ error: 'Dados grandes demais.' });
-    if (err instanceof URIError || (err && (err.status === 400 || err.statusCode === 400)) || (err instanceof RangeError)) return res.status(400).json({ error: 'Pedido inválido.' });
+    if (err && err.type === 'entity.parse.failed') return res.status(400).json({ error: 'Não foi possível concluir. Tente de novo.' });
+    if (err && err.type === 'entity.too.large') return res.status(413).json({ error: 'Não foi possível concluir. Tente de novo.' });
+    if (err instanceof URIError || (err && (err.status === 400 || err.statusCode === 400)) || (err instanceof RangeError)) return res.status(400).json({ error: 'Não foi possível concluir. Tente de novo.' });
     if (err && err.status === 404) return res.status(404).end();
     console.error('[erro]', err); res.status(500).json({ error: 'Erro interno.' });
 });

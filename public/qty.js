@@ -88,12 +88,12 @@
         if (!b || !(q >= 1) || !(price > 0)) return false;
         const per = b.shopQty > 1 ? b.shopQty : 1, total = price * q, items = per * q;
         if (!(total <= 2147483647)) { say('Valor alto demais.'); return false; }
-        if (getInvCount('Coins') < total) { say('Coins insuficientes!'); return false; }
+        if (getInvCount('Coins') < total) { say('Moedas insuficientes!'); return false; }
         const snap = JSON.stringify(player.inventory);
-        if (!invSpaceFor(name, items)) { say('Inv Cheio!'); return false; }
+        if (!invSpaceFor(name, items)) { say('Mochila cheia!'); return false; }
         // tira as moedas primeiro (libera o espaço delas) e confere de novo; se algo falhar, devolve tudo
         removeInvItem('Coins', total);
-        if (!addInvItem(name, items)) { player.inventory.length = 0; JSON.parse(snap).forEach((x) => player.inventory.push(x)); say('Inv Cheio!'); try { updateUI(); } catch (e) { } return false; }
+        if (!addInvItem(name, items)) { player.inventory.length = 0; JSON.parse(snap).forEach((x) => player.inventory.push(x)); say('Mochila cheia!'); try { updateUI(); } catch (e) { } return false; }
         say('Comprou ' + (items > 1 ? fn(items) + '× ' : '') + name + '!', '#2ecc71'); try { updateUI(); saveDataLogic(); } catch (e) { }
         return true;
     }
@@ -103,8 +103,8 @@
         const byCoins = Math.floor(coins / price);
         let space; if (b.stackable) space = invSpaceFor(name, per) ? Infinity : 0; else space = Math.floor(capacity(name) / per);
         const max = Math.min(MAXQ, byCoins, space);
-        if (byCoins < 1) { say('Coins insuficientes!'); return; }
-        if (space < 1) { say('Inv Cheio!'); return; }
+        if (byCoins < 1) { say('Moedas insuficientes!'); return; }
+        if (space < 1) { say('Mochila cheia!'); return; }
         pick({ title: 'Comprar', name, per, unit: price, max, limits: [['suas moedas', byCoins], ['espaço na mochila', space]], okLabel: 'Comprar', confirmFrom: 100, sub: (q) => fn(price) + ' moedas cada' + (q > 1 ? ' · ' + fn(q) + ' unidades' : ''), onOk: (q) => buyShop(name, price, q) });
     }
 

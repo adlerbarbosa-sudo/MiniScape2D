@@ -36,7 +36,7 @@
     // st: atributo -> [no nível 1, no nível 50]
     const P = (cls, n, slot, icon, desc, st, extra) => Object.assign({ cls, n, slot, icon, desc, st }, extra || {});
     const LIST = [
-        P('guerreiro', 'Elmo Mímico do Guerreiro', 'head', '⛑️', 'Um elmo que pisca quando ninguém olha. Cresce com você.', { defBonus: [2, 16], dr: [0.5, 3] }, { hat: 'helmet', w: 2.0 }),
+        P('guerreiro', 'Elmo Mímico do Guerreiro', 'head', '⛑️', 'Um elmo que pisca quando ninguém olha.', { defBonus: [2, 16], dr: [0.5, 3] }, { hat: 'helmet', w: 2.0 }),
         P('guerreiro', 'Peitoral Mímico do Guerreiro', 'body', '🦺', 'Armadura viva: range os dentes a cada golpe que você recebe.', { defBonus: [4, 30], dr: [1, 5] }, { w: 6.0 }),
         P('guerreiro', 'Espada Mímica do Guerreiro', 'weapon', '🗡️', 'Lâmina faminta: quanto mais você luta, mais afiada ela fica.', { bonusDmg: [5, 26], crit: [1, 5], critDmg: [0, 25] }, { w: 2.4 }),
         P('guerreiro', 'Escudo Mímico do Guerreiro', 'shield', '🛡️', 'Um escudo com um olho no meio que vigia o seu flanco.', { defBonus: [3, 22], dr: [0.5, 4] }, { w: 3.2 }),
@@ -64,8 +64,8 @@
         gelo: { n: 'Gelo', lvl: 30, a: '120,200,255', b: '230,246,255', col: '#4a90c8', acc: '#e8fbff', eye: '#e8fbff', fx: 'snow', d: 'Cristais e flocos de neve.' },
         sombra: { n: 'Sombra', lvl: 40, a: '120,70,190', b: '210,120,255', col: '#3a2358', acc: '#c58bff', eye: '#ff7af0', fx: 'wisp', d: 'Fumaça escura e olhos magenta.' },
         esmeralda: { n: 'Esmeralda', lvl: 50, a: '70,220,140', b: '200,255,170', col: '#1f9a62', acc: '#c8ffb0', eye: '#eaffd0', fx: 'leaf', d: 'Folhas e brilho de floresta.' },
-        aurora: { n: 'Aurora', lvl: 0, a: '255,160,255', b: '160,255,220', col: '#c060e0', acc: '#ffffff', eye: '#ffffff', fx: 'prism', rb: 1, d: 'Especial (presente do admin): cores que mudam como uma aurora.' },
-        eclipse: { n: 'Eclipse', lvl: 0, a: '255,190,60', b: '255,230,150', col: '#241a38', acc: '#ffd34a', eye: '#ffd34a', fx: 'ring', d: 'Especial (presente do admin): corpo negro com coroa solar.' }
+        aurora: { n: 'Aurora', lvl: 0, a: '255,160,255', b: '160,255,220', col: '#c060e0', acc: '#ffffff', eye: '#ffffff', fx: 'prism', rb: 1, d: 'Aparência especial: cores que mudam como uma aurora.' },
+        eclipse: { n: 'Eclipse', lvl: 0, a: '255,190,60', b: '255,230,150', col: '#241a38', acc: '#ffd34a', eye: '#ffd34a', fx: 'ring', d: 'Aparência especial: corpo negro com coroa solar.' }
     };
     const SKIN_IDS = Object.keys(SK);
     const SPECIAL = { aurora: 'Aparência Mímica Aurora', eclipse: 'Aparência Mímica Eclipse' };   // item de presente que libera a aparência
@@ -163,7 +163,7 @@
     /* ---------- itens: definição e sincronia com o nível ---------- */
     function def(p) {
         const C = CLS[p.cls], st = statsAt(p, 1);
-        const it = { name: p.n, icon: p.icon, type: 'equipment', slot: p.slot, stackable: false, weight: p.w || 1, desc: p.desc + ' (Mímico: evolui com XP própria; ligado à conta; só por presente do admin.)', mimic: p.cls, col: C.col };
+        const it = { name: p.n, icon: p.icon, type: 'equipment', slot: p.slot, stackable: false, weight: p.w || 1, desc: p.desc + ' Uma relíquia viva que cresce junto de quem a veste.', mimic: p.cls, col: C.col };
         if (p.hat) it.hat = p.hat; if (p.robe) it.robe = true; if (p.tool) it.tool = p.tool; if (p.gem) it.gem = p.gem;
         if (st.defBonus) it.defBonus = st.defBonus; if (st.bonusDmg) it.bonusDmg = st.bonusDmg;
         return it;
@@ -172,7 +172,7 @@
         try {
             if (typeof itemDB === 'undefined') return;
             LIST.forEach((p) => { const d = def(p); const cur = itemDB[p.n]; if (!cur) itemDB[p.n] = d; else Object.assign(cur, d); });
-            Object.keys(SPECIAL).forEach((id) => { const n = SPECIAL[id], d = { name: n, icon: '🎨', type: 'consumable', stackable: false, weight: 0.1, mimicSkin: id, desc: 'Presente do admin: libera a aparência "' + SK[id].n + '" para as suas peças Mímicas (use o item). ' + SK[id].d + ' Ligado à conta.' }; if (!itemDB[n]) itemDB[n] = d; else Object.assign(itemDB[n], d); });
+            Object.keys(SPECIAL).forEach((id) => { const n = SPECIAL[id], d = { name: n, icon: '🎨', type: 'consumable', stackable: false, weight: 0.1, mimicSkin: id, desc: 'Libera a aparência "' + SK[id].n + '" para as suas peças Mímicas (use o item). ' + SK[id].d }; if (!itemDB[n]) itemDB[n] = d; else Object.assign(itemDB[n], d); });
             if (itemDB[BOX_OLD]) delete itemDB[BOX_OLD];   // Caixa Mímica e sua receita foram removidas
         } catch (e) { console.error('Mimic.merge', e); }
     }
@@ -238,7 +238,7 @@
     const skinCol = (p, id) => (id === 'violeta' || !SK[id] || !SK[id].col) ? CLS[p.cls].col : SK[id].col;
     function setSkin(name, id, quiet) {
         if (!ensure()) return false; const p = PIECES[name], s = player.mimic[name]; if (!p || !s || !SK[id]) return false;
-        if (!skinUnlocked(id, s.lvl)) { if (!quiet) say(SK[id].lvl > 0 ? SK[id].n + ' libera no nível ' + SK[id].lvl + ' da peça.' : SK[id].n + ' só por presente do admin.', '#e67e22'); return false; }
+        if (!skinUnlocked(id, s.lvl)) { if (!quiet) say(SK[id].lvl > 0 ? SK[id].n + ' libera no nível ' + SK[id].lvl + ' da peça.' : SK[id].n + ' é uma aparência especial, ainda não liberada.', '#e67e22'); return false; }
         if (id === 'violeta') delete s.skin; else s.skin = id;
         syncAll(true); S.lastSig = ''; saveSoon(); render(true); return true;
     }
@@ -272,7 +272,7 @@
         else { const x = Math.max(30, Math.round(need(s.lvl) * 0.6)); addXpTo(name, x); say('Você já tem ' + name + ': o duplicado foi absorvido (+' + x + ' XP).', '#c58bff'); }
         sfx('pickup'); saveSoon(); S.lastSig = '';
     }
-    function announce(name) { const p = PIECES[name]; if (!p) return; say('Presente raro! ' + name + ' (Mímico)', CLS[p.cls].gold); sfx('levelup'); try { Art.burst(player.x, player.y - 14, '#c58bff', 20, 1.7); } catch (e) { } }
+    function announce(name) { const p = PIECES[name]; if (!p) return; say('Você recebeu uma relíquia rara: ' + name + '!', CLS[p.cls].gold); sfx('levelup'); try { Art.burst(player.x, player.y - 14, '#c58bff', 20, 1.7); } catch (e) { } }
     function grant(name, opt) {   // só admin (testes/uso próprio); jogadores comuns recebem pelo correio e o servidor reverte qualquer outra origem
         opt = opt || {}; if (typeof userRole === 'undefined' || userRole !== 'admin') return false;
         const p = PIECES[name]; if (!p || !ensure() || !itemDB[name]) return false;
@@ -287,7 +287,7 @@
         const cut = (list) => { let n = 0; for (let i = list.length - 1; i >= 0; i--) if (list[i] && list[i].name === BOX_OLD) { list.splice(i, 1); n++; } return n; };
         const n = cut(player.inventory) + cut(player.bank || []); if (!n) return;
         try { addInvItem('Coins', 5000 * n); } catch (e) { }
-        say('A Caixa Mímica foi descontinuada (Mímicos agora só por presente do admin): você recebeu ' + (5000 * n).toLocaleString('pt-BR') + ' moedas.', '#c58bff'); saveSoon();
+        say('Sua Caixa Mímica foi trocada por ' + (5000 * n).toLocaleString('pt-BR') + ' moedas.', '#c58bff'); saveSoon();
     }
 
     /* ============================ TOOLTIP / ITEM ============================ */
@@ -304,7 +304,7 @@
         const si = setInfo(p.cls), bt = bonusText(p.cls, si.base);
         h += `<div class="tt-stat" style="color:${C.gold}">${esc(C.name)} (${si.n}/${si.T} equipadas)${si.full ? ' ✔ completo' : ''}: ${esc(bt)}${si.full ? '' : ' (completo)'}</div>`;
         { const sk = skinOf(it.name), st = stageOf(s.lvl); h += `<div class="tt-stat" style="color:#c58bff">Estágio ${st + 1}/4 · ${STAGE_NAME[st]} · Aparência ${esc(SK[sk].n)}</div>`; }
-        h += '<div class="tt-stat" style="color:#9a8fb0">Ligado à conta: não negocia, não desmancha. Só por presente do admin. XP em Mímicos (N).</div>';
+        h += '<div class="tt-stat" style="color:#9a8fb0">Item pessoal: não pode ser trocado, vendido nem desmanchado. Evolui com o portador (painel dos Mímicos: tecla N).</div>';
         return h;
     }
     const bonusText = (cls, b) => ORDER.filter((k) => b[k] > 0).map((k) => KEYLBL(cls, k) + ' ' + FMT[k](b[k])).join(', ');
@@ -538,11 +538,10 @@ body.mimic-open #qb{display:none!important}`;
             h += `<div class="mm-box"><div class="mm-sec">Prévia · ${esc(CLS[tab].name)}</div><div class="mm-pv"><canvas id="mm-pv-front" width="192" height="256"></canvas><canvas id="mm-pv-side" width="192" height="256"></canvas><canvas id="mm-pv-back" width="192" height="256"></canvas></div>` +
                 `<div class="mm-stg"><span class="mm-note">Estágio: </span><button class="mm-pb${pvS == null ? ' on' : ''}" data-a="pvs" data-n="auto">Atual</button>${[0, 1, 2, 3].map((k) => `<button class="mm-pb${pvS === k ? ' on' : ''}" data-a="pvs" data-n="${k}" title="${esc(STAGE_NAME[k] + ': ' + STAGE_DESC[k])}">${STAGE_NAME[k]} (Nv ${STAGE_LVL[k]})</button>`).join('')}</div>` +
                 `<div class="mm-note">${pvS == null ? 'Mostrando o estágio real das suas peças.' : '<b>' + STAGE_NAME[pvS] + '</b>: ' + STAGE_DESC[pvS] + '. (Só prévia: o estágio real depende do nível de cada peça.)'}</div>` +
-                `<div class="mm-sec">Aplicar a todo o set</div>${skinRow('', 1, '', tab)}<div class="mm-note">Aparências liberam pelo nível da peça (Dourado 10, Carmesim 20, Gelo 30, Sombra 40, Esmeralda 50); Aurora e Eclipse só por presente do admin. Cada peça aceita só as que já liberou.</div></div>`;
+                `<div class="mm-sec">Aplicar a todo o set</div>${skinRow('', 1, '', tab)}<div class="mm-note">Aparências liberam pelo nível da peça (Dourado 10, Carmesim 20, Gelo 30, Sombra 40, Esmeralda 50); Aurora e Eclipse são aparências especiais. Cada peça aceita só as que já liberou.</div></div>`;
         }
         h += `<div class="mm-sec">Peças · ${esc(CLS[tab].name)}</div>` + LIST.filter((p) => p.cls === tab).map((p) => pieceRow(p)).join('');
-        if (nOwn === 0) h += `<div class="mm-note">Itens Mímicos são <b>exclusivos</b>: só o administrador entrega (presente ou missão especial). Não caem de monstros, não se fabricam e não se compram. Cada peça sobe até o nível ${MAXLVL} com XP própria e muda de aparência com o nível.</div>`;
-        if (typeof userRole !== 'undefined' && userRole === 'admin') h += `<div class="mm-box"><div class="mm-note">Admin: para dar peças ou aparências a um jogador use <b>DEV &gt; Presentes</b> (catálogo inteiro) ou crie uma <b>Missão Especial</b>.</div></div>`;
+        if (nOwn === 0) h += `<div class="mm-note">Relíquias vivas que crescem junto de quem as veste. Cada peça sobe até o nível ${MAXLVL} com XP própria e muda de aparência com o nível.</div>`;
         h += '</div>';
         if (!force && w._h === h) return;
         const keep = w.querySelector('.mm-body'), st = keep ? keep.scrollTop : 0; w._h = h; w.innerHTML = h;

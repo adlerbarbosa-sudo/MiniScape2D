@@ -9,7 +9,7 @@
     const ITEMS = {
         'Lich Crown': { name: 'Lich Crown', icon: '👑', type: 'equipment', slot: 'head', defBonus: 12, stackable: false, weight: 2.2, desc: 'Coroa gélida do Lich Rei. Ainda sussurra.' },
         'Bone Blade': { name: 'Bone Blade', icon: '🗡️', type: 'equipment', slot: 'weapon', bonusDmg: 18, stackable: false, weight: 2.4, desc: 'Lâmina de osso das Catacumbas. Corta a armadura como papel.' },
-        'Soul Gem': { name: 'Soul Gem', icon: '💠', type: 'resource', stackable: true, weight: 0.4, desc: 'Gema com uma alma presa dentro. Ainda não tem uso conhecido, mas vale muito.', value: 400 }
+        'Soul Gem': { name: 'Soul Gem', icon: '💠', type: 'resource', stackable: true, weight: 0.4, desc: 'Gema com uma alma presa dentro. Rara e muito valiosa.', value: 400 }
     };
     const CREATURES = {
         skeleton_knight: { name: 'Cavaleiro Esquelético', group: 'monstro', species: 'skeleton', behavior: 'aggressive', range: 110, speed: 1.0, w: 34, h: 50, hp: 90, maxHit: 11, xp: 140, c1: '#cfc8b0', c2: '#3a4a6a', lootStr: 'Bones,1,1|Coins,0.9,90|Steel Bar,0.3,1|Coal,0.4,2', dialog: '', shopStr: '', desc: 'Guarda das catacumbas, ainda de armadura.', biome: 'Catacumbas' },
@@ -130,12 +130,12 @@
             const r = await api('/house', { a: 'guests', list });
             if (r && r.ok) { houseData().guests = r.guests; try { saveDataLogic(); } catch (e) {} const asked = list.length, got = r.guests.length; if (got < asked) setActionText('Alguns nomes não existem e foram ignorados.', '#f1c40f'); }
             else setActionText((r && r.error) || 'Não foi possível salvar os convidados.', '#e74c3c');
-        } catch (e) { setActionText('Sem conexão com o servidor.', '#e74c3c'); }
+        } catch (e) { setActionText('Sem conexão. Tente novamente em instantes.', '#e74c3c'); }
         openDecor();
     }
     async function enterHouse(door) {
-        if (!gameMaps.casa) { setActionText('A casa ainda não foi construída neste mundo (o administrador precisa entrar uma vez).', '#e74c3c'); return; }
-        if (!door || !door.owner) { setActionText('Esta porta ainda não tem dono (o Dev define no painel).', '#f1c40f'); return; }
+        if (!gameMaps.casa) { setActionText('Esta casa ainda não está pronta. Tente novamente mais tarde.', '#e74c3c'); return; }
+        if (!door || !door.owner) { setActionText('Esta casa ainda não tem morador.', '#f1c40f'); return; }
         let r;
         try { r = await api('/house', { a: 'enter', owner: door.owner }); } catch (e) { r = null; }
         if (!r || !r.ok) { setActionText((r && r.error) || 'Não foi possível entrar agora.', '#e74c3c'); return; }

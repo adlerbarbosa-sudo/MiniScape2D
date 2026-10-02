@@ -103,7 +103,7 @@ module.exports = function createSocial(ctx) {
             case 'party_accept': { const inv = invites[u]; if (!inv || !parties[inv.pid]) return err('Convite expirado.'); if (partyOf[u]) return err('Você já está em um grupo.'); const p = parties[inv.pid]; if (p.members.length >= MAX_PARTY) return err('Grupo cheio.'); p.members.push(u); partyOf[u] = p.id; delete invites[u]; return { ok: true }; }
             case 'party_decline': delete invites[u]; return { ok: true };
             case 'party_leave': dropFromParty(u); return { ok: true };
-            case 'party_kick': { const p = parties[partyOf[u]]; if (!p || p.leader !== u) return err('Só o líder expulsa.'); if (!to || to === u || partyOf[to] !== p.id) return err('Membro inválido.'); dropFromParty(to); return { ok: true }; }
+            case 'party_kick': { const p = parties[partyOf[u]]; if (!p || p.leader !== u) return err('Só o líder expulsa.'); if (!to || to === u || partyOf[to] !== p.id) return err('Jogador não encontrado no grupo.'); dropFromParty(to); return { ok: true }; }
 
             case 'trade_request': {
                 if (!to || to === u || !online(to)) return err('Jogador indisponível.');
@@ -121,7 +121,7 @@ module.exports = function createSocial(ctx) {
             case 'trade_accept': if (t.st !== 'invite' || t.b !== u) return err('Nada para aceitar.'); t.st = 'open'; t.t = now(); markDirty(); return { ok: true };
             case 'trade_cancel': case 'trade_decline': endTrade(t, u + ' cancelou'); return { ok: true };
             case 'trade_offer': {
-                if (t.st !== 'open') return err('A troca não está aberta.'); if (Array.isArray(b.items) && b.items.some((it) => Array.isArray(it) && MIMIC.NAMES.has(it[0]))) return err('Itens Mímicos são ligados à sua conta e não podem ser trocados.'); const items = cleanItems(b.items); if (!items) return err('Oferta inválida.');
+                if (t.st !== 'open') return err('A troca não está aberta.'); if (Array.isArray(b.items) && b.items.some((it) => Array.isArray(it) && MIMIC.NAMES.has(it[0]))) return err('Itens Mímicos são pessoais e não podem ser trocados.'); const items = cleanItems(b.items); if (!items) return err('Oferta inválida. Confira os itens.');
                 t.offer[s] = items; t.ok.a = t.ok.b = false; t.t = now(); markDirty(); return { ok: true };
             }
             case 'trade_ok': {
@@ -131,7 +131,7 @@ module.exports = function createSocial(ctx) {
                 markDirty(); return { ok: true };
             }
             case 'trade_ready': {   // o cliente conferiu itens/espaço e (se passou) já tirou as peças da mochila
-                if (t.st !== 'commit') return err('Fora de fase.'); if (t.ready[s] !== null) return { ok: true };
+                if (t.st !== 'commit') return err('Não foi possível concluir. Tente de novo.'); if (t.ready[s] !== null) return { ok: true };
                 t.ready[s] = !!b.pass; t.esc[s] = !!b.pass;
                 if (t.ready[s] === true && !escrowSaved(u, t, s)) { t.ready[s] = false; t.esc[s] = true; endTrade(t, 'depósito de ' + u + ' não foi salvo (a troca foi desfeita e nada se perdeu)'); markDirty(); return { ok: true }; }   // esc=true: o cliente devolve o depósito local
                 if (t.ready[s] === false) endTrade(t, u + ' não pôde concluir');
@@ -139,8 +139,8 @@ module.exports = function createSocial(ctx) {
                 markDirty(); return { ok: true };
             }
             case 'trade_ack': {   // o cliente já aplicou (recebeu / devolveu o depósito)
-                if (t.st !== 'done' && t.st !== 'cancel') return err('Fora de fase.');
-                if (t.st === 'done' && !t.applied[s]) { const pd = savedPD(u); if (!(pd && Array.isArray(pd.tradeDone) && pd.tradeDone.includes(t.id))) return err('Salvamento pendente.'); }   // só confirma o recebimento depois que o save com o item chegou ao servidor
+                if (t.st !== 'done' && t.st !== 'cancel') return err('Não foi possível concluir. Tente de novo.');
+                if (t.st === 'done' && !t.applied[s]) { const pd = savedPD(u); if (!(pd && Array.isArray(pd.tradeDone) && pd.tradeDone.includes(t.id))) return Object.assign(err('Guardando o seu progresso. Tente de novo em instantes.'), { code: 'PENDING' }); }   // só confirma o recebimento depois que o save com o item chegou ao servidor
                 t.applied[s] = true; settle(t); markDirty(); return { ok: true };
             }
             default: return err('Ação desconhecida.');

@@ -274,10 +274,10 @@
             for (const s of b.safe) if (Math.hypot(x + w / 2 - s[0], y + h / 2 - s[1]) < s[2]) return null;
             return add({ id: nid(), type: 'enemy', dbKey: key, name: d.name, x, y, w, h, hp: d.hp, maxHp: d.hp, attackCooldown: 0, active: true }, Object.assign({ pad: 16, onPath: true, fp: 'full', margin: 60 }, opt));
         };
-        b.bank = (x, y, opt) => add({ id: nid(), type: 'bank', name: 'Bank Booth', x, y, w: 80, h: 48, active: true }, Object.assign({ pad: 16, onPath: true, fp: 'full' }, opt));
-        b.furnace = (x, y, opt) => add({ id: nid(), type: 'furnace', name: 'Furnace', x, y, w: 48, h: 72, active: true }, Object.assign({ pad: 14, onPath: true, fp: 'full' }, opt));
-        b.anvil = (x, y, opt) => add({ id: nid(), type: 'anvil', name: 'Anvil', x, y, w: 46, h: 39, active: true }, Object.assign({ pad: 14, onPath: true, fp: 'full' }, opt));
-        b.fish = (x, y, opt) => add({ id: nid(), type: 'fishing_spot', name: 'Fishing Spot', x, y, w: 46, h: 46, active: true }, Object.assign({ pad: 24, onWater: true, onPath: true, fp: 'full' }, opt));
+        b.bank = (x, y, opt) => add({ id: nid(), type: 'bank', name: 'Banco', x, y, w: 80, h: 48, active: true }, Object.assign({ pad: 16, onPath: true, fp: 'full' }, opt));
+        b.furnace = (x, y, opt) => add({ id: nid(), type: 'furnace', name: 'Fornalha', x, y, w: 48, h: 72, active: true }, Object.assign({ pad: 14, onPath: true, fp: 'full' }, opt));
+        b.anvil = (x, y, opt) => add({ id: nid(), type: 'anvil', name: 'Bigorna', x, y, w: 46, h: 39, active: true }, Object.assign({ pad: 14, onPath: true, fp: 'full' }, opt));
+        b.fish = (x, y, opt) => add({ id: nid(), type: 'fishing_spot', name: 'Ponto de Pesca', x, y, w: 46, h: 46, active: true }, Object.assign({ pad: 24, onWater: true, onPath: true, fp: 'full' }, opt));
         b.fire = (x, y, opt) => add({ id: nid(), type: 'fire', name: 'Fire', x, y, w: 34, h: 34, life: 2000000000, active: true }, Object.assign({ pad: 14, onPath: true, fp: 'full' }, opt));
         b.plot = (x, y, opt) => add({ id: nid(), type: 'farm_plot', name: 'Canteiro', x, y, w: 56, h: 46, active: true }, Object.assign({ pad: 6, onPath: true, fp: 'full' }, opt));
         b.cauldron = (x, y, opt) => add({ id: nid(), type: 'cauldron', name: 'Caldeirão', x, y, w: 44, h: 44, active: true }, Object.assign({ pad: 14, onPath: true, fp: 'full' }, opt));

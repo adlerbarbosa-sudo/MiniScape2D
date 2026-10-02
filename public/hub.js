@@ -87,9 +87,9 @@
         return 'Entregue ' + q.need + '× ' + esc(q.item) + '.';
     }
     function specialHtml() {
-        if (!online()) return '<i>As missões especiais precisam de conexão com o servidor.</i>';
+        if (!online()) return '<i>As missões especiais só ficam disponíveis online.</i>';
         if (!sqData) return '<i>Carregando...</i>';
-        let h = '<div style="font-size:.78rem;opacity:.85;margin-bottom:4px">Missões criadas pelo administrador, com recompensas exclusivas. Cada uma pode ser resgatada <b>uma vez</b> por jogador; o prêmio chega pelo correio.</div>';
+        let h = '<div style="font-size:.78rem;opacity:.85;margin-bottom:4px">Missões especiais, com recompensas exclusivas. Cada uma pode ser resgatada <b>uma vez</b> por jogador; o prêmio chega pelo correio.</div>';
         if (!sqData.length) return h + '<i>Nenhuma missão especial ativa agora.</i>';
         return h + sqData.map((q) => {
             const done = q.claimed, ok = q.active && q.prog >= q.need && q.left !== 0;
@@ -131,7 +131,7 @@
     /* ---------- ranking ---------- */
     async function loadRank() { if (!online()) return; try { const r = await api('/rank', { k: rankK }); if (r && r.ok) { rankData = r; if (open && tab === 'rank') render(true); } } catch (e) { } }
     function rankHtml() {
-        const sk = Object.keys(player.stats.skills); const opts = [['total', 'Nível geral'], ['kills', 'Criaturas derrotadas']].concat(sk.map((k) => [k, player.stats.skills[k].name || k]));
+        const sk = Object.keys(player.stats.skills); const opts = [['total', 'Nível geral'], ['kills', 'Criaturas derrotadas']].concat(sk.map((k) => [k, (window.Labels ? Labels.skill(k, player.stats.skills[k].name) : (player.stats.skills[k].name || k))]));
         let h = `<select class="hub-in" id="rk-sel" style="margin-bottom:6px">${opts.map((o) => `<option value="${o[0]}" ${o[0] === rankK ? 'selected' : ''}>${esc(o[1])}</option>`).join('')}</select>`;
         if (!rankData || rankData.k !== rankK) return h + '<i>Carregando...</i>';
         h += rankData.top.length ? rankData.top.map((r) => `<div class="hub-row ${r.u === currentUser ? 'done' : ''}"><b style="width:28px;color:${r.pos === 1 ? '#ffd24a' : r.pos === 2 ? '#d6dbe2' : r.pos === 3 ? '#d08a4a' : '#cbb98a'}">#${r.pos}</b><div class="g"><b>${esc(r.u)}</b>${r.title ? `<small style="color:#e8c469">‹${esc(r.title)}›</small>` : ''}</div><span>${r.v}${r.on ? ' <span style="color:#7bd68f" title="online">●</span>' : ''}</span></div>`).join('') : '<i>Ninguém ainda.</i>';
@@ -141,13 +141,13 @@
 
     /* ---------- mercado ---------- */
     let mailN = 0;
-    async function mkCall(b) { try { const r = await api('/market', b); if (r && r._status === 404) { noMarket = true; return { error: 'Mercado indisponível neste servidor.', _net: true }; } return r; } catch (e) { return { error: 'Sem conexão.', _net: true }; } }
+    async function mkCall(b) { try { const r = await api('/market', b); if (r && r._status === 404) { noMarket = true; return { error: 'O Mercado está indisponível no momento.', _net: true }; } return r; } catch (e) { return { error: 'Sem conexão.', _net: true }; } }
     async function loadMarket() { if (!online()) return; const r = await mkCall({ a: 'browse', q: mkQ }); if (r && r.ok) { mkData = r; mailN = r.mail | 0; if (open && tab === 'market') render(true); } }
     const coins = () => getInvCount('Coins'), fn = (n) => (window.fmtNum ? fmtNum(n) : String(n));
     function marketHtml() {
         const S = [['buy', 'Comprar'], ['sell', 'Vender'], ['mine', 'Meus anúncios']];
         let h = `<div class="hub-tabs">${S.map((t) => `<b data-sub="${t[0]}" class="${sub === t[0] ? 'on' : ''}">${t[1]}${t[0] === 'mine' && mkData && mkData.mine.length ? ' (' + mkData.mine.length + ')' : ''}</b>`).join('')}<span style="margin-left:auto;font-size:.76rem;align-self:center">Você tem ${ic('Coins', 18)} <b>${fn(coins())}</b></span></div>`;
-        if (!online()) return h + '<i>O mercado precisa de conexão com o servidor.</i>';
+        if (!online()) return h + '<i>O Mercado só fica disponível online.</i>';
         if (mailN) h += `<div class="hub-row done"><div class="g">📬 Você tem <b>${mailN}</b> item(ns) no correio. Eles chegam à mochila sozinhos (precisa de espaço).</div></div>`;
         if (!mkData) return h + '<i>Carregando...</i>';
         if (sub === 'buy') {
@@ -165,12 +165,12 @@
     }
     /* salvar e CONFIRMAR: devolve true só se o servidor gravou (o mercado só age sobre o que o save já trouxe). Espera um 429 curto passar. */
     async function saveConfirmed() { try { return (await saveDataNow(false, { wait: true })) === true; } catch (e) { return false; } }
-    function saveFailText(tail) { const st = window.saveStatus ? saveStatus() : {}; return (st.why === 'LOCKED' ? st.msg + ' ' : st.why === 'RATE' ? 'Salvando rápido demais, tente de novo em instantes. ' : 'Sem conexão para salvar. ') + tail; }
+    function saveFailText(tail) { const st = window.saveStatus ? saveStatus() : {}; return (st.why === 'LOCKED' ? st.msg + ' ' : st.why === 'RATE' ? 'Salvando rápido demais, tente de novo em instantes. ' : 'Sem conexão. Tente novamente em instantes. ') + tail; }
     /* chamada de 2ª fase (criar/comprar): se o servidor ainda não viu o pendente salvo ("Salvamento pendente"), salva de novo e repete UMA vez */
     async function mkPending(body) {
         let r = await mkCall(body);
-        if (r && !r._net && typeof r.error === 'string' && /^Salvamento pendente/.test(r.error)) {
-            if (!(await saveConfirmed())) return { error: 'Salvamento pendente', _wait: true };
+        if (r && !r._net && typeof r.error === 'string' && (r.code === 'PENDING' || /^(Salvamento pendente|Guardando o seu progresso)/.test(r.error))) {
+            if (!(await saveConfirmed())) return { error: 'Guardando o seu progresso. Tente de novo em instantes.', _wait: true };
             r = await mkCall(body);
         }
         return r;
@@ -238,7 +238,7 @@
             if (player.mailDone.length > 200) player.mailDone.splice(0, player.mailDone.length - 200);
             if (changed) { updateUI(); if (!(await saveConfirmed())) return; }   // só confirma ao servidor depois de salvar
             if (ack.length) await mkCall({ a: 'ack', ids: ack });
-            got.forEach((e) => { try { addPickupText(e.item, e.qty); if (/^Venda/.test(e.why)) Life.cnt('sold'); } catch (er) { } if (/^Venda/.test(e.why)) note(e.why, '#f1c40f'); else if (/^Presente/.test(e.why)) { note(e.why + ' \u2014 ' + (itemDB[e.item] ? itemDB[e.item].name : e.item) + ' x ' + fn(e.qty), '#2ecc71'); try { Sfx.play('quest'); } catch (er) { } } });
+            got.forEach((e) => { try { addPickupText(e.item, e.qty); if (/^Venda/.test(e.why)) Life.cnt('sold'); } catch (er) { } if (/^Venda/.test(e.why)) note(e.why, '#f1c40f'); else if (/^Missão especial/.test(e.why)) { note('Recompensa da missão: ' + itemLabel(e.item) + ' x ' + fn(e.qty), '#2ecc71'); try { Sfx.play('quest'); } catch (er) { } } else if (/^Presente/.test(e.why)) { { const _x = String(e.why).replace(/^Presente( do administrador)?:?\s*/, ''); note('Você recebeu um presente: ' + itemLabel(e.item) + ' x ' + fn(e.qty) + (_x ? ' \u2014 "' + _x + '"' : ''), '#2ecc71'); } try { Sfx.play('quest'); } catch (er) { } } });
             if (got.length) { Life.checkAch(); loadMarket(); }
             mailN = Math.max(0, r.mail.length - ack.length);
         } finally { claiming = false; }
