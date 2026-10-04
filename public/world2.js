@@ -240,6 +240,19 @@
             else if (k === 'delete' || k === 'x') { storeHeld(); e.preventDefault(); e.stopImmediatePropagation(); }
         }, true);
     }
+    /* seta dourada que mostra a FRENTE do móvel (0 = para baixo, 1 = direita, 2 = para cima, 3 = esquerda) */
+    function frontArrow(ctx, fp, r, big, T) {
+        const D = [[0, 1], [1, 0], [0, -1], [-1, 0]][r & 3], cx = fp.x + fp.w / 2, cy = fp.y + fp.h / 2, ex = Math.abs(D[0]) * fp.w / 2, ey = Math.abs(D[1]) * fp.h / 2;
+        const pulse = big ? 3 * Math.sin((T || 0) * 6) : 0, a0 = Math.max(ex, ey) + 4, len = (big ? 30 : 16) + pulse, hd = big ? 9 : 6, px = -D[1], py = D[0];
+        const x0 = cx + D[0] * (ex + 4), y0 = cy + D[1] * (ey + 4), x1 = x0 + D[0] * len, y1 = y0 + D[1] * len;
+        ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.globalAlpha = big ? 1 : 0.65;
+        ctx.strokeStyle = '#2a1706'; ctx.lineWidth = big ? 7 : 5; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x1 + D[0] * hd, y1 + D[1] * hd); ctx.lineTo(x1 + px * hd * 0.9, y1 + py * hd * 0.9); ctx.lineTo(x1 - px * hd * 0.9, y1 - py * hd * 0.9); ctx.closePath(); ctx.stroke();
+        ctx.strokeStyle = '#ffd24a'; ctx.fillStyle = '#ffd24a'; ctx.lineWidth = big ? 3.4 : 2.4; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x1 + D[0] * hd, y1 + D[1] * hd); ctx.lineTo(x1 + px * hd * 0.9, y1 + py * hd * 0.9); ctx.lineTo(x1 - px * hd * 0.9, y1 - py * hd * 0.9); ctx.closePath(); ctx.fill();
+        if (big) { ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = '#2a1706'; const lx = x1 + D[0] * (hd + 10), ly = y1 + D[1] * (hd + 10) + 3; ctx.strokeText('frente', lx, ly); ctx.fillStyle = '#fff3c0'; ctx.fillText('frente', lx, ly); }
+        ctx.restore();
+    }
     // fantasma + moldura verde/vermelha, desenhado por cima do mundo (chamado pelo laço de desenho)
     function drawOverlay(ctx, T) {
         if (currentMap !== 'casa') return;
@@ -247,8 +260,10 @@
             const k = ed.held.k, f = FURN[k], sz = sizeOf(k, ed.held.r), e = furnEntity({ k, x: ed.ghost.x, y: ed.ghost.y, r: ed.held.r }, 'g');
             ctx.save(); ctx.globalAlpha = 0.72; try { renderEntity(ctx, e, true); } catch (er) { } ctx.restore();
             ctx.save(); ctx.lineWidth = 2; ctx.strokeStyle = ed.ok ? '#2ecc71' : '#e74c3c'; ctx.fillStyle = ed.ok ? 'rgba(46,204,113,.16)' : 'rgba(231,76,60,.22)'; const fp = footOf({ k, x: ed.ghost.x, y: ed.ghost.y, r: ed.held.r }) || { x: ed.ghost.x, y: ed.ghost.y, w: sz[0], h: sz[1] }; ctx.fillRect(fp.x, fp.y, fp.w, fp.h); ctx.setLineDash([6, 4]); ctx.strokeRect(fp.x, fp.y, fp.w, fp.h); if (fp.h < sz[1] - 1) { ctx.globalAlpha = 0.35; ctx.strokeStyle = '#f0e2bd'; ctx.setLineDash([2, 4]); ctx.strokeRect(ed.ghost.x, ed.ghost.y, sz[0], sz[1]); } ctx.restore();
+            if (f.rot && f.t === 'furniture') frontArrow(ctx, fp, ed.held.r, true, T);
         } else if (ed.on) {
-            const m = gameMaps.casa; ctx.save(); ctx.strokeStyle = 'rgba(240,226,189,.35)'; ctx.setLineDash([3, 5]); (m.entities || []).forEach((o) => { if (o && o.hf) ctx.strokeRect(o.x - 1, o.y - 1, (o.w || 30) + 2, (o.h || 30) + 2); }); ctx.restore();
+            const m = gameMaps.casa; ctx.save(); ctx.strokeStyle = 'rgba(240,226,189,.35)'; ctx.setLineDash([3, 5]); (m.entities || []).forEach((o) => { if (o && o.hf && o.type !== 'house_wall' && o.type !== 'paint' || (o && o.hf && o.type === 'paint' && !o.room)) ctx.strokeRect(o.x - 1, o.y - 1, (o.w || 30) + 2, (o.h || 30) + 2); }); ctx.restore();
+            (m.entities || []).forEach((o) => { const ff = o && o.hf && o.fk && FURN[o.fk]; if (ff && ff.rot) frontArrow(ctx, fpOf(o), o.rot | 0, false, T); });
         }
         try { trainOverlay(ctx, T); } catch (e) { }
         if (tr && tr.on) {   // barra de progresso do treino
@@ -263,14 +278,14 @@
     /* ---- poses de treino: o personagem vai para o lugar certo de cada móvel ---- */
     function poseSpot(t) {
         const r = (t.rot | 0) & 3, D = [[0, 1], [1, 0], [0, -1], [-1, 0]][r], dx = D[0], dy = D[1];   // lado para onde o móvel está virado (0 = para baixo)
-        const cx = t.x + t.w / 2, cy = t.y + t.h / 2, mw = (gameMaps.casa && gameMaps.casa.width) || 900;
+        const cx = t.x + t.w / 2, cy = t.y + t.h / 2, mw = (gameMaps.casa && gameMaps.casa.width) || 900, bTop = t.y + t.h * (1 - (t.bf || 1)), bBot = t.y + t.h;   // bTop/bBot: topo e pé da BASE (o desenho do móvel alto sobe além dela)
         const clamp = (x, y) => [Math.max(HB.x0 + 20, Math.min(HB.x1 - 20, x)), Math.max(HB.y0 + 24, Math.min(HB.y1 - 14, y))];
         let px = player.x, py = player.y; tr.back = { x: player.x, y: player.y }; tr.rot = r; tr.face = { x: -dx, y: -dy };
         if (t.fk === 'hottub') { px = cx; py = t.y + t.h / 2 + 12; tr.back = { x: cx, y: t.y + t.h + 30 }; tr.face = { x: 0, y: 1 }; }
-        else if (t.fk === 'library') { [px, py] = clamp(cx + dx * (t.w / 2 + 34), dy > 0 ? t.y + t.h + 40 : dy < 0 ? t.y - 30 : cy + 12); tr.face = { x: 0, y: 1 }; }   // senta do lado em que a estante está virada
-        else if (t.fk === 'archery') { [px, py] = clamp(cx + dx * (t.w / 2 + 150), dy > 0 ? t.y + t.h + 150 : dy < 0 ? t.y - 120 : t.y + t.h - 10); tr.tx = cx; tr.ty = t.y + t.h * 0.36; tr.R = Math.min(t.w, t.h) * 0.42; tr.showHits = r === 0; }
+        else if (t.fk === 'library') { [px, py] = clamp(cx + dx * (t.w / 2 + 34), dy > 0 ? bBot + 40 : dy < 0 ? bTop - 30 : cy + 12); tr.face = { x: 0, y: 1 }; }   // senta do lado em que a estante está virada
+        else if (t.fk === 'archery') { [px, py] = clamp(cx + dx * (t.w / 2 + 150), dy > 0 ? bBot + 150 : dy < 0 ? bTop - 150 : bBot - 10); tr.tx = cx; tr.ty = t.y + t.h * 0.36; tr.R = Math.min(t.w, t.h) * 0.42; tr.showHits = r === 0; }
         else if (t.fk === 'punchbag') { if (r & 1) { [px, py] = clamp(cx + dx * (t.w / 2 + 28), t.y + t.h - 12); tr.dir = -dx; tr.face = { x: -dx, y: 0 }; } else { tr.dir = cx > mw / 2 ? 1 : -1; [px, py] = clamp(cx - tr.dir * (t.w / 2 + 26), t.y + t.h - 12); tr.face = { x: tr.dir, y: 0 }; } }
-        else if (t.fk === 'dummy') { [px, py] = clamp(cx + dx * (t.w / 2 + 26), dy > 0 ? t.y + t.h + 10 : dy < 0 ? t.y - 22 : t.y + t.h - 6); }
+        else if (t.fk === 'dummy') { [px, py] = clamp(cx + dx * (t.w / 2 + 26), dy > 0 ? bBot + 10 : dy < 0 ? bTop - 18 : bBot - 6); }
         player.x = px; player.y = py; player.destX = px; player.destY = py;
         if (t.fk !== 'hottub') { try { ensurePlayerFree(); } catch (e) { } }   // nunca fica dentro de um móvel
         tr.x = player.x; tr.y = player.y;
@@ -415,6 +430,7 @@
         try { r = await api('/house', { a: 'enter', owner: door.owner }); } catch (e) { r = null; }
         if (!r || !r.ok) { setActionText((r && r.error) || 'Não foi possível entrar agora.', '#e74c3c'); return; }
         hctx = { owner: r.owner, items: r.items || [] };
+        if (r.owner !== me() && !hctx.items.length) setTimeout(() => { try { setActionText('A casa de ' + r.owner + ' ainda não tem móveis.', '#f1c40f'); } catch (e) { } }, 1200);
         if (r.owner === me()) { const h = houseData(); if (r.guests) h.guests = r.guests; }
         const ex = gameMaps.casa.entities.find((o) => o && o.type === 'portal');
         const exit = { m: currentMap, x: door.x + Math.round((door.w || 60) / 2) - 12, y: door.y + (door.h || 80) + 26 };
@@ -732,6 +748,15 @@
         const oi = window.tryInteract; if (typeof oi === 'function') window.tryInteract = function (t) { if (tryInteractHook(t)) { player.actionAnim = 15; return; } return oi.apply(this, arguments); };
         const od = window.applyDamage; if (typeof od === 'function') window.applyDamage = function (t, dmg, s) { const was = t && t.type === 'enemy' && t.active !== false && t.hp > 0; const r = od.apply(this, arguments); try { if (was && t.hp <= 0) record(t.dbKey); } catch (e) {} return r; };
         setInterval(tickBtn, 400); setInterval(trainTick, 250); setInterval(ensureDevTab, 2000);
+        // visita: reconstrói a sala se o mundo foi recarregado por baixo (sem sala/móveis) e acompanha mudanças do dono em tempo real
+        setInterval(() => { try { if (currentMap !== 'casa') return; const m = gameMaps.casa; if (m && !(m.entities || []).some((o) => o && o.room)) refreshHouse(); } catch (e) { } }, 1200);
+        setInterval(async () => {
+            try {
+                if (currentMap !== 'casa' || !hctx || hctx.owner === me() || ed.on) return;
+                const r = await api('/house', { a: 'enter', owner: hctx.owner }); if (!r || !r.ok || !Array.isArray(r.items) || currentMap !== 'casa' || !hctx || hctx.owner === me()) return;
+                if (JSON.stringify(r.items) !== JSON.stringify(hctx.items)) { hctx.items = r.items; refreshHouse(); }
+            } catch (e) { }
+        }, 7000);
     }
     window.addEventListener('load', wire);
     window.World2 = { houseKey: () => (hctx && hctx.owner ? 'casa_' + String(hctx.owner).toLowerCase().replace(/[^\w\-]/g, '_').slice(0, 34) : null), ITEMS, CREATURES, FURN, HOUSE_MAX, record, kills, beastList, beastProgress, placeInWorld, merge, drawEntity, enterHouse, editDoor, openDecor, buy, refreshHouse, drawOverlay, onLogin, TRAIN, trainPose, drawRoom, inRoom: (x, y) => x > 70 && x < 830 && y > 160 && y < 552, training: () => !!(tr && tr.on), buildCatacombs, buildHouseShell };
