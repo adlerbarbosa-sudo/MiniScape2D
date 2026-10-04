@@ -455,7 +455,7 @@
         const P = PRED[id], W = P.wolf, t = o.t, mv = o.mv, ph = o.ph, c1 = P.c1, c2 = P.c2, c3 = P.c3, cd = sh(c1, -0.25);
         const gal = mv > 0.1, bob = gal ? (0.5 + 0.5 * sin(ph - 0.9)) * (W ? 2.6 : 3.6) * mv : 0, br = sin(t * 2) * 0.4, by = P.by - bob + br, side = v === 'side';
         const seat = { x: side ? -1 : 0, y: P.seatY - bob * 0.5 + br };
-        const hipY = by + 4, lk = (-hipY) / 15.5;
+        const hipY = by + 4, lk = (-hipY) / 15.5, HS = W ? 1 : 0.78;   // HS: escala da cabeça (pantera real tem cabeça pequena em relação aos ombros)
         shadow(P.len + 1, 0.32);
         const L2 = (segs, col) => { g.lineCap = 'round'; g.lineJoin = 'round'; for (let pass = 0; pass < 2; pass++) { g.strokeStyle = pass ? col : OUT; for (const q of segs) { g.lineWidth = pass ? q[4] : q[4] + 1.8; g.beginPath(); g.moveTo(q[0], q[1]); g.lineTo(q[2], q[3]); g.stroke(); } } };   // membro numa peça só: contorno de tudo, depois preenchimento (sem emendas)
         const leg = (kind, hx, u, col, w, far, go) => {
@@ -487,7 +487,7 @@
                 const fxx = sin(ph - 0.3) * (gal ? 2.6 : 0.6) * mv, nd = sin(t * 1.6) * 0.4 - (gal ? sin(ph - 0.3) * 1.8 : 0), phx = L - 0.5 + 6.5, phy = by + 0.8 + nd;
                 g.beginPath(); g.moveTo(-L, by - 0.5 + fxx); g.bezierCurveTo(-L - 1, by - H - 1 + fxx, -L + 5, by - H - 1.8 + fxx, -12, by - H - 1.5 + fxx);
                 g.quadraticCurveTo(-4, by - H + 0.9, 3, by - H + 0.4); g.quadraticCurveTo(L * 0.3, by - H - 2.4 - fxx, 15.5, by - H - 2 - fxx);
-                g.quadraticCurveTo(21.5, by - H - 1.2, phx - 4.6, phy - 4.6); g.lineTo(phx - 3.8, phy + 4.8);
+                g.quadraticCurveTo(21.5, by - H - 1.2, phx - 4.6 * HS, phy - 4.6 * HS); g.lineTo(phx - 3.8 * HS, phy + 4.8 * HS);
                 g.quadraticCurveTo(L + 2, by + H + 1.4, L - 4, by + H + 2 - fxx); g.quadraticCurveTo(L - 10, by + H + 2.4, 6, by + H - 0.6);
                 g.quadraticCurveTo(-4, by + H - 3, -L + 9, by + H - 1.2 + fxx); g.quadraticCurveTo(-L - 0.5, by + H - 0.6 + fxx, -L, by - 0.5 + fxx); g.closePath();
                 g.fillStyle = c1; g.fill(); g.lineWidth = 1; g.lineJoin = 'round'; g.strokeStyle = OUT; g.stroke();
@@ -509,9 +509,9 @@
             if (!W) {   // equipamento da Pantera Sombra por nível da montaria: colar com espinhos (1+), placa rúnica no ombro (2+)
                 const stg = o.stage | 0, brown = '#6b4a3a', brownL = '#9a6e4e';
                 if (stg >= 2) { g.save(); g.translate(L * 0.3, by - H - 0.4); g.rotate(-0.1); rr(-5.4, -4, 10.8, 9.4, 3, brown, 0.9); rr(-4, -2.8, 8, 7, 2, brownL, 0.6); g.strokeStyle = '#eadfff'; g.lineWidth = 0.9; g.beginPath(); g.rect(-1.8, -1, 3.6, 3.6); g.stroke(); glow(0, 1, 6, 'rgba(170,130,255,A)', 0.5); g.restore(); }
-                if (stg >= 1) { g.save(); g.translate(hx - 7.4, hy + 0.4); g.rotate(0.2); rr(-1.8, -6.4, 3.6, 12.8, 1.6, brown, 0.9); ln(0, -5.4, 0, 5.4, 0.8, brownL); for (let i = 0; i < 4; i++) poly([-1.8, -5 + i * 3.2, -4.6, -5.6 + i * 3.2, -1.8, -3.6 + i * 3.2], '#d8d4e8', 0.6); g.restore(); }
+                if (stg >= 1) { g.save(); g.translate(hx - 7.4 * HS, hy + 0.4); g.rotate(0.2); g.scale(HS, HS); rr(-1.8, -6.4, 3.6, 12.8, 1.6, brown, 0.9); ln(0, -5.4, 0, 5.4, 0.8, brownL); for (let i = 0; i < 4; i++) poly([-1.8, -5 + i * 3.2, -4.6, -5.6 + i * 3.2, -1.8, -3.6 + i * 3.2], '#d8d4e8', 0.6); g.restore(); }
             }
-            g.save(); g.translate(hx, hy); g.rotate(W ? 0.12 : 0.26); if (!W) g.scale(1.0, 1.0);
+            g.save(); g.translate(hx, hy); g.rotate(W ? 0.12 : 0.26); if (!W) g.scale(HS, HS);
             if (W) {
                 ell(0, 0, 6.2, 5.2, c1); ell(8.2, 1.9, 6.6, 3, c1); ell(8.6, 3.4, 5.8, 1.6, c2, 0, 0); ell(13.6, 1.2, 1.7, 1.4, P.nose, 0, 0.6);
                 g.strokeStyle = '#1d1d22'; g.lineWidth = 0.8; g.beginPath(); g.moveTo(13, 3.6); g.quadraticCurveTo(8.6, 4.8, 5, 3.4); g.stroke(); poly([10.6, 3.8, 11.6, 3.8, 11.1, 5.6], '#f2f2f2', 0.6);
