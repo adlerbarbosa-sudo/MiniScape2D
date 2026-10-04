@@ -130,7 +130,9 @@ svg.ic.fill { fill: currentColor; stroke: none; }
 #action-text { color: var(--gold-2); text-align: center; font-weight: 700; min-height: 18px; font-size: .84rem; text-shadow: 0 1px 2px #000; font-family: var(--serif); }
 
 /* ---------- abas ---------- */
-.tab-buttons { display: flex; gap: 3px; flex-wrap: nowrap; }
+.tab-buttons { display: flex; gap: 3px; flex-wrap: nowrap; container-type: inline-size; }
+.tab-btn span { max-width: 100%; overflow: hidden; text-overflow: clip; letter-spacing: -.15px; }
+@container (max-width: 100000px) { .tab-btn { font-size: clamp(.38rem, 1.85cqw, .56rem); } }   /* com 8 abas (Dev) o texto encolhe em vez de vazar do botão */
 .tab-btn {
     flex: 1 1 0; min-width: 0; padding: 7px 0 5px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; font-family: var(--serif); font-weight: 700; font-size: .56rem; letter-spacing: 0; text-transform: uppercase; white-space: nowrap;
     color: var(--muted); border-radius: 10px 10px 4px 4px; border: 1px solid #000; background: linear-gradient(#3b2a19, #21160c); box-shadow: var(--bevel); transition: transform .08s, filter .12s;

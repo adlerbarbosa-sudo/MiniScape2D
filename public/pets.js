@@ -670,9 +670,9 @@ html.touch #pet-row .mnt{display:none}
         if (!gameOn()) return false; injectCSS();
         if (!$('pet-row')) {
             const row = document.createElement('div'); row.id = 'pet-row';
-            row.innerHTML = '<button type="button" class="pet-chip pet" id="pet-chip" aria-label="Gerenciar pet"></button><button type="button" class="pet-chip mnt" id="mount-chip" aria-label="Montar ou desmontar"></button>';
+            row.innerHTML = '<button type="button" class="pet-chip pet" id="pet-chip" aria-label="Gerenciar pet"></button><button type="button" class="pet-chip mnt" id="mount-chip" aria-label="Montarias"></button>';
             const hud = document.querySelector('.hud-header'); if (hud && hud.parentNode) hud.parentNode.insertBefore(row, hud.nextSibling); else document.body.appendChild(row);
-            $('pet-chip').onclick = () => togglePanel('pet'); $('mount-chip').onclick = () => ride();
+            $('pet-chip').onclick = () => togglePanel('pet'); $('mount-chip').onclick = () => { if (P.pm || !(player.mount && Object.keys(player.mounts || {}).length)) ride(); else togglePanel('mount'); };   // abre direto a janela de Montarias (lá há o botão Montar/Desmontar; V continua montando)
         }
         if (!$('pets-win')) {
             const w = document.createElement('div'); w.id = 'pets-win'; const gc = $('game-container') || document.body; gc.appendChild(w);
@@ -693,7 +693,7 @@ html.touch #pet-row .mnt{display:none}
         if (sig === P.lastSig) return; P.lastSig = sig;
         if (pet && PETS[pet.id]) { pc.style.display = ''; pc.innerHTML = img(pet.id, 'pet', 52) + '<span>' + esc(pet.name || PETS[pet.id][0]) + '</span><small>Nv ' + pet.lvl + '</small>'; pc.title = 'Pet: ' + (pet.name || PETS[pet.id][0]) + ' — ' + MODES[pet.mode] + '. Clique para gerenciar (P)'; }
         else if (hasAny) { pc.style.display = ''; pc.innerHTML = '<span>Pets</span>'; pc.title = 'Seus pets e montarias (P)'; } else pc.style.display = 'none';
-        if (hasM && MOUNTS[player.mount]) { mc.style.display = ''; mc.classList.toggle('on', P.mounted); mc.innerHTML = img(player.mount, 'mount', 52) + '<span>' + (P.mounted ? 'Desmontar' : 'Montar') + '</span><small>V</small>'; mc.title = mountName(player.mount) + ' Nv ' + mLvl(player.mount) + ' (+' + mountSpd(player.mount, mLvl(player.mount)) + '% velocidade)'; if (mb) { mb.style.display = ''; mb.classList.toggle('on', P.mounted); mb.innerHTML = img(player.mount, 'mount', 64); mb.title = mc.title; } }
+        if (hasM && MOUNTS[player.mount]) { mc.style.display = ''; mc.classList.toggle('on', P.mounted); mc.innerHTML = img(player.mount, 'mount', 52) + '<span>Montaria</span><small>' + (P.mounted ? 'montado · V' : 'V') + '</small>'; mc.title = 'Abrir montarias (V monta/desmonta) · ' + mountName(player.mount) + ' Nv ' + mLvl(player.mount) + ' (+' + mountSpd(player.mount, mLvl(player.mount)) + '% velocidade)'; if (mb) { mb.style.display = ''; mb.classList.toggle('on', P.mounted); mb.innerHTML = img(player.mount, 'mount', 64); mb.title = mc.title; } }
         else { mc.style.display = 'none'; if (mb) mb.style.display = 'none'; }
         if (hasPM && (P.pm || !hasM)) { const pn = pet.name || PETS[pet.id][0]; mc.style.display = ''; mc.classList.toggle('on', P.pm); mc.innerHTML = img(pet.id, 'pet', 52) + '<span>' + (P.pm ? 'Desmontar' : 'Montar no pet') + '</span><small>V</small>'; mc.title = pn + ' Nv ' + pet.lvl + ': montado os bônus sobem (x' + PM_MUL + ') e vem velocidade extra, e dá para lutar montado nele'; if (mb) { mb.style.display = ''; mb.classList.toggle('on', P.pm); mb.innerHTML = img(pet.id, 'pet', 64); mb.title = mc.title; } }
     }

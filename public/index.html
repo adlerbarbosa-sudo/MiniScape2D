@@ -367,7 +367,7 @@
                 const pos = getCoords(e);
                 lastWorldX = pos.x; lastWorldY = pos.y;
             }
-            if (tooltip.style.display === 'block') { tooltip.style.left = (mouseX + 15) + 'px'; tooltip.style.top = (mouseY + 15) + 'px'; } 
+            if (tooltip.style.display === 'block') placeTip(); 
         });
 
         function showTooltip(item) { 
@@ -378,7 +378,12 @@
             if (item.defBonus) html += `<div class="tt-stat">🛡️ Defesa: +${item.defBonus * Balance.ARMOR_W}</div>`; 
             if (item.heal) html += `<div class="tt-stat">❤️ Cura: +${Balance.healOf(item.heal)}</div>`; 
             if (item.stackable && item.qty > 1) html += `<div class="tt-stat">Quantidade: ${fmtNum(item.qty)}</div>`; html += `<div class="tt-weight">⚖️ Peso: ${String(Number(item.weight)||0).replace(".", ",")} kg</div>`; 
-            if (window.Stats) html += Stats.tipHtml(item); tooltip.innerHTML = html; tooltip.style.left = (mouseX + 15) + 'px'; tooltip.style.top = (mouseY + 15) + 'px'; tooltip.style.display = 'block'; 
+            if (window.Stats) html += Stats.tipHtml(item); tooltip.innerHTML = html; tooltip.style.display = 'block'; placeTip(); 
+        }
+        function placeTip() {   // a dica nunca sai da tela: perto da borda direita/inferior ela abre para a esquerda/para cima do cursor
+            const w = tooltip.offsetWidth, h = tooltip.offsetHeight, vw = document.documentElement.clientWidth, vh = document.documentElement.clientHeight;
+            let x = mouseX + 15, y = mouseY + 15; if (x + w > vw - 8) x = Math.max(8, mouseX - w - 15); if (y + h > vh - 8) y = Math.max(8, mouseY - h - 15);
+            tooltip.style.left = x + 'px'; tooltip.style.top = y + 'px';
         }
         function hideTooltip() { tooltip.style.display = 'none'; }
         
