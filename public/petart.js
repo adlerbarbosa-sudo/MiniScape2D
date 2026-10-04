@@ -415,21 +415,22 @@
     }
     function dragonMount(v, o, rider) {
         const st = Math.max(0, Math.min(3, o.stage | 0)), P = DPAL[st], K = DK[st], t = o.t, mv = o.mv, ph = o.ph, WS = DWS[st];
-        const hov = 6 + sin(t * 3) * 1.6 + (mv > 0.1 ? 1.4 : 0), flap = sin(t * (mv > 0.1 ? 9 : 4.2)), cy = -25 - hov;
+        const fsp = mv > 0.1 ? 8.5 : 5, flap = sin(t * fsp) * 1.45, hov = 8 + sin(t * fsp - 1.3) * 2.6 + (mv > 0.1 ? 2.2 : 0), cy = -25 - hov;   // voo: o corpo sobe e desce no ritmo das asas
         const seat = { x: (v === 'side' ? -1 : 0) * K, y: (cy - 7.5) * K };
         g.save(); shadow(20 * K * (1 - hov * 0.012), 0.3 - hov * 0.006); g.scale(K, K);
-        const sp = DSPK[st], legSw = mv > 0.1 ? sin(ph) * 3.2 : 0;
+        const pitch = v === 'side' ? (mv > 0.1 ? -0.09 : -0.02) + flap * 0.012 : 0; if (pitch) { g.translate(0, cy); g.rotate(pitch); g.translate(0, -cy); }
+        const sp = DSPK[st], legSw = sin(t * fsp - 0.6) * 1.1;   // pernas recolhidas: só balançam de leve com o bater de asas
         const claw = (x, y, s) => { for (let i = -1; i <= 1; i++) poly([x + i * 1.6 * s - 0.7, y, x + i * 1.9 * s, y + 3.2, x + i * 1.6 * s + 0.7, y], P.horn, 0.5); };
         const saddle = (x, y, w) => { rr(x - w / 2, y, w, 3.4, 1.6, '#6b3a1c', 0.8); rr(x - w / 2 + 1, y + 0.6, w - 2, 1.2, 0.6, '#b8863f', 0); };
         if (v === 'side') {
             const bx = 0;
             dWing([-2, cy - 7], [-12 * WS - 2, cy - 21 * WS - flap * 4], [-27 * WS, cy - 30 * WS - flap * 9], [[-44 * WS, cy - 20 * WS - flap * 6], [-40 * WS, cy - 8 * WS - flap * 3], [-32 * WS, cy]], [-12, cy - 1], P, false);   // asa de trás
-            const tw = sin(t * 2.5) * 3; qc(-14, cy + 1, -30, cy + 9 + tw, -43, cy + 3 + tw * 1.4, 6, P.c); qc(-43, cy + 3 + tw * 1.4, -50, cy + 0 + tw * 1.4, -55, cy + 4 + tw * 1.6, 3, P.c);
+            const tw = sin(t * fsp * 0.5 - 0.8) * 4.5; qc(-14, cy + 1, -30, cy + 9 + tw, -43, cy + 3 + tw * 1.4, 6, P.c); qc(-43, cy + 3 + tw * 1.4, -50, cy + 0 + tw * 1.4, -55, cy + 4 + tw * 1.6, 3, P.c);
             poly([-52, cy + 4 + tw * 1.6, -62, cy - 1 + tw * 1.6, -58, cy + 6 + tw * 1.6, -62, cy + 9 + tw * 1.6], P.d, 1);   // ponta da cauda
             if (st >= 2) for (let i = 0; i < 4; i++) poly([-18 - i * 8, cy - 1 + (i > 1 ? tw * 0.4 : 0), -20 - i * 8, cy - 4.4 - i * 0.4, -23 - i * 8, cy + 0.4], P.sp, 0.6);
             // pernas de trás e de frente (distantes)
             const leg = (hx, hy, fx, fy, w, c) => { const kx = (hx + fx) / 2 + 2.2, ky = (hy + fy) / 2 - 1; ln(hx, hy, kx, ky, w, c); ln(kx, ky, fx, fy, w * 0.78, c); claw(fx + 0.5, fy - 0.4, 0.8); };
-            leg(-9, cy + 6, -10 + legSw, cy + 21, 4.6, sh(P.d, -0.15)); leg(10, cy + 5, 12 - legSw, cy + 20, 3.8, sh(P.d, -0.15));
+            leg(-9, cy + 6, -13 + legSw, cy + 13.5, 4.6, sh(P.d, -0.15)); leg(10, cy + 5, 8 - legSw, cy + 13, 3.8, sh(P.d, -0.15));
             // corpo
             ell(0, cy, 17.5, 9.2, P.c, 0, 1.1); ell(1, cy + 4.2, 14.5, 5.2, P.bel, 0, 0); g.globalAlpha = 0.35; for (let i = -3; i <= 3; i++) ln(i * 4 + 1, cy + 1.6, i * 4 + 1, cy + 8, 0.7, sh(P.bel, -0.4)); g.globalAlpha = 1;
             for (let i = 0; i < 7; i++) poly([-13 + i * 3.8, cy - 8 - (i % 2) * 0.4, -12 + i * 3.8, cy - 9.2 - sp, -10.4 + i * 3.8, cy - 7.4], P.sp, 0.6);   // espinhos do dorso
@@ -446,20 +447,20 @@
             g.restore(); if (rider) rider(seat); g.save(); g.scale(K, K);
             // asa da frente e pernas próximas
 
-            leg(-8, cy + 7, -9 - legSw, cy + 22, 5.2, P.c); leg(9, cy + 6, 11 + legSw, cy + 21, 4.2, P.c);
+            leg(-8, cy + 7, -11 - legSw, cy + 14.5, 5.2, P.c); leg(9, cy + 6, 9 + legSw, cy + 14, 4.2, P.c);
         } else {
             const fb = v === 'back';
             const wing = (sg) => dWing([sg * 8, cy - 6], [sg * (20 * WS + 4), cy - 17 * WS - flap * 5], [sg * (34 * WS + 4), cy - 25 * WS - flap * 11], [[sg * (47 * WS + 4), cy - 9 * WS - flap * 7], [sg * (42 * WS + 4), cy + 4 * WS - flap * 3], [sg * (30 * WS + 4), cy + 7 * WS]], [sg * 10, cy + 4], P, sg > 0);
             wing(-1); wing(1);
             if (!fb) { g.restore(); if (rider) rider(seat); g.save(); g.scale(K, K); }
             // cauda atrás (de costas vai pelo centro)
-            if (fb) { const tw = sin(t * 2.5) * 3; qc(0, cy + 6, tw, cy + 20, tw * 1.4, cy + 27, 6, P.c); poly([tw * 1.4 - 4, cy + 26, tw * 1.4, cy + 36, tw * 1.4 + 4, cy + 26], P.d, 1); }
-            const leg = (x, fx, w, c) => { ln(x, cy + 8, x * 1.05 + (x > 0 ? 1 : -1) * 1.5, cy + 15, w, c); ln(x * 1.05 + (x > 0 ? 1 : -1) * 1.5, cy + 15, fx, cy + 22, w * 0.8, c); claw(fx, cy + 21.5, 0.9); };
+            if (fb) { const tw = sin(t * fsp * 0.5 - 0.8) * 4.5; qc(0, cy + 6, tw, cy + 18, tw * 1.4, cy + 24, 6, P.c); poly([tw * 1.4 - 4, cy + 23, tw * 1.4, cy + 33, tw * 1.4 + 4, cy + 23], P.d, 1); }
+            const leg = (x, fx, w, c) => { ln(x, cy + 8, x * 1.1 + (x > 0 ? 1 : -1) * 1.5, cy + 12, w, c); ln(x * 1.1 + (x > 0 ? 1 : -1) * 1.5, cy + 12, fx * 0.8, cy + 15.5, w * 0.8, c); claw(fx * 0.8, cy + 15, 0.9); };
             leg(-9, -10 + legSw, 4.6, sh(P.d, -0.1)); leg(9, 10 - legSw, 4.6, sh(P.d, -0.1));
             ell(0, cy, fb ? 13 : 11.5, fb ? 9 : 11, P.c, 0, 1.1);
             if (fb) { ell(-10.5, cy + 4.5, 6, 6.6, P.c, 0, 1); ell(10.5, cy + 4.5, 6, 6.6, P.c, 0, 1); for (let i = 0; i < 6; i++) poly([-2.2, cy - 8 + i * 3.2, 0, cy - 10 - sp + i * 3.2, 2.2, cy - 8 + i * 3.2], P.sp, 0.6); }
             else { ell(0, cy + 2.4, 7.6, 8.6, P.bel, 0, 0); g.globalAlpha = 0.35; for (let i = 0; i < 5; i++) ln(-6, cy - 3 + i * 3, 6, cy - 3 + i * 3, 0.7, sh(P.bel, -0.4)); g.globalAlpha = 1;
-                const fl = (x) => { ln(x, cy + 5, x * 1.12, cy + 14, 4.6, P.c); ln(x * 1.12, cy + 14, x * 1.08, cy + 21, 3.6, P.c); claw(x * 1.08, cy + 20.5, 0.9); }; fl(-8.4); fl(8.4);
+                const fl = (x) => { ln(x, cy + 5, x * 1.15, cy + 11, 4.6, P.c); ln(x * 1.15, cy + 11, x * 0.9, cy + 15, 3.6, P.c); claw(x * 0.9, cy + 14.5, 0.9); }; fl(-8.4); fl(8.4);
                 // pescoço e cabeça de frente
                 const hy = cy - 21 + sin(t * 1.6) * 0.8;
                 ell(0, cy - 11, 6.4, 8.6, P.c, 0, 1); ell(0, cy - 11, 3.6, 7.8, P.bel, 0, 0);
