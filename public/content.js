@@ -259,7 +259,7 @@
         if (t.type === 'enchant_table') { openEnchant(); return true; }
         return false;
     }
-    function onLogin() { try { placeInWorld(gameMaps); } catch (e) { console.error(e); } if (!player.farm) player.farm = {}; if (!player.buffs) player.buffs = {}; try { if (window.World2) World2.onLogin(); } catch (e) {} try { if (dirty && userRole === 'admin') { worldDirty = true; dirty = false; setTimeout(() => { try { saveDataLogic(false, true); } catch (e) {} }, 1500); } } catch (e) {} try { if (userRole === 'admin' && window.PackAuto) setTimeout(() => { try { PackAuto.run(); } catch (e) {} }, 4000); } catch (e) {} }
+    function onLogin() { try { placeInWorld(gameMaps); } catch (e) { console.error(e); } if (!player.farm) player.farm = {}; if (!player.buffs) player.buffs = {}; try { if (window.World2) World2.onLogin(); } catch (e) {} try { if (window.Fendas) Fendas.onLogin(); } catch (e) {} try { if (dirty && userRole === 'admin') { worldDirty = true; dirty = false; setTimeout(() => { try { saveDataLogic(false, true); } catch (e) {} }, 1500); } } catch (e) {} try { if (userRole === 'admin' && window.PackAuto) setTimeout(() => { try { PackAuto.run(); } catch (e) {} }, 4000); } catch (e) {} }
     function mark() { dirty = true; }
     function wire() {
         const oi = window.tryInteract; if (typeof oi === 'function') window.tryInteract = function (t) { if (tryInteractHook(t)) { player.actionAnim = 15; return; } return oi.apply(this, arguments); };

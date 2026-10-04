@@ -182,6 +182,8 @@
 <script src="fx.js"></script>
     <script src="life.js"></script>
     <script src="fishing.js"></script>
+    <script src="riftitems.js"></script>
+    <script src="fendas.js"></script>
     <script src="packs.js"></script>
     <script src="packauto.js"></script>
     <script src="hub.js"></script>
@@ -756,6 +758,7 @@
 
         async function syncMultiplayer() {
             if(!currentUser || isOfflineMode || isSyncing || !authToken || _sessionDead) return;
+            if (window.Fendas && Fendas.active()) return;   // dentro de uma Fenda: corrida só local (ninguém vê, nada vai ao servidor de mapa)
             isSyncing = true;
             try {
                 let payload = { x: player.x, y: player.y, map: (currentMap === 'casa' && window.World2 && World2.houseKey && World2.houseKey()) || currentMap, facing: player.facing, actionAnim: player.actionAnim, combatLogs: pendingCombatLogs, chatVer: lastChatVer, title: player.title || '' }; if (window.Life) { const _em = Life.pendingEmote(); if (_em) payload.emote = _em; }
@@ -829,7 +832,7 @@
         }
         function buildWorldCopy() {
             const tempMaps = JSON.parse(JSON.stringify(gameMaps));
-            for (const _k in tempMaps) { if (/^casa_/.test(_k)) delete tempMaps[_k]; }
+            for (const _k in tempMaps) { if (/^casa_/.test(_k) || _k === 'fenda') delete tempMaps[_k]; }
             if (tempMaps.casa && tempMaps.casa.entities) tempMaps.casa.entities = tempMaps.casa.entities.filter(o => o && !o.hf);
             for (const _k in tempMaps) { const _m = tempMaps[_k]; if (_m && _m.entities) _m.entities = _m.entities.filter(o => o && !o.wb); }   // o chefe de mundo é temporário   // móveis são pessoais de cada jogador
             // itens no chão: só entram no mundo salvo os colocados pelo Dev (wi). Drops de monstros e itens largados por jogadores (np) são temporários e NUNCA persistem; "pego" (tk) é estado do jogador, não do mundo.
@@ -1481,6 +1484,8 @@
                             if(cObj.type === 'fire') addMenuOption(`Cozinhar`, () => setPendingAction(cObj));
                             if(cObj.type === 'bank') addMenuOption(`Usar Banco`, () => setPendingAction(cObj));
                             if(cObj.type === 'portal') addMenuOption(`Entrar`, () => setPendingAction(cObj));
+                            if(cObj.type === 'rift_gate') addMenuOption(`Entrar na Fenda`, () => setPendingAction(cObj));
+                            if(cObj.type === 'rift_next') addMenuOption(`Descer`, () => setPendingAction(cObj));
                             if(cObj.type === 'ground_item') addMenuOption(`Pegar ${itemDB[cObj.item]?itemDB[cObj.item].name:cObj.item}`, () => setPendingAction(cObj));
                         }
                         addMenuOption("Andar aqui", () => { rangedTarget = null; player.destX = pos.x; player.destY = pos.y; player.isPerformingAction = false; player.pendingAutoAction = null; }); 
@@ -1695,7 +1700,7 @@
                         let tW = player.pendingAutoAction.w || 30; let pType = player.pendingAutoAction.type;
                         if (pType === 'enemy') { if (player.equipment && player.equipment.weapon && (player.equipment.weapon.tool === 'magic' || player.equipment.weapon.tool === 'ranged')) { sD = attackRange(player.equipment.weapon) - 40; } else { sD = (tW / 2) + 12; } } 
                         else if (pType === 'fishing_spot' && window.Fishing && Fishing.arrived && dist > 0 && Fishing.arrived(player.x, player.y, player.pendingAutoAction, Math.hypot(player.pendingAutoAction.x + (player.pendingAutoAction.w||46)/2 - player.x, player.pendingAutoAction.y + (player.pendingAutoAction.h||46)/2 - player.y), dx / dist, dy / dist)) sD = Infinity;
-                        else if (pType === 'ground_item') sD = 10; else if (['npc', 'tree', 'rock_copper', 'rock_tin', 'rock_iron', 'furnace', 'anvil', 'bank', 'house', 'furniture'].includes(pType)) { sD = (tW / 2) + 15; }
+                        else if (pType === 'ground_item') sD = 10; else if (['npc', 'tree', 'rock_copper', 'rock_tin', 'rock_iron', 'furnace', 'anvil', 'bank', 'house', 'furniture', 'rift_gate', 'rift_next'].includes(pType)) { sD = (tW / 2) + 15; }
                     }
 
                     if (dist > sD) {
@@ -1760,7 +1765,7 @@
                     if(o.type === 'ground_item') { if(!o.active) { if (o.tk) { if (o.rt && Date.now() >= o.rt) { o.active = true; delete o.tk; delete o.rt; try { delete player.taken[worldItemKey(currentMap, o)]; } catch (e) { } } } else { cur.splice(i, 1); } continue; } if (o.wi) continue; o.life--; if(o.life <= 0) { cur.splice(i, 1); continue; } }
                     
                     if(o.type === 'enemy' && o.active) {
-                        const simulate = (isOfflineMode || isMapHost);
+                        const simulate = (isOfflineMode || isMapHost || (window.Fendas && Fendas.active()));
                         const ow = o.w || 30, oh = o.h || 30; const def = npcDB[o.dbKey] || {};
                         const beh = def.behavior || 'neutral', spd = def.speed || 1, harmless = (beh === 'passive' || beh === 'skittish' || !(def.maxHit > 0));
                         if (o.homeX === undefined) { o.homeX = o.x; o.homeY = o.y; }
@@ -1844,6 +1849,7 @@
             else if (t === 'fire' || t === 'fishing_spot' || t === 'furnace' || t === 'anvil' || t === 'bank' || t === 'portal') Art.drawStation(ctx, o, T);
             else if ((t === 'farm_plot' || t === 'cauldron' || t === 'enchant_table') && window.Content) Content.drawEntity(ctx, o, T);
             else if ((t === 'furniture' || t === 'house_door') && window.World2) World2.drawEntity(ctx, o, T);
+            else if ((t === 'rift_gate' || t === 'rift_next') && window.Fendas) Fendas.drawEntity(ctx, o, T);
             else { ctx.fillStyle = 'rgba(200,200,200,0.5)'; ctx.fillRect(o.x, o.y, o.w || 30, o.h || 30); }
 
             if (!isHologram && o.active !== false && (t === 'enemy' || t === 'npc')) drawNameplate(ctx, o);

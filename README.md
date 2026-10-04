@@ -558,6 +558,15 @@ Continente para jogadores fortes (pensado para vitalidade/defesa ~30-40 e muito 
 ### Pesca da margem
 Vara: o jogador para na beira da água (alcance até ~270px) e lança longe. Rede: entra cerca de 30px na água, mais perto do ponto. Lógica em `Fishing.arrived` (usada no movimento de `index.html`).
 
+## Fendas (`public/fendas.js`, `public/riftitems.js`, `engagesrv.js`)
+Masmorra escalonada de 6 andares (5 de criaturas + guardião). Entrada: a **Fenda Instável**, um portal colocado pelo admin na Vila (perto do spawn) no primeiro login dele (`c5.riftgate`). Botão direito > *Entrar na Fenda*.
+- **Corrida local, resultado no servidor.** O mapa `fenda` existe só no navegador (nunca vai ao mundo salvo; `buildWorldCopy` o descarta; monstros derivados `rf_*` saem do `npcDB` ao terminar). Durante a corrida o cliente não sincroniza mapa (ninguém o vê) e simula os monstros localmente. Cair/morrer, sair pelo botão ou recarregar encerra a corrida (vale o que já venceu).
+- **Escala:** nível de Fenda 1..30 (libera o seguinte vencendo o atual). Nível dos monstros = `0,5 x nível de combate + 2 x nível da Fenda`, +1,5 por andar; `Balance.mobTable` dá vida/dano, XP = 60% do padrão. Sem loot normal: a recompensa vem do servidor.
+- **Servidor (`/api/engage`: `rstate/rstart/rend/rclaim`):** valida nível liberado, tempo mínimo (18 s por andar) e máximo (45 min), calcula pontuação (`andares x100 + bônus de selar (mais rápido = mais) + nível x40`), recompensa (Fragmentos de Fenda + moedas pelo correio) e o placar semanal (semana de Brasília, igual ao Colosso). **Só as 4 primeiras corridas do dia dão recompensa**; depois ainda pontua no placar (sem grind forçado).
+- **Modificador semanal** (gira por semana): Fúria (+25% dano), Gigantes (+40% vida), Enxame (+50% inimigos), Penumbra (escuro). Todos aumentam a recompensa.
+- **Pódio:** top 3 da semana anterior resgata prêmio (moedas, Fragmentos, Isca Dourada). **Meta comunitária:** os andares vencidos por todos somam numa barra semanal (meta = 50 + 15 por conta); batendo a meta, todo participante resgata um prêmio. (Não há guildas no jogo; esta é a meta coletiva.)
+- Estado em `db.engage.rift` (saneado por `cleanRift`); o item *Fragmento de Fenda* é cadastrado no catálogo do servidor no boot (`riftitems.js`).
+
 ## Jornada (tecla N)
 
 Botão **Jornada** (ou tecla `N`): recompensa diária com sequência de 7 dias, missões diárias e semanais (+ bônus por concluir todas), Códice (mapas, espécies, chefes, abates), Maestria após o nível 99 (bônus pequenos e com teto em Stats) e placar semanal do Colosso. Tudo que dá recompensa é decidido no servidor (`engagesrv.js`, `/api/engage`) e chega pelo correio; o cliente (`public/engage_ui.js`) só mostra e informa progresso de coleta, pesca, cozinha e fabricação (`Engage.prog`, em lote, com teto por minuto no servidor). `addXP(skill, n, true)` entrega XP bruto (sem multiplicadores) para recompensas de missão.

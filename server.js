@@ -376,6 +376,7 @@ const social = createSocial({ db, activePlayers, markDirty });
 const extras = createExtras({ db, activePlayers, markDirty, knownItem: (n) => sec.knownItem(n) });
 const sq = createSQ({ getDB: () => db, extras, sec, markDirty, giftLog: (o) => giftLog(o) });   // missões especiais do admin (specialquests.js)
 eng = createEngageSrv({ getDB: () => db, extras, sec, markDirty, activePlayers });
+try { const RI = require('./public/riftitems.js'); if (db.itemDB && typeof db.itemDB === 'object') { let ch = false; for (const k of Object.keys(RI)) if (!hasOwn(db.itemDB, k)) { db.itemDB[k] = RI[k]; ch = true; } if (ch) { dbStr = JSON.stringify([db.itemDB, db.npcDB]); markDirty(); } } } catch (e) { console.error('[rift-items]', e); }   // itens das Fendas entram no catálogo do servidor (o correio só entrega itens conhecidos)
 function chatFor(user) { return db.chat.filter(c => social.chatVisible(user, c)).map(c => { if (!c.party) return c; const { sender, msg, color } = c; return { sender, msg, color }; }); }
 
 /* ---------- respawn autoritativo dos monstros e chefes ----------
@@ -905,7 +906,7 @@ app.get('/api/admin/search', auth, adminOnly, userLimit('search', 120, 60000), (
 /* engajamento: recompensa diária (/api/daily), missões, Códice, maestria e placar (/api/engage). Relógio e recompensas SEMPRE do servidor; entrega pelo correio com id único. */
 app.get('/api/daily', auth, userLimit('daily', 30, 60000), (req, res) => { const st = eng.state(req.user); res.json({ ok: true, now: st.now, daily: st.daily, boost: st.boost }); });
 app.post('/api/daily', auth, userLimit('daily', 20, 60000), (req, res) => { const r = eng.act(req.user, { a: 'daily' }, SEC_IP(req)); if (r && r.ok) persistNow(); res.json(r); });
-app.post('/api/engage', auth, userLimit('engage', 90, 60000), (req, res) => { const b = req.body; const r = eng.act(req.user, b, SEC_IP(req)); if (r && r.ok && b && ['daily', 'qclaim', 'qbonus', 'mclaim', 'lclaim'].includes(b.a)) persistNow(); res.json(r); });
+app.post('/api/engage', auth, userLimit('engage', 90, 60000), (req, res) => { const b = req.body; const r = eng.act(req.user, b, SEC_IP(req)); if (r && r.ok && b && ['daily', 'qclaim', 'qbonus', 'mclaim', 'lclaim', 'rend', 'rclaim'].includes(b.a)) persistNow(); res.json(r); });
 
 /* missões especiais: jogadores listam e resgatam; só o admin cria/edita (specialquests.js) */
 app.get('/api/specialquest/list', auth, userLimit('sqlist', 60, 60000), (req, res) => res.json({ ok: true, quests: sq.list(req.user) }));

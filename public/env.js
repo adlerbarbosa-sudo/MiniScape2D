@@ -21,7 +21,7 @@
     function clockText() { const f = dayFrac(), m = Math.floor(f * 1440); return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); }
 
     /* ---------- mapas fechados (cavernas, masmorras) ---------- */
-    const KIND_BY_ID = { torre_mago: 'dark', covil_goblins: 'dark', cripta_real: 'dark', ninho_dragao: 'dark', catacumbas: 'dark', covil: 'dark', mina_abandonada: 'dim', ruinas: 'dim', mina: 'dim', casa: 'home' };
+    const KIND_BY_ID = { torre_mago: 'dark', covil_goblins: 'dark', cripta_real: 'dark', ninho_dragao: 'dark', catacumbas: 'dark', fenda: 'dark', covil: 'dark', mina_abandonada: 'dim', ruinas: 'dim', mina: 'dim', casa: 'home' };
     function mapKind(m) {
         if (m && (m.env === 'dark' || m.env === 'dim' || m.env === 'home' || m.env === 'open')) return m.env;
         const id = (m && m.id) || '';
