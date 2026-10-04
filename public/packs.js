@@ -104,8 +104,61 @@
         for (const k of Object.keys(snap.npcs)) { if (snap.npcs[k] === null) delete ctx.npcDB[k]; else ctx.npcDB[k] = snap.npcs[k]; }
         for (const id of Object.keys(snap.maps)) { if (snap.maps[id] === null) delete ctx.maps[id]; else ctx.maps[id] = snap.maps[id]; }
     }
+
+    /* ===== Auditoria de conexões: acha mapas soltos (sem entrada) e becos sem saída, e liga os soltos ===== */
+    const solidDecor = (k) => { const d = window.CATALOG && CATALOG.DECOR && CATALOG.DECOR[k]; return d ? !!d.solid : !['sign', 'flowers', 'lily', 'bones', 'mushrooms', 'reeds', 'lava', 'paint'].includes(k); };
+    function graph(maps) {
+        const out = {}, inn = {}; const ids = Object.keys(maps || {}); ids.forEach((id) => { out[id] = new Set(); inn[id] = new Set(); });
+        const link = (a, b) => { if (b && has(maps, b) && b !== a) { out[a].add(b); inn[b].add(a); } };
+        ids.forEach((id) => { const m = maps[id]; if (!m) return; (m.entities || []).forEach((o) => { if (o && o.type === 'portal' && o.active !== false) link(id, o.destMap); }); (Array.isArray(m.edges) ? m.edges : []).forEach((e) => link(id, e && e.to)); });
+        return { ids, out, inn };
+    }
+    const reach = (adj, from) => { const seen = new Set([from]), q = [from]; while (q.length) { const c = q.shift(); (adj[c] || []).forEach((n) => { if (!seen.has(n)) { seen.add(n); q.push(n); } }); } return seen; };
+    function audit(maps, start) {
+        const g = graph(maps); start = start && has(maps, start) ? start : (has(maps, 'lumbridge') ? 'lumbridge' : g.ids[0]);
+        const fwd = reach(g.out, start), back = reach(g.inn, start);   // back = mapas de onde se consegue voltar ao início
+        return { start, ids: g.ids, loose: g.ids.filter((id) => !fwd.has(id)), trapped: g.ids.filter((id) => fwd.has(id) && !back.has(id)), g };
+    }
+    function freeSpot(m, prefer) {   // lugar livre 64x64 (+ área de chegada abaixo) para um portal
+        const W = m.width || 2000, H = m.height || 1400, ents = (m.entities || []).filter((o) => o && o.active !== false && o.w && o.type !== 'paint' && o.type !== 'ground_item' && o.type !== 'fishing_spot' && (o.type !== 'decor' || solidDecor(o.kind)));
+        const vr = (o) => o.type === 'tree' ? [o.x - 12, o.y - 30, 100, 126] : [o.x, o.y, o.w, o.h], hit = (a, b) => a[0] < b[0] + b[2] && a[0] + a[2] > b[0] && a[1] < b[1] + b[3] && a[1] + a[3] > b[1];
+        let best = null, bd = 1e12;
+        for (let x = 120; x < W - 180; x += 40) for (let y = 120; y < H - 260; y += 40) { const r = [x - 36, y - 24, 136, 190]; if (ents.some((o) => hit(r, vr(o)))) continue; const d = Math.hypot(x - prefer[0], y - prefer[1]); if (d < bd) { bd = d; best = [x, y]; } }
+        return best;
+    }
+    function autoLink(maps, start) {   // devolve { snap, lines } ; altera maps no lugar
+        const a = audit(maps, start), lines = [], snap = { name: 'Ligação automática de mapas', at: Date.now(), items: {}, npcs: {}, maps: {} };
+        const keep = (id) => { if (!has(snap.maps, id)) snap.maps[id] = clone(maps[id]); };
+        const grid = (m) => (typeof m.gridX === 'number' && typeof m.gridY === 'number') ? [m.gridX, m.gridY] : null;
+        const nm = (id) => (maps[id] && maps[id].name) || id; let n = 0;
+        const connect = (from, to, label) => {   // portal em "from" levando a "to" (+ portal de volta em "to" se pedido)
+            const A = maps[from], Bm = maps[to], ga = grid(A), gb = grid(Bm);
+            const dir = ga && gb ? [Math.sign(gb[0] - ga[0]), Math.sign(gb[1] - ga[1])] : [0, 1];
+            const pa = freeSpot(A, [(A.width || 2000) / 2 + dir[0] * 700, (A.height || 1400) / 2 + dir[1] * 400]), pb = freeSpot(Bm, [(Bm.width || 2000) / 2 - dir[0] * 700, (Bm.height || 1400) / 2 - dir[1] * 400]);
+            if (!pa || !pb) { lines.push('Sem espaço livre para ligar ' + nm(from) + ' → ' + nm(to) + '. Abra espaço no mapa e rode de novo.'); return false; }
+            keep(from); keep(to); const id = 'auto_' + from + '_' + to;
+            const mk = (m, p, dest, dx, dy, name, idp) => { m.entities = (m.entities || []).filter((o) => !(o && o.id === idp)); m.entities.push({ id: idp, type: 'portal', name, x: p[0], y: p[1], w: 64, h: 64, destMap: dest, destX: dx, destY: dy, look: 'door', active: true, pk: 'Ligação automática' }); };
+            mk(A, pa, to, pb[0] + 32, pb[1] + 110, 'Caminho para ' + nm(to), id); mk(Bm, pb, from, pa[0] + 32, pa[1] + 110, 'Voltar para ' + nm(from), id + '_volta');
+            lines.push('✔ ' + nm(from) + ' ⇄ ' + nm(to) + (label ? ' (' + label + ')' : '')); n++; return true;
+        };
+        const done = new Set(a.g.ids.filter((id) => !a.loose.includes(id)));
+        // 1) mapas soltos: um por vez, liga ao alcançável mais próximo na grade (ou ao início); depois reavalia a vizinhança
+        let guard = 0;
+        while (guard++ < 60) {
+            const g = graph(maps), fw = reach(g.out, a.start), loose = a.ids.filter((id) => !fw.has(id)); if (!loose.length) break;
+            // prefere o mapa solto que já tem saídas (é a entrada natural do grupo)
+            loose.sort((x, y) => (g.out[y].size + g.inn[y].size) - (g.out[x].size + g.inn[x].size));
+            const L = loose[0], gl = grid(maps[L]); let anchor = a.start, bestd = 1e9;
+            [...fw].forEach((id) => { if (id === L || !maps[id]) return; const gi = grid(maps[id]); const d = gl && gi ? Math.abs(gl[0] - gi[0]) + Math.abs(gl[1] - gi[1]) : (id === a.start ? 50 : 1e6 - (maps[id].env ? 1 : 0)); if (d < bestd) { bestd = d; anchor = id; } });
+            if (!connect(anchor, L, 'estava solto')) break;
+        }
+        // 2) becos sem saída: dá um portal de volta
+        const g2 = graph(maps), back2 = reach(g2.inn, a.start);
+        a.ids.filter((id) => !back2.has(id)).forEach((id) => { const pred = [...g2.inn[id]][0] || a.start; connect(id, pred, 'não tinha saída'); });
+        return { snap, lines, n };
+    }
     window.Packs = {
-        parse, check, apply, restore, LIM,
+        parse, check, apply, restore, LIM, audit, autoLink,
         pushUndo(s) { undoStack.push(s); undoStack = undoStack.slice(-3); persist(); },
         popUndo() { const s = undoStack.pop(); persist(); return s || null; },
         undoInfo() { const s = undoStack[undoStack.length - 1]; return s ? s.name + ' (' + new Date(s.at).toLocaleString('pt-BR') + ')' : ''; },

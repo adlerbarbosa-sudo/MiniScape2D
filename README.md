@@ -541,6 +541,17 @@ Formato (arquivo `public/packs.js` tem o cabeçalho completo): `name` (obrigató
 
 Região nova com 7 mapas ligados por bordas (andar até a beirada) e 2 portais: **Colinas Ventosas** (nv 7-15, chefe Capitão Dente-de-Ferro), **Floresta dos Cogumelos** (14-24, Rainha dos Esporos), **Lago Cristalino** (13-24, Leviatã do Lago, pesca), **Ruínas Solares** (27-36, Guardião Solar), **Montanha do Trovão** (35-46, Rei Troll Grumak, minério) com a **Caverna dos Cristais** (masmorra, 40-54, Coração de Cristal) e **Cidadela da Tempestade** (48-58, Lorde da Tempestade). Traz 29 monstros/NPCs (vida e dano da tabela do jogo, por nível), 20 itens novos (nível mínimo e preço de venda) e um portal na Vila de Aldeburgo (perto da estrada leste) para as Colinas. Instale em Dev > Injetor de Expansão > **Abrir arquivo .json** > Pré-visualizar > Injetar; **Desfazer último** remove tudo. O arquivo é gerado por `node tools/gen-expansion.js` (determinístico).
 
+### Pacote pronto: Terras Sombrias (`docs/packs/terras-sombrias.json`)
+
+Continente para jogadores fortes (pensado para vitalidade/defesa ~30-40 e muito dano; monstros nv 52-78 pela `Balance.mobTable` com dano reduzido: ×0,8 comuns/elites, ×0,7 chefes). Chega-se pela **Estrada para o Porto de Aurora** (portal novo na Vila), embarcando no cais para o **Navio** e desembarcando na **Costa de Ossos**. Mapas: Costa de Ossos, Pântano Negro, Floresta Murcha, Cemitério dos Reis, Fortaleza de Obsidiana, Cratera de Cinzas (bordas ligadas) e Cripta Abissal (portal no Cemitério; chefe final Rei Lich Vaelor). Itens de nv 58-75 (obsidiana, abissal, cinzas). Gerado por `tools/gen-sombrio.js`. Mar e lagoas usam a água do jogo, então dá para pescar na margem.
+
+### Auditoria de conexões (Dev > Importar)
+
+**Auditar conexões** lista mapas soltos (sem caminho a partir da Vila por portais ou bordas) e becos sem saída. **Ligar mapas soltos** cria portais de ida e volta em pontos livres (vizinho mais próximo na grade, senão a Vila) e é desfazível por "Desfazer último". Código: `Packs.audit` / `Packs.autoLink`.
+
+### Pesca da margem
+Vara: o jogador para na beira da água (alcance até ~270px) e lança longe. Rede: entra cerca de 30px na água, mais perto do ponto. Lógica em `Fishing.arrived` (usada no movimento de `index.html`).
+
 ## Jornada (tecla N)
 
 Botão **Jornada** (ou tecla `N`): recompensa diária com sequência de 7 dias, missões diárias e semanais (+ bônus por concluir todas), Códice (mapas, espécies, chefes, abates), Maestria após o nível 99 (bônus pequenos e com teto em Stats) e placar semanal do Colosso. Tudo que dá recompensa é decidido no servidor (`engagesrv.js`, `/api/engage`) e chega pelo correio; o cliente (`public/engage_ui.js`) só mostra e informa progresso de coleta, pesca, cozinha e fabricação (`Engage.prog`, em lote, com teto por minuto no servidor). `addXP(skill, n, true)` entrega XP bruto (sem multiplicadores) para recompensas de missão.

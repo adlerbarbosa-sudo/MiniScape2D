@@ -205,6 +205,20 @@
     const busy = () => !!S;
     const rodOut = () => !!(S && S.mode === 'rod');
 
+    /* ---------- aproximação: vara pesca da margem (de longe); rede entra um pouco na água ---------- */
+    function plannedMode() {
+        const t = tools(); let m = (pendingMode && Date.now() - pendingAt < 20000) ? pendingMode : null;
+        if (!m) { if (t.net && t.rod) m = rememberedMode() || 'rod'; else m = t.net ? 'net' : t.rod ? 'rod' : null; }
+        if (m && !t[m]) m = t.net ? 'net' : t.rod ? 'rod' : null; return m;
+    }
+    const REACH = { rod: 270, net: 150 };
+    function arrived(px, py, spot, dist, ux, uy) {   // true = já pode começar a pescar (o jogador para de andar)
+        try {
+            const mode = plannedMode(), m = gameMaps[currentMap]; if (!mode || !window.Art || !Art.isWater || !m) return false;
+            if (mode === 'rod') { if (dist <= 150) return true; return dist <= REACH.rod && !Art.isWater(m, px, py) && Art.isWater(m, px + ux * 16, py + uy * 16); }   // para na beira da água
+            if (dist <= 45) return true; return dist <= REACH.net && Art.isWater(m, px, py) && Art.isWater(m, px - ux * 30, py - uy * 30);                         // rede: ~30px dentro da água
+        } catch (e) { return false; }
+    }
     function start(spot, mode) {
         try {
             if (!window.Art || !player) return false;
@@ -222,7 +236,7 @@
     }
     function begin(spot, mode, opt) {
         const t = tools(); if (!t[mode]) return false; opt = opt || {};
-        if (Math.hypot(player.x - (spot.x + (spot.w || 46) / 2), player.y - (spot.y + (spot.h || 46) / 2)) > 150) { say('Chegue mais perto da água.', '#e74c3c'); return false; }
+        if (Math.hypot(player.x - (spot.x + (spot.w || 46) / 2), player.y - (spot.y + (spot.h || 46) / 2)) > (mode === 'rod' ? REACH.rod : REACH.net)) { say('Chegue mais perto da água.', '#e74c3c'); return false; }
         wrapInput(); if (S) endSession(true);
         player.fishMode = mode; if (opt.remember) lsSet('ms_fishmode', mode);
         S = { mode, spot, phase: 'cast', t: 0, bob: null, tgt: null, dir: null, forceDir: opt.dir || null, hpLast: player.stats.hp, map: currentMap, catches: 0, fish: null, mg: null, press: false };
@@ -707,6 +721,7 @@
     window.addEventListener('load', () => { injectMenuBtn(); wrapInput(); installBuffs(); });
 
     window.Fishing = {
+        arrived,
         NET, ROD, BAITS, ITEMS, SPECIES, BYID, RARN, ZONEN, cfg, start, begin, cancel, finish, menu, draw, merge, migrate, selectBait, activeBait, baitLine, isBait: (n) => !!BAIT[n],
         busy, rodOut, sim, roll, rollNow, zoneOf, difficulty, cookOut, openDiary, setHold, buffV, setBuff, renderBuffs, tipPos, weather,
         state: () => S ? { phase: S.phase, mode: S.mode, t: S.t, bob: S.bob && { x: S.bob.x, y: S.bob.y, sink: S.bob.sink }, fish: S.fish && S.fish.sp ? { id: S.fish.sp.id, cm: S.fish.cm, kg: S.fish.kg, rar: S.fish.sp.rar, d: S.fish.d } : null, mg: S.mg && { pos: S.mg.pos, zc: S.mg.zc, zw: S.mg.zw, P: S.mg.P, st: S.mg.st, d: S.mg.d }, tgt: S.tgt, catches: S.catches } : null
