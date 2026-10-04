@@ -125,10 +125,7 @@
     S.goblin = { w: 30, h: 34, sh: [10, 3], draw(g, st) {
         const { t, mv, ph, atk, c1, c2 } = st; const back = st.view === 'back', lk = (st.turn || 0) * 0.9; const sw = sin(ph) * mv, bob = abs(sin(ph)) * mv * 1.4, br = sin(t * 3 + st.seed) * 0.4;
         const skin = c1, skinD = shade(skin, -0.32), skinL = shade(skin, 0.28), cloth = c2, lean = atk * 3;
-        limb2(g, -3, -12 - bob, -3 + sw * 3, -6, -4 + sw * 5, -0.5, 4.2, skinD);
-        ell(g, -3 + sw * 5, -0.5, 3.6, 1.7, '#3b2a1d', OUT, 1);
-        limb2(g, 3, -12 - bob, 3 - sw * 3, -6, 4 - sw * 5, -0.5, 4.2, skin);
-        ell(g, 4 - sw * 5, -0.5, 3.6, 1.7, '#4a3524', OUT, 1);
+        legF(g, ph, mv, -3, -12 - bob, -1, 4.2, skinD, '#3b2a1d', 3.6, 1.7, 3.2); legF(g, ph + PI, mv, 3, -12 - bob, 1, 4.2, skin, '#4a3524', 3.6, 1.7, 3.2);
         // braço de trás
         limb2(g, -6, -22 - bob, -9.5 - sw * 2, -17 - bob, -9 - sw * 3, -10.5 - bob, 3.6, skinD); ell(g, -9 - sw * 3, -9.5 - bob, 2.1, 2, skinD, OUT, 0.9);
         // torso
@@ -162,9 +159,7 @@
     S.orc = { w: 40, h: 46, sh: [15, 4], draw(g, st) {
         const { t, mv, ph, atk, c1, c2 } = st; const back = st.view === 'back', lk = (st.turn || 0) * 0.9; const sw = sin(ph) * mv, bob = abs(sin(ph)) * mv * 1.6, br = sin(t * 2.4 + st.seed) * 0.6;
         const skin = c1, skinD = shade(skin, -0.35), skinL = shade(skin, 0.22), metal = c2, lean = atk * 4;
-        limb2(g, -5, -17 - bob, -5 + sw * 4, -9, -6 + sw * 6, -1, 7, shade('#4a3a2a', -0.2));
-        limb2(g, 5, -17 - bob, 5 - sw * 4, -9, 6 - sw * 6, -1, 7, '#5a4630');
-        ell(g, -6 + sw * 6, 0, 5.5, 2.4, '#251a10', OUT, 1); ell(g, 6 - sw * 6, 0, 5.5, 2.4, '#2c2014', OUT, 1);
+        legF(g, ph, mv, -5, -17 - bob, -1, 7, shade('#4a3a2a', -0.2), '#251a10', 5.5, 2.4, 4); legF(g, ph + PI, mv, 5, -17 - bob, 1, 7, '#5a4630', '#2c2014', 5.5, 2.4, 4);
         limb2(g, -12, -34 - bob, -17 - sw * 2, -27 - bob, -15 - sw * 3, -18 - bob, 6, skinD); ell(g, -15 - sw * 3, -17 - bob, 3.4, 3.2, skinD, OUT, 1);
         // tronco
         g.save(); g.translate(lean, 0);
@@ -232,8 +227,7 @@
     /* --- ESQUELETO --- */
     S.skeleton = { w: 30, h: 44, sh: [10, 3], draw(g, st) {
         const { t, mv, ph, atk, c1, c2 } = st; const back = st.view === 'back', lk = (st.turn || 0) * 0.8; const sw = sin(ph) * mv, bob = abs(sin(ph)) * mv * 1.3, bone = c1, boneD = shade(bone, -0.35), lean = atk * 3, br = sin(t * 2.5 + st.seed) * 0.3;
-        limb2(g, -3, -17 - bob, -3 + sw * 4, -9, -3 + sw * 6, -0.5, 2.6, boneD); limb2(g, 3, -17 - bob, 3 - sw * 4, -9, 3 - sw * 6, -0.5, 2.6, bone);
-        ell(g, -3 + sw * 6, -0.5, 3, 1.4, boneD, OUT, 0.8); ell(g, 3 - sw * 6, -0.5, 3, 1.4, bone, OUT, 0.8);
+        legF(g, ph, mv, -3, -17 - bob, -1, 2.6, boneD, boneD, 3, 1.4, 3.6); legF(g, ph + PI, mv, 3, -17 - bob, 1, 2.6, bone, bone, 3, 1.4, 3.6);
         // pelve
         ell(g, lean * 0.4, -18 - bob, 6, 3, bone, OUT, 1);
         // escudo (costas)
@@ -384,8 +378,7 @@
     /* --- TROLL --- */
     S.troll = { w: 58, h: 70, sh: [20, 5], draw(g, st) {
         const { t, mv, ph, atk, c1, c2 } = st; const back = st.view === 'back', lk = (st.turn || 0) * 1.1; const sw = sin(ph) * mv, bob = abs(sin(ph)) * mv * 2.2, br = sin(t * 2 + st.seed) * 0.8, skin = c1, skinD = shade(skin, -0.38), skinL = shade(skin, 0.22), lean = atk * 5;
-        limb2(g, -7, -24 - bob, -7 + sw * 4, -13, -8 + sw * 8, -1, 11, skinD); limb2(g, 8, -24 - bob, 8 - sw * 4, -13, 9 - sw * 8, -1, 11, skin);
-        ell(g, -8 + sw * 8, 0, 8, 3, '#2e2a22', OUT, 1.2); ell(g, 9 - sw * 8, 0, 8, 3, '#332e26', OUT, 1.2);
+        legF(g, ph, mv, -7, -24 - bob, -1, 11, skinD, '#2e2a22', 8, 3, 5.5); legF(g, ph + PI, mv, 8, -24 - bob, 1, 11, skin, '#332e26', 8, 3, 5.5);
         // braço de trás
         limb2(g, -17, -47 - bob, -25, -35 - bob, -22 - sw * 4, -21 - bob, 9, skinD); ell(g, -22 - sw * 4, -19 - bob, 5.4, 5, skinD, OUT, 1.1);
         g.save(); g.translate(lean, 0);
@@ -645,6 +638,10 @@
        VISTAS: cada espécie pode ter v = { front, back, side } e home ('front' p/ bípedes, 'side' p/ bichos).
        'front'/'back' não espelham com a direção (só 'side' espelha); st.turn (-1..1) = para onde olha, st.lookY = cima/baixo.
        ============================================================ */
+    function legF(g, ph, mv, hx, hy, side, w, col, shoe, sx, sy, lf) {   // perna de frente: o pé sobe alternado e o joelho abre para fora
+        const lift = max(0, sin(ph)) * mv * lf, fy = -0.5 - lift, fx = hx + side * (0.8 + lift * 0.12), kx = hx + side * (1.4 + lift * 0.2), ky = (hy + fy) / 2 - lift * 0.3;
+        limb2(g, hx, hy, kx, ky, fx, fy, w, col); ell(g, fx, fy, sx, sy, shoe, OUT, 1);
+    }
     function legS(g, st, hx, hy, off, stride, lf, w, col, shoe, sl) {   // perna de perfil com passada e pé levantando
         const a = sin(st.ph + off) * st.mv, lift = max(0, cos(st.ph + off)) * st.mv * lf, fx0 = hx + a * stride, fy0 = -0.5 - lift, lh = (-hy - 0.5) / 2 + 0.1 + st.mv * (-hy) * 0.025, K = ik(hx, hy, fx0, fy0, lh, lh, 1), fx = K[2], fy = K[3];
         limb2(g, hx, hy, K[0], K[1], fx, fy, w, col);
