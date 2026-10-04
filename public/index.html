@@ -1093,6 +1093,7 @@
         
         // XP: valores "base RS" x XP_RATE x (escala de recurso por nível, só nos ofícios) x VIP modesto x impulso de iniciante x evento x 5% humano; frações sorteadas. Nível = tabela do RuneScape (balance.js)
         const _xpPop = {};
+        window.partyXpGain = function (sK, x, from) { addXP(sK, x * 0.5); try { addFloatingText(player.x, player.y - 56, `Grupo (${from})`, '#7bd67b'); } catch (e) { } };
         function addXP(sK, a, raw) {
             const sk = player.stats.skills[sK]; if (!sk || !(a > 0)) return;
             let mult = raw ? 1 : Balance.roleXpMul(userRole) * Balance.earlyMul(sk.level);   // VIP modesto (+10%/+15%) e impulso de iniciante (balance.js)
@@ -1468,8 +1469,8 @@
             let _cr = false; if (window.Stats && dmg > 0) { const _r = Stats.rollAttack(dmg); dmg = _r.dmg; _cr = _r.crit; const _h = Stats.lifestealHeal(dmg); if (_h > 0 && player.stats.hp < player.stats.maxHp) { player.stats.hp = Math.min(player.stats.maxHp, player.stats.hp + _h); Fx.dmg(floatingTexts, player.x, player.y - 50, _h, 'heal'); } }
             const _hp0 = Math.max(0, Number(t.hp) || 0), _dealt = (t.type === 'enemy' && dmg > 0) ? Math.min(dmg, _hp0) : 0;   // sem overkill: o XP conta só a vida que o alvo ainda tinha
             t.hp -= dmg; t.aggroTarget = currentUser;
-            if (_dealt > 0 && (sT === 'combat' || sT === 'ranged' || sT === 'magic') && !(window.Pets && Pets._P && Pets._P.own)) { const _d = npcDB[t.dbKey]; { const _xb = Balance.mobXpFor(_d, _dealt, t.maxHp > 0 ? t.maxHp : (_d && _d.hp), _hp0); if (_xb > 0) addXP(sT, _xb); } }   // perícia ofensiva sobe ao CAUSAR dano: XP base da criatura x (dano efetivo / vida máxima); pet não dá XP
-            const crit = _cr, big = !_cr && dmg > 0 && maxHit >= 4 && dmg >= maxHit * 0.9; Fx.dmg(floatingTexts, t.x + (t.w||30)/2, t.y + 2, dmg, dmg > 0 ? (crit ? 'crit' : big ? 'big' : 'hit') : 'miss'); if (dmg > 0) { Art.burst(t.x + (t.w||30)/2, t.y + (t.h||30)/2, '#d33', (crit || big) ? 12 : 6, (crit || big) ? 1.6 : 1); if (crit || big) Art.burst(t.x + (t.w||30)/2, t.y + (t.h||30)/2, '#ffe27a', 8, 1.8); }
+            if (_dealt > 0 && (sT === 'combat' || sT === 'ranged' || sT === 'magic') && !(window.Pets && Pets._P && Pets._P.own)) { const _d = npcDB[t.dbKey]; { const _xb = Balance.mobXpFor(_d, _dealt, t.maxHp > 0 ? t.maxHp : (_d && _d.hp), _hp0); if (_xb > 0) { addXP(sT, _xb); try { if (window.partyShareXp) partyShareXp(sT, _xb); } catch (e) { } } } }   // perícia ofensiva sobe ao CAUSAR dano: XP base da criatura x (dano efetivo / vida máxima); pet não dá XP
+            const crit = _cr, big = !_cr && dmg > 0 && maxHit >= 4 && dmg >= maxHit * 0.9; Fx.dmg(floatingTexts, t.x + (t.w||30)/2, t.y + 2, dmg, dmg > 0 ? (crit ? 'crit' : big ? 'big' : 'hit') : 'miss'); try { if (window.RemoteFx) RemoteFx.out('dmg', dmg > 0 ? (crit ? '#ffe27a' : big ? '#ff8a00' : '#dd3333') : '#aaaaaa', player.x, player.y, t.x + (t.w||30)/2, t.y + 2, dmg); } catch (e) { } if (dmg > 0) { Art.burst(t.x + (t.w||30)/2, t.y + (t.h||30)/2, '#d33', (crit || big) ? 12 : 6, (crit || big) ? 1.6 : 1); if (crit || big) Art.burst(t.x + (t.w||30)/2, t.y + (t.h||30)/2, '#ffe27a', 8, 1.8); }
             if (!isOfflineMode) { pendingCombatLogs.push({ id: t.id, dmg: dmg, aggro: currentUser, maxHp: t.maxHp }); if (pendingCombatLogs.length > 200) pendingCombatLogs.splice(0, pendingCombatLogs.length - 200); }
             if(t.hp <= 0) { 
                 Fx.ghost(t); t.active = false; t._kd = Date.now(); t.aggroTarget = null; Art.poof(t.x + (t.w||30)/2, t.y + (t.h||30)/2);

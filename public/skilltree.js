@@ -170,7 +170,7 @@
         const q2 = g.createRadialGradient(32, 32, 0, 32, 32, 14); q2.addColorStop(0, 'rgba(255,255,255,.85)'); q2.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = q2; g.globalAlpha = 1; g.beginPath(); g.arc(32, 32, 14, 0, TAU); g.fill();
         return (glows[col] = c);
     }
-    function fx(o) { if (S.fx.length > 90) S.fx.shift(); o.t = 0; S.fx.push(o); return o; }
+    function fx(o) { if (S.fx.length > 90) S.fx.shift(); o.t = 0; try { if (S.pl === player) { if (o.k === 'cone') rfx('cone', o.col, o.x, o.y, o.x + Math.cos(o.ang) * o.r, o.y + Math.sin(o.ang) * o.r, o.r); else if (o.k === 'beam') rfx('beam', o.col, o.x, o.y, o.x2, o.y2); } } catch (e) { } S.fx.push(o); return o; }
     const rfx = (k, c, x, y, tx, ty, r) => { try { if (window.RemoteFx) RemoteFx.out(k, c, x, y, tx === undefined ? x : tx, ty === undefined ? y : ty, r); } catch (e) { } };
     const ring = (x, y, r0, r1, col, life, w, sq) => (rfx('ring', col, x, y, x, y, r1), fx)({ k: 'ring', x, y, r0, r1, col, max: life || 24, w: w || 4, sq: sq == null ? 0.58 : sq });
     const flash = (x, y, r, col, life) => (rfx('flash', col, x, y, x, y, r), fx)({ k: 'flash', x, y, r, col, max: life || 14 });

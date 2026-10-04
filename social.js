@@ -72,9 +72,12 @@ module.exports = function createSocial(ctx) {
     }
     setInterval(() => { try { tick(); } catch (e) { console.error('[social.tick]', e); } }, 2000).unref();
 
+    const pend = Object.create(null), xpRate = Object.create(null);   // XP compartilhado do grupo, entregue uma vez a cada membro
     function view(u) {
         const inv = invites[u];
-        return { party: partyView(u), invite: inv && parties[inv.pid] ? { from: inv.from } : null, trade: tradeView(u) };
+        const out = { party: partyView(u), invite: inv && parties[inv.pid] ? { from: inv.from } : null, trade: tradeView(u) };
+        if (pend[u] && pend[u].length) { out.xp = pend[u]; pend[u] = []; }
+        return out;
     }
     const err = (m) => ({ error: m });
     const savedPD = (u) => { const x = hasOwn(db.users, u) ? db.users[u] : null; return x && x.playerData && typeof x.playerData === 'object' ? x.playerData : null; };
@@ -105,6 +108,14 @@ module.exports = function createSocial(ctx) {
             case 'party_leave': dropFromParty(u); return { ok: true };
             case 'party_kick': { const p = parties[partyOf[u]]; if (!p || p.leader !== u) return err('Só o líder expulsa.'); if (!to || to === u || partyOf[to] !== p.id) return err('Jogador não encontrado no grupo.'); dropFromParty(to); return { ok: true }; }
 
+            case 'party_xp': {   // o XP de combate de quem lutou rende 50% (no cliente) aos companheiros próximos, no mesmo mapa
+                const pid = partyOf[u], p = pid && parties[pid]; if (!p) return { ok: true };
+                const sk = String(b.s || ''); if (!/^(combat|ranged|magic)$/.test(sk)) return { ok: true };
+                let x = Math.floor(Number(b.x)); if (!(x > 0)) return { ok: true }; x = Math.min(x, 5000);
+                const n = now(), r = xpRate[u] || (xpRate[u] = { t: n, a: 0 }); if (n - r.t > 10000) { r.t = n; r.a = 0; } r.a += x; if (r.a > 20000) return { ok: true };
+                for (const m of p.members) { if (m === u || !online(m)) continue; const a = activePlayers[m]; if (a.map !== me.map || Math.hypot(a.x - me.x, a.y - me.y) > 1100) continue; const q = pend[m] || (pend[m] = []); if (q.length < 40) q.push({ f: u, s: sk, x }); }
+                return { ok: true };
+            }
             case 'trade_request': {
                 if (!to || to === u || !online(to)) return err('Jogador indisponível.');
                 if (tradeOf[u] || tradeOf[to]) return err('Um dos dois já está em uma troca.');

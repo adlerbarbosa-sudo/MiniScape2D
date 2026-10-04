@@ -51,6 +51,7 @@
     const busy = {};   // ids de troca que já estão sendo processados neste cliente
     function onSync(data) { if (data && data.social) onState(data.social); try { if (window.Life) Life.onSync(data); } catch (e) { } }
     function onState(s) {
+        try { if (s.xp && s.xp.length) { s.xp.forEach((e) => { try { if (window.partyXpGain) window.partyXpGain(e.s, e.x, e.f); } catch (x) { } }); } } catch (e) { }
         S = s;
         const key = JSON.stringify(s);
         try { handleTrade(s.trade).catch((e) => console.error('[troca]', e)); } catch (e) { console.error('[troca]', e); }
@@ -142,15 +143,21 @@
 
     /* ============================ INTERFACE ============================ */
     let hud = null, btn = null;
+    // XP de grupo: quem causa dano repassa o XP base; juntamos por 1,2 s e mandamos num pedido só
+    let _px = {}, _pxT = 0;
+    window.partyShareXp = function (sk, x) {
+        if (!S.party || S.party.members.length < 2 || !(x > 0)) return; _px[sk] = (_px[sk] || 0) + x;
+        if (_pxT) return; _pxT = setTimeout(() => { const o = _px; _px = {}; _pxT = 0; Object.keys(o).forEach((k) => { socialCall('party_xp', { s: k, x: Math.round(o[k]) }, true).catch(() => { }); }); }, 1200);
+    };
     function place() {
         const c = document.getElementById('gameCanvas'); const r = c ? c.getBoundingClientRect() : { right: window.innerWidth - 20, top: 10 };
         if (btn) { btn.style.left = Math.max(8, r.right - 118) + 'px'; btn.style.top = (r.top + 66) + 'px'; }
-        if (hud) { hud.style.left = Math.max(8, r.right - 190) + 'px'; hud.style.top = (r.top + 98) + 'px'; }
+        if (hud) { hud.style.left = Math.max(8, (r.left || 0) + 10) + 'px'; hud.style.top = (r.top + 96) + 'px'; }
     }
     function mkUi() {
         if (btn) return;
         const css = document.createElement('style');
-        css.textContent = '.soc-btn{position:fixed;z-index:60;padding:4px 12px;font:700 .78rem serif;color:#f0e2bd;background:linear-gradient(#5a3d1e,#3a2410);border:2px solid #c9a24a;border-radius:8px;cursor:pointer}.soc-hud{position:fixed;z-index:59;width:176px;display:none;background:rgba(30,20,10,.72);border:1px solid #8a6a2a;border-radius:8px;padding:5px 7px;font:.72rem sans-serif;color:#f0e2bd;pointer-events:none}.soc-hud .r{margin:3px 0}.soc-hud .b{height:5px;background:#000a;border-radius:3px;overflow:hidden}.soc-hud .b i{display:block;height:100%;background:linear-gradient(#e0523f,#a12a1e)}.soc-b{background:#3a2a18;color:#f0e2bd;border:1px solid #8a6a2a;border-radius:6px;padding:4px 10px;cursor:pointer;margin:2px;font:inherit}.soc-b:disabled{opacity:.45;cursor:default}.soc-b.ok{border-color:#5ab26a;background:#24452b}.soc-col{flex:1;min-width:0}.soc-it{display:inline-block;margin:2px;padding:2px 6px;background:#0004;border:1px solid #6a4a1a;border-radius:6px;font-size:.78rem}';
+        css.textContent = '.soc-btn{position:fixed;z-index:60;padding:4px 12px;font:700 .78rem serif;color:#f0e2bd;background:linear-gradient(#5a3d1e,#3a2410);border:2px solid #c9a24a;border-radius:8px;cursor:pointer}.soc-hud{position:fixed;z-index:59;width:150px;display:none;background:linear-gradient(#2a1c0e,#1b110a);border:2px solid #c9a24a;border-radius:10px;padding:5px 8px 6px;font:700 .72rem serif;color:#f0e2bd;pointer-events:none;box-shadow:0 2px 8px #0008}.soc-hud .h{display:flex;justify-content:space-between;color:#e8c46a;font-size:.7rem;letter-spacing:.5px;border-bottom:1px solid #6a4a1a;padding-bottom:2px;margin-bottom:3px}.soc-hud .r{margin:4px 0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.soc-hud .r small{float:right;font:.62rem sans-serif;opacity:.85}.soc-hud .b{height:6px;margin-top:1px;background:#000a;border:1px solid #000;border-radius:4px;overflow:hidden}.soc-hud .b i{display:block;height:100%;background:linear-gradient(#7be07f,#2f9a3c)}.soc-hud .b i.m{background:linear-gradient(#f2d36a,#c08a1e)}.soc-hud .b i.l{background:linear-gradient(#e0523f,#a12a1e)}.soc-b{background:#3a2a18;color:#f0e2bd;border:1px solid #8a6a2a;border-radius:6px;padding:4px 10px;cursor:pointer;margin:2px;font:inherit}.soc-b:disabled{opacity:.45;cursor:default}.soc-b.ok{border-color:#5ab26a;background:#24452b}.soc-col{flex:1;min-width:0}.soc-it{display:inline-block;margin:2px;padding:2px 6px;background:#0004;border:1px solid #6a4a1a;border-radius:6px;font-size:.78rem}';
         document.head.appendChild(css);
         btn = document.createElement('button'); btn.className = 'soc-btn'; btn.textContent = 'Social'; btn.style.display = 'none'; btn.onclick = openSocial; document.body.appendChild(btn);
         hud = document.createElement('div'); hud.className = 'soc-hud'; document.body.appendChild(hud);
@@ -160,7 +167,7 @@
         if (!hud) return; const p = S.party;
         if (!p) { hud.style.display = 'none'; return; }
         hud.style.display = 'block'; place();
-        hud.innerHTML = '<div style="font-weight:700;color:#7bd67b">Grupo</div>' + p.members.map((m) => `<div class="r" style="opacity:${m.on ? 1 : .45}">${m.u === p.leader ? '★ ' : ''}${esc(m.u)}<div class="b"><i style="width:${m.maxHp ? Math.round(m.hp / m.maxHp * 100) : 0}%"></i></div></div>`).join('');
+        hud.innerHTML = `<div class="h"><span>GRUPO</span><span>${p.members.length}</span></div>` + p.members.map((m) => { const pc = m.maxHp ? Math.max(0, Math.min(100, Math.round(m.hp / m.maxHp * 100))) : 0; return `<div class="r" style="opacity:${m.on ? 1 : .45}">${m.u === p.leader ? '<span style="color:#f1c40f">★</span> ' : ''}${esc(m.u)}<small>${m.on ? m.hp + '/' + m.maxHp : 'off'}</small><div class="b"><i class="${pc < 30 ? 'l' : pc < 60 ? 'm' : ''}" style="width:${pc}%"></i></div></div>`; }).join('');
     }
     function showInvite(from) {
         openModal(`<h3 style="margin:0 0 8px">Convite de grupo</h3><p><b>${esc(from)}</b> convidou você para um grupo.</p><div style="text-align:right"><button class="soc-b" id="soc-yes">Aceitar</button><button class="soc-b" id="soc-no">Recusar</button></div>`);
