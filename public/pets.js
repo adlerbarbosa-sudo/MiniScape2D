@@ -791,7 +791,7 @@ html.touch #pet-row .mnt{display:none}
         PETS, MOUNTS, PET_IDS, MOUNT_IDS, MODES, RARN, RARC, cfg: { dropMul, DROP_CH, LUCK_CAP, LEG_HALF, COLLECT_R, SPD_CAP, MAXLVL },
         bonus, speedFactor, merge, tick, queue, mountOf, drawMounted, itemIcon, fill, onSync, onXP, useItem, equip: equipPet, unequip: unequipPet, setMode, rename, renameMount, mountSpd, mStage, mNeed, mLvl, mount, dismount, toggleMount, choose: chooseMount,
         open: openPanel, close: closePanel, petBase, petItem, mountItem, petStats, grant, rollSource, onKill, postKill, dropTable, capItemChance,
-        mountPet, dismountPet, togglePetMount, ride, petCan, PET_MLVL, PM_MUL, mixInfo, xpShare, setMountPct, mountPct: () => (gameOn() && ensure() ? player.mountPct : 0), isMounted: () => P.mounted, isPetMounted: () => P.pm, state: () => ({ mounted: P.mounted, pm: P.pm, pet: player && player.pet, fol: P.fol.me && { x: P.fol.me.x, y: P.fol.me.y, view: P.fol.me.view, sleep: !!P.fol.me.sleep, mv: P.fol.me.mv }, tgt: !!P.tgt, others: P.others }),
+        mountPet, dismountPet, togglePetMount, ride, petCan, PET_MLVL, PM_MUL, mixInfo, xpShare, setMountPct, mountPct: () => (gameOn() && ensure() ? player.mountPct : 0), isMounted: () => P.mounted, flying: () => { try { return !!(gameOn() && ((P.mounted && player.mount && MOUNTS[player.mount] && MOUNTS[player.mount][3]) || (P.pm && player.pet && PETS[player.pet.id] && PETS[player.pet.id][3]))); } catch (e) { return false; } }, isPetMounted: () => P.pm, state: () => ({ mounted: P.mounted, pm: P.pm, pet: player && player.pet, fol: P.fol.me && { x: P.fol.me.x, y: P.fol.me.y, view: P.fol.me.view, sleep: !!P.fol.me.sleep, mv: P.fol.me.mv }, tgt: !!P.tgt, others: P.others }),
         _P: P
     };
 })();

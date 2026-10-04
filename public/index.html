@@ -1612,13 +1612,16 @@
         canvas.addEventListener('touchend', () => clearTimeout(_lpTimer));
         canvas.addEventListener('touchcancel', () => clearTimeout(_lpTimer));
 
+        // montaria voadora (dragão, fênix): sobrevoa objetos baixos (cercas, barris, arbustos, caixotes...); prédios, árvores, rochas e muros continuam bloqueando
+        const FLY_LOW = new Set(['fence_h', 'fence_v', 'barrel', 'crates', 'stump', 'bush', 'haystack', 'sign', 'campfire', 'mushrooms', 'lily', 'flowers', 'gravestone', 'bones', 'reeds', 'cactus', 'torch', 'banner', 'netrack']);
+        function flyOver(o) { return !!(o && o.type === 'decor' && FLY_LOW.has(o.kind) && window.Pets && Pets.flying && Pets.flying()); }
         // --- PATHFINDING (A*) : o personagem contorna casas, árvores e paredes em vez de travar ---
         const PF_CELL = 16; let pfKey = ''; let pfPath = [];
         const PF_SKIP = ['ground_item','fishing_spot','farm_plot','rift_gate','rift_next','portal','fire','paint','enemy'];
         function pfBlockedFn(cur, mapW, mapH) {
             const cols = Math.ceil(mapW / PF_CELL), rows = Math.ceil(mapH / PF_CELL); const grid = new Uint8Array(cols * rows); const m = 11;
             for (const o of cur) {
-                if (!o || !o.type || !o.active || PF_SKIP.includes(o.type)) continue;
+                if (!o || !o.type || !o.active || PF_SKIP.includes(o.type) || flyOver(o)) continue;
                 const hb = getHitbox(o); if (!hb) continue;
                 const x0 = Math.max(0, Math.floor((hb.x - m) / PF_CELL)), x1 = Math.min(cols - 1, Math.floor((hb.x + hb.w + m) / PF_CELL));
                 const y0 = Math.max(0, Math.floor((hb.y - m) / PF_CELL)), y1 = Math.min(rows - 1, Math.floor((hb.y + hb.h + m) / PF_CELL));
@@ -1731,7 +1734,7 @@
                     let nX = player.x + mx; let nY = player.y + my; let colX = false, colY = false; let pw = 10, ph = 10;
                     
                     for(let o of cur) {
-                        if(!o || !o.type || !o.active || ['ground_item','fishing_spot','farm_plot','rift_gate','rift_next','portal','fire','paint'].includes(o.type)) continue;
+                        if(!o || !o.type || !o.active || ['ground_item','fishing_spot','farm_plot','rift_gate','rift_next','portal','fire','paint'].includes(o.type) || flyOver(o)) continue;
                         let hb = getHitbox(o); if (!hb) continue;
                         let wasInside = (player.x-pw < hb.x+hb.w && player.x+pw > hb.x && player.y-ph < hb.y+hb.h && player.y+ph > hb.y);
                         if (wasInside && (o.type === 'enemy' || o.type === 'npc')) continue;
@@ -1756,7 +1759,7 @@
                         let sdx = dx, sdy = dy, sdist = dist; const wp = getSteerPoint(cur, mapW, mapH); if (wp) { sdx = wp.x - player.x; sdy = wp.y - player.y; sdist = Math.hypot(sdx, sdy) || 1; }
                         const _sp2 = window.Stats ? Stats.spd(true) : player.speed; const mx = (sdx / sdist) * _sp2; const my = (sdy / sdist) * _sp2; let nX = player.x + mx; let nY = player.y + my; let colX = false, colY = false; let pw = 10, ph = 10;
                         for(let o of cur) {
-                            if(!o || !o.type || !o.active || ['ground_item','fishing_spot','farm_plot','rift_gate','rift_next','portal','fire','paint'].includes(o.type)) continue;
+                            if(!o || !o.type || !o.active || ['ground_item','fishing_spot','farm_plot','rift_gate','rift_next','portal','fire','paint'].includes(o.type) || flyOver(o)) continue;
                             let hb = getHitbox(o); if (!hb) continue;
                             let wasInside = (player.x-pw < hb.x+hb.w && player.x+pw > hb.x && player.y-ph < hb.y+hb.h && player.y+ph > hb.y);
                             if (wasInside && (o.type === 'enemy' || o.type === 'npc')) continue;
