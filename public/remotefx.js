@@ -28,6 +28,7 @@
                 for (const u of Object.keys(seen)) if (!players[u]) { delete seen[u]; delete known[u]; }
             } catch (e) { }
         },
+        _liveCount() { return live.length; },
         step() {
             for (let i = live.length - 1; i >= 0; i--) {
                 const p = live[i];

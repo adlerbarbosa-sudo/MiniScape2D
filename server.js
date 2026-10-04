@@ -67,7 +67,10 @@ app.get('/balance.js', (req, res, next) => {   // XP_RATE (env) chega ao cliente
     if (!(+process.env.XP_RATE > 0)) return next();
     try { const src = fs.readFileSync(path.join(__dirname, 'public', 'balance.js'), 'utf8'); res.type('application/javascript').set('Cache-Control', 'no-cache').send('self.MS_XP_RATE=' + (+process.env.XP_RATE) + ';\n' + src); } catch (e) { next(); }
 });
-app.use(express.static(path.join(__dirname, 'public'), { dotfiles: 'ignore', index: 'index.html' }));
+app.use(express.static(path.join(__dirname, 'public'), { dotfiles: 'ignore', index: 'index.html', setHeaders: (res, p) => { if (/\.(js|html|css|json)$/.test(p)) res.setHeader('Cache-Control', 'no-cache'); } }));   // sempre revalida: ninguém fica com versão velha do jogo
+/* versão do cliente = data do arquivo mais novo em public/: o jogo avisa quem está com uma versão velha para recarregar (senão os dois lados não se veem direito) */
+let CLIENT_VER = '0'; function calcVer() { try { let m = 0; const walk = (d, n) => { for (const f of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, f.name); if (f.isDirectory()) { if (n < 2) walk(p, n + 1); } else { const t = fs.statSync(p).mtimeMs; if (t > m) m = t; } } }; walk(path.join(__dirname, 'public'), 0); CLIENT_VER = String(Math.round(m)); } catch (e) { } }
+calcVer(); setInterval(calcVer, 60000).unref();
 
 /* ---------------- BANCO DE DADOS (em memória + disco) ---------------- */
 const DATA_DIR = process.env.DATA_DIR || __dirname;
@@ -847,7 +850,7 @@ function doSync(user, b, ip) {
 
     const players = {};
     for (const u of Object.keys(activePlayers)) if (u !== user && activePlayers[u].map === map) players[u] = activePlayers[u];
-    const out = { t: now, drops: dropsView(user, map), dmine: dropsMine(user, map), dep: depView(user, map), toggles: db.toggles, boss: extras.bossInfo(), players, mapVersion: db.mapVersion, serverMobs: serverMobs[map], isHost, chatVer: db.chatVer, social: social.view(user) };
+    const out = { t: now, ver: CLIENT_VER, drops: dropsView(user, map), dmine: dropsMine(user, map), dep: depView(user, map), toggles: db.toggles, boss: extras.bossInfo(), players, mapVersion: db.mapVersion, serverMobs: serverMobs[map], isHost, chatVer: db.chatVer, social: social.view(user) };
     if (b.chatVer !== db.chatVer) out.chat = chatFor(user);
     if (killed.length) out.kills = killed;
     const lk = sec.lockedUntil(user); if (lk) out.lock = lk;   // salvamento suspenso: o cliente deve avisar o jogador

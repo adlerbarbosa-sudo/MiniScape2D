@@ -809,6 +809,7 @@
                 try { if (window.Net) Net.onSync(data); } catch (e) { console.error(e); }
 
                 if (window.DropSync && data.drops) { DropSync.onSync(data.drops, data.dmine); DropSync.onDep(data.dep); }
+                if (data.ver) { if (!window._srvVer) window._srvVer = data.ver; else if (data.ver !== window._srvVer && !window._verWarn) { window._verWarn = 1; try { setActionText('Nova versão do jogo no ar! Recarregue a página (Ctrl+F5) para ver tudo certo online.', '#e8c469'); } catch (e) { } } }
                 if (data.toggles && typeof data.toggles === 'object') window.EventToggles = data.toggles;   // eventos ligados pelo admin (Fenda, Missões Especiais)
                 if(data.players) {
                     try { if (window.RemoteFx) RemoteFx.onSync(data.players); } catch (e) { }
