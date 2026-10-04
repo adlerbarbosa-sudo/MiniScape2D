@@ -74,7 +74,9 @@ function openSide(M, d, c, w, col, to, td, tc, tw, linkId) {
     else { const y0 = d === 'n' ? 0 : cy, y1 = d === 'n' ? cy : H, b0 = d === 'n' ? 0 : cy + 260, b1 = d === 'n' ? cy - 260 : H; M.block(c - w / 2 - 20, b0, w + 40, b1 - b0); M.paint(col, c - w / 2, y0, w, y1 - y0); M.paint(col, Math.min(c, cx) - w / 2, cy - w / 2, Math.abs(c - cx) + w, w); }
     M.m.edges.push({ id: linkId, d, a: R(c - w / 2 + 12), b: R(c + w / 2 - 12), to, td, ta: R(tc - tw / 2 + 12), tb: R(tc + tw / 2 - 12) });
 }
-function link(A, ad, ac, B, bd, bc, col, id, w) { w = w || 120; openSide(A, ad, ac, w, col, B.m.id, bd, bc, w, id); openSide(B, bd, bc, w, col, A.m.id, ad, ac, w, id + '_r'); }
+/* placa ao lado da abertura (dentro do mapa), dizendo para onde a estrada leva */
+function signAt(M, d, c, w, label) { if (!label) return; const hz = d === 'e' || d === 'w', W = M.m.width, H = M.m.height, off = w / 2 + 34; const x = hz ? (d === 'w' ? 150 : W - 190) : c + off, y = hz ? c + off : (d === 'n' ? 130 : H - 170); M.decor('sign', x, y, { name: 'Placa: → ' + label }); }
+function link(A, ad, ac, B, bd, bc, col, id, w) { w = w || 120; openSide(A, ad, ac, w, col, B.m.id, bd, bc, w, id); openSide(B, bd, bc, w, col, A.m.id, ad, ac, w, id + '_r'); if (col !== '#7a5a3a') { signAt(A, ad, ac, w, B.m.name); signAt(B, bd, bc, w, A.m.name); } }
 /* moldura de árvores/arbustos ao redor do mapa, deixando as aberturas livres */
 function border(M, treeFn, opts) {
     const W = M.m.width, H = M.m.height, step = 64;
@@ -170,92 +172,85 @@ K.vulc = npc('vulcanologo_pyra', 'Vulcanóloga Pyra', 'wizard', '#c8501a', 'Se o
 
 /* ============ MAPAS ============ */
 const SEA = '#17405f', SEA2 = '#1d5078', WOOD = '#7a5a3a', WOOD2 = '#5c4028', ASH = '#3a3532', OBS = '#2a2a38', BLK = '#2b2630';
-const GX = -6, GY = 3;   // mapa-múndi: sudoeste, do outro lado do mar a partir do Porto dos Mares (-1,2)
+const GX = -3, GY = 3;   // mapa-múndi: oeste do Estaleiro (-1,3): navio (-2,3), depois a Costa de Ossos (-3,3) e o continente rumo ao oeste
 const porto = makeMap('porto_aurora', 'Estaleiro de Porto dos Mares', 2000, 1400, '#7a7468', -1, 3);
-const navio = makeMap('navio_sombrio', 'Navio para as Terras Sombrias', 1400, 800, SEA, null, null, 'dim');
+const navio = makeMap('navio_sombrio', 'Navio para as Terras Sombrias', 900, 800, SEA, -2, 3, 'dim');
 const costa = makeMap('costa_ossos', 'Costa de Ossos', 2000, 1400, '#5a574a', GX, GY, 'dim');
-const pantano = makeMap('pantano_negro', 'Pântano Negro', 2000, 1400, '#2c3a2c', GX + 1, GY, 'dim');
-const fortaleza = makeMap('fortaleza_obsidiana', 'Fortaleza de Obsidiana', 2000, 1400, '#2e2a34', GX + 2, GY, 'dim');
+const pantano = makeMap('pantano_negro', 'Pântano Negro', 2000, 1400, '#2c3a2c', GX - 1, GY, 'dim');
+const fortaleza = makeMap('fortaleza_obsidiana', 'Fortaleza de Obsidiana', 2000, 1400, '#2e2a34', GX - 2, GY, 'dim');
 const floresta = makeMap('floresta_murcha', 'Floresta Murcha', 2000, 1400, '#2a3a2e', GX, GY + 1, 'dim');
-const cemiterio = makeMap('cemiterio_reis', 'Cemitério dos Reis', 2000, 1400, '#3a3a48', GX + 1, GY + 1, 'dim');
-const cratera = makeMap('cratera_cinzas', 'Cratera de Cinzas', 2000, 1400, '#4a2e24', GX + 2, GY + 1, 'dim');
+const cemiterio = makeMap('cemiterio_reis', 'Cemitério dos Reis', 2000, 1400, '#3a3a48', GX - 1, GY + 1, 'dim');
+const cratera = makeMap('cratera_cinzas', 'Cratera de Cinzas', 2000, 1400, '#4a2e24', GX - 2, GY + 1, 'dim');
 const cripta = makeMap('cripta_abissal', 'Cripta Abissal', 1600, 1200, '#10121c', null, null, 'dark');
 
-/* o estaleiro fica ao sul do Porto dos Mares (borda sul, c=900, como a norte dele) */
+/* ligações pela borda (nada de portal, só estradas e o cais). Continente fluindo para o oeste a partir da Costa de Ossos. */
 const EXT = [];
-function extLink(M, d, c, w, other, od, oc, id, col) { openSide(M, d, c, w, col, other, od, oc, w, id); EXT.push({ map: other, e: { id: id + '_r', d: od, a: R(oc - w / 2 + 12), b: R(oc + w / 2 - 12), to: M.m.id, td: d, ta: R(c - w / 2 + 12), tb: R(c + w / 2 - 12), w, col } }); }
-extLink(porto, 'n', 900, 110, 'porto_mares', 's', 900, 'som_porto_mares', STONE);
-link(costa, 'e', 700, pantano, 'w', 700, DIRT, 'som_costa_pantano');
-link(pantano, 'e', 700, fortaleza, 'w', 700, STONE, 'som_pantano_fortaleza');
+function extLink(M, d, c, w, other, od, oc, id, col, label) { openSide(M, d, c, w, col, other, od, oc, w, id); signAt(M, d, c, w, label); EXT.push({ map: other, e: { id: id + '_r', d: od, a: R(oc - w / 2 + 12), b: R(oc + w / 2 - 12), to: M.m.id, td: d, ta: R(c - w / 2 + 12), tb: R(c + w / 2 - 12), w, col, label: M.m.name } }); }
+extLink(porto, 'n', 900, 110, 'porto_mares', 's', 900, 'som_porto_mares', STONE, 'Porto dos Mares');
+link(porto, 'w', 715, navio, 'e', 415, WOOD, 'som_cais_navio', 120);          // o cais leva ao navio
+link(navio, 'w', 415, costa, 'e', 700, WOOD, 'som_navio_costa', 120);          // o navio leva ao cais da Costa de Ossos
+link(costa, 'w', 700, pantano, 'e', 700, DIRT, 'som_costa_pantano');
+link(pantano, 'w', 700, fortaleza, 'e', 700, STONE, 'som_pantano_fortaleza');
 link(costa, 's', 1000, floresta, 'n', 1000, DIRT, 'som_costa_floresta');
 link(pantano, 's', 1000, cemiterio, 'n', 1000, DIRT, 'som_pantano_cemiterio');
-link(floresta, 'e', 700, cemiterio, 'w', 700, DIRT, 'som_floresta_cemiterio');
+link(floresta, 'w', 700, cemiterio, 'e', 700, DIRT, 'som_floresta_cemiterio');
 link(fortaleza, 's', 1000, cratera, 'n', 1000, STONE, 'som_fortaleza_cratera');
-link(cemiterio, 'e', 700, cratera, 'w', 700, STONE, 'som_cemiterio_cratera');
-
+link(cemiterio, 'w', 700, cratera, 'e', 700, STONE, 'som_cemiterio_cratera');
 const plaza = (M, col, w, h) => { M.reserve(cx - w / 2, cy - h / 2, w, h); M.paint(col, cx - w / 2 + 10, cy - h / 2 + 10, w - 20, h - 20); };
 const sprinkle = (M, kinds, n, rect) => { for (const [k, c] of kinds) M.scatter((x, y) => M.decor(k, x, y), c, rect || [100, 100, 1800, 1200], 2500); };
 const pastelRect = (M, cols) => cols.forEach(([c, x, y, w, h]) => M.paint(c, x, y, w, h));
 const station = (M, type, name, x, y, w, h) => M.add({ type, name, x, y, w, h });
 
-/* --- Porto de Aurora --- */
+/* --- Estaleiro de Porto dos Mares (o mar fica a OESTE; o cais termina na borda oeste, de onde se embarca andando) --- */
 (function () {
     const M = porto;
-    M.paint('#8a8478', 100, 100, 1300, 1200); M.paint('#3498db', 1480, 0, 520, 1400);
-    M.paint(SAND, 1420, 0, 60, 1400);
-    // cais de madeira
-    M.paint(WOOD, 1180, 660, 560, 110); M.paint(WOOD2, 1180, 660, 560, 14); M.paint(WOOD2, 1180, 756, 560, 14);
-    M.reserve(1160, 600, 600, 240);
-    M.decor('boat', 1450, 790); M.decor('boat', 1450, 560); for (let i = 0; i < 4; i++) { M.decor('barrel', 1220 + i * 120, 640); M.decor('lamp', 1260 + i * 110, 780); }
-    M.decor('crates', 1300, 590); M.decor('netrack', 1600, 600);
+    M.paint('#8a8478', 600, 100, 1300, 1200); M.paint('#3498db', 0, 0, 520, 1400); M.paint(SAND, 520, 0, 70, 1400);
+    M.paint(WOOD, 0, 660, 900, 110); M.paint(WOOD2, 0, 660, 900, 14); M.paint(WOOD2, 0, 756, 900, 14);   // cais: da praia até a borda oeste
+    M.reserve(0, 590, 940, 250);
+    M.decor('boat', 150, 800); M.decor('boat', 150, 540); for (let i = 0; i < 3; i++) { M.decor('barrel', 600 + i * 90, 630); M.decor('lamp', 620 + i * 90, 790); }
+    M.decor('crates', 740, 600); M.decor('netrack', 330, 600);
     M.reserve(cx - 160, cy - 120, 320, 240); M.paint(STONE, cx - 150, cy - 110, 300, 220); M.decor('fountain', cx - 24, cy - 40); M.decor('lamp', cx - 120, cy - 100); M.decor('lamp', cx + 100, cy - 100);
-    M.build('tavern', 420, 200); M.build('market', 760, 190); M.build('townhouse', 330, 520); M.build('church', 330, 880); M.build('cottage', 720, 920); M.build('townhouse', 920, 1000); M.build('cottage', 1030, 220);
-    station(M, 'bank', 'Banco', 880, 410, 80, 48);
-    for (const [x, y] of [[1560, 300], [1700, 480], [1600, 980], [1760, 1120]]) M.add({ type: 'fishing_spot', name: 'Ponto de Pesca', x, y, w: 46, h: 46 }, false);
-    M.npc(K.cap, 1390, 640); M.npc(K.estivador, 1330, 680);
-    M.decor('sign', 1130, 600, { name: 'Placa: Embarque para as Terras Sombrias — recomendado vit/def 30+' });
-    M.decor('banner', 380, 130); M.decor('banner', 820, 130); M.decor('statue', 760, 700);
-    // a estrada do portão da Vila chega por cima
-    sprinkle(M, [['flowers', 18], ['bush', 12], ['crates', 5], ['barrel', 7], ['haystack', 3]], 0, [120, 120, 1280, 1160]);
-    M.scatter((x, y) => M.tree(x, y), 22, [120, 120, 1280, 1160]);
+    M.build('tavern', 1250, 200); M.build('market', 1020, 190); M.build('townhouse', 1500, 520); M.build('church', 1500, 880); M.build('cottage', 1150, 920); M.build('townhouse', 1000, 1030); M.build('cottage', 660, 230);
+    station(M, 'bank', 'Banco', 1130, 440, 80, 48);
+    for (const [x, y] of [[120, 300], [260, 470], [140, 980], [300, 1130]]) M.add({ type: 'fishing_spot', name: 'Ponto de Pesca', x, y, w: 46, h: 46 }, false);
+    M.npc(K.cap, 700, 690); M.npc(K.estivador, 780, 700);
+    M.decor('sign', 940, 600, { name: 'Placa: Cais para as Terras Sombrias — recomendado vit/def 30+ (siga o cais para oeste)' });
+    M.decor('banner', 1260, 130); M.decor('banner', 1060, 130); M.decor('statue', 1180, 700);
+    sprinkle(M, [['flowers', 18], ['bush', 12], ['crates', 5], ['barrel', 7], ['haystack', 3]], 0, [620, 120, 1280, 1160]);
+    M.scatter((x, y) => M.tree(x, y), 22, [620, 120, 1280, 1160]);
     M.flush();
-    portal(M, 'Embarcar para as Terras Sombrias', 1620, 685, 'navio_sombrio', 420, 470, 'door');
 })();
 
-/* --- Navio --- */
+/* --- Navio (convés de ponta a ponta: entra pelo leste, sai pelo oeste) --- */
 (function () {
     const M = navio;
-    M.paint('#3498db', 80, 80, 1240, 640);
-    M.paint(WOOD, 360, 280, 700, 260); M.paint(WOOD2, 360, 280, 700, 16); M.paint(WOOD2, 360, 524, 700, 16);
-    for (let i = 0; i < 7; i++) M.add({ type: 'decor', kind: 'pillar', name: 'Pilar', x: 372 + i * 100, y: 250, w: 34, h: 52 }, false);
-    M.reserve(360, 280, 700, 260);
-    M.decor('barrel', 560, 330); M.decor('barrel', 600, 340); M.decor('crates', 800, 320); M.decor('netrack', 740, 480); M.decor('lamp', 460, 300); M.decor('lamp', 960, 300); M.decor('banner', 640, 270);
-    M.npc(K.rook, 700, 410); M.npc(K.tomas, 840, 420);
-    M.decor('sign', 400, 520, { name: 'Placa: Dica — leve poções e equipamento de nível alto' });
-    for (let i = 0; i < 6; i++) M.decor('lily', 120 + i * 200, 120 + (i % 2) * 560, { name: 'Espuma' });
+    M.paint('#3498db', 0, 0, 900, 800);
+    M.paint(WOOD, 0, 270, 900, 290); M.paint(WOOD2, 0, 270, 900, 14); M.paint(WOOD2, 0, 546, 900, 14);
+    for (let i = 0; i < 9; i++) { M.add({ type: 'decor', kind: 'fence_h', name: 'Amurada', x: i * 100, y: 236, w: R(DEC.fence_h[1] * SCALE_DECOR), h: R(DEC.fence_h[2] * SCALE_DECOR) }); M.add({ type: 'decor', kind: 'fence_h', name: 'Amurada', x: i * 100, y: 556, w: R(DEC.fence_h[1] * SCALE_DECOR), h: R(DEC.fence_h[2] * SCALE_DECOR) }); }   // amurada: não dá para sair do convés
+    M.reserve(0, 270, 900, 290);
+    M.decor('barrel', 330, 285); M.decor('barrel', 370, 292); M.decor('crates', 520, 285); M.decor('netrack', 640, 495); M.decor('lamp', 250, 290); M.decor('banner', 450, 262);
+    M.npc(K.rook, 440, 290); M.npc(K.tomas, 560, 500);
+    M.decor('sign', 150, 505, { name: 'Placa: Dica — leve poções e equipamento de nível alto' });
     M.flush();
-    portal(M, 'Voltar ao Porto de Aurora', 380, 400, 'porto_aurora', 1540, 725, 'door');
-    portal(M, 'Desembarcar na Costa de Ossos', 960, 400, 'costa_ossos', 460, 735, 'door');
 })();
 
-/* --- Costa de Ossos --- */
+/* --- Costa de Ossos (o mar fica a LESTE; o cais termina na borda leste) --- */
 (function () {
     const M = costa; border(M, rocksB(M));
-    M.paint('#3498db', 40, 40, 300, 1320); M.paint(SAND, 330, 40, 40, 1320);
-    M.paint(WOOD, 280, 650, 330, 100); M.paint(WOOD2, 280, 650, 330, 12); M.paint(WOOD2, 280, 738, 330, 12); M.reserve(250, 600, 400, 220);
-    for (const [x, y] of [[150, 300], [200, 520], [160, 1000]]) M.add({ type: 'fishing_spot', name: 'Ponto de Pesca', x, y, w: 46, h: 46 }, false);
-    M.decor('boat', 130, 780); M.decor('lamp', 330, 640); M.decor('lamp', 330, 760); M.decor('crates', 540, 700); M.decor('barrel', 580, 700);
-    pastelRect(M, [['#6a665a', 420, 200, 500, 360], ['#4a483e', 1100, 160, 700, 380], ['#6a665a', 400, 860, 800, 400], ['#4a483e', 1300, 820, 560, 400]]);
-    plaza(M, '#6a6a60', 420, 260); M.build('tent', 880, 560); M.build('tent', 1130, 560); M.decor('campfire', cx - 14, cy - 10); M.decor('crates', cx + 130, cy + 40);
-    M.npc(K.elara, cx - 90, cy - 80); M.npc(K.bran, cx + 90, cy - 80); station(M, 'furnace', 'Fornalha', cx - 210, cy - 140, 48, 72); station(M, 'anvil', 'Bigorna', cx - 210, cy - 40, 46, 39);
-    M.decor('sign', 600, 600, { name: 'Placa: Costa de Ossos — acampamento seguro' });
-    sprinkle(M, [['bones', 44], ['boulder', 26], ['deadtree', 22], ['mushrooms', 10], ['gravestone', 8]]);
-    M.scatter((x, y) => M.rock(pick(['rock_iron', 'rock_coal', 'rock_mithril']), x, y), 10, [400, 150, 1500, 1100]);
-    for (let i = 0; i < 4; i++) M.pack(K.nauf, 3, 700 + ri(0, 1100), 250 + ri(0, 900), 100);
-    for (let i = 0; i < 3; i++) M.pack(K.lodoM, 3, 650 + ri(0, 1100), 250 + ri(0, 900), 90);
-    M.pack('ghost_base', 2, 1500, 400, 110);
-    portal(M, 'Embarcar de volta ao Porto de Aurora', 340, 665, 'navio_sombrio', 900, 470, 'door');
-    M.boss(K.vorgan, 1560, 1050);
+    M.paint('#3498db', 1660, 40, 300, 1320); M.paint(SAND, 1620, 40, 50, 1320);
+    M.paint(WOOD, 1380, 650, 620, 100); M.paint(WOOD2, 1380, 650, 620, 12); M.paint(WOOD2, 1380, 738, 620, 12); M.reserve(1340, 600, 660, 220);
+    for (const [x, y] of [[1780, 300], [1740, 520], [1790, 1000]]) M.add({ type: 'fishing_spot', name: 'Ponto de Pesca', x, y, w: 46, h: 46 }, false);
+    M.decor('boat', 1830, 790); M.decor('lamp', 1600, 640); M.decor('lamp', 1600, 760); M.decor('crates', 1440, 610); M.decor('barrel', 1490, 610);
+    pastelRect(M, [['#6a665a', 420, 200, 500, 360], ['#4a483e', 1100, 160, 500, 360], ['#6a665a', 400, 860, 800, 400], ['#4a483e', 1300, 820, 300, 400]]);
+    plaza(M, '#6a6a60', 420, 260); M.build('tent', 880, 480); M.build('tent', 1130, 480); M.decor('campfire', cx - 14, cy - 10); M.decor('crates', cx + 130, cy + 60);
+    M.npc(K.elara, cx - 90, cy - 150); M.npc(K.bran, cx + 90, cy - 150); station(M, 'furnace', 'Fornalha', cx - 210, cy - 250, 48, 72); station(M, 'anvil', 'Bigorna', cx - 150, cy - 250, 46, 39);
+    M.decor('sign', 1330, 590, { name: 'Placa: Costa de Ossos — acampamento seguro; o navio parte do cais a leste' });
+    sprinkle(M, [['bones', 44], ['boulder', 26], ['deadtree', 22], ['mushrooms', 10], ['gravestone', 8]], 0, [100, 100, 1500, 1200]);
+    M.scatter((x, y) => M.rock(pick(['rock_iron', 'rock_coal', 'rock_mithril']), x, y), 10, [200, 150, 1300, 1100]);
+    for (let i = 0; i < 4; i++) M.pack(K.nauf, 3, 300 + ri(0, 1100), 250 + ri(0, 900), 100);
+    for (let i = 0; i < 3; i++) M.pack(K.lodoM, 3, 250 + ri(0, 1100), 250 + ri(0, 900), 90);
+    M.pack('ghost_base', 2, 500, 400, 110);
+    M.boss(K.vorgan, 400, 1100);
     M.flush();
 })();
 

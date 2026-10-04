@@ -375,5 +375,5 @@
     }
     function wire() { const om = window.openModal; if (typeof om === 'function') window.openModal = function () { const b = $('custom-modal-box'); if (b) { b.style.width = ''; b.style.maxWidth = ''; b.style.boxSizing = ''; b.style.padding = ''; } return om.apply(this, arguments); }; mkBtn(); setInterval(() => { try { tick(); background(); } catch (e) { } }, 1000); }
     window.addEventListener('load', wire);
-    window.Hub = { open: openHub, refresh, tick, claimMail, loadMarket };
+    window.Hub = { WM_POS, open: openHub, refresh, tick, claimMail, loadMarket };
 })();

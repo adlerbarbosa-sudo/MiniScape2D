@@ -1,0 +1,14 @@
+[
+ {
+  "id": "solaris",
+  "file": "reinos-de-solaris.json",
+  "stampMap": "colinas_ventosas",
+  "ver": "767900c3"
+ },
+ {
+  "id": "sombrias",
+  "file": "terras-sombrias.json",
+  "stampMap": "costa_ossos",
+  "ver": "4256ec1f"
+ }
+]

@@ -96,6 +96,7 @@
         const rect = hz ? [e.d === 'w' ? 0 : W - D, c - w / 2 - 20, D, w + 40] : [c - w / 2 - 20, e.d === 'n' ? 0 : H - D, w + 40, D];
         const ov = (o) => { const r = o.type === 'tree' ? [o.x - 12, o.y - 30, 100, 126] : [o.x, o.y, o.w || 30, o.h || 30]; return r[0] < rect[0] + rect[2] && r[0] + r[2] > rect[0] && r[1] < rect[1] + rect[3] && r[1] + r[3] > rect[1]; };
         m.entities = (m.entities || []).filter((o) => !(o && (o.type === 'tree' || o.type === 'decor' || o.type === 'ground_item' || o.type === 'enemy' || (typeof o.type === 'string' && o.type.indexOf('rock') === 0)) && ov(o)));
+        if (e.label) { const off = w / 2 + 34; m.entities.push(tag({ id: 'pk_sign_' + e.id, type: 'decor', kind: 'sign', name: 'Placa: → ' + e.label, x: Math.round(hz ? (e.d === 'w' ? 150 : W - 190) : c + off), y: Math.round(hz ? c + off : (e.d === 'n' ? 130 : H - 170)), w: 39, h: 52, active: true }, pk)); }
         m.entities.push(tag({ id: 'pk_road_' + e.id, type: 'paint', name: 'Chão', color: e.col || '#5c4033', x: Math.round(hz ? rect[0] : c - w / 2), y: Math.round(hz ? c - w / 2 : rect[1]), w: Math.round(hz ? D : w), h: Math.round(hz ? w : D), active: true }, pk));
     }
     /* aplica no estado do jogo (itemDB, npcDB, gameMaps) e devolve o instantâneo para desfazer */

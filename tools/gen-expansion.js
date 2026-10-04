@@ -129,7 +129,9 @@ function openSide(M, d, c, w, col, to, td, tc, tw, linkId) {
     else { const y0 = d === 'n' ? 0 : cy, y1 = d === 'n' ? cy : H, b0 = d === 'n' ? 0 : cy + 260, b1 = d === 'n' ? cy - 260 : H; M.block(c - w / 2 - 20, b0, w + 40, b1 - b0); M.paint(col, c - w / 2, y0, w, y1 - y0); M.paint(col, Math.min(c, cx) - w / 2, cy - w / 2, Math.abs(c - cx) + w, w); }
     M.m.edges.push({ id: linkId, d, a: R(c - w / 2 + 12), b: R(c + w / 2 - 12), to, td, ta: R(tc - tw / 2 + 12), tb: R(tc + tw / 2 - 12) });
 }
-function link(A, ad, ac, B, bd, bc, col, id, w) { w = w || 120; openSide(A, ad, ac, w, col, B.m.id, bd, bc, w, id); openSide(B, bd, bc, w, col, A.m.id, ad, ac, w, id + '_r'); }
+/* placa ao lado da abertura (dentro do mapa), dizendo para onde a estrada leva */
+function signAt(M, d, c, w, label) { if (!label) return; const hz = d === 'e' || d === 'w', W = M.m.width, H = M.m.height, off = w / 2 + 34; const x = hz ? (d === 'w' ? 150 : W - 190) : c + off, y = hz ? c + off : (d === 'n' ? 130 : H - 170); M.decor('sign', x, y, { name: 'Placa: → ' + label }); }
+function link(A, ad, ac, B, bd, bc, col, id, w) { w = w || 120; openSide(A, ad, ac, w, col, B.m.id, bd, bc, w, id); openSide(B, bd, bc, w, col, A.m.id, ad, ac, w, id + '_r'); if (col !== '#7a5a3a') { signAt(A, ad, ac, w, B.m.name); signAt(B, bd, bc, w, A.m.name); } }
 /* moldura de árvores/arbustos ao redor do mapa, deixando as aberturas livres */
 function border(M, treeFn, opts) {
     const W = M.m.width, H = M.m.height, step = 64;
@@ -157,8 +159,8 @@ const caverna = makeMap('caverna_cristais', 'Caverna dos Cristais', 1600, 1200, 
 
 /* ligação com o mundo: a estrada leste da Mina de Pedra (borda leste, c=700, como a oeste da Vila) leva às Colinas Ventosas */
 const EXT = [];
-function extLink(M, d, c, w, other, od, oc, id, col) { openSide(M, d, c, w, col, other, od, oc, w, id); EXT.push({ map: other, e: { id: id + '_r', d: od, a: R(oc - w / 2 + 12), b: R(oc + w / 2 - 12), to: M.m.id, td: d, ta: R(c - w / 2 + 12), tb: R(c + w / 2 - 12), w, col } }); }
-extLink(colinas, 'w', 700, 120, 'mina', 'e', 700, 'sol_mina_colinas', DIRT);
+function extLink(M, d, c, w, other, od, oc, id, col, label) { openSide(M, d, c, w, col, other, od, oc, w, id); signAt(M, d, c, w, label); EXT.push({ map: other, e: { id: id + '_r', d: od, a: R(oc - w / 2 + 12), b: R(oc + w / 2 - 12), to: M.m.id, td: d, ta: R(c - w / 2 + 12), tb: R(c + w / 2 - 12), w, col, label: M.m.name } }); }
+extLink(colinas, 'w', 700, 120, 'mina', 'e', 700, 'sol_mina_colinas', DIRT, 'Mina de Pedra');
 /* ligações (grade 3x2 + a caverna acima da montanha, por portal) */
 link(colinas, 'e', 700, cogumelos, 'w', 700, DIRT, 'sol_colinas_cogumelos');
 link(cogumelos, 'e', 700, montanha, 'w', 700, DIRT, 'sol_cogumelos_montanha');
