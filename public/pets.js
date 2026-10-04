@@ -499,8 +499,7 @@
         const dx = px - st.lx, dy = py - st.ly, sp = hyp(dx, dy); let moving = false;
         if (sp > 60 || st.view === null) { st.ph = st.ph; } else { moving = sp > 0.08; st.mv += ((moving ? 1 : 0) - st.mv) * 0.2; st.ph += sp * 0.062; }
         st.lx = px; st.ly = py; if (moving || anim > 0) st.still = now;
-        let wv = facing.y < 0 ? 'back' : facing.y > 0 ? 'front' : 'side'; const wf = facing.x < 0 ? -1 : 1;
-        if (!moving && anim <= 0 && now - st.still > 2.8) wv = 'front';
+        const wv = facing.y < 0 ? 'back' : facing.y > 0 ? 'front' : 'side', wf = facing.x < 0 ? -1 : facing.x > 0 ? 1 : st.face;   // igual ao Art.drawPlayer: parado continua voltado para onde andou (cavalo e cavaleiro iguais)
         if (!st.view) st.view = wv; else if (wv !== st.view) { if (++st.vc >= 4) { st.view = wv; st.vc = 0; } } else st.vc = 0;
         if (wf !== st.face && st.view === 'side') { if (++st.fc >= 3) { st.face = wf; st.fc = 0; } } else if (st.view !== 'side') { st.face = wf; st.fc = 0; } else st.fc = 0;
         return moving;
@@ -630,7 +629,7 @@
 #pets-win .pw-pcts{display:flex;flex-wrap:wrap;gap:4px} #pets-win .pw-pcts .pw-b{min-height:30px;padding:2px 9px} #pets-win .pw-split{display:flex;height:10px;border-radius:5px;overflow:hidden;background:#120c07;border:1px solid #000;margin:6px 0 4px} #pets-win .pw-split i{display:block;height:100%} #pets-win .pw-split .a{background:#6fe08a} #pets-win .pw-split .m{background:#c58bff} #pets-win .pw-split .b{background:#ffb347} #pets-win .pw-box{padding:8px;border-radius:8px;background:rgba(0,0,0,.22);border:1px solid rgba(255,226,122,.18)} #pets-win .pw-mix{font-size:.78rem}
 #pets-win .pw-b.go{color:#2b1a05;background:linear-gradient(#f0cf7c,#b98a2e)} #pets-win .pw-b.bad{color:#ffb2a4;background:linear-gradient(#4a1f1a,#2a100d)}
 #pets-win .pw-x{width:34px;height:34px;flex:none;border-radius:50%;border:1px solid #000;cursor:pointer;font-size:1.25rem;line-height:1;color:#ffb2a4;background:linear-gradient(#4a1f1a,#2a100d)}
-#pets-win .pw-body{overflow-y:auto;overscroll-behavior:contain;display:flex;flex-direction:column;gap:8px;min-height:0;padding-right:2px}
+#pets-win .pw-body{overflow-y:auto;overflow-anchor:none;overscroll-behavior:contain;display:flex;flex-direction:column;gap:8px;min-height:0;padding-right:2px}
 #pets-win .pw-card{display:flex;gap:10px;align-items:center;padding:8px;border-radius:10px;background:rgba(0,0,0,.3);border:1px solid rgba(232,196,105,.25)}
 #pets-win .pw-card canvas,#pets-win .pw-card img{width:64px;height:64px;flex:none;border-radius:10px;background:radial-gradient(circle,rgba(255,255,255,.12),rgba(0,0,0,.25))}
 #pets-win .pw-ct{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}

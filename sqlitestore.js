@@ -38,7 +38,7 @@ function open(file) {
                 st.upU.run(name, u.password, u.role, u.playerData ? JSON.stringify(u.playerData) : null); cache.users.set(name, { pw: u.password, role: u.role, ref: u.playerData });
             }
             for (const name of [...cache.users.keys()]) if (!seen.has(name)) { st.delU.run(name); cache.users.delete(name); }
-            const kv = { worldData: db.worldData, itemDB: db.itemDB, npcDB: db.npcDB, chat: db.chat, chatVer: db.chatVer, mapVersion: db.mapVersion, trades: db.trades, market: db.market, mobDeaths: db.mobDeaths, specialQuests: db.specialQuests, specialClaims: db.specialClaims, specialProg: db.specialProg };
+            const kv = { worldData: db.worldData, itemDB: db.itemDB, npcDB: db.npcDB, chat: db.chat, chatVer: db.chatVer, mapVersion: db.mapVersion, trades: db.trades, market: db.market, mobDeaths: db.mobDeaths, specialQuests: db.specialQuests, specialClaims: db.specialClaims, specialProg: db.specialProg, engage: db.engage };
             for (const k of Object.keys(kv)) {
                 const big = k === 'worldData' || k === 'itemDB' || k === 'npcDB';
                 if (big && cache.kv.get(k) === kv[k]) continue;   // objetos grandes: compara por referência

@@ -4,7 +4,11 @@
    - NÓS (skillnodes.js): passivas (1 ponto por rank, até 5 ranks) somam atributos via Stats.addSource('skilltree') e bônus próprios (dano %, vida/mana máx., regenerações, recarga);
      ativas (2 pontos por rank, até 3 ranks) vão para a barra de habilidades (teclas Q, E, F, G; no celular, botões ao lado) e têm recarga, custo e efeitos próprios.
    - ESTADO (playerData.skillTree): { pts:{warrior:{id:rank},archer:{},mage:{}}, bar:[4 ids|null], hint, rs:{resets por árvore}, cd:{id: fim da recarga em ms}, ap:{hp,mp embutidos no maxHp/maxMp} }.
-   - Custos de recurso: Guerreiro nenhum (só recarga); Arqueiro gasta flechas (e respeita "poupar munição"); Mago gasta mana (regenera sozinha, mais com passivas). Exigem arma: corpo a corpo / arco+flechas / cajado.
+   - Custos de recurso: TODAS as ativas gastam MANA (8 a 55 de mana, escala da mana v2 = 50 + 5 por nível de Magia + bônus). O Arqueiro gasta mana E flechas (respeita "poupar munição"); Guerreiro e Arqueiro recuperam +1,5 de mana/s extra (o Mago já tem mais mana).
+     Exigem arma: corpo a corpo / arco+flechas / cajado. Sem mana a habilidade não sai ("Sem mana!").
+   - RECARGA: básicas 4-10 s, médias 10-25 s, supremas 30-60 s (antes da redução). Atributo Stats.cdr (%; teto 40%, recarga mínima 1,5 s) soma passivas da árvore (Disciplina, Foco, Maestria...) e itens (campo `cdr`).
+   - CAPSTONES (camada 6, 3 pontos, alternáveis ON/OFF, tecla X ou botão na barra; ligado/desligado fica em skillTree.tg): Aljava Mágica (arco sem flechas, gasta 2-6 de mana por disparo), Fonte Arcana (magias sem runas, gasta mais mana),
+     Vigor Inabalável (golpes cercam de vigor: cada golpe corpo a corpo cura 1,5% da vida e custa 3 de mana). Ganchos em tryInteract (sem editar o código do jogo).
    - Dano das ativas = dano-base da perícia (o mesmo "d" dos golpes comuns) x multiplicador do rank x (1 + dano% + dano de habilidades%). Passa por applyDamage (crítico, roubo de vida, XP, loot, relatório ao servidor).
      Limitador de relatórios: no máx. ~9 golpes/s (rajada 8) e ~1100 de dano/s vindos de habilidades, para ficar longe dos tetos de security.js (20 relatórios/s, 3000 de dano/s, 900 por golpe).
    - Efeitos visuais, partículas e projéteis são LOCAIS (outros jogadores só veem a animação de ataque); lentidão/atordoamento valem para quem simula os monstros do mapa (o host) e para o ataque do monstro em si.
@@ -51,7 +55,7 @@
     const totalFree = () => SN.TREE_IDS.reduce((a, t) => a + points(t).free, 0);
     const rankOf = (id) => { const n = NODES[id], st = player && player.skillTree; return n && st ? SN.rankOf(st.pts[n.tree], id) : 0; };
     const learnedActives = () => SN.ACTIVE_IDS.filter((id) => rankOf(id) > 0);
-    const STAT_KEYS = ['crit', 'critDmg', 'atkSpd', 'dr', 'lifesteal', 'luck', 'moveSpd', 'save', 'spellDmg'];
+    const STAT_KEYS = ['crit', 'critDmg', 'atkSpd', 'dr', 'lifesteal', 'luck', 'moveSpd', 'save', 'spellDmg', 'cdr'];
     function recompute() {   // soma as passivas e ajusta vida/mana máx. (embutidas no maxHp/maxMp; o servidor soma o mesmo limite)
         const st = player.skillTree, b = SN.bonusAll(st); S.bonus = b; S.pass = {}; STAT_KEYS.forEach((k) => { if (b[k] > 0) S.pass[k] = b[k]; });
         const bt = b.byTree; S.dmgPct = { combat: bt.warrior.dmg || 0, ranged: bt.archer.dmg || 0, magic: bt.mage.dmg || 0 }; S.skd = { combat: bt.warrior.skd || 0, ranged: bt.archer.skd || 0, magic: bt.mage.skd || 0 };
@@ -81,7 +85,7 @@
         const L = lv(skill), w = wpn() || {}, b = (window.Content && Content.buff) ? Content.buff('dmg') : 0;
         let rt;
         if (skill === 'combat') rt = (w.bonusDmg || 0) + b;
-        else if (skill === 'ranged') { const am = player.equipment.ammo; rt = (w.bonusDmg || 0) + ((am && am.bonusDmg) || 0) + b; }
+        else if (skill === 'ranged') { const am = player.equipment.ammo; rt = (w.bonusDmg || 0) + (am ? (am.bonusDmg || 0) : (capOn('a_aljava_cap') && w.tool === 'ranged' ? quiverBonus(w) : 0)) + b; }
         else { let sp = null; try { sp = spellbookDB.find((s) => s.id === player.activeSpell); } catch (e) { } rt = (sp ? sp.dmg : 3) + (w.bonusDmg || 0) + (window.Stats ? Stats.spellDmg() : 0); }
         return Balance.dmgBase(L, rt);
     }
@@ -153,7 +157,9 @@
         am.qty -= used; if (am.qty <= 0) player.equipment.ammo = null; try { updateUI(); } catch (e) { } return true;
     }
     const cdMs = (id) => { const st = player.skillTree; return st && st.cd && st.cd[id] ? st.cd[id] - Date.now() : 0; };
-    function setCd(id, sec) { const st = player.skillTree; if (!st.cd) st.cd = {}; st.cd[id] = Date.now() + Math.round(sec * 1000 * (1 - S.cdr / 100)); try { saveDataLogic(); } catch (e) { } }
+    const cdrNow = () => (window.Stats && Stats.cdrPct ? Stats.cdrPct() : S.cdr);   // redução de recarga total (árvore + itens + conjuntos), teto 40%
+    const cdTime = (sec) => (window.Stats && Stats.cdTime ? Stats.cdTime(sec) : Math.min(sec, Math.max(1.5, Math.round(sec * (1 - S.cdr / 100) * 10) / 10)));   // recarga em s, mínimo 1,5 s
+    function setCd(id, sec) { const st = player.skillTree; if (!st.cd) st.cd = {}; st.cd[id] = Date.now() + Math.round(cdTime(sec) * 1000); try { saveDataLogic(); } catch (e) { } }
 
     /* ============================ EFEITOS VISUAIS (locais) ============================ */
     const glows = Object.create(null);
@@ -280,7 +286,7 @@
     const facingVec = () => { const fx = player.facing || { x: 0, y: 1 }; const d = Math.hypot(fx.x, fx.y) || 1; return [fx.x / d, fx.y / d]; };
 
     /* ----- Guerreiro ----- */
-    def('w_golpe', { sk: 'combat', need: 'melee', col: '#ffb04a', cd: [8, 7, 6], mult: [2.2, 2.7, 3.2], range: 85, st: [30, 40, 50],
+    def('w_golpe', { sk: 'combat', need: 'melee', col: '#ffb04a', mp: [8, 9, 10], cd: [7, 6, 5], mult: [2.2, 2.7, 3.2], range: 85, st: [30, 40, 50],
         info: (r) => ['Alcance: ' + ACT.w_golpe.range + ' px (inimigo à frente)', 'Atordoa por ' + fnum(at(ACT.w_golpe.st, r) / FR) + ' s'],
         run(r) {
             const t = pickTarget(ACT.w_golpe.range, true); if (!t) return S.blocked ? 'Sem linha de visão: contorne a parede.' : 'Nenhum inimigo ao alcance do golpe.';
@@ -288,7 +294,7 @@
             slashFx(player.x + Math.cos(ang) * 14, player.y - 12 + Math.sin(ang) * 8, ang, 38, '#ffb04a', 14); flash(ex(t), ey(t), 40, '#ffb04a', 12); burst(ex(t), ey(t), '#ffd27a', 12, 1.8);
             hit(t, sdmg('combat', at(ACT.w_golpe.mult, r)), 'combat', '', 4); stun(t, at(ACT.w_golpe.st, r)); sfx('hit'); return true;
         } });
-    def('w_grito', { sk: 'combat', need: 'melee', col: '#ffd24a', cd: [32, 30, 28], dur: [12, 15, 18], dmgp: [15, 20, 25], drp: [8, 10, 12],
+    def('w_grito', { sk: 'combat', need: 'melee', col: '#ffd24a', mp: [15, 16, 18], cd: [24, 22, 20], dur: [12, 15, 18], dmgp: [15, 20, 25], drp: [8, 10, 12],
         info: (r) => ['Duração: ' + at(ACT.w_grito.dur, r) + ' s', '+' + at(ACT.w_grito.dmgp, r) + '% de dano e +' + at(ACT.w_grito.drp, r) + '% de redução de dano', 'Intimida inimigos próximos (atrasa o ataque deles)'],
         run(r) {
             addBuff('grito', at(ACT.w_grito.dur, r), { st: { dr: at(ACT.w_grito.drp, r) }, dmg: at(ACT.w_grito.dmgp, r), name: 'Grito de Guerra', col: '#ffd24a', ic: 'shout' });
@@ -296,7 +302,7 @@
             const l = aoe(player.x, player.y, 140, 8, true); for (let i = 0; i < l.length; i++) { l[i].attackCooldown = Math.max(l[i].attackCooldown || 0, 55); }
             callout('GRITO DE GUERRA!', '#ffd24a'); sfx('quest'); return true;
         } });
-    def('w_investida', { sk: 'combat', need: 'melee', col: '#ff9a4a', cd: [14, 12, 10], mult: [1.4, 1.7, 2.0], len: [160, 190, 220], st: 30,
+    def('w_investida', { sk: 'combat', need: 'melee', col: '#ff9a4a', mp: [12, 13, 14], cd: [12, 10, 9], mult: [1.4, 1.7, 2.0], len: [160, 190, 220], st: 30,
         info: (r) => ['Distância: ' + at(ACT.w_investida.len, r) + ' px', 'Atinge até 4 inimigos no caminho e os atordoa', 'Para ao bater numa parede'],
         run(r) {
             let v = null; const k = (typeof keys !== 'undefined') ? keys : {}; let dx = (k.d || k.arrowright ? 1 : 0) - (k.a || k.arrowleft ? 1 : 0), dy = (k.s || k.arrowdown ? 1 : 0) - (k.w || k.arrowup ? 1 : 0);
@@ -308,16 +314,16 @@
             });
             ring(x0, y0 + 4, 6, 40, '#ffd27a', 14, 3); callout('Investida!', '#ffb04a'); sfx('miss'); return true;
         } });
-    def('w_furor', { sk: 'combat', need: 'melee', col: '#ff5a2a', cd: [45, 40, 35], dur: [10, 12, 14], asp: [30, 35, 40], ls: [6, 8, 10],
+    def('w_furor', { sk: 'combat', need: 'melee', col: '#ff5a2a', mp: [25, 28, 30], cd: [40, 36, 32], dur: [10, 12, 14], asp: [30, 35, 40], ls: [6, 8, 10],
         info: (r) => ['Duração: ' + at(ACT.w_furor.dur, r) + ' s', '+' + at(ACT.w_furor.asp, r) + '% de velocidade de ataque e +' + at(ACT.w_furor.ls, r) + '% de roubo de vida', '(os limites de atributos do jogo continuam valendo)'],
         run(r) {
             addBuff('furor', at(ACT.w_furor.dur, r), { st: { atkSpd: at(ACT.w_furor.asp, r), lifesteal: at(ACT.w_furor.ls, r) }, name: 'Furor', col: '#ff5a2a', ic: 'rage2' });
             ring(player.x, player.y + 4, 6, 90, '#ff5a2a', 22, 5); flash(player.x, player.y - 14, 56, '#ff6a2a', 18); burst(player.x, player.y - 14, '#ff8a3a', 20, 2); callout('FUROR!', '#ff7a3a'); sfx('kill'); return true;
         } });
-    def('w_muralha', { sk: 'combat', need: 'melee', col: '#8ad0ff', cd: [50, 45, 40], pct: [35, 50, 65], dur: 10,
+    def('w_muralha', { sk: 'combat', need: 'melee', col: '#8ad0ff', mp: [30, 34, 38], cd: [40, 36, 32], pct: [35, 50, 65], dur: 10,
         info: (r) => ['Barreira de ' + at(ACT.w_muralha.pct, r) + '% da vida máxima (+100)', 'Absorve dano por até ' + ACT.w_muralha.dur + ' s'],
         run(r) { setBarrier(player.stats.maxHp * at(ACT.w_muralha.pct, r) / 100 + 100, ACT.w_muralha.dur, '#8ad0ff'); ring(player.x, player.y + 4, 10, 60, '#8ad0ff', 22, 5); flash(player.x, player.y - 16, 52, '#8ad0ff', 18); callout('MURALHA!', '#8ad0ff'); sfx('accept'); return true; } });
-    def('w_terremoto', { sk: 'combat', need: 'melee', col: '#c89a5a', cd: [28, 25, 22], mult: [1.8, 2.2, 2.6], rad: [120, 135, 150], st: [50, 60, 70],
+    def('w_terremoto', { sk: 'combat', need: 'melee', col: '#c89a5a', mp: [40, 45, 50], cd: [34, 31, 28], mult: [1.8, 2.2, 2.6], rad: [120, 135, 150], st: [50, 60, 70],
         info: (r) => ['Raio: ' + at(ACT.w_terremoto.rad, r) + ' px · até 8 inimigos', 'Atordoa por ' + fnum(at(ACT.w_terremoto.st, r) / FR) + ' s'],
         run(r) {
             const R = at(ACT.w_terremoto.rad, r), l = aoe(player.x, player.y, R, 8, true); if (!l.length) return 'Nenhum inimigo ao alcance do Terremoto.'; const m = at(ACT.w_terremoto.mult, r), s = at(ACT.w_terremoto.st, r);
@@ -327,14 +333,14 @@
 
     /* ----- Arqueiro ----- */
     const arrowOrb = (col) => ({ kind: 'arrow', col, r: 5, sp: 13, walls: true });
-    def('a_tiro', { sk: 'ranged', need: 'bow', col: '#ff6a4a', cd: [9, 8, 7], mult: [3, 3.6, 4.2], range: 300, cost: { ammo: 1 },
+    def('a_tiro', { sk: 'ranged', need: 'bow', col: '#ff6a4a', mp: [10, 11, 12], cd: [7, 6.5, 6], mult: [3, 3.6, 4.2], range: 300, cost: { ammo: 1 },
         info: () => ['Alcance: ' + ACT.a_tiro.range + ' px', 'Crítico garantido', 'Gasta 1 flecha'],
         run(r) {
             const t = pickTarget(ACT.a_tiro.range, true); if (!t) return S.blocked ? 'Sem linha de visão: contorne a parede.' : 'Nenhum alvo ao alcance.';
             face(ex(t), ey(t)); const dm = sdmg('ranged', at(ACT.a_tiro.mult, r)); const p = shoot(Object.assign(arrowOrb('#ff6a4a'), { tgt: t, sp: 15, r: 6, dmg: dm, sk: 'ranged', maxDist: 700 }));
             p.onHit = (pp, tt) => { hit(tt, pp.dmg, 'ranged', 'crit', 0); flash(ex(tt), ey(tt), 44, '#ff6a4a', 12); burst(ex(tt), ey(tt), '#ffd27a', 14, 2); }; flash(player.x, player.y - 14, 26, '#ff9a6a', 8); callout('Tiro Preciso!', '#ff8a6a'); sfx('miss'); return true;
         } });
-    def('a_multi', { sk: 'ranged', need: 'bow', col: '#7fd8ff', cd: [10, 9, 8], mult: [1, 1.1, 1.2], n: [3, 4, 5], range: 280, cost: { ammo: 2 },
+    def('a_multi', { sk: 'ranged', need: 'bow', col: '#7fd8ff', mp: [14, 16, 18], cd: [8, 7, 6], mult: [1, 1.1, 1.2], n: [3, 4, 5], range: 280, cost: { ammo: 2 },
         info: (r) => ['Dispara ' + at(ACT.a_multi.n, r) + ' flechas em leque', 'Gasta 2 flechas'],
         run(r) {
             const t = pickTarget(ACT.a_multi.range, true); if (!t) return S.blocked ? 'Sem linha de visão: contorne a parede.' : 'Nenhum alvo ao alcance.';
@@ -342,21 +348,21 @@
             for (let i = 0; i < n; i++) { const a = a0 + (i - (n - 1) / 2) * (spread * 2 / Math.max(1, n - 1)); const p = shoot(Object.assign(arrowOrb('#7fd8ff'), { vx: Math.cos(a) * 12, vy: Math.sin(a) * 12, dmg: sdmg('ranged', m), sk: 'ranged', maxDist: 330, life: 40 })); p.onHit = (pp, tt) => { hit(tt, pp.dmg, 'ranged', '', i); flash(ex(tt), ey(tt), 30, '#7fd8ff', 9); burst(ex(tt), ey(tt), '#bfeaff', 6, 1.3); }; }
             flash(player.x, player.y - 14, 26, '#7fd8ff', 8); callout('Disparo Múltiplo!', '#7fd8ff'); sfx('miss'); return true;
         } });
-    def('a_passo', { sk: 'ranged', need: 'bow', col: '#c8a0ff', cd: [16, 14, 12], len: [150, 170, 190], inv: [1, 1.3, 1.6], spd: [3, 4, 5],
+    def('a_passo', { sk: 'ranged', need: 'bow', col: '#c8a0ff', mp: [10, 11, 12], cd: [12, 11, 10], len: [150, 170, 190], inv: [1, 1.3, 1.6], spd: [3, 4, 5],
         info: (r) => ['Salta ' + at(ACT.a_passo.len, r) + ' px para longe do perigo', 'Intocável por ' + fnum(at(ACT.a_passo.inv, r)) + ' s · +30% de velocidade por ' + at(ACT.a_passo.spd, r) + ' s'],
         run(r) {
             let v; const t = pickTarget(340, false); if (t) { const d = dirToward(t); v = [-d[0], -d[1]]; } else { const f = facingVec(); v = [-f[0], -f[1]]; }
             S.invuln = S.frame + Math.round(at(ACT.a_passo.inv, r) * FR); addBuff('passo', at(ACT.a_passo.spd, r), { st: { moveSpd: 30 }, name: 'Passo Sombrio', col: '#c8a0ff', ic: 'shadow' });
             startDash(v[0], v[1], at(ACT.a_passo.len, r), 15, '#c8a0ff'); ring(player.x, player.y + 4, 4, 50, '#c8a0ff', 18, 4); flash(player.x, player.y - 14, 40, '#9a6aff', 14); callout('Passo Sombrio', '#c8a0ff'); sfx('portal'); return true;
         } });
-    def('a_marca', { sk: 'ranged', need: 'bow', col: '#ff4a4a', cd: [20, 18, 16], dur: [10, 13, 16], pct: [20, 25, 30], range: 320,
+    def('a_marca', { sk: 'ranged', need: 'bow', col: '#ff4a4a', mp: [15, 17, 19], cd: [16, 14, 12], dur: [10, 13, 16], pct: [20, 25, 30], range: 320,
         info: (r) => ['Alcance: ' + ACT.a_marca.range + ' px', 'O alvo sofre +' + at(ACT.a_marca.pct, r) + '% de dano seu por ' + at(ACT.a_marca.dur, r) + ' s'],
         run(r) {
             const t = pickTarget(ACT.a_marca.range, true); if (!t) return S.blocked ? 'Sem linha de visão: contorne a parede.' : 'Nenhum alvo ao alcance.';
             face(ex(t), ey(t)); t._mk = S.frame + at(ACT.a_marca.dur, r) * FR; t._mkp = at(ACT.a_marca.pct, r); if (S.marks.indexOf(t) < 0) S.marks.push(t);
             bolt(player.x, player.y - 16, ex(t), ey(t) - 10, '#ff6a4a', 8); ring(ex(t), t.y + (t.h || 30), 6, 46, '#ff4a4a', 20, 4); flash(ex(t), ey(t), 40, '#ff4a4a', 14); callout('Marca da Presa!', '#ff6a5a'); sfx('accept'); return true;
         } });
-    def('a_perf', { sk: 'ranged', need: 'bow', col: '#9fe0ff', cd: [16, 14, 12], mult: [2.2, 2.7, 3.2], len: 340, cost: { ammo: 1 },
+    def('a_perf', { sk: 'ranged', need: 'bow', col: '#9fe0ff', mp: [20, 22, 24], cd: [12, 11, 10], mult: [2.2, 2.7, 3.2], len: 340, cost: { ammo: 1 },
         info: () => ['Atravessa até 8 inimigos numa linha de ' + ACT.a_perf.len + ' px', 'Cada inimigo seguinte sofre 10% menos', 'Gasta 1 flecha'],
         run(r) {
             const t = pickTarget(ACT.a_perf.len - 20, true); let v; if (t) { v = dirToward(t); face(ex(t), ey(t)); } else { const f = facingVec(); v = f; }
@@ -364,7 +370,7 @@
             p.onHit = (pp, tt) => { hit(tt, pp.dmg * Math.pow(0.9, k++), 'ranged', '', 0); flash(ex(tt), ey(tt), 34, '#9fe0ff', 10); burst(ex(tt), ey(tt), '#d8f4ff', 8, 1.6); };
             flash(player.x, player.y - 14, 30, '#9fe0ff', 9); callout('Flecha Perfurante!', '#9fe0ff'); sfx('miss'); return true;
         } });
-    def('a_chuva', { sk: 'ranged', need: 'bow', col: '#ffd27a', cd: [32, 29, 26], mult: [0.8, 0.9, 1], rad: [105, 120, 135], waves: [4, 5, 6], range: 320, cost: { ammo: 3 },
+    def('a_chuva', { sk: 'ranged', need: 'bow', col: '#ffd27a', mp: [32, 36, 40], cd: [30, 27, 24], mult: [0.8, 0.9, 1], rad: [105, 120, 135], waves: [4, 5, 6], range: 320, cost: { ammo: 3 },
         info: (r) => ['Área de ' + at(ACT.a_chuva.rad, r) + ' px · ' + at(ACT.a_chuva.waves, r) + ' saraivadas · até 6 alvos por saraivada', 'Gasta 3 flechas'],
         run(r) {
             const t = pickTarget(ACT.a_chuva.range, true); if (!t) return S.blocked ? 'Sem linha de visão: contorne a parede.' : 'Nenhum alvo ao alcance.';
@@ -380,7 +386,7 @@
     /* ----- Mago ----- */
     const magicRange = 280;
     function splashAt(x, y, r, skip, mult, skill) { const l = aoe(x, y, r, 5, false); for (let i = 0; i < l.length; i++) if (l[i] !== skip) hit(l[i], mult, skill, '', 3 + i); }
-    def('m_fogo', { sk: 'magic', need: 'staff', col: '#ff7a3a', cd: [6, 5.5, 5], mult: [2.6, 3.1, 3.6], mp: [6, 6, 7], range: magicRange,
+    def('m_fogo', { sk: 'magic', need: 'staff', col: '#ff7a3a', cd: [5, 4.5, 4], mult: [2.6, 3.1, 3.6], mp: [12, 12, 14], range: magicRange,
         info: () => ['Alcance: ' + magicRange + ' px', 'Explode: 50% do dano nos vizinhos (raio 55)'],
         run(r) {
             const t = pickTarget(magicRange, true); if (!t) return S.blocked ? 'Sem linha de visão: contorne a parede.' : 'Nenhum alvo ao alcance.';
@@ -389,7 +395,7 @@
             p.onHit = (pp, tt) => { hit(tt, pp.dmg, 'magic', '', 0); splashAt(ex(tt), ey(tt), 55, tt, pp.dmg * 0.5, 'magic'); ring(ex(tt), tt.y + (tt.h || 30), 6, 58, '#ff9a3a', 18, 5); flash(ex(tt), ey(tt), 56, '#ff7a3a', 16); burst(ex(tt), ey(tt), '#ffb04a', 16, 2.2); burst(ex(tt), ey(tt), '#ff5a2a', 10, 1.4); };
             flash(player.x, player.y - 14, 26, '#ff9a4a', 8); callout('Bola de Fogo!', '#ff9a4a'); sfx('fire'); return true;
         } });
-    def('m_gelo', { sk: 'magic', need: 'staff', col: '#8fd8ff', cd: [8, 7, 6], mult: [1.8, 2.1, 2.4], mp: [5, 5, 6], slow: [4, 5, 6], range: magicRange,
+    def('m_gelo', { sk: 'magic', need: 'staff', col: '#8fd8ff', cd: [6, 5.5, 5], mult: [1.8, 2.1, 2.4], mp: [10, 10, 12], slow: [4, 5, 6], range: magicRange,
         info: (r) => ['Alcance: ' + magicRange + ' px', 'Lentidão de 50% por ' + at(ACT.m_gelo.slow, r) + ' s'],
         run(r) {
             const t = pickTarget(magicRange, true); if (!t) return S.blocked ? 'Sem linha de visão: contorne a parede.' : 'Nenhum alvo ao alcance.';
@@ -398,7 +404,7 @@
             p.onHit = (pp, tt) => { hit(tt, pp.dmg, 'magic', '', 0); slow(tt, sl * FR, 0.5); ring(ex(tt), tt.y + (tt.h || 30), 6, 44, '#bff0ff', 20, 4); flash(ex(tt), ey(tt), 46, '#8fd8ff', 14); burst(ex(tt), ey(tt), '#dff6ff', 14, 2); };
             flash(player.x, player.y - 14, 24, '#8fd8ff', 8); callout('Raio de Gelo!', '#8fd8ff'); sfx('enchant'); return true;
         } });
-    def('m_cura', { sk: 'magic', need: 'staff', col: '#6fe08a', cd: [14, 12, 10], pct: [20, 30, 45], mp: [8, 9, 12],
+    def('m_cura', { sk: 'magic', need: 'staff', col: '#6fe08a', cd: [10, 9, 8], pct: [20, 30, 45], mp: [16, 18, 24],
         info: (r) => ['Cura ' + at(ACT.m_cura.pct, r) + '% da vida máxima (+ dano mágico x8)', r >= 3 ? 'Cura Maior' : 'Cura Menor (no rank 3 vira Cura Maior)'],
         run(r) {
             if (player.stats.hp >= player.stats.maxHp) return 'Sua vida já está cheia.';
@@ -406,17 +412,17 @@
             ring(player.x, player.y + 4, 6, 56, '#6fe08a', 24, 5); flash(player.x, player.y - 16, 54, '#6fe08a', 20); for (let i = 0; i < 10; i++) puff(player.x + (rnd() - 0.5) * 30, player.y - 6 - rnd() * 10, 'rgba(120,255,160,', 1, 4, 0.7);
             callout(r >= 3 ? 'Cura Maior!' : 'Cura Menor!', '#6fe08a'); sfx('accept'); return true;
         } });
-    def('m_nova', { sk: 'magic', need: 'staff', col: '#b080ff', cd: [18, 16, 14], mult: [2, 2.4, 2.8], mp: [10, 11, 12], rad: [125, 140, 155], st: 45,
+    def('m_nova', { sk: 'magic', need: 'staff', col: '#b080ff', cd: [14, 12, 11], mult: [2, 2.4, 2.8], mp: [25, 28, 30], rad: [125, 140, 155], st: 45,
         info: (r) => ['Raio: ' + at(ACT.m_nova.rad, r) + ' px · até 8 inimigos', 'Atordoa por ' + fnum(ACT.m_nova.st / FR) + ' s'],
         run(r) {
             const R = at(ACT.m_nova.rad, r), l = aoe(player.x, player.y, R, 8, true); if (!l.length) return 'Nenhum inimigo ao alcance da Nova.'; const m = at(ACT.m_nova.mult, r);
             for (let i = 0; i < l.length; i++) { hit(l[i], sdmg('magic', m), 'magic', '', 4 + i); stun(l[i], ACT.m_nova.st); burst(ex(l[i]), ey(l[i]), '#d8b8ff', 8, 1.6); }
             ring(player.x, player.y + 4, 8, R, '#b080ff', 26, 8); ring(player.x, player.y + 4, 4, R * 0.6, '#f0e0ff', 20, 4); flash(player.x, player.y - 12, 80, '#a070ff', 18); burst(player.x, player.y - 10, '#c8a0ff', 22, 2.2); callout('Nova Arcana!', '#c8a0ff'); sfx('enchant'); return true;
         } });
-    def('m_escudo', { sk: 'magic', need: 'staff', col: '#7fb8ff', cd: [32, 28, 24], pct: [25, 35, 45], mp: [8, 9, 10], dur: 12,
+    def('m_escudo', { sk: 'magic', need: 'staff', col: '#7fb8ff', cd: [22, 20, 18], pct: [25, 35, 45], mp: [20, 22, 25], dur: 12,
         info: (r) => ['Barreira de ' + at(ACT.m_escudo.pct, r) + '% da vida máxima (+ dano mágico x12)', 'Dura até ' + ACT.m_escudo.dur + ' s'],
         run(r) { setBarrier(player.stats.maxHp * at(ACT.m_escudo.pct, r) / 100 + (window.Stats ? Stats.spellDmg() * 12 : 0) + 60, ACT.m_escudo.dur, '#7fb8ff'); ring(player.x, player.y + 4, 8, 58, '#9ad0ff', 22, 5); flash(player.x, player.y - 16, 56, '#7fb8ff', 18); callout('Escudo Arcano!', '#9ad0ff'); sfx('enchant'); return true; } });
-    def('m_tempest', { sk: 'magic', need: 'staff', col: '#ffe86a', cd: [42, 38, 34], mult: [1.4, 1.6, 1.8], mp: [16, 18, 20], rad: [115, 130, 145], n: [8, 10, 12], range: 300,
+    def('m_tempest', { sk: 'magic', need: 'staff', col: '#ffe86a', cd: [36, 32, 28], mult: [1.4, 1.6, 1.8], mp: [45, 50, 55], rad: [115, 130, 145], n: [8, 10, 12], range: 300,
         info: (r) => ['Raio: ' + at(ACT.m_tempest.rad, r) + ' px · ' + at(ACT.m_tempest.n, r) + ' raios', 'Cada raio atinge um inimigo da área'],
         run(r) {
             const t = pickTarget(ACT.m_tempest.range, true); if (!t) return S.blocked ? 'Sem linha de visão: contorne a parede.' : 'Nenhum alvo ao alcance.';
@@ -430,14 +436,29 @@
         } });
 
     /* ============================ LANÇAR ============================ */
-    function costOf(a, r) { const c = a.cost || {}, o = {}; if (a.mp) o.mp = at(a.mp, r) * Balance.MP_MULT; if (c.ammo) o.ammo = c.ammo; return o; }
-    const cdOf = (a, r) => Math.round(at(a.cd, r) * (1 - S.cdr / 100) * 10) / 10;
+    /* ---- Aljava Mágica / Fonte Arcana / Vigor Inabalável: custos e ganchos ---- */
+    const capOn = (id) => { const st = player && player.skillTree; return !!(st && st.tg && st.tg[id] === true && rankOf(id) > 0); };
+    function weaponTier(w) {   // 1..5 pelo nível mínimo e pelo dano do arco/cajado (arco de bronze = 1 ... arco de mithril/dragão = 5)
+        const rq = window.Stats && Stats.reqOf ? Stats.reqOf(w) : null, L = rq ? rq.lvl : 1, d = (w && w.bonusDmg) || 0;
+        const a = L >= 40 ? 5 : L >= 30 ? 4 : L >= 20 ? 3 : L >= 10 ? 2 : 1, b = d >= 14 ? 5 : d >= 10 ? 4 : d >= 7 ? 3 : d >= 4 ? 2 : 1; return Math.max(a, b);
+    }
+    const shotMp = (w) => Math.min(6, 1 + weaponTier(w));                  // mana por disparo da Aljava Mágica: 2 a 6 conforme o arco
+    const quiverBonus = (w) => Math.min(11, 1 + 2 * (weaponTier(w) - 1)); // dano das "flechas de mana" (equivale a uma boa flecha do mesmo nível)
+    const spellMp = (sp) => Math.max(4, Math.round(3 + 1.5 * Object.keys(sp.req || {}).length + (sp.lvl || 1) / 5));   // mana por magia básica da Fonte Arcana
+    const VIGOR_MP = 3, VIGOR_HEAL = 1.5;
+    function costOf(a, r, live) {   // live = checagem na hora de lançar (cai para flechas se a mana não der); sem live = custo "de vitrine" (barra e dicas)
+        const c = a.cost || {}, o = {}; if (a.mp) o.mp = at(a.mp, r); if (c.ammo) o.ammo = c.ammo;
+        if (c.ammo && capOn('a_aljava_cap') && wpn() && wpn().tool === 'ranged') { const mp = (o.mp || 0) + c.ammo * shotMp(wpn()); if (!live || player.stats.mp >= mp) { o.mp = mp; o.ammo = 0; o.q = 1; } }
+        return o;
+    }
+    const cdOf = (a, r) => cdTime(at(a.cd, r));
     function reason(a, r) {   // '' = pode usar agora
         if (!gameOn()) return 'Entre no jogo.'; if (player.stats.hp <= 0) return 'Você está caído.';
         if (cdMs(a.id) > 0) return 'Em recarga (' + Math.ceil(cdMs(a.id) / 1000) + ' s).';
         if (!needOk(a.need)) return 'Equipe ' + NEED[a.need] + ' para usar ' + NODES[a.id].name + '.';
-        const c = costOf(a, r); if (c.ammo) { const am = player.equipment.ammo; if (!am || am.qty < c.ammo) return 'Sem flechas equipadas!'; }
-        if (c.mp && player.stats.mp < c.mp) return 'Mana insuficiente (precisa de ' + c.mp + ').';
+        const c = costOf(a, r, true), q = capOn('a_aljava_cap') && a.cost && a.cost.ammo;
+        if (c.mp && player.stats.mp < c.mp) return 'Sem mana! (precisa de ' + fnum(c.mp) + ').';
+        if (c.ammo) { const am = player.equipment.ammo; if (!am || am.qty < c.ammo) return q ? 'Sem mana nem flechas!' : 'Sem flechas equipadas!'; }
         return '';
     }
     function say1(t, c) { const n = performance.now(); if (n - S.lastMsg < 700) return; S.lastMsg = n; say(t, c || '#e67e22'); sfx('error'); }
@@ -445,7 +466,7 @@
         const a = ACT[id], r = rankOf(id); if (!a || r < 1) return false;
         const why = reason(a, r); if (why) { say1(why); return false; }
         const out = a.run(r); if (out !== true) { say1(out); return false; }
-        const c = costOf(a, r); if (c.mp) mana(-c.mp); if (c.ammo) spendAmmo(c.ammo);
+        const c = costOf(a, r, true); if (c.mp) mana(-c.mp); if (c.ammo) spendAmmo(c.ammo);
         setCd(id, at(a.cd, r)); player.actionAnim = 15; try { player.attackCooldown = Math.max(player.attackCooldown || 0, 12); } catch (e) { } S.barSig = ''; return true;
     }
     function cast(slot) {
@@ -470,9 +491,59 @@
         if (S.frame % 120 === 0) { for (let i = S.marks.length - 1; i >= 0; i--) if (!alive(S.marks[i]) || !(S.marks[i]._mk > S.frame)) S.marks.splice(i, 1); for (let i = S.status.length - 1; i >= 0; i--) { const o = S.status[i]; if (!alive(o) || !(o._stun > S.frame || o._slow > S.frame)) S.status.splice(i, 1); } const cd = player.skillTree.cd; if (cd) for (const k of Object.keys(cd)) if (cd[k] < Date.now() - 2000) delete cd[k]; }
         if (S.extra && S.extra.tick) S.extra.tick();
     }
+    const MARTIAL_MP = 1.5;   // Guerreiro e Arqueiro (mana base menor): +1,5 de mana por segundo para sustentar as habilidades
     function regen() {
         const st = player.stats; if (st.hp < st.maxHp && S.hpRegen > 0) { S.rg.hp += S.hpRegen / 10; if (S.rg.hp >= 1) { const n = Math.floor(S.rg.hp); S.rg.hp -= n; heal(n); } }
-        if (st.mp < st.maxMp) { S.rg.mp += Balance.MP_REGEN_FLAT + st.maxMp * 0.006 + S.mpRegen / 10; if (S.rg.mp >= 1) { const n = Math.floor(S.rg.mp); S.rg.mp -= n; mana(n); } }
+        if (st.mp < st.maxMp) { S.rg.mp += Balance.MP_REGEN_FLAT + st.maxMp * 0.006 + S.mpRegen / 10 + (player.cls && player.cls !== 'mage' ? MARTIAL_MP : 0); if (S.rg.mp >= 1) { const n = Math.floor(S.rg.mp); S.rg.mp -= n; mana(n); } }
+    }
+
+    /* ============================ CAPSTONES (alternáveis) ============================ */
+    const CAPS = SN.CAP_IDS.slice();
+    const learnedCaps = () => (player && player.skillTree ? CAPS.filter((id) => rankOf(id) > 0) : []);
+    const primaryCap = () => { const l = learnedCaps(); return l.find((id) => NODES[id].tree === player.cls) || l[0] || null; };
+    const noteOnce = (k, t, c) => { const n = performance.now(); S.notes = S.notes || {}; if (n - (S.notes[k] || 0) < 5000) return; S.notes[k] = n; say(t, c || '#9ad3ff'); };
+    function toggleCap(id) {
+        const st = ensure(); if (!st) return false; id = id || primaryCap(); if (!id || !NODES[id] || NODES[id].kind !== 'c' || rankOf(id) < 1) { say1('Aprenda o poder final de uma árvore para poder ligá-lo (K).', '#9ad3ff'); return false; }
+        if (!st.tg) st.tg = {}; const on = !(st.tg[id] === true); if (on) st.tg[id] = true; else delete st.tg[id];
+        S.barSig = ''; try { saveDataLogic(); } catch (e) { } sfx(on ? 'accept' : 'click');
+        const n = NODES[id]; say(n.name + (on ? ': LIGADO.' : ': desligado.'), on ? '#8affd8' : '#9aa0aa');
+        try { Art.burst(player.x, player.y - 14, on ? TREES[n.tree].color2 : '#888', on ? 14 : 6, on ? 1.6 : 0.8); } catch (e) { }
+        if (S.ui.open) { renderSide(); renderTree(true); } return on;
+    }
+    // chamado antes de cada ataque comum (tryInteract): devolve false = bloqueia (sem mana nem munição), função = rodar depois do ataque (gastar a mana), undefined = segue normal
+    function capPre(t) {
+        if (!gameOn() || !t || t.type !== 'enemy' || !t.active || !(player.attackCooldown <= 0) || player.stats.hp <= 0 || !player.skillTree || !player.skillTree.tg) return undefined;
+        const w = wpn(), eq = player.equipment, st = player.stats, pj = () => (typeof projectiles !== 'undefined' ? projectiles.length : 0);
+        if (w && w.tool === 'ranged' && capOn('a_aljava_cap')) {   // Aljava Mágica
+            const cost = shotMp(w), real = eq.ammo, has = !!(real && real.qty >= 1);
+            if (st.mp >= cost) {
+                const pn = pj(); let tmp = null, q0 = 0;
+                if (real) { q0 = real.qty; real.qty = q0 + 1; } else { tmp = { name: 'Flecha Mágica', stackable: true, bonusDmg: quiverBonus(w), qty: 2, virtual: true }; eq.ammo = tmp; }
+                return () => { if (real) real.qty = q0; else if (eq.ammo === tmp) eq.ammo = null; if (pj() > pn) { mana(-cost); try { Art.burst(player.x + (player.facing ? player.facing.x * 10 : 0), player.y - 14, '#8ae0ff', 4, 0.8); } catch (e) { } } };
+            }
+            if (!has) { say1('Sem mana! A Aljava Mágica precisa de ' + cost + ' de mana (ou equipe flechas).'); return false; }
+            noteOnce('aq', 'Sem mana: usando as flechas da aljava.'); return undefined;
+        }
+        if (w && w.tool === 'magic' && capOn('m_fonte_cap')) {   // Fonte Arcana
+            let sp = null; try { sp = spellbookDB.find((x) => x.id === player.activeSpell); } catch (e) { }
+            if (!sp || lv('magic') < sp.lvl) return undefined;
+            const cost = spellMp(sp), req = sp.req || {}, hasRunes = Object.keys(req).every((k) => getInvCount(k) >= req[k]);
+            if (st.mp >= cost) { const pn = pj(); S.noRune = req; return () => { S.noRune = null; if (pj() > pn) { mana(-cost); try { Art.burst(player.x, player.y - 16, '#b88aff', 4, 0.8); } catch (e) { } } }; }
+            if (!hasRunes) { say1('Sem mana! A Fonte Arcana precisa de ' + cost + ' de mana (ou use runas).'); return false; }
+            noteOnce('fa', 'Sem mana: usando as runas.'); return undefined;
+        }
+        if ((!w || (w.tool !== 'ranged' && w.tool !== 'magic')) && capOn('w_vigor_cap')) {   // Vigor Inabalável
+            if (st.mp >= VIGOR_MP) return () => { if (player.attackCooldown > 0 && player.stats.mp >= VIGOR_MP) { mana(-VIGOR_MP); heal(Math.max(1, Math.round(st.maxHp * VIGOR_HEAL / 100)), '#ff8a7a'); } };
+            noteOnce('vi', 'Sem mana: o Vigor Inabalável descansa.'); return undefined;
+        }
+        return undefined;
+    }
+    function capLines(n) {
+        const out = [], on = capOn(n.id);
+        if (n.id === 'a_aljava_cap') { const w = wpn(), tw = w && w.tool === 'ranged' ? w : null; out.push('Ligado: seus disparos de arco (comuns e das habilidades) não gastam flechas.'); out.push('Custo: ' + (tw ? shotMp(tw) + ' de mana por disparo (seu arco atual)' : '2 a 6 de mana por disparo (conforme o arco: arcos melhores custam mais)') + '.'); out.push('Sem mana, volta a usar flechas; sem nenhuma das duas, avisa "Sem mana".'); }
+        else if (n.id === 'm_fonte_cap') { out.push('Ligado: suas magias básicas não gastam runas.'); out.push('Custo: um pouco mais de mana por magia (6 a 12, conforme a magia).'); out.push('Sem mana, volta a usar runas; sem nenhuma das duas, avisa "Sem mana".'); }
+        else { out.push('Ligado: cada golpe corpo a corpo cura ' + String(VIGOR_HEAL).replace('.', ',') + '% da sua vida máxima.'); out.push('Custo: ' + VIGOR_MP + ' de mana por golpe. Sem mana, o vigor descansa e você luta normalmente.'); }
+        out.push('Alternável: tecla X, botão na barra de habilidades ou aqui no painel.'); out.push('Estado: ' + (rankOf(n.id) > 0 ? (on ? 'LIGADO' : 'desligado') : 'ainda não aprendido')); return out;
     }
 
     /* ============================ GANCHOS (sem editar o código do jogo) ============================ */
@@ -505,6 +576,17 @@
                 return o.call(this, t, d, sT, d > dmg ? Math.max(maxHit || 0, d) : maxHit);
             };
         }
+        if (typeof W.getInvCount === 'function') { const o = W.getInvCount; W.getInvCount = function (n) { if (S.noRune && S.noRune[n] > 0) return 99999; return o.apply(this, arguments); }; }   // Fonte Arcana: durante o lançamento as runas "existem"
+        if (typeof W.removeInvItem === 'function') { const o = W.removeInvItem; W.removeInvItem = function (n) { if (S.noRune && S.noRune[n] > 0) return true; return o.apply(this, arguments); }; }
+        if (typeof W.tryInteract === 'function') {
+            const o = W.tryInteract;
+            W.tryInteract = function (t) {
+                let post;
+                try { post = capPre(t); } catch (e) { post = undefined; console.error('SkillTree.cap', e); }
+                if (post === false) return;
+                try { return o.apply(this, arguments); } finally { if (typeof post === 'function') { try { post(); } catch (e) { console.error('SkillTree.cap', e); } } }
+            };
+        }
         if (typeof W.mobStep === 'function') { const o = W.mobStep; W.mobStep = function (m, cur, ex_, ey_, ed, spd, ow, oh) { if (m && m._stun > S.frame) return false; if (m && m._slow > S.frame) spd *= (1 - (m._slowp || 0.5)); return o.call(this, m, cur, ex_, ey_, ed, spd, ow, oh); }; }
         if (typeof W.respawnAtVillage === 'function') { const o = W.respawnAtVillage; W.respawnAtVillage = function () { try { clearAll(true); } catch (e) { } return o.apply(this, arguments); }; }
         if (typeof W.switchMap === 'function') { const o = W.switchMap; W.switchMap = function () { try { clearAll(false); } catch (e) { } return o.apply(this, arguments); }; }
@@ -527,17 +609,19 @@
         const a = ACT[id], r = Math.max(1, rank), out = []; if (!a) return out;
         if (a.mult) { const est = (gameOn() && needOk(a.need)) ? Math.round(baseDmg(a.sk) * at(a.mult, r)) : 0; out.push('Dano: ×' + fnum(at(a.mult, r)) + ' do seu dano-base' + (est ? ' (≈ ' + est + ')' : '')); }
         const info = a.info ? a.info(r) : []; info.forEach((l) => out.push(l));
-        const c = costOf(a, r); const cs = []; if (c.mp) cs.push(c.mp + ' de mana'); if (c.ammo) cs.push(c.ammo + (c.ammo > 1 ? ' flechas' : ' flecha')); out.push('Custo: ' + (cs.length ? cs.join(' + ') : 'nenhum (só recarga)'));
-        out.push('Recarga: ' + fnum(cdOf(a, r)) + ' s' + (S.cdr > 0 ? ' (com redução de recarga)' : '')); out.push('Requer: ' + NEED[a.need] + (a.need === 'bow' ? ' e flechas' : a.need === 'staff' ? ' e mana' : ''));
+        const c = costOf(a, r); const cs = []; if (c.mp) cs.push(fnum(c.mp) + ' de mana'); if (c.ammo) cs.push(c.ammo + (c.ammo > 1 ? ' flechas' : ' flecha')); out.push('Custo: ' + (cs.length ? cs.join(' + ') : 'nenhum (só recarga)') + (c.q ? ' (Aljava Mágica: sem flechas)' : ''));
+        out.push('Recarga: ' + fnum(cdOf(a, r)) + ' s' + (cdrNow() > 0 ? ' (com ' + fnum(cdrNow()) + '% de redução de recarga)' : '')); out.push('Requer: ' + NEED[a.need] + (a.need === 'bow' ? ' e flechas' : ''));
         return out;
     }
     function nodeHtml(n, compact) {
-        const st = ensure(), rank = rankOf(n.id), pt = points(n.tree), tag = n.kind === 'a' ? 'Ativa' : 'Passiva';
+        const st = ensure(), rank = rankOf(n.id), pt = points(n.tree), tag = n.kind === 'a' ? 'Ativa' : n.kind === 'c' ? 'Poder final · alternável' : 'Passiva';
         let h = '<div class="sk-ih"><img class="sk-big" src="' + Icons.skillUrl(n.ic) + '" alt=""><div><b class="sk-nm">' + esc(n.name) + '</b><div class="sk-tg ' + n.kind + '">' + tag + ' · ' + esc(TREES[n.tree].branches[n.branch]) + '</div></div></div>';
         h += '<div class="sk-rk" title="Rank">' + Array.from({ length: n.max }, (_, i) => '<i class="' + (i < rank ? 'on' : '') + '"></i>').join('') + '<span>Rank ' + rank + '/' + n.max + '</span></div>';
         if (n.d) h += '<p class="sk-d">' + esc(n.d) + '</p>';
         if (n.kind === 'p') {
             effLines(n, rank, true).forEach((l) => { h += '<div class="sk-ef">' + (l.cur ? '<span class="a">Agora:</span> ' + esc(l.cur) : '<span class="m">Rank 1:</span> ' + esc(SN.EFF_LABEL[l.k](fnum(n.eff[l.k])))) + '</div>'; if (l.cur && l.nxt) h += '<div class="sk-ef nx"><span>Próximo:</span> ' + esc(l.nxt) + '</div>'; });
+        } else if (n.kind === 'c') {
+            capLines(n).forEach((l) => { h += '<div class="sk-ef' + (/^Estado: LIGADO/.test(l) ? ' on' : '') + '">' + esc(l) + '</div>'; });
         } else {
             const rr = Math.max(1, rank); actStats(n.id, rr).forEach((l) => { h += '<div class="sk-ef">' + esc(l) + '</div>'; });
             if (rank < n.max && rank > 0) { const nx = actStats(n.id, rank + 1).filter((l) => !/^Requer|^Custo/.test(l)); if (nx.length) h += '<div class="sk-ef nx"><span>Rank ' + (rank + 1) + ':</span> ' + esc(nx.slice(0, 3).join(' · ')) + '</div>'; }
@@ -608,10 +692,10 @@
         ids.forEach((id) => { const n = NODES[id], p1 = nodeXY(n); n.req.forEach((q) => { const par = NODES[q[0]], p0 = nodeXY(par), okp = SN.rankOf(ranks, par.id) >= q[1], on = SN.rankOf(ranks, id) > 0; const dx = (p1[0] - p0[0]) * 0.5; const cls = on && okp ? 'lit' : okp ? 'av' : 'dim'; h += '<path class="sk-e ' + cls + '" d="M' + p0[0] + ',' + p0[1] + ' C' + (p0[0] + dx) + ',' + p0[1] + ' ' + (p1[0] - dx) + ',' + p1[1] + ' ' + p1[0] + ',' + p1[1] + '" style="--c:' + T.color2 + '"/>'; }); });
         // nós
         ids.forEach((id) => {
-            const n = NODES[id], p = nodeXY(n), st = nodeState(n), r = rankOf(id), isA = n.kind === 'a', sel = S.ui.sel === id;
-            const shape = isA ? '<polygon class="rg" points="0,-31 27,-15.5 27,15.5 0,31 -27,15.5 -27,-15.5"/><polygon class="core" points="0,-26 22.5,-13 22.5,13 0,26 -22.5,13 -22.5,-13" fill="url(#skg-' + (st === 'on' || st === 'max' ? tree : st === 'avail' || st === 'soft' ? 'av' : 'off') + ')"/>' : '<circle class="rg" r="27"/><circle class="core" r="22.5" fill="url(#skg-' + (st === 'on' || st === 'max' ? tree : st === 'avail' || st === 'soft' ? 'av' : 'off') + ')"/>';
-            h += '<g class="sk-n st-' + st + (isA ? ' act' : '') + (sel ? ' sel' : '') + '" data-id="' + id + '" transform="translate(' + p[0] + ',' + p[1] + ')" style="--c:' + T.color + ';--c2:' + T.color2 + '">' + shape + '<image href="' + Icons.skillUrl(n.ic) + '" x="-17" y="-17" width="34" height="34"/>' +
-                '<g class="bd" transform="translate(19,19)"><circle r="9.5"/><text y="3.6" text-anchor="middle">' + r + '/' + n.max + '</text></g>' + (st === 'max' ? '<text class="mx" y="-34" text-anchor="middle">★</text>' : '') + '<text class="nm" y="' + (isA ? 47 : 43) + '" text-anchor="middle">' + esc(n.name) + '</text></g>';
+            const n = NODES[id], p = nodeXY(n), st = nodeState(n), r = rankOf(id), isA = n.kind === 'a', isC = n.kind === 'c', sel = S.ui.sel === id;
+            const shape = isC ? '<circle class="rg" r="36"/><circle class="rg2" r="31"/><circle class="core" r="27" fill="url(#skg-' + (st === 'on' || st === 'max' ? tree : st === 'avail' || st === 'soft' ? 'av' : 'off') + ')"/>' : isA ? '<polygon class="rg" points="0,-31 27,-15.5 27,15.5 0,31 -27,15.5 -27,-15.5"/><polygon class="core" points="0,-26 22.5,-13 22.5,13 0,26 -22.5,13 -22.5,-13" fill="url(#skg-' + (st === 'on' || st === 'max' ? tree : st === 'avail' || st === 'soft' ? 'av' : 'off') + ')"/>' : '<circle class="rg" r="27"/><circle class="core" r="22.5" fill="url(#skg-' + (st === 'on' || st === 'max' ? tree : st === 'avail' || st === 'soft' ? 'av' : 'off') + ')"/>';
+            h += '<g class="sk-n st-' + st + (isA ? ' act' : '') + (isC ? ' cap' + (capOn(id) ? ' tgon' : '') : '') + (sel ? ' sel' : '') + '" data-id="' + id + '" transform="translate(' + p[0] + ',' + p[1] + ')" style="--c:' + T.color + ';--c2:' + T.color2 + '">' + shape + '<image href="' + Icons.skillUrl(n.ic) + '" x="' + (isC ? -21 : -17) + '" y="' + (isC ? -21 : -17) + '" width="' + (isC ? 42 : 34) + '" height="' + (isC ? 42 : 34) + '"/>' +
+                '<g class="bd" transform="translate(19,19)"><circle r="9.5"/><text y="3.6" text-anchor="middle">' + r + '/' + n.max + '</text></g>' + (st === 'max' ? '<text class="mx" y="-34" text-anchor="middle">★</text>' : '') + '<text class="nm" y="' + (isC ? 52 : isA ? 47 : 43) + '" text-anchor="middle">' + esc(n.name) + '</text></g>';
         });
         world.innerHTML = h; if (!keepView) fitView(); else applyView();
     }
@@ -633,11 +717,12 @@
         return h + '</div>';
     }
     function renderSide() {
-        const s = $('sk-side'); if (!s) return; const id = S.ui.sel; if (!id || !NODES[id] || NODES[id].tree !== S.ui.tab) { const T = TREES[S.ui.tab]; s.innerHTML = '<div class="sk-ih"><img class="sk-big" src="' + Icons.skillUrl(S.ui.tab === 'warrior' ? 'sword' : S.ui.tab === 'archer' ? 'bow' : 'wand') + '" alt=""><div><b class="sk-nm">' + esc(T.name) + '</b><div class="sk-tg">' + esc(T.blurb) + '</div></div></div><p class="sk-d">Toque num nó para ver os detalhes e gastar pontos. <b>Hexágonos</b> são habilidades <b>ativas</b> (vão para a barra); <b>círculos</b> são <b>passivas</b>.</p><p class="sk-d">Os pontos desta árvore vêm do nível de <b>' + esc(T.skillName) + '</b>: 1 ponto a cada 2 níveis.</p>' + (player.cls === S.ui.tab || (!player.cls && S.ui.tab === 'warrior') ? '<p class="sk-d rec">★ Árvore recomendada para a sua classe.</p>' : ''); return; }
+        const s = $('sk-side'); if (!s) return; const id = S.ui.sel; if (!id || !NODES[id] || NODES[id].tree !== S.ui.tab) { const T = TREES[S.ui.tab]; s.innerHTML = '<div class="sk-ih"><img class="sk-big" src="' + Icons.skillUrl(S.ui.tab === 'warrior' ? 'sword' : S.ui.tab === 'archer' ? 'bow' : 'wand') + '" alt=""><div><b class="sk-nm">' + esc(T.name) + '</b><div class="sk-tg">' + esc(T.blurb) + '</div></div></div><p class="sk-d">Toque num nó para ver os detalhes e gastar pontos. <b>Hexágonos</b> são habilidades <b>ativas</b> (vão para a barra); <b>círculos</b> são <b>passivas</b>; o <b>grande círculo dourado</b> no fim da árvore é o <b>poder final</b>, que você liga e desliga.</p><p class="sk-d">Os pontos desta árvore vêm do nível de <b>' + esc(T.skillName) + '</b>: 1 ponto a cada 2 níveis.</p>' + (player.cls === S.ui.tab || (!player.cls && S.ui.tab === 'warrior') ? '<p class="sk-d rec">★ Árvore recomendada para a sua classe.</p>' : ''); return; }
         const n = NODES[id], r = rankOf(id), pt = points(n.tree), why = SN.canLearn(player.skillTree.pts[n.tree], id, pt.free);
         let h = nodeHtml(n, false); h += '<div class="sk-act">';
         if (r >= n.max) h += '<button type="button" class="sk-b go" disabled>Rank máximo</button>';
         else h += '<button type="button" class="sk-b go" data-a="learn" ' + (why ? 'disabled' : '') + '>' + (r ? 'Melhorar para o rank ' + (r + 1) : 'Aprender') + ' <small>(' + n.cost + (n.cost > 1 ? ' pontos' : ' ponto') + ')</small></button>' + (why ? '<div class="sk-why">' + esc(why) + '</div>' : '');
+        if (n.kind === 'c' && r > 0) { const on = capOn(id); h += '<button type="button" class="sk-b tgl' + (on ? ' on' : '') + '" data-a="togcap" data-id="' + id + '">' + (on ? 'Ligado · tocar para desligar (X)' : 'Desligado · tocar para ligar (X)') + '</button>'; }
         h += '</div>'; if (n.kind === 'a' && r > 0) h += barSlotsHtml(id);
         s.innerHTML = h;
     }
@@ -652,7 +737,7 @@
         if (a === 'close') closeUI(); else if (a === 'tab') { S.ui.tab = b.dataset.t; S.ui.sel = null; try { localStorage.setItem('ms_sk_tab', S.ui.tab); } catch (er) { } renderAll(); fitView(); }
         else if (a === 'zin') zoomAt(V.cw / 2, V.ch / 2, 1.25); else if (a === 'zout') zoomAt(V.cw / 2, V.ch / 2, 1 / 1.25); else if (a === 'fit') fitView();
         else if (a === 'learn') { const r = learn(S.ui.sel); if (!r.ok) say(r.msg, '#e67e22'); }
-        else if (a === 'slot') setSlot(S.ui.sel, +b.dataset.i); else if (a === 'unslot') clearSlot(S.ui.sel);
+        else if (a === 'togcap') toggleCap(b.dataset.id || S.ui.sel); else if (a === 'slot') setSlot(S.ui.sel, +b.dataset.i); else if (a === 'unslot') clearSlot(S.ui.sel);
         else if (a === 'reset') { const tr = S.ui.tab, pt = points(tr); if (pt.spent > 0) { S.ui.confirm = { tree: tr, spent: pt.spent, cost: resetCost(tr), have: getInvCount('Coins') }; renderConfirm(); } }
         else if (a === 'cfno') { S.ui.confirm = null; renderConfirm(); } else if (a === 'cfok') { const q = S.ui.confirm; S.ui.confirm = null; const r = reset(q.tree); say(r.msg, r.ok ? '#6fe08a' : '#e67e22'); renderAll(); }
     }
@@ -670,13 +755,14 @@
         const ranks = st.pts[n.tree], why = SN.canLearn(ranks, id, points(n.tree).free); if (why) return { ok: false, msg: why };
         const first = !ranks[id]; ranks[id] = (ranks[id] | 0) + 1; recompute();
         if (n.kind === 'a' && first && st.bar.indexOf(id) < 0) { const i = st.bar.indexOf(null); if (i >= 0) st.bar[i] = id; }
+        if (n.kind === 'c' && first) { if (!st.tg) st.tg = {}; st.tg[id] = true; say(n.name + ' aprendido e LIGADO! Tecla X (ou botão na barra) liga e desliga.', '#8affd8'); }
         S.barSig = ''; sfx('accept'); try { Art.burst(player.x, player.y - 14, TREES[n.tree].color2, 10, 1.2); } catch (e) { }
         try { saveDataLogic(); } catch (e) { } renderAll(); return { ok: true, msg: n.name + ' → rank ' + ranks[id] };
     }
     function reset(tree) {
         const st = ensure(), pt = points(tree); if (!st || !TREES[tree]) return { ok: false, msg: 'Árvore inexistente.' }; if (pt.spent < 1) return { ok: false, msg: 'Nada a redistribuir.' };
         const cost = resetCost(tree); if (cost > 0) { if (getInvCount('Coins') < cost) return { ok: false, msg: 'Moedas insuficientes (' + fmtNum(cost) + ').' }; removeInvItem('Coins', cost); }
-        st.pts[tree] = {}; st.rs[tree] = Math.min(9999, (st.rs[tree] | 0) + 1);
+        st.pts[tree] = {}; if (st.tg) CAPS.forEach((c) => { if (NODES[c].tree === tree) delete st.tg[c]; }); st.rs[tree] = Math.min(9999, (st.rs[tree] | 0) + 1);
         for (let i = 0; i < BAR_N; i++) if (st.bar[i] && NODES[st.bar[i]] && NODES[st.bar[i]].tree === tree) st.bar[i] = null;
         recompute(); S.barSig = ''; S.free = freeAll(); try { saveDataLogic(true); updateUI(); } catch (e) { }
         return { ok: true, msg: 'Árvore redistribuída' + (cost ? ' (−' + fmtNum(cost) + ' moedas).' : ' (grátis).') };
@@ -702,7 +788,7 @@
     function slotHtml(i, strip) {   // um slot da barra (HUD ou faixa de edição dentro da árvore): tecla, ícone, custo, recarga e botão de remover
         const s = slotInfo(i), k = keyLabel(i);
         if (!s) return '<div class="sk-s empty" data-i="' + i + '" title="Slot ' + k + ' vazio: ' + (strip ? 'selecione uma habilidade ativa na árvore e toque aqui' : 'clique para escolher uma habilidade') + '"><b class="sk-k">' + k + '</b><span>+</span></div>';
-        const c = costOf(s.a, s.r), cs = c.mp ? '<s class="mp" title="Custo de mana">' + fnum(c.mp) + '</s>' : c.ammo ? '<s class="am" title="Gasta flechas">' + c.ammo + '</s>' : '';
+        const c = costOf(s.a, s.r), cs = c.mp ? '<s class="mp" title="Custo de mana' + (c.ammo ? ' e flechas' : '') + '">' + fnum(c.mp) + (c.ammo ? '<sup>+' + c.ammo + '➶</sup>' : '') + '</s>' : c.ammo ? '<s class="am" title="Gasta flechas">' + c.ammo + '</s>' : '';
         return '<div class="sk-s" data-i="' + i + '" style="--c:' + s.a.col + '"><div class="sk-c"><img class="sk-ic" src="' + Icons.skillUrl(s.n.ic) + '" alt=""><i class="cd"></i><u></u></div><b class="sk-k">' + k + '</b>' + cs + '<em class="sk-cb" title="Recarga">' + fnum(cdOf(s.a, s.r)) + 's</em><button type="button" class="sk-rm" tabindex="-1" aria-label="Remover ' + esc(s.n.name) + ' da barra" title="Remover da barra">×</button></div>';
     }
     /* ---- arrastar/trocar/remover (barra do jogo e faixa da árvore): toque curto = usar (ou escolher, se vazio / modo editar); arrastar para outro slot = trocar; arrastar para fora = remover; botão direito = remover ---- */
@@ -763,7 +849,7 @@
         if (!ids.length) { say('Aprenda uma habilidade ativa na árvore (K) para colocar na barra.', '#9ad3ff'); openUI(); return; }
         const st = player.skillTree, cur = st.bar[i];
         let h = '<div class="sk-ph">Slot <b>' + keyLabel(i) + '</b>: escolha a habilidade</div>';
-        ids.forEach((id) => { const n = NODES[id], a = ACT[id], r = rankOf(id), c = costOf(a, r), at_ = st.bar.indexOf(id); h += '<button type="button" class="sk-pr' + (at_ === i ? ' on' : '') + '" data-id="' + id + '" style="--c:' + a.col + '"><img src="' + Icons.skillUrl(n.ic) + '" alt=""><span><b>' + esc(n.name) + '</b><small>rank ' + r + ' · ' + (c.mp ? 'mana ' + fnum(c.mp) + ' · ' : c.ammo ? c.ammo + ' flecha(s) · ' : '') + 'recarga ' + fnum(cdOf(a, r)) + ' s</small></span>' + (at_ >= 0 ? '<em>' + keyLabel(at_) + '</em>' : '') + '</button>'; });
+        ids.forEach((id) => { const n = NODES[id], a = ACT[id], r = rankOf(id), c = costOf(a, r), at_ = st.bar.indexOf(id); h += '<button type="button" class="sk-pr' + (at_ === i ? ' on' : '') + '" data-id="' + id + '" style="--c:' + a.col + '"><img src="' + Icons.skillUrl(n.ic) + '" alt=""><span><b>' + esc(n.name) + '</b><small>rank ' + r + ' · ' + (c.mp ? 'mana ' + fnum(c.mp) + (c.ammo ? ' + ' + c.ammo + ' flecha(s)' : '') + ' · ' : c.ammo ? c.ammo + ' flecha(s) · ' : '') + 'recarga ' + fnum(cdOf(a, r)) + ' s</small></span>' + (at_ >= 0 ? '<em>' + keyLabel(at_) + '</em>' : '') + '</button>'; });
         if (cur) h += '<button type="button" class="sk-pr rm" data-id="">Esvaziar o slot ' + keyLabel(i) + '</button>';
         pick._i = i; pick.innerHTML = h; pick.classList.add('on');
         const r = el.getBoundingClientRect(), pw = Math.min(260, window.innerWidth - 16), up = r.top - 16, dn = window.innerHeight - r.bottom - 16, above = up >= Math.min(dn, 260) || up >= dn;
@@ -775,33 +861,65 @@
         const b = e.target.closest('.sk-pr'); if (!b || !pick._i && pick._i !== 0) return; const i = pick._i, id = b.dataset.id; closePick();
         if (!id) { removeAt(i); return; } if (setSlot(id, i)) say(NODES[id].name + ' equipada no slot ' + keyLabel(i) + '.', '#6fe08a');
     }
+    /* ---- barra recolhível e móvel: estado só neste aparelho (localStorage: ms_sk_barui = {c: recolhida 0/1, x, y: posição em fração da área livre da tela}) ---- */
+    const LSUI = 'ms_sk_barui'; let UIS = {}, MV = null;
+    try { const o = JSON.parse(localStorage.getItem(LSUI) || 'null'); if (o && typeof o === 'object') UIS = o; } catch (e) { }
+    const saveUiState = () => { try { localStorage.setItem(LSUI, JSON.stringify(UIS)); } catch (e) { } };
+    const barCollapsed = () => UIS.c === 1 ? true : UIS.c === 0 ? false : isTouch();   // padrão: recolhida no celular, aberta no computador
+    const hasPos = () => typeof UIS.x === 'number' && typeof UIS.y === 'number';
+    function setCollapsed(v) { UIS.c = v ? 1 : 0; saveUiState(); S.barSig = ''; try { renderBar(); place(); } catch (e) { } }
+    function resetBarPos() { delete UIS.x; delete UIS.y; saveUiState(); if (bar) { bar.classList.remove('mv'); bar.style.left = ''; bar.style.top = ''; } place(); say('Posição da barra restaurada.', '#9ad3ff'); }
+    function clampBar(l, t) { const w = bar.offsetWidth || 60, h = bar.offsetHeight || 40, vw = window.innerWidth, vh = window.innerHeight; return { l: Math.max(0, Math.min(vw - w, l)), t: Math.max(0, Math.min(vh - h, t)), fw: Math.max(1, vw - w), fh: Math.max(1, vh - h) }; }
+    function applyPos() { if (!bar) return false; if (!hasPos()) { bar.classList.remove('mv'); return false; } const w = Math.max(1, window.innerWidth - (bar.offsetWidth || 60)), h = Math.max(1, window.innerHeight - (bar.offsetHeight || 40)); const c = clampBar(UIS.x * w, UIS.y * h); bar.classList.add('mv'); bar.style.left = c.l + 'px'; bar.style.top = c.t + 'px'; return true; }
+    function bigPanelOpen() {   // modais, banco, janelas e gaveta do celular ficam por cima da barra: ela some enquanto estiverem abertos
+        if (document.body.classList.contains('m-drawer')) return true;
+        for (const id of ['custom-modal-overlay', 'bank-win', 'mimic-win', 'pets-win', 'stats-panel', 'cg-overlay', 'sk-ov']) { const el = $(id); if (el && el.offsetWidth > 0 && getComputedStyle(el).display !== 'none') return true; }
+        return false;
+    }
+    function bindMove() {
+        bar.addEventListener('pointerdown', (e) => {
+            const g = e.target.closest('.sk-gr'); if (!g || (e.button !== undefined && e.button !== 0)) return; e.preventDefault();
+            const r = bar.getBoundingClientRect(); MV = { dx: e.clientX - r.left, dy: e.clientY - r.top, id: e.pointerId, moved: false }; try { g.setPointerCapture(e.pointerId); } catch (er) { } bar.classList.add('moving');
+        });
+        document.addEventListener('pointermove', (e) => {
+            if (!MV) return; const c = clampBar(e.clientX - MV.dx, e.clientY - MV.dy); MV.moved = true; bar.classList.add('mv'); bar.style.left = c.l + 'px'; bar.style.top = c.t + 'px'; e.preventDefault();
+        }, { passive: false });
+        const end = () => { if (!MV) return; const m = MV; MV = null; bar.classList.remove('moving'); if (m.moved) { const c = clampBar(parseFloat(bar.style.left) || 0, parseFloat(bar.style.top) || 0); UIS.x = c.l / c.fw; UIS.y = c.t / c.fh; saveUiState(); } };
+        document.addEventListener('pointerup', end); document.addEventListener('pointercancel', end);
+    }
     function mkBar() {
-        if (bar) return; bar = document.createElement('div'); bar.id = 'sk-bar'; document.body.appendChild(bar); bindSlots(bar, 'hud');
+        if (bar) return; bar = document.createElement('div'); bar.id = 'sk-bar'; document.body.appendChild(bar); bindSlots(bar, 'hud'); bindMove();
         bar.addEventListener('click', (e) => {
+            const cb = e.target.closest('.sk-col'); if (cb) { setCollapsed(!barCollapsed()); return; }
+            if (e.target.closest('.sk-rp')) { resetBarPos(); return; }
             const x = e.target.closest('.sk-ed'); if (x) { setEdit(!S.edit); return; }
-            const s = e.target.closest('.sk-s'); if (s && s.dataset.x) { if (S.extra && S.extra.cast) S.extra.cast(); }
+            const s = e.target.closest('.sk-s'); if (s && s.dataset.cap) { toggleCap(s.dataset.cap); return; } if (s && s.dataset.x) { if (S.extra && S.extra.cast) S.extra.cast(); }
         });
         btn = document.createElement('button'); btn.type = 'button'; btn.id = 'sk-btn'; btn.title = 'Habilidades (K)'; btn.setAttribute('aria-label', 'Habilidades'); btn.innerHTML = '<img src="' + Icons.skillUrl('star') + '" alt=""><i></i>'; btn.onclick = () => toggleUI(); document.body.appendChild(btn);
     }
     function renderBar() {
         const on = gameOn(); if (!bar) return; if (!on || !ensure()) { bar.style.display = 'none'; if (btn) btn.style.display = 'none'; return; }
         const ex_ = S.extra && S.extra.slot ? S.extra.slot() : null; const learned = learnedActives().length;
-        const sig = player.skillTree.bar.map((id) => (id || '-') + (id ? rankOf(id) : '')).join(',') + '|' + (ex_ ? ex_.id : '') + '|' + learned + '|' + (isTouch() ? 1 : 0) + '|' + (S.edit ? 1 : 0) + '|' + S.cdr;
+        const sig = player.skillTree.bar.map((id) => (id || '-') + (id ? rankOf(id) : '')).join(',') + '|' + (ex_ ? ex_.id : '') + '|' + learned + '|' + (isTouch() ? 1 : 0) + '|' + (S.edit ? 1 : 0) + '|' + (barCollapsed() ? 1 : 0) + '|' + cdrNow() + '|' + learnedCaps().map((c) => c + (capOn(c) ? 1 : 0)).join(',');
         if (sig !== S.barSig) {
             S.barSig = sig; let h = '';
             for (let i = 0; i < BAR_N; i++) { if (!slotInfo(i) && learned < 1) continue; h += slotHtml(i, false); }
             if (h) h += '<button type="button" class="sk-ed' + (S.edit ? ' on' : '') + '" aria-label="Editar a barra" title="Editar a barra: trocar, reordenar e remover habilidades">✎</button>';
-            if (ex_) h += '<div class="sk-s xs" data-x="1" style="--c:' + ex_.col + '"><div class="sk-c"><img class="sk-ic" src="' + Icons.skillUrl(ex_.ic) + '" alt=""><i class="cd"></i><u></u></div><b class="sk-k set">' + esc(isTouch() ? 'SET' : ex_.key) + '</b><em class="sk-cb" title="Recarga">' + Math.round(ex_.total) + 's</em></div>';
+            if (ex_) h += '<div class="sk-s xs" data-x="1" style="--c:' + ex_.col + '"><div class="sk-c"><img class="sk-ic" src="' + Icons.skillUrl(ex_.ic) + '" alt=""><i class="cd"></i><u></u></div><b class="sk-k set">' + esc(isTouch() ? 'SET' : ex_.key) + '</b>' + (ex_.mp ? '<s class="mp" title="Custo de mana">' + ex_.mp + '</s>' : '') + '<em class="sk-cb" title="Recarga">' + Math.round(ex_.total) + 's</em></div>';
+            { const pc = primaryCap(); learnedCaps().forEach((cid) => { const n = NODES[cid], on = capOn(cid); h += '<div class="sk-s xs cap' + (on ? ' on' : '') + '" data-x="2" data-cap="' + cid + '" style="--c:' + TREES[n.tree].color2 + '" role="button" aria-pressed="' + on + '" aria-label="' + esc(n.name) + (on ? ' ligado' : ' desligado') + '"><div class="sk-c"><img class="sk-ic" src="' + Icons.skillUrl(n.ic) + '" alt=""></div><b class="sk-k set">' + (cid === pc ? (isTouch() ? 'PODER' : 'X') : '★') + '</b><em class="sk-cb tg">' + (on ? 'Ligado' : 'Desl.') + '</em></div>'; }); if (learnedCaps().length) h = h || ' '; }
+            if (h && S.edit) h += '<button type="button" class="sk-rp" title="Volta a barra para o lugar padrão">Resetar posição</button>';
+            if (h) { const cl = barCollapsed(); h = '<div class="sk-hd"><span class="sk-gr" title="Arraste para mover a barra" aria-label="Mover a barra de habilidades">⠿</span><button type="button" class="sk-col" aria-expanded="' + !cl + '" aria-label="' + (cl ? 'Expandir' : 'Recolher') + ' a barra de habilidades" title="' + (cl ? 'Expandir a barra de habilidades' : 'Recolher a barra de habilidades') + '">' + (cl ? '<small>Hab.</small> ▴' : '▾') + '</button></div>' + h; }
             if (h) h += '<div class="sk-hl"><span class="h1">' + HINT_HOVER + '</span><span class="h2">' + HINT_EDIT + '</span></div>';
-            bar.innerHTML = h; bar.classList.toggle('has', !!h); bar.classList.toggle('edit', !!S.edit); lastKey = '';
+            bar.innerHTML = h; bar.classList.toggle('has', !!h); bar.classList.toggle('edit', !!S.edit); bar.classList.toggle('col', barCollapsed()); lastKey = '';
             if (h && !S.hintSaid) { S.hintSaid = true; let seen = false; try { seen = !!localStorage.getItem('ms_sk_barhint'); localStorage.setItem('ms_sk_barhint', '1'); } catch (e) { } if (!seen && learned > 0) say(isTouch() ? 'Dica: segure uma habilidade da barra para editar (trocar, reordenar, remover).' : 'Dica: clique com o botão direito numa habilidade da barra para removê-la; arraste para reordenar.', '#9ad3ff'); }
         }
         bar.style.display = bar.classList.contains('has') ? 'flex' : 'none';
         const kids = bar.querySelectorAll('.sk-s'); let t = '';
         for (let k = 0; k < kids.length; k++) {
             const el = kids[k]; let left = 0, tot = 1, bad = false, title = '', col = '';
+            if (el.dataset.cap) { const cid = el.dataset.cap, n = NODES[cid], on = capOn(cid), tt = n.name + (on ? ' — LIGADO' : ' — desligado') + (cid === primaryCap() ? ' (tecla X)' : '') + '\n' + capLines(n).slice(0, 3).join('\n') + '\nClique para ' + (on ? 'desligar' : 'ligar'); if (el.title !== tt) el.title = tt; continue; }
             if (el.dataset.x) { const x = S.extra && S.extra.slot ? S.extra.slot() : null; if (!x) continue; left = x.left; tot = x.total; bad = !x.ok; title = x.title; }
-            else { if (el.classList.contains('empty')) continue; const s = slotInfo(+el.dataset.i); if (!s) continue; left = cdMs(s.id) / 1000; tot = Math.max(1, at(s.a.cd, s.r) * (1 - S.cdr / 100)); const why = reason(s.a, s.r); bad = !!why && left <= 0; title = s.n.name + ' (rank ' + s.r + ') — tecla ' + KEYS[+el.dataset.i].toUpperCase() + '\n' + actStats(s.id, s.r).join('\n') + (why && left <= 0 ? '\n⚠ ' + why : '') + '\nClique direito: remover · arraste: reordenar'; }
+            else { if (el.classList.contains('empty')) continue; const s = slotInfo(+el.dataset.i); if (!s) continue; left = cdMs(s.id) / 1000; tot = Math.max(1, cdOf(s.a, s.r)); const why = reason(s.a, s.r); bad = !!why && left <= 0; title = s.n.name + ' (rank ' + s.r + ') — tecla ' + KEYS[+el.dataset.i].toUpperCase() + '\n' + actStats(s.id, s.r).join('\n') + (why && left <= 0 ? '\n⚠ ' + why : '') + '\nClique direito: remover · arraste: reordenar'; }
             const p = left > 0 ? Math.min(100, left / tot * 100) : 0, cdEl = el.querySelector('.cd'), ct = el.querySelector('u'), txt = left > 0 ? (left >= 10 ? Math.ceil(left) : (Math.ceil(left * 10) / 10).toFixed(1)) : '';
             if (cdEl && cdEl._p !== p.toFixed(0)) { cdEl._p = p.toFixed(0); cdEl.style.setProperty('--p', p.toFixed(1) + '%'); }
             if (ct && ct._t !== txt) { ct._t = txt; ct.textContent = txt; }
@@ -819,8 +937,10 @@
     }
     function place() {
         if (!bar) return; const q = $('qb'), c = $('gameCanvas'); const touch = !!(window.Mobile && Mobile.on && Mobile.on());
-        const chat = $('chat-container'), hide = (chat && chat.classList.contains('open')) || S.ui.open; bar.style.visibility = hide ? 'hidden' : '';
-        if (!touch) {
+        const chat = $('chat-container'), hide = (chat && chat.classList.contains('open')) || S.ui.open || bigPanelOpen(); bar.style.visibility = hide ? 'hidden' : '';
+        if (MV) { /* arrastando */ }
+        else if (applyPos()) { /* posição escolhida pelo jogador */ }
+        else if (!touch) {
             if (q && q.style.display !== 'none' && q.offsetWidth) { const r = q.getBoundingClientRect(); bar.style.left = (r.left + r.width / 2) + 'px'; bar.style.top = Math.max(8, r.top - (bar.offsetHeight || 44) - 6) + 'px'; }
             else if (c) { const r = c.getBoundingClientRect(); bar.style.left = (r.left + r.width / 2) + 'px'; bar.style.top = Math.max(8, r.bottom - 120) + 'px'; }
         }
@@ -848,6 +968,7 @@
         if (e.repeat || !canCastKeys()) return;
         const i = KEYS.indexOf(k); if (i >= 0) { cast(i); return; }
         if (k === 'z' && S.extra && S.extra.cast) S.extra.cast();
+        else if (k === 'x') toggleCap();
     });
     function wire() {
         install(); mkBar();
@@ -856,10 +977,10 @@
     }
     window.addEventListener('load', () => setTimeout(wire, 50));
     window.SkillTree = {
-        open: openUI, close: closeUI, toggle: toggleUI, learn, reset, cast, castId, points, totalFree, ensure, adopt, recompute, validate, rankOf, learnedActives, ACT, resetCost,
-        setSlot, clearSlot, removeAt, swapSlots, openPicker: (i) => { const el = bar && bar.querySelector('.sk-s[data-i="' + i + '"]'); if (el) openPick(i, el); }, setEdit, isEdit: () => !!S.edit, bar: () => (ensure() ? player.skillTree.bar.slice() : []), isOpen: () => S.ui.open,
-        state: () => ({ tree: ensure() ? JSON.parse(JSON.stringify(player.skillTree)) : null, frame: S.frame, buffs: S.buffs.map((b) => ({ id: b.id, left: b.until - S.frame })), barrier: S.barrier && { hp: S.barrier.hp, max: S.barrier.max }, invuln: S.invuln - S.frame, queue: S.Q.length, pj: S.pj.length, zones: S.zn.length, fx: S.fx.length, bonus: S.bonus, dmgPct: S.dmgPct, skd: S.skd, cdr: S.cdr, tok: S.tok }),
-        api: { S, hit, aoe, enemies, alive, pickTarget, sdmg, baseDmg, heal, mana, addBuff, setBarrier, ring, flash, bolt, slashFx, fx, burst, puff, face, stun, slow, shoot, zone, startDash, callout, sfx, ex, ey, er, los, lv, setCd, cdMs, fnum, esc, glowSprite, dirToward, facingVec, needOk, isPetRide, say1, canCastKeys, mimicLevel: null },
+        open: openUI, close: closeUI, toggle: toggleUI, learn, reset, cast, castId, points, toggleCap, capOn, capCost: () => ({ shot: wpn() && wpn().tool === 'ranged' ? shotMp(wpn()) : 0, vigor: VIGOR_MP }), costOf, cdOf, cdTime, primaryCap, learnedCaps, totalFree, ensure, adopt, recompute, validate, rankOf, learnedActives, ACT, resetCost,
+        setSlot, clearSlot, removeAt, setCollapsed, isCollapsed: barCollapsed, resetBarPos, barRect: () => (bar ? bar.getBoundingClientRect() : null), swapSlots, openPicker: (i) => { const el = bar && bar.querySelector('.sk-s[data-i="' + i + '"]'); if (el) openPick(i, el); }, setEdit, isEdit: () => !!S.edit, bar: () => (ensure() ? player.skillTree.bar.slice() : []), isOpen: () => S.ui.open,
+        state: () => ({ tree: ensure() ? JSON.parse(JSON.stringify(player.skillTree)) : null, frame: S.frame, buffs: S.buffs.map((b) => ({ id: b.id, left: b.until - S.frame })), barrier: S.barrier && { hp: S.barrier.hp, max: S.barrier.max }, invuln: S.invuln - S.frame, queue: S.Q.length, pj: S.pj.length, zones: S.zn.length, fx: S.fx.length, bonus: S.bonus, dmgPct: S.dmgPct, skd: S.skd, cdr: cdrNow(), tok: S.tok, caps: Object.assign({}, (player.skillTree && player.skillTree.tg) || {}) }),
+        api: { S, cdTime, hit, aoe, enemies, alive, pickTarget, sdmg, baseDmg, heal, mana, addBuff, setBarrier, ring, flash, bolt, slashFx, fx, burst, puff, face, stun, slow, shoot, zone, startDash, callout, sfx, ex, ey, er, los, lv, setCd, cdMs, fnum, esc, glowSprite, dirToward, facingVec, needOk, isPetRide, say1, canCastKeys, mimicLevel: null },
         setExtra: (x) => { S.extra = x; S.barSig = ''; }, setExtraDraw: (f) => { S.extraDraw = f; }, clear
     };
 })();

@@ -4,7 +4,8 @@
    Pontos de cada árvore = floor((nível da perícia - 1) / 2): Guerreiro usa Combate (combat), Arqueiro usa Arquearia (ranged), Mago usa Magia (magic).
    Cada árvore tem 6 camadas (tier 0..5) e 6 raias (lane 0..5): 3 ramos de 2 raias. Passivas custam 1 ponto por rank (max 3 a 5 ranks); ativas custam 2 por rank (max 3).
    Efeitos de passiva (por rank): dmg (% de dano da perícia da árvore: golpes comuns E habilidades), skd (% só das habilidades ativas), crit, critDmg, atkSpd, dr, lifesteal, luck,
-   moveSpd, save, spellDmg (iguais aos atributos de Stats), maxHp, maxMp (fixos), hpRegen (vida a cada 10 s), mpRegen (mana a cada 10 s) e cdr (% de recarga). */
+   moveSpd, save, spellDmg (iguais aos atributos de Stats), cdr (% de redução de recarga: vira o atributo Stats.cdr, teto 40% somando itens), maxHp, maxMp (fixos), hpRegen (vida a cada 10 s), mpRegen (mana a cada 10 s).
+   CAPSTONE (kind 'c', camada 6): um por árvore (Vigor Inabalável / Aljava Mágica / Fonte Arcana), 1 rank, custa 3 pontos, ALTERNÁVEL (ligado/desligado). O estado ligado fica em skillTree.tg = {id: true}. */
 (function (root, factory) {
     const m = factory();
     if (typeof module === 'object' && module.exports) module.exports = m; else root.SkillNodes = m;
@@ -35,6 +36,7 @@
     }
     const P = (tree, id, name, tier, lane, req, max, eff, ic, branch, d) => add(tree, 'p', id, name, tier, lane, req, max, eff, ic, branch, { d: d || '' });
     const A = (tree, id, name, tier, lane, req, ic, branch, d) => add(tree, 'a', id, name, tier, lane, req, 3, null, ic, branch, { d: d || '' });
+    const C = (tree, id, name, tier, lane, req, ic, branch, d) => add(tree, 'c', id, name, tier, lane, req, 1, null, ic, branch, { d: d || '', cost: 3 });
 
     /* ============================ GUERREIRO (Combate) ============================ */
     (function () {
@@ -64,6 +66,9 @@
         A(t, 'w_terremoto', 'Terremoto', 5, 1.5, [['w_furor', 2]], 'quake', 0, 'Bate no chão e abala todos os inimigos ao redor.');
         P(t, 'w_inabalavel', 'Inabalável', 5, 2.5, [['w_muralha', 1]], 3, { dr: 2, maxHp: 5 }, 'tower', 1, 'Nada o derruba.');
         P(t, 'w_lenda', 'Lenda de Guerra', 5, 4.5, [['w_instinto', 2], ['w_veterano', 1]], 3, { dmg: 3, skd: 4 }, 'crown', 2, 'Seu nome é cantado nas tavernas.');
+        P(t, 'w_foco', 'Foco de Batalha', 5, 3.5, [['w_instinto', 1]], 3, { cdr: 3 }, 'hourglass', 2, 'Cabeça fria, braço rápido: as técnicas voltam mais cedo.');
+        P(t, 'w_maestria', 'Maestria Marcial', 6, 4, [['w_foco', 1]], 3, { cdr: 4 }, 'hourglass', 2, 'Dominar o próprio ritmo é a arte final da guerra.');
+        C(t, 'w_vigor_cap', 'Vigor Inabalável', 6, 2.5, [['w_inabalavel', 1], ['w_mestre', 1]], 'vigor', 1, 'Capstone. Ligado: cada golpe corpo a corpo cura 1,5% da vida máxima e custa 3 de mana. Sem mana, o vigor descansa.');
     })();
 
     /* ============================ ARQUEIRO (Arquearia) ============================ */
@@ -77,7 +82,7 @@
         P(t, 'a_olho', 'Olho de Falcão', 2, 1, ['a_mira'], 5, { crit: 1.2 }, 'eye', 0, 'Nada escapa ao seu olhar.');
         P(t, 'a_rastro', 'Rastreador', 2, 2, ['a_cacador'], 4, { luck: 3 }, 'clover', 1, 'Você sempre acha o melhor despojo.');
         A(t, 'a_multi', 'Disparo Múltiplo', 2, 3, [['a_cacador', 2]], 'multi', 1, 'Solta várias flechas de uma vez em leque.');
-        P(t, 'a_reflexo', 'Reflexos', 2, 4, ['a_leve'], 4, { atkSpd: 2 }, 'speed', 2, 'Saque rápido.');
+        P(t, 'a_reflexo', 'Reflexos', 2, 4, ['a_leve'], 4, { atkSpd: 2, cdr: 1.5 }, 'speed', 2, 'Saque rápido: tiro, recarga e de novo.');
         A(t, 'a_passo', 'Passo Sombrio', 2, 5, [['a_leve', 2]], 'shadow', 2, 'Esquiva para trás num salto, ficando intocável por instantes.');
         P(t, 'a_certeiro', 'Tiro Certeiro', 3, 0, [['a_tiro', 1]], 4, { critDmg: 8 }, 'critdmg', 0, 'Quando acerta, dói.');
         P(t, 'a_afiadas', 'Flechas Afiadas', 3, 1, [['a_olho', 2]], 4, { dmg: 2.5 }, 'arrow', 0, 'Pontas amoladas à mão.');
@@ -93,6 +98,9 @@
         P(t, 'a_rajada', 'Rajada Letal', 5, 1.5, [['a_perf', 2]], 3, { skd: 5 }, 'rage', 0, 'Suas habilidades atingem com mais força.');
         P(t, 'a_mestrecaca', 'Mestre da Caça', 5, 3.5, [['a_chuva', 1], ['a_economia', 1]], 3, { luck: 4, dmg: 3 }, 'crown', 1, 'Nenhum monstro lhe escapa.');
         P(t, 'a_fantasma', 'Predador Fantasma', 5, 4.5, [['a_sombra', 2]], 3, { lifesteal: 1, atkSpd: 2 }, 'fang', 2, 'Silêncio, e então o ataque.');
+        P(t, 'a_foco', 'Foco do Caçador', 5, 2.5, [['a_chuva', 1]], 3, { cdr: 3 }, 'hourglass', 1, 'Respiração calma: a próxima habilidade vem mais cedo.');
+        P(t, 'a_maestria', 'Maestria do Arco', 6, 1, [['a_foco', 1]], 3, { cdr: 4 }, 'hourglass', 0, 'O arco já é parte do seu corpo.');
+        C(t, 'a_aljava_cap', 'Aljava Mágica', 6, 2.5, [['a_foco', 1], ['a_atirador', 1]], 'magquiver', 1, 'Capstone. Ligado: seus disparos de arco não gastam flechas; custam mana (2 a 6 por disparo, conforme o arco). Sem mana, volta a exigir flechas.');
     })();
 
     /* ============================ MAGO (Magia) ============================ */
@@ -119,13 +127,17 @@
         P(t, 'm_ceu', 'Bênção Estelar', 4, 4.5, [['m_prece', 2], ['m_sorte', 1]], 3, { maxMp: 5, hpRegen: 2 }, 'star', 2, 'A luz das estrelas renova você.');
         P(t, 'm_arquimago', 'Arquimago', 5, 0.5, [['m_nova', 1]], 3, { dmg: 3, skd: 4 }, 'crown', 0, 'Poder digno de lendas.');
         A(t, 'm_tempest', 'Tempestade', 5, 1.5, [['m_nova', 2]], 'storm', 0, 'Invoca uma tempestade de raios sobre os inimigos.');
-        P(t, 'm_sabedoria', 'Sabedoria Infinita', 5, 3, [['m_escudo', 1]], 3, { maxMp: 6, mpRegen: 2 }, 'book', 1, 'Conhecimento é poder... e mana.');
+        P(t, 'm_sabedoria', 'Sabedoria Infinita', 5, 2.5, [['m_escudo', 1]], 3, { maxMp: 6, mpRegen: 2 }, 'book', 1, 'Conhecimento é poder... e mana.');
         P(t, 'm_lenda', 'Lenda Arcana', 5, 4.5, [['m_ceu', 1]], 3, { cdr: 3, lifesteal: 1 }, 'orb', 2, 'Seu nome ecoa pela Academia.');
+        P(t, 'm_ritmo', 'Foco Sereno', 5, 3.5, [['m_escudo', 1]], 3, { cdr: 3 }, 'hourglass', 1, 'A mente calma lança no tempo certo.');
+        P(t, 'm_maestria', 'Maestria Arcana', 6, 4, [['m_ritmo', 1]], 3, { cdr: 4 }, 'hourglass', 2, 'As magias obedecem antes de você terminar de pensar.');
+        C(t, 'm_fonte_cap', 'Fonte Arcana', 6, 2.5, [['m_sabedoria', 1], ['m_arquimago', 1]], 'fountain', 1, 'Capstone. Ligado: suas magias básicas não gastam runas; custam mais mana. Sem mana, volta a exigir runas.');
     })();
 
     /* ============================ HABILIDADES DE SET (ids usados pelo servidor para validar recargas salvas) ============================ */
     const SET_IDS = ['mimic_guerreiro', 'mimic_arqueiro', 'mimic_mago', 'bronze', 'iron', 'steel', 'gold', 'mithril', 'dragonscale', 'ranger', 'dragonhide', 'mystic', 'arcane'];
     const ACTIVE_IDS = Object.keys(NODES).filter((k) => NODES[k].kind === 'a');
+    const CAP_IDS = Object.keys(NODES).filter((k) => NODES[k].kind === 'c');
     const BAR_SLOTS = 4;
 
     /* ============================ REGRAS ============================ */
@@ -155,7 +167,7 @@
        Devolve { tree, forged, trimmed } — forged = nós inexistentes / ranks impossíveis / tipos errados (indício de edição manual); trimmed = ranks removidos por pré-requisito ou excesso de pontos. */
     function clean(raw, lv, now) {
         now = now || Date.now(); let forged = 0, trimmed = 0;
-        const out = { pts: { warrior: {}, archer: {}, mage: {} }, bar: [], hint: false, rs: { warrior: 0, archer: 0, mage: 0 }, cd: {}, ap: { hp: 0, mp: 0 } };
+        const out = { pts: { warrior: {}, archer: {}, mage: {} }, bar: [], hint: false, rs: { warrior: 0, archer: 0, mage: 0 }, cd: {}, ap: { hp: 0, mp: 0 }, tg: {} };
         const isObj = (v) => v && typeof v === 'object' && !Array.isArray(v);
         if (!isObj(raw)) return { tree: out, forged: raw === undefined || raw === null ? 0 : 1, trimmed };
         const rp = isObj(raw.pts) ? raw.pts : {};
@@ -186,8 +198,9 @@
         out.hint = raw.hint === true;
         if (isObj(raw.rs)) for (const t of TREE_IDS) { const v = raw.rs[t]; if (typeof v === 'number' && Number.isFinite(v)) out.rs[t] = Math.max(0, Math.min(9999, Math.floor(v))); }
         if (isObj(raw.cd)) { let n = 0; for (const id of Object.keys(raw.cd)) { if (n >= 40) break; if (!(Object.prototype.hasOwnProperty.call(NODES, id) ? NODES[id].kind === 'a' : SET_IDS.indexOf(id) >= 0)) continue; const v = raw.cd[id]; if (typeof v === 'number' && Number.isFinite(v) && v > now - 1000 && v <= now + 900000) { out.cd[id] = Math.floor(v); n++; } } }
+        if (isObj(raw.tg)) for (const id of CAP_IDS) if (raw.tg[id] === true && rankOf(out.pts[NODES[id].tree], id) > 0) out.tg[id] = true;   // capstone ligado (só se aprendido)
         const b = bonusAll(out); out.ap = { hp: Math.round(b.maxHp || 0), mp: Math.round(b.maxMp || 0) };
         return { tree: out, forged, trimmed };
     }
-    return { TREE_IDS, TREES, NODES, ORDER, EFF_LABEL, EFF_KEYS, SET_IDS, ACTIVE_IDS, BAR_SLOTS, pointsFor, rankOf, reqOk, costOf, spentOf, bonusOf, bonusAll, canLearn, clean };
+    return { TREE_IDS, TREES, NODES, ORDER, EFF_LABEL, EFF_KEYS, SET_IDS, ACTIVE_IDS, CAP_IDS, BAR_SLOTS, pointsFor, rankOf, reqOk, costOf, spentOf, bonusOf, bonusAll, canLearn, clean };
 });

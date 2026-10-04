@@ -458,7 +458,7 @@
 #mimic-win.on{display:flex}
 #mimic-win .mm-h{display:flex;align-items:center;gap:6px;flex-wrap:wrap} #mimic-win .mm-t{font:700 1rem var(--serif,Georgia,serif);color:#e8c469;margin-right:auto}
 #mimic-win .mm-x{width:32px;height:32px;border-radius:50%;border:1px solid #000;background:#3a2150;color:#eadfc4;font-size:1.1rem;cursor:pointer}
-#mimic-win .mm-body{display:flex;flex-direction:column;gap:7px;overflow-y:auto;min-height:0;padding-right:2px}
+#mimic-win .mm-body{display:flex;flex-direction:column;gap:7px;overflow-y:auto;overflow-anchor:none;min-height:0;padding-right:2px}
 #mimic-win .mm-tab{min-height:32px;padding:0 10px;border-radius:999px;border:1px solid #000;background:#33204a;color:#cdbfe6;font:700 .72rem var(--sans,sans-serif);cursor:pointer} #mimic-win .mm-tab.on{background:linear-gradient(#8a55c8,#5a2f96);color:#fff}
 #mimic-win .mm-sec{font:700 .72rem var(--serif,Georgia,serif);color:#bfa9e0;letter-spacing:.5px;text-transform:uppercase}
 #mimic-win .mm-box{padding:7px 9px;border-radius:10px;background:rgba(0,0,0,.28);border:1px solid rgba(190,140,255,.25);display:flex;flex-direction:column;gap:5px}
@@ -522,6 +522,7 @@ body.mimic-open #qb{display:none!important}`;
         if (si.n) h += `<div class="mm-note">Nível médio das peças equipadas: ${si.avg}.</div>`;
         return h + '</div>';
     }
+    const setSig = (cls) => { try { const si = setInfo(cls); return si.n + '|' + (si.full ? 1 : 0) + '|' + si.avg; } catch (e) { return ''; } };
     function render(force) {
         const w = $('mimic-win'); if (!w || !S.ui.open || !ensure()) return;
         const pct = player.mimicPct | 0, tg = targets(), eqN = equipped().length;
@@ -544,8 +545,12 @@ body.mimic-open #qb{display:none!important}`;
         if (nOwn === 0) h += `<div class="mm-note">Relíquias vivas que crescem junto de quem as veste. Cada peça sobe até o nível ${MAXLVL} com XP própria e muda de aparência com o nível.</div>`;
         h += '</div>';
         if (!force && w._h === h) return;
-        const keep = w.querySelector('.mm-body'), st = keep ? keep.scrollTop : 0; w._h = h; w.innerHTML = h;
-        const nb = w.querySelector('.mm-body'); if (nb) nb.scrollTop = st; drawPreviews();
+        /* Outros módulos (setskills.js: "Habilidade do Set") encaixam uma caixa dentro do .mm-body depois de cada render, via temporizador. Se o render a apagasse, o conteúdo
+           encolhia 98 px e, 350 ms depois, voltava: o navegador "ancorava" a rolagem e cada clique numa cor descia a tela. Por isso a caixa de fora é preservada (enquanto o
+           estado do set é o mesmo; senão sai e o outro módulo recria) e a ancoragem de rolagem é desligada no corpo do painel. */
+        const sig = tab + '|' + setSig(tab);
+        const keep = w.querySelector('.mm-body'), st = keep ? keep.scrollTop : 0, foreign = keep && w._sig === sig ? keep.querySelector(':scope > .ss-box') : null; w._h = h; w._sig = sig; w.innerHTML = h;
+        const nb = w.querySelector('.mm-body'); if (nb) { if (foreign) nb.insertBefore(foreign, nb.firstChild); nb.scrollTop = st; } drawPreviews();
     }
     function onClick(e) {
         const el = e.target.closest('[data-a]'); if (!el) return; const a = el.dataset.a, n = el.dataset.n; if (!ensure()) return;

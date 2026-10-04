@@ -1,17 +1,19 @@
 /* MiniScape 2D — atributos especiais, correr e energia.
    Atributos (somados de tudo que está equipado + conjuntos + outras fontes registradas):
      crit (% de chance), critDmg (% a mais sobre o 1,5x padrão), moveSpd (% velocidade de movimento, teto +50%), atkSpd (% velocidade de ataque, teto +50%),
-     lifesteal (% do dano que cura), luck (% a mais de chance de drop), dr (% de redução de dano sofrido, teto 50%), spellDmg (dano mágico plano), save (% de poupar munição/runas).
+     lifesteal (% do dano que cura), luck (% a mais de chance de drop), dr (% de redução de dano sofrido, teto 50%), spellDmg (dano mágico plano), save (% de poupar munição/runas), cdr (% de REDUÇÃO DE RECARGA das habilidades da árvore e de set; teto 40%, recarga mínima 1,5 s).
+   Campo de item: `cdr: 5` (amuletos, anéis, chapéus/capuzes, sets via Gear.SETS[...].bonus.cdr, Mímicos...): é somado em Stats.get().cdr, aparece na dica do item e no painel Atributos.
    Outras fontes (pets, montarias, buffs, mímicos...): Stats.addSource('nome', () => ({ crit: 2, moveSpd: 5 })) — a função é chamada a cada leitura (resultado em cache de ~80 ms); Stats.removeSource('nome').
    Correr: Shift (segura) ou tecla R (liga/desliga) ou botão Correr (celular). +45% de velocidade; gasta Energia (0 a 100) enquanto anda correndo; regenera parado/andando.
    Velocidade total (itens + correr) nunca passa de +80%. O servidor não valida deslocamento por sync, então não há limite a ajustar lá. */
 (function () {
     'use strict';
     const $ = (id) => document.getElementById(id);
-    const KEYS = ['crit', 'critDmg', 'moveSpd', 'atkSpd', 'lifesteal', 'luck', 'dr', 'spellDmg', 'save'];
-    const CAPS = { crit: 75, critDmg: 200, moveSpd: 50, atkSpd: 50, lifesteal: 25, luck: 100, dr: 50, spellDmg: 60, save: 60 };
-    const LABEL = { crit: 'Crítico', critDmg: 'Dano crítico', moveSpd: 'Vel. de movimento', atkSpd: 'Vel. de ataque', lifesteal: 'Roubo de vida', luck: 'Sorte (drops)', dr: 'Redução de dano', spellDmg: 'Dano mágico', save: 'Poupar munição/runas' };
-    const FMT = { crit: (v) => v + '%', critDmg: (v) => '+' + v + '%', moveSpd: (v) => '+' + v + '%', atkSpd: (v) => '+' + v + '%', lifesteal: (v) => v + '%', luck: (v) => '+' + v + '%', dr: (v) => v + '%', spellDmg: (v) => '+' + v, save: (v) => v + '%' };
+    const KEYS = ['crit', 'critDmg', 'moveSpd', 'atkSpd', 'lifesteal', 'luck', 'dr', 'spellDmg', 'save', 'cdr'];
+    const CAPS = { crit: 75, critDmg: 200, moveSpd: 50, atkSpd: 50, lifesteal: 25, luck: 100, dr: 50, spellDmg: 60, save: 60, cdr: 40 };
+    const LABEL = { crit: 'Crítico', critDmg: 'Dano crítico', moveSpd: 'Vel. de movimento', atkSpd: 'Vel. de ataque', lifesteal: 'Roubo de vida', luck: 'Sorte (drops)', dr: 'Redução de dano', spellDmg: 'Dano mágico', save: 'Poupar munição/runas', cdr: 'Redução de recarga' };
+    const FMT = { crit: (v) => v + '%', critDmg: (v) => '+' + v + '%', moveSpd: (v) => '+' + v + '%', atkSpd: (v) => '+' + v + '%', lifesteal: (v) => v + '%', luck: (v) => '+' + v + '%', dr: (v) => v + '%', spellDmg: (v) => '+' + v, save: (v) => v + '%', cdr: (v) => '-' + v + '%' };
+    const CD_MIN = 1.5;   // recarga mínima (s) de qualquer habilidade
     const SKNAME = { combat: 'Combate', ranged: 'Arquearia', magic: 'Magia' };
     const SLOTS = ['head', 'body', 'weapon', 'shield', 'amulet', 'ring'];
     const RUN_BONUS = 45, TOTAL_CAP = 80, E_MAX = 100, E_DRAIN = 5, E_REGEN_WALK = 3, E_REGEN_IDLE = 7, E_MIN_RESTART = 12;
@@ -69,6 +71,8 @@
     const cd = (base) => Math.max(14, Math.round(base / (1 + get().atkSpd / 100)));   // recarga do ataque (em quadros)
     const luckMul = () => 1 + get().luck / 100;
     const spellDmg = () => Math.floor(get().spellDmg);
+    const cdrPct = () => Math.min(CAPS.cdr, get().cdr);   // redução de recarga atual (0..40)
+    const cdTime = (base) => { base = Number(base) || 0; return Math.min(base, Math.max(CD_MIN, Math.round(base * (1 - cdrPct() / 100) * 10) / 10)); };   // recarga (s) já com a redução; nunca abaixo de 1,5 s
     const saves = () => Math.random() * 100 < get().save;   // true = não gasta a munição/runa desta vez
 
     /* ---------- nível mínimo para equipar ---------- */
@@ -171,6 +175,6 @@
     document.addEventListener('visibilitychange', () => { if (document.hidden) E.shift = false; });
     setInterval(renderHud, 250);
 
-    window.Stats = { force: (m) => { force = m || null; }, KEYS, CAPS, LABEL, addSource, removeSource, hasSource: (n) => !!sources[n], invalidate, get, critChance, critMul, rollAttack, lifestealHeal, reduce, cd, luckMul, spellDmg, saves, reqOf, canEquip, tipHtml, tick, spd, moveBonus, energy, setRun, isRunToggled: () => E.toggle,
+    window.Stats = { force: (m) => { force = m || null; }, KEYS, CAPS, LABEL, addSource, removeSource, hasSource: (n) => !!sources[n], invalidate, get, critChance, critMul, rollAttack, lifestealHeal, reduce, cd, luckMul, spellDmg, saves, cdrPct, cdTime, CD_MIN, reqOf, canEquip, tipHtml, tick, spd, moveBonus, energy, setRun, isRunToggled: () => E.toggle,
         get running() { return E.running; }, get exhausted() { return E.exhausted; }, E_MAX, RUN_BONUS, TOTAL_CAP, state: () => ({ running: E.running, want: E.want, exhausted: E.exhausted, toggle: E.toggle, shift: E.shift, energy: energy() }), _setShift: (v) => { E.shift = !!v; } };
 })();

@@ -1654,9 +1654,9 @@
         if (sp > 60) { p.x = px; p.y = py; }
         else { p.x = px; p.y = py; moving = sp > 0.08; p.mv += ((moving ? 1 : 0) - p.mv) * 0.2; p.ph += sp * (isMain && root.Stats && root.Stats.running ? 0.095 : 0.085); }
         if (moving || anim > 0) p.still = now;
-        // vista pedida pelo facing; parado/sem agir por alguns segundos volta a olhar para a frente (para baixo)
-        let wv = facing.y < 0 ? 'back' : facing.y > 0 ? 'front' : 'side'; const wf = facing.x < 0 ? -1 : 1;
-        if (!moving && anim <= 0 && now - p.still > 2.8) wv = 'front';
+        // vista pedida pelo facing (a direção do ÚLTIMO movimento). Parado, o personagem continua voltado para onde andou: nada de "virar para a frente" sozinho.
+        // Sem componente horizontal no facing (andando para cima/baixo) o lado do espelho é mantido, para não piscar ao trocar de vista.
+        const wv = facing.y < 0 ? 'back' : facing.y > 0 ? 'front' : 'side', wf = facing.x < 0 ? -1 : facing.x > 0 ? 1 : p.face;
         if (!p.view) p.view = wv;
         else if (wv !== p.view) { if (++p.vc >= 4) { p.view = wv; p.vc = 0; p.turn = 1; } } else p.vc = 0;
         if (wf !== p.face && p.view === 'side') { if (++p.fc >= 3) { p.face = wf; p.fc = 0; p.turn = 1; } } else if (p.view !== 'side') p.face = wf, p.fc = 0; else p.fc = 0;
@@ -1700,6 +1700,6 @@
         const sp = speciesOf(o.dbKey, def), S0 = S[sp], ow = o.w || 30, oh = o.h || 30; if (NPCLOOK[sp]) return o.y + oh - Math.max(oh, 46) * 1.02;
         if (!S0) return o.y; const sc = ow / S0.w; return o.y + oh - (S0.h * (S0.bounds ? 1.12 : 1) + (S0.fly || 0)) * sc * 0.95;
     }
-    Object.assign(root.Art, { creatureTop, hash, hex, shade, alpha, mix, ell, poly, rrect, limb, limb2, lg, rg, glow, tri, paint, OUT, PI, TAU, S, NPCLOOK, human, hat, prop, speciesOf, stepState, drawCreature, drawPlayer, drawLook, defaultLook, cleanLook, dimsOf, PAL, SKIN, HAIR_NAMES });
+    Object.assign(root.Art, { pstate: (k) => _pst[k] || null, creatureTop, hash, hex, shade, alpha, mix, ell, poly, rrect, limb, limb2, lg, rg, glow, tri, paint, OUT, PI, TAU, S, NPCLOOK, human, hat, prop, speciesOf, stepState, drawCreature, drawPlayer, drawLook, defaultLook, cleanLook, dimsOf, PAL, SKIN, HAIR_NAMES });
 })(typeof window !== 'undefined' ? window : globalThis);
 

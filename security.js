@@ -134,7 +134,7 @@ module.exports = function createSecurity(opts) {
     const int = (v, a, b, d) => { v = Math.floor(Number(v)); return Number.isFinite(v) ? Math.max(a, Math.min(b, v)) : d; };
 
     /* limites de campos numéricos de itens (muito acima do maior valor legítimo do catálogo + encantos + Mímicos nível 50) */
-    const ITEM_CAPS = { bonusDmg: 200, defBonus: 200, heal: 5000, mp: 1000, cookXp: 5000, tier: 12, bait: 12, shopQty: 1000, luck: 100, crit: 100, critDmg: 400, moveSpd: 100, atkSpd: 100, lifesteal: 50, dr: 80, spellDmg: 100, save: 100, craftQty: 1000, weight: 1000, value: 100000000, ench: 12 };
+    const ITEM_CAPS = { bonusDmg: 200, defBonus: 200, heal: 5000, mp: 1000, cookXp: 5000, tier: 12, bait: 12, shopQty: 1000, luck: 100, crit: 100, critDmg: 400, moveSpd: 100, atkSpd: 100, lifesteal: 50, dr: 80, spellDmg: 100, save: 100, cdr: 60, craftQty: 1000, weight: 1000, value: 100000000, ench: 12 };
     const HEX = /^#[0-9a-fA-F]{6}$/;
     function cleanItem(it, ctx) {
         if (!it || typeof it !== 'object' || Array.isArray(it)) return null;
@@ -269,7 +269,7 @@ module.exports = function createSecurity(opts) {
                         const p = psk[key], pxp = int(p.xp, 0, BAL.MAX_XP, 0), pl = BAL.levelForXp(pxp);
                         const gain = xp - pxp;
                         if (gain > 0) {   // orçamento generoso (jogo limpo nunca chega perto): ~4 mil XP/s sustentados por perícia, ou 1 milhão de uma vez (vários minutos sem salvar)
-                            const allow = spend(user, 'xp:' + key, gain, BAL.XP_BUDGET.cap * 2, BAL.XP_BUDGET.perMin * 4, now);
+                            const mx = mobXpCeil(now), allow = spend(user, 'xp:' + key, gain, BAL.XP_BUDGET.cap * 2 + mx * 12, BAL.XP_BUDGET.perMin * 4 + mx * 6, now);   // monstros do Dev com XP base alto aumentam o orçamento (XP por golpe = xpBase x dano/vida)
                             if (allow < gain) { sk[key] = { level: pl, xp: pxp, next: BAL.xpNext(pl), name: SK[key][0] }; notes.push('xp:' + key + '+' + gain); n++; }
                         }
                     }
@@ -406,11 +406,16 @@ module.exports = function createSecurity(opts) {
         let r = dmgRate.get(user); if (!r || now - r.t > 1000) { r = { t: now, n: 0 }; dmgRate.set(user, r); } return ++r.n <= 20;
     }
     setInterval(() => { const n = Date.now(); for (const [k, r] of dmgRate) if (n - r.t > 5000) dmgRate.delete(k); }, 60000).unref();
+    let _mxc = { t: 0, v: 0 };
+    function mobXpCeil(now) {   // maior XP base entre os monstros do catálogo (cache de 10 s)
+        if (now - _mxc.t < 10000) return _mxc.v; let v = 0; try { const c = getDB().npcDB; if (c) for (const k of Object.keys(c)) { const x = c[k] && Number(c[k].xp); if (x > v) v = x; } } catch (e) { }
+        _mxc = { t: now, v: Math.min(BAL.MAX_MOB_XP, v) }; return _mxc.v;
+    }
     function expectedMaxHp(map, id) {
         const db = getDB(); try {
             if (String(id) === '424242') { const d = db.npcDB && db.npcDB.wboss_golem; return d && d.hp > 0 ? d.hp : BAL.mobTable(50, 'world').hp; }
             const m = db.worldData && hasOwn(db.worldData, map) ? db.worldData[map] : null; if (!m || !Array.isArray(m.entities)) return 0;
-            const e = m.entities.find(o => o && String(o.id) === String(id)); if (!e) return 0;
+            const e = m.entities.find(o => o && String(o.id) === String(id)); if (!e) { const x = opts.extraMob && opts.extraMob(map, id); return x && x.hp > 0 ? Math.min(2000000, x.hp) : 0; }
             const d = e.dbKey && db.npcDB && hasOwn(db.npcDB, e.dbKey) ? db.npcDB[e.dbKey] : null; const hp = e.maxHp || (d && d.hp) || e.hp || 0; return hp > 0 ? Math.min(2000000, hp) : 0;
         } catch (e) { return 0; }
     }

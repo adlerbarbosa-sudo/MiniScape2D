@@ -388,7 +388,7 @@ html.touch #bank-win .bk-t { display: none; } html.touch #bank-win .bk-b { paddi
 #sk-btn.pts{animation:skPulse 1.6s ease-in-out infinite} #sk-btn.pts i{display:flex!important}
 @keyframes skPulse{0%,100%{box-shadow:0 0 0 rgba(255,226,122,0)}50%{box-shadow:0 0 12px rgba(255,226,122,.9)}}
 html.touch #sk-btn,#m-top #sk-btn{position:static;width:40px;height:40px;display:flex}
-#sk-bar{position:fixed;z-index:100;transform:translateX(-50%);display:none;align-items:center;gap:9px;padding:9px 9px 12px 11px;border-radius:12px;background:rgba(20,12,6,.78);border:1px solid rgba(0,0,0,.6)}
+#sk-bar{position:fixed;z-index:88;transform:translateX(-50%);display:none;align-items:center;gap:9px;padding:9px 9px 12px 11px;border-radius:12px;background:rgba(20,12,6,.78);border:1px solid rgba(0,0,0,.6)}
 .sk-s{position:relative;width:48px;height:48px;border-radius:50%;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
 .sk-s .sk-c{position:absolute;inset:0;border-radius:50%;border:2px solid var(--c,#c79a3a);background:radial-gradient(#3a2a1a,#150d06);overflow:hidden;box-shadow:0 0 6px rgba(0,0,0,.6)}
 .sk-s .sk-ic{position:absolute;inset:5px;width:34px;height:34px;pointer-events:none}
@@ -464,7 +464,7 @@ html.touch #sk-bar:hover:not(.edit) .sk-hl{display:none}
 .sk-n .nm{fill:#d8ccaa;font:600 10.5px sans-serif;paint-order:stroke;stroke:#000;stroke-width:3px}
 #sk-panel{padding:8px;margin-bottom:8px;border-radius:8px;background:rgba(0,0,0,.25);border:1px solid rgba(255,226,122,.2)}#sk-panel h4{margin:0 0 4px;font:700 .85rem var(--serif);color:var(--gold-2)}
 .sk-pl{display:flex;justify-content:space-between;font-size:.76rem;color:var(--c);padding:1px 0}.sk-pl .hot{color:#ffe27a}#sk-panel .sk-b{width:100%;margin-top:5px;min-height:32px}
-html.touch #sk-bar{left:auto!important;right:calc(env(safe-area-inset-right,0px) + 8px);bottom:100px;top:auto!important;transform:none;max-width:72vw;flex-wrap:wrap;justify-content:flex-end;gap:10px 9px}
+html.touch #sk-bar:not(.mv){left:auto!important;right:calc(env(safe-area-inset-right,0px) + 8px);bottom:100px;top:auto!important;transform:none;max-width:72vw;flex-wrap:wrap;justify-content:flex-end;gap:10px 9px}
 html.touch .sk-s{width:46px;height:46px}html.touch .sk-s.xs{width:50px;height:50px}
 html.touch .sk-hl{left:auto;right:0;transform:none;white-space:normal;width:max-content;max-width:70vw;text-align:right}
 html.touch .sk-strip .sk-s{width:42px;height:42px}
@@ -475,3 +475,29 @@ html.touch .sk-strip .sk-s{width:42px;height:42px}
  .sk-sh{display:none}.sk-strip{flex-wrap:nowrap;gap:8px;padding:8px 10px 10px;margin:0}.sk-sl{display:none}.sk-ft{padding:0}.sk-pts{font-size:.72rem}.sk-pts small{display:none}.sk-b{min-height:34px}
 }
 @media (max-width:640px) and (min-height:521px){.sk-main{flex-direction:column}.sk-side{width:auto;max-height:36%}}
+
+/* ---- poderes finais (capstones) alternáveis: botão na barra de habilidades, nó grande na árvore, custo de mana + flechas ---- */
+.sk-s s sup{font-size:.52rem;margin-left:1px;color:#e8d49a;vertical-align:baseline}
+.sk-s.xs.cap{cursor:pointer}.sk-s.xs.cap .sk-c{animation:none;border-style:dashed;filter:grayscale(.85) brightness(.75);opacity:.85}
+.sk-s.xs.cap.on .sk-c{animation:skGlow 1.4s ease-in-out infinite;border-style:solid;filter:none;opacity:1;box-shadow:0 0 14px 3px var(--c)}
+.sk-s.xs.cap .sk-k{min-width:19px;background:linear-gradient(#ffe9a8,#c79a3a)}
+.sk-s.xs.cap .sk-cb.tg{color:#aeb4bf;font-size:.58rem;letter-spacing:.2px}.sk-s.xs.cap.on .sk-cb.tg{background:#0f5a3a;color:#bfffe0;border:1px solid #2ee59a}
+html.touch .sk-s.xs.cap .sk-k{font-size:.5rem;padding:0 2px;white-space:nowrap}html.touch .sk-s.xs.cap .sk-cb.tg{font-size:.62rem;height:16px;padding:0 5px}
+.sk-n.cap .rg{stroke:#c79a3a;stroke-width:4}.sk-n.cap .rg2{fill:none;stroke:#7a5a22;stroke-width:1.5;stroke-dasharray:3 3}
+.sk-n.cap.st-on .rg,.sk-n.cap.st-max .rg{stroke:#ffe27a;filter:drop-shadow(0 0 10px #ffe27a)}.sk-n.cap.tgon .rg2{stroke:#8affd8;stroke-dasharray:none;filter:drop-shadow(0 0 5px #8affd8)}
+.sk-tg.c{color:#ffe27a}.sk-ef.on{color:#8affd8;font-weight:700}
+.sk-b.tgl{width:100%;margin-top:8px;min-height:38px;border-color:#6a5a3a}.sk-b.tgl.on{background:linear-gradient(#1c6b4a,#0f4a30);border-color:#2ee59a;color:#d8ffee;box-shadow:0 0 10px rgba(46,229,154,.45)}
+
+/* barra de habilidades: alça para mover, botão de recolher, aba pequena quando recolhida */
+#sk-bar .sk-hd{display:flex;flex-direction:column;align-items:center;gap:3px;align-self:stretch;justify-content:center}
+#sk-bar .sk-gr{width:22px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:6px;background:rgba(255,255,255,.08);color:#caa95a;font-size:.95rem;line-height:1;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
+#sk-bar.moving .sk-gr{cursor:grabbing;background:rgba(255,226,122,.25)}
+#sk-bar .sk-col{min-width:22px;height:22px;padding:0 4px;border-radius:6px;border:1px solid #000;background:#33220f;color:#e6d7b4;font:700 .8rem/1 sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:3px;touch-action:manipulation}
+#sk-bar .sk-col small{font-size:.62rem;font-weight:700}
+#sk-bar.mv{transform:none!important;right:auto!important;bottom:auto!important}
+#sk-bar.col{padding:3px 5px;gap:4px;flex-direction:row;border-radius:10px;opacity:.92}
+#sk-bar.col .sk-hd{flex-direction:row;gap:4px}
+#sk-bar.col > :not(.sk-hd){display:none!important}
+.sk-rp{display:none;height:26px;padding:0 8px;border-radius:8px;border:1px solid #000;background:#33220f;color:#e6d7b4;font:700 .7rem sans-serif;cursor:pointer}
+#sk-bar.edit .sk-rp{display:block}
+html.touch #sk-bar .sk-gr{width:30px;height:26px}html.touch #sk-bar .sk-col{min-width:30px;height:28px}

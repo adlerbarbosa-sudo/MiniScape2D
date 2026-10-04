@@ -22,7 +22,7 @@
     // XP total do nível L = floor( 1/4 * soma_{l=1}^{L-1} floor( l + 300 * 2^(l/7) ) )
     const XP = [0, 0];
     (function () { let pts = 0; for (let l = 1; l <= 130; l++) { pts += Math.floor(l + 300 * Math.pow(2, l / 7)); XP[l + 1] = Math.floor(pts / 4); } })();
-    let XP_RATE = 1.5;   // multiplicador global dos ganhos (1 = ritmo puro do RuneScape); 1,5 = "um pouco mais generoso"
+    let XP_RATE = 0.65;  // multiplicador global dos ganhos (1 = ritmo puro do RuneScape). 0,65 = ritmo "longa jornada": ~300 h até o 99 de uma perícia de combate (sem VIP)
     try { if (typeof process !== 'undefined' && process.env && +process.env.XP_RATE > 0) XP_RATE = +process.env.XP_RATE; } catch (e) { }
     try { if (typeof globalThis !== 'undefined' && +globalThis.MS_XP_RATE > 0) XP_RATE = +globalThis.MS_XP_RATE; } catch (e) { }
     XP_RATE = Math.max(0.1, Math.min(50, XP_RATE));
@@ -46,8 +46,8 @@
     const tierScale = (L) => 1 + TIER_K * (Math.max(1, Math.min(MAX_LEVEL, Math.floor(L) || 1)) - 1);
     const COMBAT_SKILLS = ['combat', 'ranged', 'magic', 'hp', 'defence'];
     const isCombatSkill = (k) => COMBAT_SKILLS.indexOf(k) >= 0;
-    const XP_PER_DMG = 0.16;        // XP base por ponto de dano CAUSADO na perícia usada (antes de XP_RATE): ~0,24 com XP_RATE 1,5
-    const TAKEN_XP = 1.33;          // XP base por ponto de dano SOFRIDO, para Vitalidade e para Defesa (cada uma), antes de XP_RATE
+    const XP_PER_DMG = 0.09;        // XP base por ponto de dano CAUSADO na perícia usada (antes de XP_RATE): ~0,058 com XP_RATE 0,65
+    const TAKEN_XP = 0.80;          // XP base por ponto de dano SOFRIDO, para Vitalidade e para Defesa (cada uma), antes de XP_RATE
     const craftXp = (units, k) => Math.round((18 + 7 * Math.max(1, units)) * Math.max(1, k || 1));   // Artesanato: depende do tamanho da receita
 
     /* ============================ HP, MANA E REGENERAÇÃO ============================ */
@@ -93,7 +93,8 @@
     // dano de monstros ACIMA do nível do jogador sobe 4% por nível de diferença (mob +20 níveis = x1,8; teto x3,5); abaixo, cai (mob -10 níveis = x0,6, piso x0,5). Nível igual = tabela pura.
     const levelEdge = (mobLevel, cmbLevel) => Math.max(0.5, Math.min(3.5, 1 + 0.04 * ((Number(mobLevel) || 1) - Math.max(1, Number(cmbLevel) || 1))));
     const xpFromDealt = (dmg) => Math.max(0, Number(dmg) || 0) * XP_PER_DMG;
-    function damageTakenXp(dmg, mobLevel, cmbLevel) { const v = Math.max(0, Number(dmg) || 0) * TAKEN_XP * relevance(mobLevel, cmbLevel); return { hp: v, defence: v }; }
+    // XP de Defesa/Vitalidade por dano sofrido; xpRatio = xpBase/vida do monstro (padrão = XP_PER_DMG): monstro de XP alto rende mais XP defensivo (fator limitado a 0 a 100)
+    function damageTakenXp(dmg, mobLevel, cmbLevel, xpRatio) { const k = xpRatio > 0 ? Math.min(100, xpRatio / XP_PER_DMG) : 1, v = Math.max(0, Number(dmg) || 0) * TAKEN_XP * relevance(mobLevel, cmbLevel) * k; return { hp: v, defence: v }; }
 
     // requisitos de nível de itens/receitas: os níveis antigos iam até ~30; a escala nova vai até 99 (x2), alinhada com os monstros por nível
     const reqLevel = (l) => { l = Math.floor(Number(l)) || 1; return l <= 1 ? 1 : Math.min(MAX_LEVEL, l * 2); };
@@ -143,13 +144,52 @@
         else { lvl = legacyLevel(def); const g = def && def.group; tier = !(def && def.maxHit > 0) ? 'critter' : g === 'chefe' ? 'boss' : lvl < 6 ? 'light' : 'common'; }
         return mobTable(lvl, tier);
     }
-    // define vida/dano novos na definição (idempotente: balV)
+    /* ---- Definição de criatura (editor DEV): o que o admin digita MANDA ----
+       HP final = HP base (hpBase) + HP por nível (hpLvl) x nível. hpLvl padrão: 10 (comum) ou 100 (grupo 'chefe'); 0 vale. Nível 0/vazio = só o HP base.
+       Dano base = hit + hitLvl x nível; golpe sorteado em [0,9 x base, 1,5 x base]. XP base (xp) = XP total que a criatura "vale": ver mobXpFor.
+       Só as criaturas padrão do jogo (sem def.adm) usam a tabela por nível (MOBS). def.hp é SEMPRE o HP final (todo o resto do jogo lê def.hp). */
+    const MOB_HP_LVL = 10, BOSS_HP_LVL = 100, MAX_MOB_HP = 2000000, MAX_MOB_XP = 10000000;
+    const hpPerLevel = (def) => { const v = def && def.hpLvl; if (typeof v === 'number' && isFinite(v) && v >= 0) return v; return def && def.group === 'chefe' ? BOSS_HP_LVL : MOB_HP_LVL; };
+    function mobHp(def) {   // HP final da criatura (0 = NPC, sem vida)
+        if (!def) return 0;
+        if (!(typeof def.hpBase === 'number' && isFinite(def.hpBase))) return Math.max(0, Number(def.hp) || 0);
+        if (!(def.hpBase > 0)) return 0;
+        const lvl = Math.max(0, Math.min(999, Math.floor(Number(def.level)) || 0));
+        return Math.max(1, Math.min(MAX_MOB_HP, Math.round(def.hpBase + hpPerLevel(def) * lvl)));
+    }
+    const defaultXp = (hp) => Math.max(1, Math.round((Number(hp) || 0) * XP_PER_DMG));   // XP base padrão de quem não tem XP definido: 0,09 por ponto de vida
+    function mobXpBase(def, hp) { const x = Number(def && def.xp); return x > 0 ? Math.min(MAX_MOB_XP, x) : defaultXp(hp > 0 ? hp : mobHp(def) || (def && def.hp)); }
+    // XP de combate de UM golpe: xpBase x (dano efetivo / vida máxima final). Dano efetivo = limitado à vida restante (sem overkill). XP 1000 e vida 1000 = 1 XP por 1 HP tirado.
+    function mobXpFor(def, dealt, maxHp, hpLeft) {
+        let d = Math.max(0, Number(dealt) || 0); if (hpLeft !== undefined && hpLeft !== null) d = Math.min(d, Math.max(0, Number(hpLeft) || 0));
+        const mh = Number(maxHp) > 0 ? Number(maxHp) : (mobHp(def) || Number(def && def.hp) || 0); if (!(mh > 0) || !(d > 0)) return 0;
+        return mobXpBase(def, mh) * Math.min(1, d / mh);
+    }
+    const xpPerHp = (def, maxHp) => { const mh = Number(maxHp) > 0 ? Number(maxHp) : (mobHp(def) || Number(def && def.hp) || 0); return mh > 0 ? mobXpBase(def, mh) / mh : XP_PER_DMG; };
+    function admDamage(def) {   // dano da definição do admin: base = hit + hitLvl x nível; faixa [0,9x, 1,5x]
+        if (!(typeof def.hit === 'number' && isFinite(def.hit))) return false;
+        const lvl = Math.max(0, Math.min(999, Math.floor(Number(def.level)) || 0)), B = Math.max(0, def.hit) + Math.max(0, Number(def.hitLvl) || 0) * lvl;
+        let lo = 0, hi = 0; if (B > 0) { lo = Math.max(1, Math.floor(B * LO)); hi = Math.max(lo, Math.ceil(B * HI)); }
+        def.dmin = lo; def.dmax = hi; def.maxHit = hi; return true;
+    }
+    // idempotente: pode rodar a cada carga/salvamento. Devolve true se mudou algo.
     function applyMob(key, def) {
-        if (!def || typeof def !== 'object' || !(def.hp > 0) || def.balV >= VERSION) return false;
+        if (!def || typeof def !== 'object') return false;
         if (def.group === 'npc' || def.behavior === 'npc') return false;
-        const s = mobSpec(key, def);
-        def.level = s.level; def.tier = s.tier; def.hp = s.hp; def.dmin = s.dmin; def.dmax = s.dmax; def.maxHit = s.dmax; def.balV = VERSION;
-        return true;
+        if (!(def.hp > 0) && !(def.hpBase > 0)) return false;
+        const before = JSON.stringify([def.hp, def.hpBase, def.hpLvl, def.dmin, def.dmax, def.maxHit, def.xp, def.level, def.balV, def.adm]);
+        const inTable = typeof key === 'string' && own(MOBS, key);
+        if (def.adm) { /* definida pelo admin: vale o que ele digitou */ }
+        else if (typeof def.hpBase === 'number' && isFinite(def.hpBase)) { /* já migrada */ }
+        else if (inTable && !(def.balV >= VERSION)) {   // criatura padrão do jogo: tabela por nível
+            const s = mobSpec(key, def);
+            def.level = s.level; def.tier = s.tier; def.hp = s.hp; def.hpBase = s.hp; def.hpLvl = 0; def.dmin = s.dmin; def.dmax = s.dmax; def.maxHit = s.dmax; def.hit = s.dmax > 0 ? Math.round(s.avg / 1.2) : 0; def.balV = VERSION;
+        } else if (def.balV >= VERSION) { def.hpBase = def.hp; if (!(typeof def.hpLvl === 'number')) def.hpLvl = 0; }   // já balanceada antes (vida final): preserva
+        else { def.hpBase = def.hp; def.adm = true; def.balV = VERSION; }                                              // criada/ajustada pelo admin antes do v2: o que ele digitou vale como base
+        if (!def.adm && inTable) def.xp = defaultXp(def.hp);   // XP base da criatura padrão: coerente com a vida da tabela
+        if (typeof def.hpBase === 'number') def.hp = mobHp(def);
+        if (def.adm) admDamage(def);
+        return before !== JSON.stringify([def.hp, def.hpBase, def.hpLvl, def.dmin, def.dmax, def.maxHit, def.xp, def.level, def.balV, def.adm]);
     }
     function applyNpcDB(db) { let n = 0; if (!db || typeof db !== 'object') return 0; for (const k of Object.keys(db)) if (applyMob(k, db[k])) n++; return n; }
     // entidades inimigas do mundo carregam hp/maxHp copiados do catálogo: alinha com a definição já balanceada
@@ -180,7 +220,13 @@
     const maxMpAllowed = (mag, tree) => MP_BASE + MP_PER_LEVEL * (lv1(mag) - 1) + 60 + Math.max(0, Number(tree) || 0) + 40;
     // XP por minuto por perícia que o servidor aceita (orçamento do balde): base para "player"; VIPs ganham 2x/4x de XP no jogo
     const XP_BUDGET = { perMin: 70000, cap: 500000 };
-    const roleXpMul = (role) => role === 'vip_full' || role === 'admin' ? 4 : role === 'vip_light' ? 2 : 1;
+    /* VIP MODESTO (sem pay-to-win): só um empurrãozinho de XP (+10% Light, +15% Full; admin = Full). Drop, velocidade e dano NÃO mudam com VIP; o resto do VIP é conveniência/cosmético (cor e [VIP] no chat). */
+    const VIP_XP = { vip_light: 1.10, vip_full: 1.15, admin: 1.15 };
+    const roleXpMul = (role) => (typeof role === 'string' && Object.prototype.hasOwnProperty.call(VIP_XP, role)) ? VIP_XP[role] : 1;
+    /* Impulso de iniciante: as primeiras horas são mais rápidas (x1,6 no nível 1, caindo linear até x1,0 no nível 30) para o jogador não sentir o ritmo longo logo de cara. */
+    const earlyMul = (L) => 1 + 0.6 * Math.max(0, Math.min(1, (30 - lv1(L)) / 29));
+    /* Bônus de eventos (Lua Cheia etc.) nunca passam de +10% somados; maestria/engajamento ficam em engage.js. */
+    const EVENT_XP_CAP = 1.10;
 
     /* ============================ MIGRAÇÃO (contas antigas -> balV 2) ============================ */
     const SKILL_NAMES = { hp: 'Health', combat: 'Combat', defence: 'Defence', ranged: 'Ranged', magic: 'Magic', prayer: 'Prayer', woodcutting: 'Woodcut', mining: 'Mining', smithing: 'Smithing', firemaking: 'Firemk', cooking: 'Cooking', crafting: 'Crafting', fishing: 'Fishing', farming: 'Farming', alchemy: 'Alchemy', enchanting: 'Enchant' };
@@ -229,8 +275,8 @@
         HP_BASE, HP_PER_LEVEL, MP_BASE, MP_PER_LEVEL, MIN_MP, CLASS_BONUS, RACE_BONUS, maxHpForLevel, maxMpForLevel, maxHp, maxMp, hpRegenTick, MP_REGEN_FLAT, HEAL_MULT, MP_MULT, healOf, mpOf, FLAT_HP, FLAT_MP,
         LEVEL_POWER, RATING_W, LO, HI, weaponMult, dmgBase, rangeOf, playerDmgRange, rollDmg, avgOf,
         ARMOR_W, DEF_K, RED_CAP, defRating, dmgReduction, mobHitChance, levelEdge, combatLevel, relevance, xpFromDealt, damageTakenXp,
-        reqLevel, TIERS, MOBS, typRating, typArmor, typDefR, mobTable, mobSpec, legacyLevel, applyMob, applyNpcDB, applyWorld, mobDamage, mobLevelOf,
-        ratingMax, critMax, hitCap, dmgPerSecCap, clientSkillPerSec, MAX_TREE_HP, MAX_TREE_MP, maxHpAllowed, maxMpAllowed, XP_BUDGET, roleXpMul,
+        reqLevel, TIERS, MOBS, typRating, typArmor, typDefR, mobTable, mobSpec, legacyLevel, MOB_HP_LVL, BOSS_HP_LVL, MAX_MOB_HP, MAX_MOB_XP, hpPerLevel, mobHp, defaultXp, mobXpBase, mobXpFor, xpPerHp, admDamage, applyMob, applyNpcDB, applyWorld, mobDamage, mobLevelOf,
+        ratingMax, critMax, hitCap, dmgPerSecCap, clientSkillPerSec, MAX_TREE_HP, MAX_TREE_MP, maxHpAllowed, maxMpAllowed, XP_BUDGET, roleXpMul, VIP_XP, earlyMul, EVENT_XP_CAP,
         SKILL_NAMES, SKILL_KEYS, convertOld, migratePlayer, fmtNum, fmtK, fixDesc
     };
 });

@@ -25,6 +25,7 @@ const createSecurity = require('./security');
 const BAL = require('./public/balance.js');        // balanceamento v2 (XP, vida, dano, monstros): mesma fonte do cliente
 const SKILLNODES = require('./public/skillnodes.js');
 const createSQ = require('./specialquests');
+const createEngageSrv = require('./engagesrv');   // engajamento: recompensa diária, missões, Códice, maestria, eventos (engagesrv.js + public/engage.js)
 const { cleanSQ } = createSQ;
 
 const scrypt = util.promisify(crypto.scrypt);
@@ -80,7 +81,7 @@ function emptyDB() {
         users: Object.create(null), worldData: null, itemDB: null, npcDB: null,
         chat: [{ sender: 'Sistema', msg: 'O reino está aberto. Boa aventura!', color: '#2ecc71' }], chatVer: 1,
         mapVersion: Date.now(), sessions: Object.create(null),
-        mobDeaths: Object.create(null), specialQuests: Object.create(null), specialClaims: Object.create(null), specialProg: Object.create(null)
+        mobDeaths: Object.create(null), specialQuests: Object.create(null), specialClaims: Object.create(null), specialProg: Object.create(null), engage: createEngageSrv.cleanDB(null)
     };
 }
 function normalizeDB(d) {
@@ -114,6 +115,7 @@ function normalizeDB(d) {
     if (d.specialQuests && typeof d.specialQuests === 'object') for (const id of Object.keys(d.specialQuests)) { const q = cleanSQ(d.specialQuests[id], id); if (q) out.specialQuests[id] = q; }
     if (d.specialClaims && typeof d.specialClaims === 'object') for (const id of Object.keys(d.specialClaims)) { const c = d.specialClaims[id]; if (out.specialQuests[id] && c && typeof c === 'object' && !Array.isArray(c)) { const o = Object.create(null); for (const u of Object.keys(c)) if (Number.isFinite(c[u])) o[u] = c[u]; out.specialClaims[id] = o; } }
     if (d.specialProg && typeof d.specialProg === 'object') for (const id of Object.keys(d.specialProg)) { const c = d.specialProg[id]; if (out.specialQuests[id] && c && typeof c === 'object' && !Array.isArray(c)) { const o = Object.create(null); for (const u of Object.keys(c)) if (Number.isFinite(c[u]) && c[u] >= 0) o[u] = Math.min(1e6, Math.floor(c[u])); out.specialProg[id] = o; } }
+    out.engage = createEngageSrv.cleanDB(d.engage);   // estado de engajamento por conta (diária, missões, Códice, placar)
     if (out.worldData) healWorld(out.worldData);
     if (Number.isFinite(d.mapVersion)) out.mapVersion = d.mapVersion;
     if (d.sessions && typeof d.sessions === 'object') {
@@ -165,7 +167,8 @@ function loadDB() {
     return migrated;
 }
 let db = loadDB();
-const sec = createSecurity({ dataDir: DATA_DIR, root: __dirname, getDB: () => db });
+let eng = null;   // engajamento (criado depois: precisa de extras/activePlayers)
+const sec = createSecurity({ dataDir: DATA_DIR, root: __dirname, getDB: () => db, extraMob: (m, id) => (eng ? eng.extraMob(m, id) : null) });
 const SEC_IP = (req) => String(req.ip || '').replace(/^::ffff:/, '');
 let worldStr = db.worldData ? JSON.stringify(db.worldData) : '';
 let dbStr = JSON.stringify([db.itemDB, db.npcDB]);
@@ -372,6 +375,7 @@ const lastChat = Object.create(null);        // user -> timestamp
 const social = createSocial({ db, activePlayers, markDirty });
 const extras = createExtras({ db, activePlayers, markDirty, knownItem: (n) => sec.knownItem(n) });
 const sq = createSQ({ getDB: () => db, extras, sec, markDirty, giftLog: (o) => giftLog(o) });   // missões especiais do admin (specialquests.js)
+eng = createEngageSrv({ getDB: () => db, extras, sec, markDirty, activePlayers });
 function chatFor(user) { return db.chat.filter(c => social.chatVisible(user, c)).map(c => { if (!c.party) return c; const { sender, msg, color } = c; return { sender, msg, color }; }); }
 
 /* ---------- respawn autoritativo dos monstros e chefes ----------
@@ -381,7 +385,7 @@ function chatFor(user) { return db.chat.filter(c => social.chatVisible(user, c))
 const MOB_RESPAWN_MS = Math.max(500, +process.env.MOB_RESPAWN_MS || 15000);
 const BOSS_RESPAWN_MS = Math.max(500, +process.env.BOSS_RESPAWN_MS || MOB_RESPAWN_MS);
 function mobEntity(map, id) { const m = db.worldData && hasOwn(db.worldData, map) ? db.worldData[map] : null; return m && Array.isArray(m.entities) ? m.entities.find(o => o && String(o.id) === String(id)) : null; }
-function mobSpecies(map, id) { if (String(id) === '424242') return 'wboss_golem'; const e = mobEntity(map, id); return e && typeof e.dbKey === 'string' ? e.dbKey : ''; }
+function mobSpecies(map, id) { if (String(id) === '424242') return 'wboss_golem'; const e = mobEntity(map, id); if (e) return typeof e.dbKey === 'string' ? e.dbKey : ''; const x = eng ? eng.extraMob(map, id) : null; return x ? x.sp : ''; }   // invasão: a espécie vem do relógio do servidor
 function mobIsBoss(map, id) { const k = mobSpecies(map, id); const d = k && db.npcDB && hasOwn(db.npcDB, k) ? db.npcDB[k] : null; return !!(d && d.group === 'chefe'); }
 function respawnMs(map, id) { return mobIsBoss(map, id) ? BOSS_RESPAWN_MS : MOB_RESPAWN_MS; }
 function respawnDue(map, id, deadTime, now) { return String(id) === '424242' ? extras.bossHour(now) !== extras.bossHour(deadTime) : now - deadTime >= respawnMs(map, id); }
@@ -659,7 +663,7 @@ app.post('/api/save', (req, res) => {
         if (r.error) { sec.slog('SAVE-REJECT', req.user, ip, r.error, true); return res.status(400).json({ error: r.error, code: 'INVALID' }); }
         const pd = r.pd; const pendSig = (x) => x ? JSON.stringify([x.mkt || null, x.escrow || null, (x.mailDone || []).length, (x.tradeDone || []).length, (x.mailDone || []).slice(-1)[0] || '', (x.tradeDone || []).slice(-1)[0] || '']) : '';
         pendChanged = pendSig(pd) !== pendSig(u.playerData);
-        cleanFishData(pd); cleanStatsData(pd); sec.cleanTree(req.user, ip, pd, req.role); extras.cleanPetData(pd); require('./mimicnames').cleanMimicData(pd);
+        cleanFishData(pd); cleanStatsData(pd); sec.cleanTree(req.user, ip, pd, req.role); eng.cleanEngage(pd); extras.cleanPetData(pd); require('./mimicnames').cleanMimicData(pd);
         sec.checkCollections(req.user, req.role, pd, u.playerData, ip);
         u.playerData = pd; lastSaveAt[req.user] = now;
         if (r.notes.length) adjusted = r.notes.slice(0, 12);   // o cliente deve avisar: o servidor corrigiu parte do progresso enviado
@@ -680,6 +684,13 @@ app.post('/api/save', (req, res) => {
                 sec.slog('ADMIN-WORLD', req.user, ip, 'mundo salvo: ' + nNew + ' mapa(s) (antes ' + nOld + '), ' + Math.round(s.length / 1024) + ' KB, ' + wv.warns.length + ' aviso(s)', true);
             }
             if (wv.warns.length) { warnings = wv.warns.slice(0, 30); sec.slog('WORLD-WARN', req.user, ip, wv.warns.slice(0, 8).join(' | ')); }
+        }
+        if (nv || wv) {   // HP final = base + HP por nível x nível (Balance.mobHp): recalcula o catálogo, as criaturas do mundo e os monstros vivos do servidor
+            try {
+                BAL.applyNpcDB(db.npcDB || {});
+                if (db.worldData && BAL.applyWorld(db.worldData, db.npcDB || {})) { worldStr = JSON.stringify(db.worldData); changed = true; }
+                for (const mk of Object.keys(serverMobs)) for (const id of Object.keys(serverMobs[mk])) { const sm = serverMobs[mk][id], ex = sec.expectedMaxHp(mk, id); if (sm && ex > 0 && ex !== sm.maxHp) { sm.maxHp = ex; sm.hp = sm.isDead ? 0 : ex; } }
+            } catch (e) { console.error('[balanceamento] HP dos monstros:', e.message); }
         }
         if (iv || nv) { const s = JSON.stringify([db.itemDB, db.npcDB]); if (s !== dbStr) { dbStr = s; changed = true; sec.slog('ADMIN-CATALOG', req.user, ip, 'catálogo de itens/NPCs salvo', true); } }
         if (changed) db.mapVersion = Math.max(Date.now(), db.mapVersion + 1);
@@ -733,7 +744,8 @@ function doSync(user, b, ip) {
         look: (b.look !== undefined && cleanLook(b.look)) || (prev ? prev.look : null) || savedLook(user),
         pet: b.pet !== undefined ? extras.cleanPetSync(b.pet) : (prev ? prev.pet : null), mount: b.mount !== undefined ? extras.cleanMountId(b.mount) : (prev ? prev.mount : null), ms: b.ms !== undefined ? extras.cleanMountStage(b.ms) : (prev ? prev.ms : 0) };
     if (typeof b.emote === 'string' && /^[a-z]{2,10}$/.test(b.emote) && (!prev || !prev.emote || now - prev.emote.t > 1500)) activePlayers[user].emote = { k: b.emote, t: now };
-    try { if (!/^casa_/.test(map)) sq.onVisit(user, map); } catch (e) { }
+    try { if (!/^casa_/.test(map)) { sq.onVisit(user, map); eng.onVisit(user, map); } } catch (e) { }
+    try { if (eng.isLegend(user) && !activePlayers[user].title) activePlayers[user].title = 'Lenda da Semana'; } catch (e) { }
     const host = electHost(map); const isHost = host === user;
 
     if (!serverMobs[map]) serverMobs[map] = Object.create(null);
@@ -759,8 +771,9 @@ function doSync(user, b, ip) {
             }
             if (!sm.isDead) {
                 if (dmg === 0 && sm.aggro && sm.aggro !== user && activePlayers[sm.aggro] && activePlayers[sm.aggro].map === map) continue;   // "vi você" (dano 0) não rouba o alvo de outro jogador
-                sm.hp -= dmg; sm.aggro = user;   // o monstro foca em quem bateu por último
-                if (sm.hp <= 0) { sm.hp = 0; sm.isDead = true; sm.deadTime = now; sm.aggro = null; noteDeath(map, id, now); killed.push(id); try { sq.onKill(user, mobSpecies(map, id), map, id); } catch (e) { } }
+                const hp0 = sm.hp; sm.hp -= dmg; sm.aggro = user;   // o monstro foca em quem bateu por último
+                if (dmg > 0 && id === '424242') { try { eng.onBossDamage(user, Math.min(dmg, Math.max(0, hp0))); } catch (e) { } }   // placar semanal do Colosso (dano que o servidor aceitou)
+                if (sm.hp <= 0) { sm.hp = 0; sm.isDead = true; sm.deadTime = now; sm.aggro = null; noteDeath(map, id, now); killed.push(id); try { const spc = mobSpecies(map, id); sq.onKill(user, spc, map, id); eng.onKill(user, spc, map, id); } catch (e) { } }
             }
         }
     }
@@ -888,6 +901,11 @@ app.get('/api/admin/search', auth, adminOnly, userLimit('search', 120, 60000), (
     const list = Object.keys(db.users).filter(n => !q || n.toLowerCase().includes(q)).sort().slice(0, 30).map(n => ({ name: n, role: db.users[n].role, online: !!activePlayers[n] && now - activePlayers[n].lastSeen < 6000 }));
     res.json({ users: list });
 });
+
+/* engajamento: recompensa diária (/api/daily), missões, Códice, maestria e placar (/api/engage). Relógio e recompensas SEMPRE do servidor; entrega pelo correio com id único. */
+app.get('/api/daily', auth, userLimit('daily', 30, 60000), (req, res) => { const st = eng.state(req.user); res.json({ ok: true, now: st.now, daily: st.daily, boost: st.boost }); });
+app.post('/api/daily', auth, userLimit('daily', 20, 60000), (req, res) => { const r = eng.act(req.user, { a: 'daily' }, SEC_IP(req)); if (r && r.ok) persistNow(); res.json(r); });
+app.post('/api/engage', auth, userLimit('engage', 90, 60000), (req, res) => { const b = req.body; const r = eng.act(req.user, b, SEC_IP(req)); if (r && r.ok && b && ['daily', 'qclaim', 'qbonus', 'mclaim', 'lclaim'].includes(b.a)) persistNow(); res.json(r); });
 
 /* missões especiais: jogadores listam e resgatam; só o admin cria/edita (specialquests.js) */
 app.get('/api/specialquest/list', auth, userLimit('sqlist', 60, 60000), (req, res) => res.json({ ok: true, quests: sq.list(req.user) }));
