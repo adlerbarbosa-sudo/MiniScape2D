@@ -457,17 +457,18 @@
         const seat = { x: side ? -1 : 0, y: P.seatY - bob * 0.5 + br };
         const hipY = by + 4, lk = (-hipY) / 15.5;
         shadow(P.len + 1, 0.32);
+        const L2 = (segs, col) => { g.lineCap = 'round'; g.lineJoin = 'round'; for (let pass = 0; pass < 2; pass++) { g.strokeStyle = pass ? col : OUT; for (const q of segs) { g.lineWidth = pass ? q[4] : q[4] + 1.8; g.beginPath(); g.moveTo(q[0], q[1]); g.lineTo(q[2], q[3]); g.stroke(); } } };   // membro numa peça só: contorno de tudo, depois preenchimento (sem emendas)
         const leg = (kind, hx, u, col, w, far, go) => {
             const A = mv * (W ? 1 : 1.2), s = sin(u), l = Math.max(0, cos(u)) * A, gq = gal ? gaitPose(ph / TAU - go, 0.28) : null; let fx, fy, a3;
             if (kind === 'f') {
                 const a1 = (gq ? gq[0] * 0.95 : s * 0.7 * A) + 0.06, a2 = a1 * 0.5 - (gq ? gq[1] * 1.9 : l * 1.4) - 0.02, jx = hx + sin(a1) * 7.5 * lk, jy = hipY + cos(a1) * 7.5 * lk;
                 fx = jx + sin(a2) * 8 * lk; fy = jy + cos(a2) * 8 * lk; a3 = a2;
-                ln(hx, hipY, jx, jy, 5.2 * w, col); ln(jx, jy, fx, fy, 3.4 * w, col);
+                L2([[hx, hipY, jx, jy, (W ? 5.2 : 5) * w], [jx, jy, fx, fy, (W ? 3.4 : 3) * w]], col);
             } else {
                 const a1 = gq ? 0.55 + gq[0] * 0.8 : 0.55 + s * 0.5 * A, a2 = gq ? -0.85 + gq[0] * 0.55 - gq[1] * 0.5 : -0.85 + s * 0.45 * A - l * 0.4, a3b = gq ? 0.35 + gq[0] * 0.3 - gq[1] * 1.3 : 0.35 + s * 0.2 * A - l * 1.0;
                 const kx = hx + sin(a1) * 7.2 * lk, ky = hipY + cos(a1) * 7.2 * lk, hx2 = kx + sin(a2) * 7.2 * lk, hy2 = ky + cos(a2) * 7.2 * lk;
                 fx = hx2 + sin(a3b) * 5 * lk; fy = hy2 + cos(a3b) * 5 * lk; a3 = a3b;
-                ln(hx, hipY, kx, ky, 6.6 * w, col); ln(kx, ky, hx2, hy2, 3.8 * w, col); ln(hx2, hy2, fx, fy, 2.8 * w, col);
+                L2([[hx, hipY, kx, ky, (W ? 6.6 : 6.2) * w], [kx, ky, hx2, hy2, (W ? 3.8 : 3.4) * w], [hx2, hy2, fx, fy, (W ? 2.8 : 2.6) * w]], col);
             }
             ell(fx + 0.8, fy, 3.1 * w, 1.9 * w, far ? cd : (W ? c2 : c1)); g.strokeStyle = 'rgba(0,0,0,.5)'; g.lineWidth = 0.6; for (let i = 0; i < 2; i++) { g.beginPath(); g.moveTo(fx + 1.6 + i * 1.1, fy - 0.8); g.lineTo(fx + 2 + i * 1.1, fy + 1.2); g.stroke(); }
         };
@@ -482,22 +483,28 @@
             const L = P.len, H = P.h;
             if (W) { g.beginPath(); g.moveTo(-L, by - 1); g.quadraticCurveTo(-L - 0.8, by - H, -L + 6, by - H - 0.2); g.quadraticCurveTo(0, by - H + (W ? 0.6 : 1.6), L - 6, by - H - 0.8); g.quadraticCurveTo(L + 1.2, by - H, L, by + 1.5); g.quadraticCurveTo(L - 2, by + H + 1, L - 8, by + H - 0.6); g.quadraticCurveTo(0, by + H - 3.2, -L + 8, by + H - 0.4); g.quadraticCurveTo(-L - 0.8, by + H, -L, by - 1); g.closePath();
             g.fillStyle = c1; g.fill(); g.lineWidth = 1; g.lineJoin = 'round'; g.strokeStyle = OUT; g.stroke(); } else {
-                const fxx = sin(ph - 0.3) * 2.6 * mv; blob([[-L * 0.5, by + 0.6 + fxx, L * 0.56, H * 1.02], [L * 0.5, by - 0.4 - fxx, L * 0.52, H * 1.14], [0, by + 1.2, L * 0.72, H * 0.8]], c1);
-                ell(L * 0.34, by - H + 1.6 - fxx, 4.8, 3, sh(c1, 0.1), -0.35, 0.8); ell(-L * 0.55, by - 0.5 + fxx, 6, H * 0.8, sh(c1, 0.06), 0, 0.8);
-                ell(0, by + H * 0.78, L * 0.7, 2, c3, 0, 0); g.strokeStyle = 'rgba(215,195,255,.7)'; g.lineWidth = 0.9; g.lineCap = 'round'; g.beginPath(); g.moveTo(-L * 0.9, by - H * 0.55 + fxx); g.quadraticCurveTo(0, by - H - 0.4, L * 0.8, by - H * 0.9 - fxx); g.stroke();
+                // corpo da pantera numa peça só: quadril -> lombo -> ombro -> pescoço baixo -> peito fundo -> barriga recolhida
+                const fxx = sin(ph - 0.3) * (gal ? 2.6 : 0.6) * mv, nd = sin(t * 1.6) * 0.4 - (gal ? sin(ph - 0.3) * 1.8 : 0), phx = L - 0.5 + 6.5, phy = by + 0.8 + nd;
+                g.beginPath(); g.moveTo(-L, by - 0.5 + fxx); g.bezierCurveTo(-L - 1, by - H - 1 + fxx, -L + 5, by - H - 1.8 + fxx, -12, by - H - 1.5 + fxx);
+                g.quadraticCurveTo(-4, by - H + 0.9, 3, by - H + 0.4); g.quadraticCurveTo(L * 0.3, by - H - 2.4 - fxx, 15.5, by - H - 2 - fxx);
+                g.quadraticCurveTo(21.5, by - H - 1.2, phx - 4.6, phy - 4.6); g.lineTo(phx - 3.8, phy + 4.8);
+                g.quadraticCurveTo(L + 2, by + H + 1.4, L - 4, by + H + 2 - fxx); g.quadraticCurveTo(L - 10, by + H + 2.4, 6, by + H - 0.6);
+                g.quadraticCurveTo(-4, by + H - 3, -L + 9, by + H - 1.2 + fxx); g.quadraticCurveTo(-L - 0.5, by + H - 0.6 + fxx, -L, by - 0.5 + fxx); g.closePath();
+                g.fillStyle = c1; g.fill(); g.lineWidth = 1; g.lineJoin = 'round'; g.strokeStyle = OUT; g.stroke();
+                g.save(); g.clip();
+                g.globalAlpha = 0.7; ell(2, by + H + 0.4, L + 4, 3.4, c3, 0, 0); g.globalAlpha = 0.22; ell(-3, by - H - 0.4, L - 2, 3, c2, 0, 0); ell(-13, by + 0.4 + fxx, 6.4, 6.6, c2, 0, 0); ell(L * 0.36, by - 0.4 - fxx, 5.6, 6.4, c2, 0, 0); g.globalAlpha = 1;
+                g.lineCap = 'round'; g.lineJoin = 'round'; for (let i = 0; i < 5; i++) { g.globalAlpha = 0.65 + sin(t * 2.2 + i) * 0.3; const x0 = -14 + i * 6.4, fy = i < 2 ? fxx : -fxx * 0.5; g.strokeStyle = 'rgba(160,120,255,.5)'; g.lineWidth = 2.4; g.beginPath(); g.moveTo(x0, by - 4.6 + fy); g.lineTo(x0 + 1.5, by - 1.6 + fy); g.lineTo(x0 - 0.2, by + 0.2 + fy); g.lineTo(x0 + 1.3, by + 3.8 + fy); g.stroke(); g.strokeStyle = '#eadfff'; g.lineWidth = 0.9; g.stroke(); } g.globalAlpha = 1;
+                g.strokeStyle = 'rgba(215,195,255,.7)'; g.lineWidth = 0.9; g.beginPath(); g.moveTo(-L * 0.9, by - H * 0.5 + fxx); g.quadraticCurveTo(-4, by - H - 0.2, 3, by - H + 0.2); g.quadraticCurveTo(L * 0.3, by - H - 2.4 - fxx, 15.5, by - H - 2 - fxx); g.stroke();
+                g.restore(); glow(0, by + 1, 24, 'rgba(150,100,255,A)', 0.22);
             }
             if (W) { // dorso escuro, barriga clara, pelo em tufos
                 g.save(); g.clip(); ell(-1, by - H + 1, L - 1, 4.2, c3, 0, 0); ell(0, by + H - 1.2, L - 3, 3.6, c2, 0, 0); g.restore();
                 g.fillStyle = c3; g.beginPath(); g.moveTo(-L + 5, by - H - 0.2); for (let i = 0; i < 8; i++) { g.lineTo(-L + 8 + i * 4, by - H - 2.4 + (i % 2) * 0.8); g.lineTo(-L + 10 + i * 4, by - H - 0.4); } g.closePath(); g.fill();
                 g.strokeStyle = 'rgba(0,0,0,.28)'; g.lineWidth = 0.8; g.beginPath(); g.moveTo(-14, by - 4); g.quadraticCurveTo(-7, by - 3, -6, by + 5); g.stroke(); g.beginPath(); g.moveTo(5, by - 6); g.quadraticCurveTo(11, by - 1, 8, by + 6); g.stroke();
-            } else {
-                g.lineCap = 'round'; g.lineJoin = 'round'; for (let i = 0; i < 5; i++) { g.globalAlpha = 0.65 + sin(t * 2.2 + i) * 0.3; const x0 = -13 + i * 6.2; g.strokeStyle = 'rgba(160,120,255,.5)'; g.lineWidth = 2.4; g.beginPath(); g.moveTo(x0, by - 4.4); g.lineTo(x0 + 1.4, by - 1.4); g.lineTo(x0 - 0.2, by + 0.4); g.lineTo(x0 + 1.2, by + 3.8); g.stroke(); g.strokeStyle = '#eadfff'; g.lineWidth = 0.9; g.stroke(); } g.globalAlpha = 1;   // veios de luz rúnica
-                glow(0, by + 1, 24, 'rgba(150,100,255,A)', 0.22);
-                g.strokeStyle = 'rgba(0,0,0,.3)'; g.lineWidth = 0.8; g.beginPath(); g.moveTo(-14, by - 3); g.quadraticCurveTo(-7, by - 2, -7, by + 5); g.stroke();
             }
             // pescoço + cabeça
             const nod = sin(t * 1.6) * 0.4 - (mv > 0.1 ? sin(ph * 2) * 0.5 : 0), hx = L - 0.5 + (W ? 4 : 6.5), hy = by - (W ? 7.5 : -0.8) + nod;
-            g.beginPath(); g.moveTo(L - 9, by - H - 0.8); g.quadraticCurveTo(L - 2, by - H - (W ? 1.6 : 0), hx, hy - (W ? 3.4 : 4.6)); g.lineTo(hx + 1, hy + 5); g.quadraticCurveTo(L, by + 5, L - 8, by + H - 1); g.closePath(); g.fillStyle = c1; g.fill(); g.lineWidth = 1; g.strokeStyle = OUT; g.stroke();
+            if (W) { g.beginPath(); g.moveTo(L - 9, by - H - 0.8); g.quadraticCurveTo(L - 2, by - H - (W ? 1.6 : 0), hx, hy - (W ? 3.4 : 4.6)); g.lineTo(hx + 1, hy + 5); g.quadraticCurveTo(L, by + 5, L - 8, by + H - 1); g.closePath(); g.fillStyle = c1; g.fill(); g.lineWidth = 1; g.strokeStyle = OUT; g.stroke(); }
             if (W) { ell(L - 2.4, by + 0.5, 6.6, 7.8, c2); poly([L - 8, by + 6, L - 6.2, by + 11, L - 3.6, by + 6.6], c2, 0.9); poly([L - 4, by + 6.8, L - 1.4, by + 11.6, L + 1.6, by + 5.4], c2, 0.9); poly([L - 1, by - 5, L + 3, by - 1, L + 1, by + 3], sh(c2, 0.1), 0); }
             if (!W) {   // equipamento da Pantera Sombra por nível da montaria: colar com espinhos (1+), placa rúnica no ombro (2+)
                 const stg = o.stage | 0, brown = '#6b4a3a', brownL = '#9a6e4e';
