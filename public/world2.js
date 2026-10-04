@@ -15,6 +15,7 @@
         skeleton_knight: { name: 'Cavaleiro Esquelético', group: 'monstro', species: 'skeleton', behavior: 'aggressive', range: 110, speed: 1.0, w: 34, h: 50, hp: 90, maxHit: 11, xp: 140, c1: '#cfc8b0', c2: '#3a4a6a', lootStr: 'Bones,1,1|Coins,0.9,90|Steel Bar,0.3,1|Coal,0.4,2', dialog: '', shopStr: '', desc: 'Guarda das catacumbas, ainda de armadura.', biome: 'Catacumbas' },
         lich_boss: { name: 'Lich Rei Ossian', group: 'chefe', species: 'darkmage', behavior: 'aggressive', range: 230, speed: 0.8, w: 64, h: 92, hp: 700, maxHit: 26, xp: 3000, c1: '#12301f', c2: '#5dffb0', lootStr: 'Lich Crown,0.35,1|Soul Gem,1,2|Bone Blade,0.25,1|Mithril Bar,0.6,2|Coins,1,1200|Greater Health Potion,0.8,3', dialog: '', shopStr: '', desc: 'O rei morto-vivo das Catacumbas. Traga poções, aço e coragem.', biome: 'Catacumbas' }
     };
+    try { if (window.Balance) Balance.applyNpcDB(CREATURES); } catch (e) { }   // balanceamento v2
 
     /* ============================ BESTIÁRIO ============================ */
     function record(key) {

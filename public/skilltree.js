@@ -58,7 +58,7 @@
         S.cdr = Math.min(40, b.cdr || 0); S.hpRegen = b.hpRegen || 0; S.mpRegen = b.mpRegen || 0;
         const hp = Math.round(b.maxHp || 0), mp = Math.round(b.maxMp || 0), dh = hp - (st.ap.hp | 0), dm = mp - (st.ap.mp | 0);
         if (dh) { player.stats.maxHp = Math.max(1, player.stats.maxHp + dh); player.stats.hp = dh > 0 ? Math.min(player.stats.maxHp, player.stats.hp + dh) : Math.min(player.stats.hp, player.stats.maxHp); st.ap.hp = hp; }
-        if (dm) { player.stats.maxMp = Math.max(6, player.stats.maxMp + dm); player.stats.mp = dm > 0 ? Math.min(player.stats.maxMp, player.stats.mp + dm) : Math.min(player.stats.mp, player.stats.maxMp); st.ap.mp = mp; }
+        if (dm) { player.stats.maxMp = Math.max(Balance.MIN_MP, player.stats.maxMp + dm); player.stats.mp = dm > 0 ? Math.min(player.stats.maxMp, player.stats.mp + dm) : Math.min(player.stats.mp, player.stats.maxMp); st.ap.mp = mp; }
         try { Stats.invalidate(); if (dh || dm) updateUI(); } catch (e) { }
     }
     function validate() {   // níveis mudaram (subiu, ou o servidor corrigiu): tira o que passou do permitido e avisa de pontos novos
@@ -77,12 +77,13 @@
     }
 
     /* ============================ DANO E ALVOS ============================ */
-    function baseDmg(skill) {
+    function baseDmg(skill) {   // dano-base (decimal) da perícia: Balance.dmgBase(nível, poder da arma); a faixa dos golpes comuns é [0,9x, 1,5x] desse valor
         const L = lv(skill), w = wpn() || {}, b = (window.Content && Content.buff) ? Content.buff('dmg') : 0;
-        if (skill === 'combat') return 1 + Math.floor(L / 2) + (w.bonusDmg || 0) + b;
-        if (skill === 'ranged') { const am = player.equipment.ammo; return 1 + Math.floor(L / 2) + (w.bonusDmg || 0) + ((am && am.bonusDmg) || 0) + b; }
-        let sp = null; try { sp = spellbookDB.find((s) => s.id === player.activeSpell); } catch (e) { }
-        return (sp ? sp.dmg : 3) + Math.floor(L / 2) + (w.bonusDmg || 0) + (window.Stats ? Stats.spellDmg() : 0);
+        let rt;
+        if (skill === 'combat') rt = (w.bonusDmg || 0) + b;
+        else if (skill === 'ranged') { const am = player.equipment.ammo; rt = (w.bonusDmg || 0) + ((am && am.bonusDmg) || 0) + b; }
+        else { let sp = null; try { sp = spellbookDB.find((s) => s.id === player.activeSpell); } catch (e) { } rt = (sp ? sp.dmg : 3) + (w.bonusDmg || 0) + (window.Stats ? Stats.spellDmg() : 0); }
+        return Balance.dmgBase(L, rt);
     }
     const buffDmg = () => { let v = 0; for (const b of S.buffs) if (b.until > S.frame && b.dmg) v += b.dmg; return v; };
     function sdmg(skill, mult) {
@@ -91,7 +92,7 @@
     }
     function capDmg(v, mode) {   // o crítico, o conjunto Mímico, pets e marca multiplicam DEPOIS: mantém o golpe final abaixo do teto do servidor (900)
         const worst = (mode === 'crit' || (mode !== 'none' && Stats.critChance() > 0)) ? Stats.critMul() : 1;
-        const L = Math.max(lv('combat'), lv('ranged'), lv('magic')), lim = Math.min(850, Math.floor((L * 0.5 + 150) * 4.68 * 0.9));   // mesmo teto de security.hitCap, com folga
+        const L = Math.max(lv('combat'), lv('ranged'), lv('magic')), lim = Math.floor(Balance.hitCap(L) * 0.9);   // mesmo teto de Balance.hitCap (usado pelo servidor), com folga
         return Math.max(1, Math.min(v, Math.floor(lim / (worst * 1.3 * 1.5))));
     }
     function enemies() {
@@ -130,7 +131,7 @@
         let sum = 0; for (let i = 1; i < w.length; i += 2) sum += w[i];
         for (let i = 0; i < Q.length && S.tok >= 1;) {
             const h = Q[i]; if (!alive(h.t)) { Q.splice(i, 1); continue; } if (h.due > S.frame) { i++; continue; }
-            if (w.length && sum + h.dmg > 1100) break;
+            if (w.length && sum + h.dmg > Balance.clientSkillPerSec(Math.max(lv('combat'), lv('ranged'), lv('magic')))) break;
             Q.splice(i, 1); S.tok--; sum += h.dmg; w.push(S.frame, h.dmg);
             S.inSkill = true; try { if (h.mode) Stats.force(h.mode); window.applyDamage(h.t, h.dmg, h.sk, h.dmg); } catch (e) { console.error(e); } finally { Stats.force(null); S.inSkill = false; }
         }
@@ -314,8 +315,8 @@
             ring(player.x, player.y + 4, 6, 90, '#ff5a2a', 22, 5); flash(player.x, player.y - 14, 56, '#ff6a2a', 18); burst(player.x, player.y - 14, '#ff8a3a', 20, 2); callout('FUROR!', '#ff7a3a'); sfx('kill'); return true;
         } });
     def('w_muralha', { sk: 'combat', need: 'melee', col: '#8ad0ff', cd: [50, 45, 40], pct: [35, 50, 65], dur: 10,
-        info: (r) => ['Barreira de ' + at(ACT.w_muralha.pct, r) + '% da vida máxima (+10)', 'Absorve dano por até ' + ACT.w_muralha.dur + ' s'],
-        run(r) { setBarrier(player.stats.maxHp * at(ACT.w_muralha.pct, r) / 100 + 10, ACT.w_muralha.dur, '#8ad0ff'); ring(player.x, player.y + 4, 10, 60, '#8ad0ff', 22, 5); flash(player.x, player.y - 16, 52, '#8ad0ff', 18); callout('MURALHA!', '#8ad0ff'); sfx('accept'); return true; } });
+        info: (r) => ['Barreira de ' + at(ACT.w_muralha.pct, r) + '% da vida máxima (+100)', 'Absorve dano por até ' + ACT.w_muralha.dur + ' s'],
+        run(r) { setBarrier(player.stats.maxHp * at(ACT.w_muralha.pct, r) / 100 + 100, ACT.w_muralha.dur, '#8ad0ff'); ring(player.x, player.y + 4, 10, 60, '#8ad0ff', 22, 5); flash(player.x, player.y - 16, 52, '#8ad0ff', 18); callout('MURALHA!', '#8ad0ff'); sfx('accept'); return true; } });
     def('w_terremoto', { sk: 'combat', need: 'melee', col: '#c89a5a', cd: [28, 25, 22], mult: [1.8, 2.2, 2.6], rad: [120, 135, 150], st: [50, 60, 70],
         info: (r) => ['Raio: ' + at(ACT.w_terremoto.rad, r) + ' px · até 8 inimigos', 'Atordoa por ' + fnum(at(ACT.w_terremoto.st, r) / FR) + ' s'],
         run(r) {
@@ -398,10 +399,10 @@
             flash(player.x, player.y - 14, 24, '#8fd8ff', 8); callout('Raio de Gelo!', '#8fd8ff'); sfx('enchant'); return true;
         } });
     def('m_cura', { sk: 'magic', need: 'staff', col: '#6fe08a', cd: [14, 12, 10], pct: [20, 30, 45], mp: [8, 9, 12],
-        info: (r) => ['Cura ' + at(ACT.m_cura.pct, r) + '% da vida máxima (+ dano mágico x2)', r >= 3 ? 'Cura Maior' : 'Cura Menor (no rank 3 vira Cura Maior)'],
+        info: (r) => ['Cura ' + at(ACT.m_cura.pct, r) + '% da vida máxima (+ dano mágico x8)', r >= 3 ? 'Cura Maior' : 'Cura Menor (no rank 3 vira Cura Maior)'],
         run(r) {
             if (player.stats.hp >= player.stats.maxHp) return 'Sua vida já está cheia.';
-            heal(player.stats.maxHp * at(ACT.m_cura.pct, r) / 100 + (window.Stats ? Stats.spellDmg() * 2 : 0), '#6fe08a');
+            heal(player.stats.maxHp * at(ACT.m_cura.pct, r) / 100 + (window.Stats ? Stats.spellDmg() * 8 : 0), '#6fe08a');
             ring(player.x, player.y + 4, 6, 56, '#6fe08a', 24, 5); flash(player.x, player.y - 16, 54, '#6fe08a', 20); for (let i = 0; i < 10; i++) puff(player.x + (rnd() - 0.5) * 30, player.y - 6 - rnd() * 10, 'rgba(120,255,160,', 1, 4, 0.7);
             callout(r >= 3 ? 'Cura Maior!' : 'Cura Menor!', '#6fe08a'); sfx('accept'); return true;
         } });
@@ -413,8 +414,8 @@
             ring(player.x, player.y + 4, 8, R, '#b080ff', 26, 8); ring(player.x, player.y + 4, 4, R * 0.6, '#f0e0ff', 20, 4); flash(player.x, player.y - 12, 80, '#a070ff', 18); burst(player.x, player.y - 10, '#c8a0ff', 22, 2.2); callout('Nova Arcana!', '#c8a0ff'); sfx('enchant'); return true;
         } });
     def('m_escudo', { sk: 'magic', need: 'staff', col: '#7fb8ff', cd: [32, 28, 24], pct: [25, 35, 45], mp: [8, 9, 10], dur: 12,
-        info: (r) => ['Barreira de ' + at(ACT.m_escudo.pct, r) + '% da vida máxima (+ dano mágico x3)', 'Dura até ' + ACT.m_escudo.dur + ' s'],
-        run(r) { setBarrier(player.stats.maxHp * at(ACT.m_escudo.pct, r) / 100 + (window.Stats ? Stats.spellDmg() * 3 : 0) + 6, ACT.m_escudo.dur, '#7fb8ff'); ring(player.x, player.y + 4, 8, 58, '#9ad0ff', 22, 5); flash(player.x, player.y - 16, 56, '#7fb8ff', 18); callout('Escudo Arcano!', '#9ad0ff'); sfx('enchant'); return true; } });
+        info: (r) => ['Barreira de ' + at(ACT.m_escudo.pct, r) + '% da vida máxima (+ dano mágico x12)', 'Dura até ' + ACT.m_escudo.dur + ' s'],
+        run(r) { setBarrier(player.stats.maxHp * at(ACT.m_escudo.pct, r) / 100 + (window.Stats ? Stats.spellDmg() * 12 : 0) + 60, ACT.m_escudo.dur, '#7fb8ff'); ring(player.x, player.y + 4, 8, 58, '#9ad0ff', 22, 5); flash(player.x, player.y - 16, 56, '#7fb8ff', 18); callout('Escudo Arcano!', '#9ad0ff'); sfx('enchant'); return true; } });
     def('m_tempest', { sk: 'magic', need: 'staff', col: '#ffe86a', cd: [42, 38, 34], mult: [1.4, 1.6, 1.8], mp: [16, 18, 20], rad: [115, 130, 145], n: [8, 10, 12], range: 300,
         info: (r) => ['Raio: ' + at(ACT.m_tempest.rad, r) + ' px · ' + at(ACT.m_tempest.n, r) + ' raios', 'Cada raio atinge um inimigo da área'],
         run(r) {
@@ -429,11 +430,10 @@
         } });
 
     /* ============================ LANÇAR ============================ */
-    function costOf(a, r) { const c = a.cost || {}, o = {}; if (a.mp) o.mp = at(a.mp, r); if (c.ammo) o.ammo = c.ammo; return o; }
+    function costOf(a, r) { const c = a.cost || {}, o = {}; if (a.mp) o.mp = at(a.mp, r) * Balance.MP_MULT; if (c.ammo) o.ammo = c.ammo; return o; }
     const cdOf = (a, r) => Math.round(at(a.cd, r) * (1 - S.cdr / 100) * 10) / 10;
     function reason(a, r) {   // '' = pode usar agora
         if (!gameOn()) return 'Entre no jogo.'; if (player.stats.hp <= 0) return 'Você está caído.';
-        if (isPetRide()) return 'Desmonte do pet para lutar.';
         if (cdMs(a.id) > 0) return 'Em recarga (' + Math.ceil(cdMs(a.id) / 1000) + ' s).';
         if (!needOk(a.need)) return 'Equipe ' + NEED[a.need] + ' para usar ' + NODES[a.id].name + '.';
         const c = costOf(a, r); if (c.ammo) { const am = player.equipment.ammo; if (!am || am.qty < c.ammo) return 'Sem flechas equipadas!'; }
@@ -450,7 +450,7 @@
     }
     function cast(slot) {
         if (!ensure() || !canCastKeys()) return false; const id = player.skillTree.bar[slot];
-        if (!id) { say1('Slot vazio: abra a árvore (K), aprenda uma habilidade ativa e coloque na barra.', '#9ad3ff'); return false; }
+        if (!id) { say1('Slot vazio: clique nele para escolher uma habilidade (ou abra a árvore com K).', '#9ad3ff'); return false; }
         return castId(id);
     }
     function canCastKeys() { const ov = $('custom-modal-overlay'); return gameOn() && !S.ui.open && !(typeof chatOpen !== 'undefined' && chatOpen) && !(ov && ov.style.display !== 'none' && ov.style.display !== '') && $('login-overlay').style.display === 'none'; }
@@ -472,7 +472,7 @@
     }
     function regen() {
         const st = player.stats; if (st.hp < st.maxHp && S.hpRegen > 0) { S.rg.hp += S.hpRegen / 10; if (S.rg.hp >= 1) { const n = Math.floor(S.rg.hp); S.rg.hp -= n; heal(n); } }
-        if (st.mp < st.maxMp) { S.rg.mp += 0.25 + st.maxMp * 0.006 + S.mpRegen / 10; if (S.rg.mp >= 1) { const n = Math.floor(S.rg.mp); S.rg.mp -= n; mana(n); } }
+        if (st.mp < st.maxMp) { S.rg.mp += Balance.MP_REGEN_FLAT + st.maxMp * 0.006 + S.mpRegen / 10; if (S.rg.mp >= 1) { const n = Math.floor(S.rg.mp); S.rg.mp -= n; mana(n); } }
     }
 
     /* ============================ GANCHOS (sem editar o código do jogo) ============================ */
@@ -556,9 +556,9 @@
         ov = document.createElement('div'); ov.id = 'sk-ov';
         ov.innerHTML = '<div id="sk-win" role="dialog" aria-label="Árvore de Habilidades"><div class="sk-hd"><span class="sk-ttl">Habilidades</span><div class="sk-tabs" id="sk-tabs"></div><button type="button" class="sk-x" data-a="close" aria-label="Fechar">×</button></div>' +
             '<div class="sk-main"><div class="sk-view" id="sk-view"><svg id="sk-svg" xmlns="http://www.w3.org/2000/svg"><defs></defs><g id="sk-world"></g></svg><div class="sk-zoom"><button type="button" data-a="zin" aria-label="Aproximar">+</button><button type="button" data-a="zout" aria-label="Afastar">−</button><button type="button" data-a="fit" aria-label="Ajustar">⤢</button></div><div class="sk-hint" id="sk-hint">Arraste para mover · roda ou pinça para zoom</div></div>' +
-            '<div class="sk-side" id="sk-side"></div></div><div class="sk-ft" id="sk-ft"></div><div class="sk-cf" id="sk-cf"></div></div><div id="sk-tip"></div>';
+            '<div class="sk-side" id="sk-side"></div></div><div class="sk-ft" id="sk-ft"><div id="sk-ft-l"></div><div class="sk-strip" id="sk-strip"></div><div id="sk-ft-r"></div></div><div class="sk-cf" id="sk-cf"></div></div><div id="sk-tip"></div>';
         document.body.appendChild(ov); svg = $('sk-svg'); world = $('sk-world'); tipEl = $('sk-tip');
-        ov.addEventListener('click', onClick); ov.addEventListener('mousedown', (e) => { if (e.target === ov) closeUI(); });
+        ov.addEventListener('click', onClick); bindSlots($('sk-strip'), 'tree'); ov.addEventListener('mousedown', (e) => { if (e.target === ov) closeUI(); });
         const view = $('sk-view');
         view.addEventListener('pointerdown', onPD); view.addEventListener('pointermove', onPM); view.addEventListener('pointerup', onPU); view.addEventListener('pointercancel', onPU);
         view.addEventListener('wheel', (e) => { e.preventDefault(); const r = view.getBoundingClientRect(); zoomAt(e.clientX - r.left, e.clientY - r.top, e.deltaY < 0 ? 1.12 : 1 / 1.12); }, { passive: false });
@@ -622,14 +622,15 @@
     }
     function resetCost(tree) { const pt = points(tree), rs = (player.skillTree.rs && player.skillTree.rs[tree]) | 0; return rs < 1 ? 0 : Math.max(250, 250 * pt.spent); }
     function renderFoot() {
-        const f = $('sk-ft'); if (!f) return; const tree = S.ui.tab, T = TREES[tree], pt = points(tree), cost = resetCost(tree), coins = getInvCount('Coins');
-        f.innerHTML = '<div class="sk-pts"><b>Pontos de ' + esc(T.name) + ': <span class="' + (pt.free > 0 ? 'hot' : '') + '">' + pt.free + '</span> disponíveis / ' + pt.total + ' totais</b><small>' + esc(T.skillName) + ' nível ' + pt.lvl + ' · 1 ponto a cada 2 níveis (' + pt.spent + ' gastos)</small></div>' +
-            '<button type="button" class="sk-b rs" data-a="reset"' + (pt.spent < 1 ? ' disabled' : '') + ' title="' + (cost ? 'Custa ' + cost + ' moedas' : 'A primeira vez desta árvore é grátis') + '">Redistribuir' + (pt.spent > 0 ? ' <small>' + (cost ? fmtNum(cost) + ' 🪙' : 'grátis') + '</small>' : '') + '</button>';
-        f.dataset.coins = coins;
+        const f = $('sk-ft-l'), f2 = $('sk-ft-r'); if (!f || !f2) return; const tree = S.ui.tab, T = TREES[tree], pt = points(tree), cost = resetCost(tree), coins = getInvCount('Coins');
+        f.innerHTML = '<div class="sk-pts"><b>Pontos de ' + esc(T.name) + ': <span class="' + (pt.free > 0 ? 'hot' : '') + '">' + pt.free + '</span> disponíveis / ' + pt.total + ' totais</b><small>' + esc(T.skillName) + ' nível ' + pt.lvl + ' · 1 ponto a cada 2 níveis (' + pt.spent + ' gastos)</small></div>'; f2.innerHTML = '<button type="button" class="sk-b rs" data-a="reset"' + (pt.spent < 1 ? ' disabled' : '') + ' title="' + (cost ? 'Custa ' + cost + ' moedas' : 'A primeira vez desta árvore é grátis') + '">Redistribuir' + (pt.spent > 0 ? ' <small>' + (cost ? fmtNum(cost) + ' 🪙' : 'grátis') + '</small>' : '') + '</button>';
+        f.dataset.coins = coins; renderStrip(false);
     }
     function barSlotsHtml(id) {
-        const st = player.skillTree; let h = '<div class="sk-bar-sel"><span>Barra:</span>' + KEYS.map((k, i) => '<button type="button" class="sk-b sm' + (st.bar[i] === id ? ' on' : '') + '" data-a="slot" data-i="' + i + '" title="Colocar no slot ' + k.toUpperCase() + '">' + k.toUpperCase() + '</button>').join('');
-        if (st.bar.indexOf(id) >= 0) h += '<button type="button" class="sk-b sm" data-a="unslot" title="Tirar da barra">Tirar</button>'; return h + '</div>';
+        const st = player.skillTree, cur = st.bar.indexOf(id), nm = (k) => (st.bar[k] && NODES[st.bar[k]] ? NODES[st.bar[k]].name : null);
+        let h = '<div class="sk-bar-sel"><b>Equipar na barra</b><span class="sk-bs-note">' + (cur >= 0 ? 'Equipada no slot <b>' + keyLabel(cur) + '</b>.' : 'Escolha o slot (troca a que já estiver nele):') + '</span><div class="sk-bs-row">' + KEYS.map((k, i) => '<button type="button" class="sk-b sm' + (cur === i ? ' on' : '') + '" data-a="slot" data-i="' + i + '" title="' + (cur === i ? 'Já está no slot ' : 'Colocar no slot ') + keyLabel(i) + (nm(i) && cur !== i ? ' (substitui ' + esc(nm(i)) + ')' : '') + '"><b>' + keyLabel(i) + '</b>' + (nm(i) && cur !== i ? '<small>' + esc(nm(i)) + '</small>' : cur === i ? '<small>aqui</small>' : '<small>vazio</small>') + '</button>').join('') + '</div>';
+        if (cur >= 0) h += '<button type="button" class="sk-b sm rm" data-a="unslot" title="Tirar da barra">Remover da barra</button>';
+        return h + '</div>';
     }
     function renderSide() {
         const s = $('sk-side'); if (!s) return; const id = S.ui.sel; if (!id || !NODES[id] || NODES[id].tree !== S.ui.tab) { const T = TREES[S.ui.tab]; s.innerHTML = '<div class="sk-ih"><img class="sk-big" src="' + Icons.skillUrl(S.ui.tab === 'warrior' ? 'sword' : S.ui.tab === 'archer' ? 'bow' : 'wand') + '" alt=""><div><b class="sk-nm">' + esc(T.name) + '</b><div class="sk-tg">' + esc(T.blurb) + '</div></div></div><p class="sk-d">Toque num nó para ver os detalhes e gastar pontos. <b>Hexágonos</b> são habilidades <b>ativas</b> (vão para a barra); <b>círculos</b> são <b>passivas</b>.</p><p class="sk-d">Os pontos desta árvore vêm do nível de <b>' + esc(T.skillName) + '</b>: 1 ponto a cada 2 níveis.</p>' + (player.cls === S.ui.tab || (!player.cls && S.ui.tab === 'warrior') ? '<p class="sk-d rec">★ Árvore recomendada para a sua classe.</p>' : ''); return; }
@@ -644,7 +645,7 @@
         const c = $('sk-cf'); if (!c) return; const q = S.ui.confirm; if (!q) { c.classList.remove('on'); c.innerHTML = ''; return; }
         c.classList.add('on'); c.innerHTML = '<div class="sk-cfb"><b>Redistribuir ' + esc(TREES[q.tree].name) + '?</b><p>Devolve os <b>' + q.spent + ' pontos</b> gastos nesta árvore (as habilidades saem da barra). ' + (q.cost ? 'Custa <b>' + fmtNum(q.cost) + ' moedas</b>' + (q.have < q.cost ? ' <span class="no">(você tem ' + fmtNum(q.have) + ')</span>' : '') + '.' : 'A primeira vez é <b>grátis</b>; as próximas custam 250 moedas por ponto gasto.') + '</p><div><button type="button" class="sk-b go" data-a="cfok"' + (q.have < q.cost ? ' disabled' : '') + '>Confirmar</button><button type="button" class="sk-b" data-a="cfno">Cancelar</button></div></div>';
     }
-    function renderAll() { if (!S.ui.open || !ov) return; renderTabs(); renderTree(true); renderSide(); renderFoot(); renderConfirm(); }
+    function renderAll() { if (!S.ui.open || !ov) return; renderTabs(); renderTree(true); renderSide(); renderFoot(); renderStrip(true); renderConfirm(); }
     function select(id) { S.ui.sel = id; renderTree(true); renderSide(); }
     function onClick(e) {
         const b = e.target.closest('[data-a]'); if (!b) return; const a = b.dataset.a;
@@ -680,41 +681,127 @@
         recompute(); S.barSig = ''; S.free = freeAll(); try { saveDataLogic(true); updateUI(); } catch (e) { }
         return { ok: true, msg: 'Árvore redistribuída' + (cost ? ' (−' + fmtNum(cost) + ' moedas).' : ' (grátis).') };
     }
-    function setSlot(id, i) { const st = ensure(); if (!st || !NODES[id] || NODES[id].kind !== 'a' || rankOf(id) < 1 || !(i >= 0 && i < BAR_N)) return false; const j = st.bar.indexOf(id); if (j >= 0) st.bar[j] = st.bar[i]; st.bar[i] = id; S.barSig = ''; try { saveDataLogic(); } catch (e) { } renderSide(); return true; }
-    function clearSlot(id) { const st = ensure(); if (!st) return; const j = st.bar.indexOf(id); if (j >= 0) st.bar[j] = null; S.barSig = ''; try { saveDataLogic(); } catch (e) { } renderSide(); }
+    const saveBar = () => { S.barSig = ''; try { saveDataLogic(); } catch (e) { } if (S.ui.open) { renderSide(); renderStrip(true); } };
+    function setSlot(id, i) {   // coloca a ativa `id` no slot i (substitui o que estiver lá; se já estava em outro slot, os dois trocam de lugar)
+        const st = ensure(); if (!st || !NODES[id] || NODES[id].kind !== 'a' || rankOf(id) < 1 || !(i >= 0 && i < BAR_N)) return false;
+        const j = st.bar.indexOf(id); if (j === i) return true; if (j >= 0) st.bar[j] = st.bar[i]; st.bar[i] = id; saveBar(); return true;
+    }
+    function removeAt(i) { const st = ensure(); if (!st || !(i >= 0 && i < BAR_N) || !st.bar[i]) return false; const n = NODES[st.bar[i]]; st.bar[i] = null; saveBar(); say((n ? n.name : 'Habilidade') + ' removida da barra.', '#9ad3ff'); return true; }
+    function swapSlots(i, j) { const st = ensure(); if (!st || !(i >= 0 && i < BAR_N) || !(j >= 0 && j < BAR_N) || i === j) return false; const t = st.bar[i]; st.bar[i] = st.bar[j]; st.bar[j] = t; saveBar(); return true; }
+    function clearSlot(id) { const st = ensure(); if (!st) return; const j = st.bar.indexOf(id); if (j >= 0) removeAt(j); }
 
     /* ============================ BARRA DE HABILIDADES + BOTÕES ============================ */
-    let bar = null, btn = null, lastKey = '';
-    function mkBar() {
-        if (bar) return; bar = document.createElement('div'); bar.id = 'sk-bar'; document.body.appendChild(bar);
-        bar.addEventListener('pointerdown', (e) => { const s = e.target.closest('.sk-s'); if (s) { e.preventDefault(); } });
-        bar.addEventListener('click', (e) => { const s = e.target.closest('.sk-s'); if (!s) return; if (s.dataset.x) { if (S.extra && S.extra.cast) S.extra.cast(); return; } if (s.classList.contains('empty')) { openUI(); return; } cast(+s.dataset.i); });
-        btn = document.createElement('button'); btn.type = 'button'; btn.id = 'sk-btn'; btn.title = 'Habilidades (K)'; btn.setAttribute('aria-label', 'Habilidades'); btn.innerHTML = '<img src="' + Icons.skillUrl('star') + '" alt=""><i></i>'; btn.onclick = () => toggleUI(); document.body.appendChild(btn);
-    }
+    let bar = null, btn = null, lastKey = '', pick = null;
+    const isTouch = () => !!(window.Mobile && Mobile.on && Mobile.on());
+    const keyLabel = (i) => (isTouch() ? String(i + 1) : KEYS[i].toUpperCase());   // desktop: a tecla; celular: a ordem (1-4)
+    const HINT_HOVER = 'Clique direito: remover · Arraste: reordenar · ✎: trocar';
+    const HINT_EDIT = 'Toque num slot para trocar · arraste para reordenar · × remove · ✎ sai';
     function slotInfo(i) {
         const id = player.skillTree.bar[i]; if (!id) return null; const a = ACT[id], r = rankOf(id); if (!a || r < 1) return null; return { id, a, r, n: NODES[id] };
+    }
+    function slotHtml(i, strip) {   // um slot da barra (HUD ou faixa de edição dentro da árvore): tecla, ícone, custo, recarga e botão de remover
+        const s = slotInfo(i), k = keyLabel(i);
+        if (!s) return '<div class="sk-s empty" data-i="' + i + '" title="Slot ' + k + ' vazio: ' + (strip ? 'selecione uma habilidade ativa na árvore e toque aqui' : 'clique para escolher uma habilidade') + '"><b class="sk-k">' + k + '</b><span>+</span></div>';
+        const c = costOf(s.a, s.r), cs = c.mp ? '<s class="mp" title="Custo de mana">' + fnum(c.mp) + '</s>' : c.ammo ? '<s class="am" title="Gasta flechas">' + c.ammo + '</s>' : '';
+        return '<div class="sk-s" data-i="' + i + '" style="--c:' + s.a.col + '"><div class="sk-c"><img class="sk-ic" src="' + Icons.skillUrl(s.n.ic) + '" alt=""><i class="cd"></i><u></u></div><b class="sk-k">' + k + '</b>' + cs + '<em class="sk-cb" title="Recarga">' + fnum(cdOf(s.a, s.r)) + 's</em><button type="button" class="sk-rm" tabindex="-1" aria-label="Remover ' + esc(s.n.name) + ' da barra" title="Remover da barra">×</button></div>';
+    }
+    /* ---- arrastar/trocar/remover (barra do jogo e faixa da árvore): toque curto = usar (ou escolher, se vazio / modo editar); arrastar para outro slot = trocar; arrastar para fora = remover; botão direito = remover ---- */
+    const DR = { on: false };
+    function slotOf(e) { const t = e.target && e.target.closest ? e.target.closest('.sk-s') : null; return t && !t.dataset.x && t.dataset.i !== undefined ? t : null; }
+    function dragReset() { if (DR.timer) clearTimeout(DR.timer); if (DR.ghost) DR.ghost.remove(); document.querySelectorAll('.sk-s.drop,.sk-s.dragging').forEach((el) => el.classList.remove('drop', 'dragging')); DR.on = false; DR.drag = false; DR.ghost = null; DR.timer = 0; }
+    function outsideAll(x, y) {
+        const roots = [bar, $('sk-strip')].filter((r) => r && r.offsetWidth); for (const r of roots) { const b = r.getBoundingClientRect(); if (x >= b.left - 26 && x <= b.right + 26 && y >= b.top - 26 && y <= b.bottom + 26) return false; } return true;
+    }
+    function bindSlots(root, mode) {
+        root.addEventListener('pointerdown', (e) => {
+            if (e.button !== undefined && e.button !== 0) return; const el = slotOf(e); if (!el || !ensure()) return;
+            if (e.target.closest('.sk-rm')) return;   // o ×: tratado no click
+            if (mode === 'hud') e.preventDefault();
+            const i = +el.dataset.i, was = !!(pick && pick.classList.contains('on') && pick._i === i); closePick(); dragReset(); DR.was = was; DR.on = true; DR.mode = mode; DR.i = i; DR.el = el; DR.x0 = e.clientX; DR.y0 = e.clientY; DR.pt = e.pointerType; DR.filled = !el.classList.contains('empty'); DR.drag = false; DR.lp = false;
+            if (mode === 'hud' && e.pointerType === 'touch' && !S.edit && DR.filled) DR.timer = setTimeout(() => { if (DR.on && !DR.drag) { DR.lp = true; setEdit(true); try { navigator.vibrate && navigator.vibrate(20); } catch (er) { } say('Modo editar: toque num slot para trocar, arraste para reordenar, × remove.', '#9ad3ff'); } }, 480);
+        });
+        root.addEventListener('click', (e) => {
+            const x = e.target.closest('.sk-rm'); if (!x) return; const el = x.closest('.sk-s'); e.preventDefault(); e.stopPropagation(); if (el) removeAt(+el.dataset.i);
+        });
+        root.addEventListener('contextmenu', (e) => { const el = slotOf(e); if (!el) return; e.preventDefault(); if (!el.classList.contains('empty')) removeAt(+el.dataset.i); });
+        root.addEventListener('dragstart', (e) => e.preventDefault());
+    }
+    document.addEventListener('pointermove', (e) => {
+        if (!DR.on) return; const dx = e.clientX - DR.x0, dy = e.clientY - DR.y0;
+        if (!DR.drag) {
+            if (Math.hypot(dx, dy) < 8) return; if (!DR.filled) { dragReset(); return; }
+            if (DR.pt === 'touch' && DR.mode === 'hud' && !S.edit) { dragReset(); return; }   // no celular, arrastar na barra só no modo editar (senão atrapalha o jogo)
+            if (DR.timer) { clearTimeout(DR.timer); DR.timer = 0; }
+            DR.drag = true; DR.el.classList.add('dragging'); const g = document.createElement('div'); g.className = 'sk-ghost'; const im = DR.el.querySelector('.sk-ic'); g.innerHTML = '<img src="' + (im ? im.src : '') + '" alt=""><span>Solte fora para remover</span>'; document.body.appendChild(g); DR.ghost = g;
+        }
+        e.preventDefault(); DR.ghost.style.left = e.clientX + 'px'; DR.ghost.style.top = e.clientY + 'px';
+        const out = outsideAll(e.clientX, e.clientY); DR.ghost.classList.toggle('out', out);
+        document.querySelectorAll('.sk-s.drop').forEach((el) => el.classList.remove('drop')); const under = document.elementFromPoint(e.clientX, e.clientY), t = under && under.closest ? under.closest('.sk-s') : null; if (t && !t.dataset.x && t !== DR.el) t.classList.add('drop');
+    }, { passive: false });
+    document.addEventListener('pointerup', (e) => {
+        if (!DR.on) return; const d = { ...DR }; const under = document.elementFromPoint(e.clientX, e.clientY), t = under && under.closest ? under.closest('.sk-s') : null; dragReset();
+        if (d.drag) { if (t && !t.dataset.x && t.dataset.i !== undefined) swapSlots(d.i, +t.dataset.i); else if (outsideAll(e.clientX, e.clientY)) removeAt(d.i); return; }
+        if (d.lp) return; onSlotTap(d.mode, d.i, d.el, d.was);
+    });
+    document.addEventListener('pointercancel', () => { if (DR.on) dragReset(); });
+    function onSlotTap(mode, i, el, was) {
+        if (mode === 'tree') {
+            const id = player.skillTree.bar[i];
+            if (id) { S.ui.tab = NODES[id].tree; S.ui.sel = id; renderAll(); return; }
+            const sel = S.ui.sel; if (sel && NODES[sel] && NODES[sel].kind === 'a' && rankOf(sel) > 0) { setSlot(sel, i); say(NODES[sel].name + ' equipada no slot ' + keyLabel(i) + '.', '#6fe08a'); return; }
+            openPick(i, el); return;
+        }
+        if (el.classList.contains('empty') || S.edit) { if (was) return; openPick(i, el); return; }
+        cast(i);
+    }
+    function setEdit(v) { S.edit = !!v; if (!S.edit) closePick(); S.barSig = ''; }
+    /* ---- seletor: escolher qual habilidade vai para o slot ---- */
+    function closePick() { if (pick && pick.classList.contains('on')) { pick._ct = performance.now(); pick.classList.remove('on'); pick.innerHTML = ''; } }
+    function openPick(i, el) {
+        if (!ensure()) return; const ids = learnedActives();
+        if (!pick) { pick = document.createElement('div'); pick.id = 'sk-pick'; document.body.appendChild(pick); pick.addEventListener('click', onPickClick); pick.addEventListener('pointerdown', (e) => e.stopPropagation()); document.addEventListener('pointerdown', (e) => { if (pick.classList.contains('on') && !pick.contains(e.target)) closePick(); }, true); }
+        if (!ids.length) { say('Aprenda uma habilidade ativa na árvore (K) para colocar na barra.', '#9ad3ff'); openUI(); return; }
+        const st = player.skillTree, cur = st.bar[i];
+        let h = '<div class="sk-ph">Slot <b>' + keyLabel(i) + '</b>: escolha a habilidade</div>';
+        ids.forEach((id) => { const n = NODES[id], a = ACT[id], r = rankOf(id), c = costOf(a, r), at_ = st.bar.indexOf(id); h += '<button type="button" class="sk-pr' + (at_ === i ? ' on' : '') + '" data-id="' + id + '" style="--c:' + a.col + '"><img src="' + Icons.skillUrl(n.ic) + '" alt=""><span><b>' + esc(n.name) + '</b><small>rank ' + r + ' · ' + (c.mp ? 'mana ' + fnum(c.mp) + ' · ' : c.ammo ? c.ammo + ' flecha(s) · ' : '') + 'recarga ' + fnum(cdOf(a, r)) + ' s</small></span>' + (at_ >= 0 ? '<em>' + keyLabel(at_) + '</em>' : '') + '</button>'; });
+        if (cur) h += '<button type="button" class="sk-pr rm" data-id="">Esvaziar o slot ' + keyLabel(i) + '</button>';
+        pick._i = i; pick.innerHTML = h; pick.classList.add('on');
+        const r = el.getBoundingClientRect(), pw = Math.min(260, window.innerWidth - 16), up = r.top - 16, dn = window.innerHeight - r.bottom - 16, above = up >= Math.min(dn, 260) || up >= dn;
+        pick.style.width = pw + 'px'; pick.style.maxHeight = Math.max(110, Math.min(300, above ? up : dn)) + 'px'; const ph = Math.min(pick.scrollHeight, parseFloat(pick.style.maxHeight));
+        const x = Math.max(8, Math.min(window.innerWidth - pw - 8, r.left + r.width / 2 - pw / 2)), y = above ? r.top - ph - 10 : r.bottom + 10; pick.style.left = x + 'px'; pick.style.top = Math.max(8, Math.min(window.innerHeight - ph - 8, y)) + 'px'; pick._ot = DR.pt === 'touch' ? performance.now() : 0;
+    }
+    function onPickClick(e) {
+        if (performance.now() - (pick._ot || 0) < 350) return;   // o clique do mesmo toque que abriu o seletor
+        const b = e.target.closest('.sk-pr'); if (!b || !pick._i && pick._i !== 0) return; const i = pick._i, id = b.dataset.id; closePick();
+        if (!id) { removeAt(i); return; } if (setSlot(id, i)) say(NODES[id].name + ' equipada no slot ' + keyLabel(i) + '.', '#6fe08a');
+    }
+    function mkBar() {
+        if (bar) return; bar = document.createElement('div'); bar.id = 'sk-bar'; document.body.appendChild(bar); bindSlots(bar, 'hud');
+        bar.addEventListener('click', (e) => {
+            const x = e.target.closest('.sk-ed'); if (x) { setEdit(!S.edit); return; }
+            const s = e.target.closest('.sk-s'); if (s && s.dataset.x) { if (S.extra && S.extra.cast) S.extra.cast(); }
+        });
+        btn = document.createElement('button'); btn.type = 'button'; btn.id = 'sk-btn'; btn.title = 'Habilidades (K)'; btn.setAttribute('aria-label', 'Habilidades'); btn.innerHTML = '<img src="' + Icons.skillUrl('star') + '" alt=""><i></i>'; btn.onclick = () => toggleUI(); document.body.appendChild(btn);
     }
     function renderBar() {
         const on = gameOn(); if (!bar) return; if (!on || !ensure()) { bar.style.display = 'none'; if (btn) btn.style.display = 'none'; return; }
         const ex_ = S.extra && S.extra.slot ? S.extra.slot() : null; const learned = learnedActives().length;
-        const sig = player.skillTree.bar.join(',') + '|' + (ex_ ? ex_.id : '') + '|' + learned + '|' + (window.Mobile && Mobile.on && Mobile.on() ? 1 : 0);
+        const sig = player.skillTree.bar.map((id) => (id || '-') + (id ? rankOf(id) : '')).join(',') + '|' + (ex_ ? ex_.id : '') + '|' + learned + '|' + (isTouch() ? 1 : 0) + '|' + (S.edit ? 1 : 0) + '|' + S.cdr;
         if (sig !== S.barSig) {
             S.barSig = sig; let h = '';
-            for (let i = 0; i < BAR_N; i++) {
-                const s = slotInfo(i);
-                if (!s) { h += learned > 0 ? '<div class="sk-s empty" data-i="' + i + '" title="Slot ' + KEYS[i].toUpperCase() + ' vazio: abra a árvore (K) e coloque uma habilidade ativa"><b>' + KEYS[i].toUpperCase() + '</b><span>+</span></div>' : ''; continue; }
-                const c = costOf(s.a, s.r), cs = c.mp ? '<s class="mp">' + c.mp + '</s>' : c.ammo ? '<s class="am">' + c.ammo + '</s>' : '';
-                h += '<div class="sk-s" data-i="' + i + '" style="--c:' + s.a.col + '"><img class="sk-ic" src="' + Icons.skillUrl(s.n.ic) + '" alt=""><b>' + KEYS[i].toUpperCase() + '</b>' + cs + '<i class="cd"></i><u></u></div>';
-            }
-            if (ex_) h += '<div class="sk-s xs" data-x="1" style="--c:' + ex_.col + '"><img class="sk-ic" src="' + Icons.skillUrl(ex_.ic) + '" alt=""><b>' + esc(ex_.key) + '</b><i class="cd"></i><u></u></div>';
-            bar.innerHTML = h; bar.classList.toggle('has', !!h); lastKey = '';
+            for (let i = 0; i < BAR_N; i++) { if (!slotInfo(i) && learned < 1) continue; h += slotHtml(i, false); }
+            if (h) h += '<button type="button" class="sk-ed' + (S.edit ? ' on' : '') + '" aria-label="Editar a barra" title="Editar a barra: trocar, reordenar e remover habilidades">✎</button>';
+            if (ex_) h += '<div class="sk-s xs" data-x="1" style="--c:' + ex_.col + '"><div class="sk-c"><img class="sk-ic" src="' + Icons.skillUrl(ex_.ic) + '" alt=""><i class="cd"></i><u></u></div><b class="sk-k set">' + esc(isTouch() ? 'SET' : ex_.key) + '</b><em class="sk-cb" title="Recarga">' + Math.round(ex_.total) + 's</em></div>';
+            if (h) h += '<div class="sk-hl"><span class="h1">' + HINT_HOVER + '</span><span class="h2">' + HINT_EDIT + '</span></div>';
+            bar.innerHTML = h; bar.classList.toggle('has', !!h); bar.classList.toggle('edit', !!S.edit); lastKey = '';
+            if (h && !S.hintSaid) { S.hintSaid = true; let seen = false; try { seen = !!localStorage.getItem('ms_sk_barhint'); localStorage.setItem('ms_sk_barhint', '1'); } catch (e) { } if (!seen && learned > 0) say(isTouch() ? 'Dica: segure uma habilidade da barra para editar (trocar, reordenar, remover).' : 'Dica: clique com o botão direito numa habilidade da barra para removê-la; arraste para reordenar.', '#9ad3ff'); }
         }
         bar.style.display = bar.classList.contains('has') ? 'flex' : 'none';
-        const kids = bar.children; let t = '';
+        const kids = bar.querySelectorAll('.sk-s'); let t = '';
         for (let k = 0; k < kids.length; k++) {
             const el = kids[k]; let left = 0, tot = 1, bad = false, title = '', col = '';
             if (el.dataset.x) { const x = S.extra && S.extra.slot ? S.extra.slot() : null; if (!x) continue; left = x.left; tot = x.total; bad = !x.ok; title = x.title; }
-            else { const s = slotInfo(+el.dataset.i); if (!s) continue; left = cdMs(s.id) / 1000; tot = Math.max(1, at(s.a.cd, s.r) * (1 - S.cdr / 100)); const why = reason(s.a, s.r); bad = !!why && left <= 0; title = s.n.name + ' (rank ' + s.r + ') — tecla ' + KEYS[+el.dataset.i].toUpperCase() + '\n' + actStats(s.id, s.r).join('\n') + (why && left <= 0 ? '\n⚠ ' + why : ''); }
+            else { if (el.classList.contains('empty')) continue; const s = slotInfo(+el.dataset.i); if (!s) continue; left = cdMs(s.id) / 1000; tot = Math.max(1, at(s.a.cd, s.r) * (1 - S.cdr / 100)); const why = reason(s.a, s.r); bad = !!why && left <= 0; title = s.n.name + ' (rank ' + s.r + ') — tecla ' + KEYS[+el.dataset.i].toUpperCase() + '\n' + actStats(s.id, s.r).join('\n') + (why && left <= 0 ? '\n⚠ ' + why : '') + '\nClique direito: remover · arraste: reordenar'; }
             const p = left > 0 ? Math.min(100, left / tot * 100) : 0, cdEl = el.querySelector('.cd'), ct = el.querySelector('u'), txt = left > 0 ? (left >= 10 ? Math.ceil(left) : (Math.ceil(left * 10) / 10).toFixed(1)) : '';
             if (cdEl && cdEl._p !== p.toFixed(0)) { cdEl._p = p.toFixed(0); cdEl.style.setProperty('--p', p.toFixed(1) + '%'); }
             if (ct && ct._t !== txt) { ct._t = txt; ct.textContent = txt; }
@@ -722,6 +809,13 @@
             el.classList.toggle('bad', bad); if (el.title !== title) el.title = title;
         }
         const f = totalFree(); if (btn) { btn.style.display = 'flex'; const i = btn.querySelector('i'); const sg = String(f); if (i._t !== sg) { i._t = sg; i.textContent = sg; } i.style.display = f > 0 ? '' : 'none'; btn.classList.toggle('pts', f > 0); }
+    }
+    /* faixa da barra dentro da árvore (rodapé): mesmas teclas, × e arrastar */
+    function renderStrip(force) {
+        const el = $('sk-strip'); if (!el || !S.ui.open || !ensure()) return;
+        const st = player.skillTree, sig = st.bar.map((id) => id || '-').join(',') + '|' + (S.ui.sel || '') + '|' + (isTouch() ? 1 : 0); if (!force && el._sig === sig) return; if (DR.on && DR.mode === 'tree') return; el._sig = sig;
+        let h = '<span class="sk-sl">Sua barra</span>'; for (let i = 0; i < BAR_N; i++) h += slotHtml(i, true);
+        el.innerHTML = h + '<span class="sk-sh">Arraste para trocar ou tirar · clique direito remove</span>';
     }
     function place() {
         if (!bar) return; const q = $('qb'), c = $('gameCanvas'); const touch = !!(window.Mobile && Mobile.on && Mobile.on());
@@ -748,6 +842,8 @@
         if (!gameOn() || e.ctrlKey || e.metaKey || e.altKey || /^(INPUT|TEXTAREA|SELECT)$/.test((e.target || {}).tagName || '') || (e.target && e.target.isContentEditable)) return;
         const k = (e.key || '').toLowerCase();
         if (k === 'k' && !e.repeat) { toggleUI(); return; }
+        if (k === 'escape' && pick && pick.classList.contains('on')) { closePick(); return; }
+        if (k === 'escape' && S.edit && !S.ui.open) { setEdit(false); return; }
         if (k === 'escape' && S.ui.open) { if (S.ui.confirm) { S.ui.confirm = null; renderConfirm(); } else closeUI(); return; }
         if (e.repeat || !canCastKeys()) return;
         const i = KEYS.indexOf(k); if (i >= 0) { cast(i); return; }
@@ -761,7 +857,7 @@
     window.addEventListener('load', () => setTimeout(wire, 50));
     window.SkillTree = {
         open: openUI, close: closeUI, toggle: toggleUI, learn, reset, cast, castId, points, totalFree, ensure, adopt, recompute, validate, rankOf, learnedActives, ACT, resetCost,
-        setSlot, clearSlot, bar: () => (ensure() ? player.skillTree.bar.slice() : []), isOpen: () => S.ui.open,
+        setSlot, clearSlot, removeAt, swapSlots, openPicker: (i) => { const el = bar && bar.querySelector('.sk-s[data-i="' + i + '"]'); if (el) openPick(i, el); }, setEdit, isEdit: () => !!S.edit, bar: () => (ensure() ? player.skillTree.bar.slice() : []), isOpen: () => S.ui.open,
         state: () => ({ tree: ensure() ? JSON.parse(JSON.stringify(player.skillTree)) : null, frame: S.frame, buffs: S.buffs.map((b) => ({ id: b.id, left: b.until - S.frame })), barrier: S.barrier && { hp: S.barrier.hp, max: S.barrier.max }, invuln: S.invuln - S.frame, queue: S.Q.length, pj: S.pj.length, zones: S.zn.length, fx: S.fx.length, bonus: S.bonus, dmgPct: S.dmgPct, skd: S.skd, cdr: S.cdr, tok: S.tok }),
         api: { S, hit, aoe, enemies, alive, pickTarget, sdmg, baseDmg, heal, mana, addBuff, setBarrier, ring, flash, bolt, slashFx, fx, burst, puff, face, stun, slow, shoot, zone, startDash, callout, sfx, ex, ey, er, los, lv, setCd, cdMs, fnum, esc, glowSprite, dirToward, facingVec, needOk, isPetRide, say1, canCastKeys, mimicLevel: null },
         setExtra: (x) => { S.extra = x; S.barSig = ''; }, setExtraDraw: (f) => { S.extraDraw = f; }, clear

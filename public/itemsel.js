@@ -33,7 +33,7 @@
     }
     function info(item) {
         const a = [];
-        if (item.bonusDmg) a.push('Dano +' + item.bonusDmg); if (item.defBonus) a.push('Defesa +' + item.defBonus); if (item.heal) a.push('Cura ' + item.heal + ' HP'); if (item.mp) a.push('+' + item.mp + ' MP'); if (item.ench) a.push('Encantado +' + item.ench); if (item.mimic && window.Mimic) { const mb = Mimic.brief(item); if (mb) a.push(mb); } if (window.Stats) Stats.KEYS.forEach((k) => { if (item[k] > 0) a.push(Stats.LABEL[k] + ' ' + (k === 'critDmg' || k === 'moveSpd' || k === 'atkSpd' || k === 'luck' ? '+' : '') + item[k] + (k === 'spellDmg' ? '' : '%')); });
+        if (item.bonusDmg) { if (item.slot === 'weapon' && typeof playerRange === 'function') { const r = playerRange(item.tool === 'magic' ? 'magic' : item.tool === 'ranged' ? 'ranged' : 'melee', item); a.push('Dano ' + r.lo + '-' + r.hi); } else a.push('Dano +' + Math.round(Balance.RATING_W * 100 * item.bonusDmg) + '%'); } if (item.defBonus) a.push('Defesa +' + item.defBonus * Balance.ARMOR_W); if (item.heal) a.push('Cura ' + Balance.healOf(item.heal) + ' HP'); if (item.mp) a.push('+' + Balance.mpOf(item.mp) + ' MP'); if (item.ench) a.push('Encantado +' + item.ench); if (item.mimic && window.Mimic) { const mb = Mimic.brief(item); if (mb) a.push(mb); } if (window.Stats) Stats.KEYS.forEach((k) => { if (item[k] > 0) a.push(Stats.LABEL[k] + ' ' + (k === 'critDmg' || k === 'moveSpd' || k === 'atkSpd' || k === 'luck' ? '+' : '') + item[k] + (k === 'spellDmg' ? '' : '%')); });
         return a.join(' · ');
     }
 

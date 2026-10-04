@@ -26,7 +26,10 @@
     const EFF_KEYS = Object.keys(EFF_LABEL);
     const r1 = (v) => Math.round(v * 10) / 10;
 
+    // Balanceamento v2: vida/mana/regeneração das passivas valem 10x / 5x (a vida base do jogador é 100 + 10 por nível de Vitalidade)
+    const FLAT_SCALE = { maxHp: 10, maxMp: 5, hpRegen: 10, mpRegen: 5 };
     function add(tree, kind, id, name, tier, lane, req, max, eff, ic, branch, extra) {
+        if (eff) { eff = Object.assign({}, eff); for (const k of Object.keys(FLAT_SCALE)) if (eff[k]) eff[k] = eff[k] * FLAT_SCALE[k]; }
         const n = Object.assign({ id, tree, kind, name, tier, lane, req: (req || []).map((r) => (typeof r === 'string' ? [r, 1] : r)), max, cost: kind === 'a' ? 2 : 1, eff: eff || null, ic, branch }, extra || {});
         NODES[id] = n; ORDER[tree].push(id); return n;
     }

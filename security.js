@@ -10,7 +10,8 @@ const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 const MAXQ = 2147483647;
 const ITEM_RE = /^[\p{L}\p{N}_.'’()+%!:\- ]{1,40}$/u;   // letras, números e pontuação comum de nomes de item (nunca < > " & ` nem barras)
 const BAD_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
-const SN = require('./public/skillnodes.js');   // dados compartilhados das árvores de habilidades (ids, ranks, custos)
+const SN = require('./public/skillnodes.js');
+const BAL = require('./public/balance.js');   // balanceamento v2: tabela de XP, vida/mana, tetos de dano (fonte única, a mesma do cliente)   // dados compartilhados das árvores de habilidades (ids, ranks, custos)
 
 module.exports = function createSecurity(opts) {
     const DATA_DIR = opts.dataDir, ROOT = opts.root;
@@ -125,11 +126,10 @@ module.exports = function createSecurity(opts) {
     }
 
     /* ---------------- perícias / stats ---------------- */
-    const SK = { hp: ['Health', 10, 100], combat: ['Combat', 1, 100], ranged: ['Ranged', 1, 100], magic: ['Magic', 1, 100], prayer: ['Prayer', 1, 50], woodcutting: ['Woodcut', 1, 50], mining: ['Mining', 1, 50], smithing: ['Smithing', 1, 50], firemaking: ['Firemk', 1, 50], cooking: ['Cooking', 1, 50], crafting: ['Crafting', 1, 50], fishing: ['Fishing', 1, 50], farming: ['Farming', 1, 50], alchemy: ['Alchemy', 1, 50], enchanting: ['Enchant', 1, 50] };
-    function totalXp(key, level, xp) {   // XP acumulado (aproximado com a mesma cadeia floor(next*1.5) do cliente)
-        const d = SK[key]; let n = d[2], t = 0; for (let l = d[1]; l < level; l++) { t += n; n = Math.floor(n * 1.5); } return t + xp;
-    }
-    const nextFor = (key, level) => { const d = SK[key]; let n = d[2]; for (let l = d[1]; l < level; l++) n = Math.floor(n * 1.5); return n; };
+    const SK = { hp: ['Health', 1, 100], combat: ['Combat', 1, 100], defence: ['Defence', 1, 100], ranged: ['Ranged', 1, 100], magic: ['Magic', 1, 100], prayer: ['Prayer', 1, 50], woodcutting: ['Woodcut', 1, 50], mining: ['Mining', 1, 50], smithing: ['Smithing', 1, 50], firemaking: ['Firemk', 1, 50], cooking: ['Cooking', 1, 50], crafting: ['Crafting', 1, 50], fishing: ['Fishing', 1, 50], farming: ['Farming', 1, 50], alchemy: ['Alchemy', 1, 50], enchanting: ['Enchant', 1, 50] };
+    // XP agora é TOTAL (tabela do RuneScape em balance.js): o nível é sempre derivado do XP
+    const totalXp = (key, level, xp) => Math.max(0, Number(xp) || 0);
+    const nextFor = (key, level) => BAL.xpNext(level);
     const num = (v, a, b, d) => (typeof v === 'number' && Number.isFinite(v)) ? Math.max(a, Math.min(b, v)) : d;
     const int = (v, a, b, d) => { v = Math.floor(Number(v)); return Number.isFinite(v) ? Math.max(a, Math.min(b, v)) : d; };
 
@@ -262,26 +262,25 @@ module.exports = function createSecurity(opts) {
                 const psk = prev && prev.stats && prev.stats.skills ? prev.stats.skills : {};
                 for (const key of Object.keys(sk0)) {
                     if (!hasOwn(SK, key)) continue; const s = sk0[key]; if (!s || typeof s !== 'object') continue;
-                    const lvl = int(s.level, SK[key][1], 99, SK[key][1]);
-                    let xp = num(s.xp, 0, 1e15, 0), next = num(s.next, 1, 1e18, nextFor(key, lvl));
-                    sk[key] = { level: lvl, xp, next, name: SK[key][0] };
-                    if (s.level !== lvl) n++;
+                    const xp = int(s.xp, 0, BAL.MAX_XP, 0), lvl = BAL.levelForXp(xp);   // XP manda: o nível é o que a tabela dá para esse XP (nunca um nível sem XP)
+                    sk[key] = { level: BAL.levelForXp(xp), xp, next: BAL.xpNext(BAL.levelForXp(xp)), name: SK[key][0] };
+                    if (s.level !== sk[key].level) n++;
                     if (strict && hasOwn(psk, key) && psk[key] && typeof psk[key].level === 'number') {
-                        const p = psk[key], pl = int(p.level, SK[key][1], 99, SK[key][1]); const pt = totalXp(key, pl, num(p.xp, 0, 1e15, 0)), nt = totalXp(key, lvl, xp);
-                        const gain = nt - pt;
-                        if (gain > 0) {
-                            const allow = spend(user, 'xp:' + key, gain, 400000, 100000, now);
-                            if (allow < gain) { sk[key] = { level: pl, xp: num(p.xp, 0, 1e15, 0), next: num(p.next, 1, 1e18, nextFor(key, pl)), name: SK[key][0] }; notes.push('xp:' + key + '+' + gain); n++; }
+                        const p = psk[key], pxp = int(p.xp, 0, BAL.MAX_XP, 0), pl = BAL.levelForXp(pxp);
+                        const gain = xp - pxp;
+                        if (gain > 0) {   // orçamento generoso (jogo limpo nunca chega perto): ~4 mil XP/s sustentados por perícia, ou 1 milhão de uma vez (vários minutos sem salvar)
+                            const allow = spend(user, 'xp:' + key, gain, BAL.XP_BUDGET.cap * 2, BAL.XP_BUDGET.perMin * 4, now);
+                            if (allow < gain) { sk[key] = { level: pl, xp: pxp, next: BAL.xpNext(pl), name: SK[key][0] }; notes.push('xp:' + key + '+' + gain); n++; }
                         }
                     }
                 }
                 st.skills = sk;
                 const tb = cleanTree(user, ip, pd, role, sk);   // a árvore de habilidades pode somar vida/mana máx. (já embutidas no maxHp/maxMp salvos)
-                const hpL = sk.hp ? sk.hp.level : 10;
-                const maxHp = num(st.maxHp, 1, 40 + 2 * hpL + tb.hp, prev && prev.stats ? num(prev.stats.maxHp, 1, 40 + 2 * hpL + tb.hp, 15) : 15);
+                const hpL = sk.hp ? sk.hp.level : 1, mgL = sk.magic ? sk.magic.level : 1, hpLim = BAL.maxHpAllowed(hpL, tb.hp), mpLim = BAL.maxMpAllowed(mgL, tb.mp);   // 100 + 10 por nível de Vitalidade + classe/raça/árvore (com folga)
+                const maxHp = num(st.maxHp, 1, hpLim, prev && prev.stats ? num(prev.stats.maxHp, 1, hpLim, BAL.maxHpForLevel(hpL)) : BAL.maxHpForLevel(hpL));
                 if (st.maxHp !== maxHp && strict) { n++; notes.push('maxHp'); }
                 st.maxHp = strict ? maxHp : st.maxHp; st.hp = num(st.hp, 0, st.maxHp, st.maxHp);
-                st.maxMp = num(st.maxMp, 1, 100 + tb.mp, 10); st.mp = num(st.mp, 0, st.maxMp, st.maxMp);
+                st.maxMp = num(st.maxMp, 1, mpLim, BAL.maxMpForLevel(mgL)); st.mp = num(st.mp, 0, st.maxMp, st.maxMp);
                 pd.stats = st;
             }
             /* 2) progressão: itens e moedas contra o save anterior (+ créditos entregues pelo servidor) */
@@ -331,7 +330,7 @@ module.exports = function createSecurity(opts) {
             const allow = spend(user, 'coll', added.length, 12, 0.5, now);
             if (allow < added.length) { for (const x of added.slice(allow)) delete pd[k][x]; strike(user, ip, 'coll', added.length - allow, k + ' novos: ' + added.slice(allow).join(',')); }
         }
-        if (pd.mounts && typeof pd.mounts === 'object') {   // XP das montarias: orçamento por minuto (cavalgar ~300 XP/min no máximo); montaria nova começa no nível 1
+        if (pd.mounts && typeof pd.mounts === 'object') {   // XP das montarias: orçamento por minuto (cavalgar ~300 XP/min + até 40% do XP do jogador, que já tem orçamento próprio); montaria nova começa no nível 1
             const cum = (v) => { let t = (v && v.xp) || 0; for (let l = 1; l < ((v && v.lvl) || 1); l++) t += Math.round(250 * Math.pow(1.2, l - 1)); return t; };
             let up = 0; const ups = [];
             for (const k of Object.keys(pd.mounts)) {   // montaria nova ainda não vista no save anterior conta a partir do nível 1 (o save pode atrasar em relação à compra)
@@ -339,7 +338,7 @@ module.exports = function createSecurity(opts) {
                 const d = cum(n) - cum(p); if (d > 0) { up += d; ups.push(k); }
             }
             if (up) {
-                const allow = spend(user, 'mxp', up, 15000, 900, now);
+                const allow = spend(user, 'mxp', up, 150000, 30000, now);
                 if (allow < up) {
                     for (const k of ups) { const pv = prev && prev.mounts && prev.mounts[k], p = pv && typeof pv === 'object' ? pv : { lvl: 1, xp: 0 }; const nm = pd.mounts[k].name; pd.mounts[k] = { lvl: p.lvl, xp: p.xp }; if (nm) pd.mounts[k].name = nm; }
                     strike(user, ip, 'mxp', Math.min(10, Math.ceil((up - allow) / 5000)), 'XP de montaria revertido: ' + ups.join(','));
@@ -394,12 +393,14 @@ module.exports = function createSecurity(opts) {
     }
 
     /* ---------------- dano ---------------- */
-    const HIT_ABS = 900;   // teto absoluto de UM golpe (antes 500): habilidades ativas x crítico chegam a ~800 em nível 99; o cliente limita o dano base para ficar abaixo disso
-    function hitCap(user) {
+    function topCombat(user) {
         const db = getDB(); const u = db.users[user]; const sk = u && u.playerData && u.playerData.stats && u.playerData.stats.skills;
         let L = 1; if (sk) for (const k of ['combat', 'ranged', 'magic']) if (sk[k] && Number.isFinite(sk[k].level)) L = Math.max(L, Math.min(99, sk[k].level));
-        return Math.min(HIT_ABS, Math.round((L * 0.5 + 150) * 3.6 * 1.3));   // folga para críticos e habilidades da árvore (golpe forte x crítico): na prática HIT_ABS (o teto absoluto de um golpe)
+        return L;
     }
+    // teto de UM golpe e de dano por segundo (Balance.hitCap / dmgPerSecCap: melhor arma do nível x habilidade x crítico x bônus, com folga); admin é isento no chamador
+    const hitCap = (user) => BAL.hitCap(topCombat(user));
+    const dmgPerSec = (user) => BAL.dmgPerSecCap(topCombat(user));
     const dmgRate = new Map();
     function dmgOk(user, now) {   // no máximo 20 relatórios de dano por segundo
         let r = dmgRate.get(user); if (!r || now - r.t > 1000) { r = { t: now, n: 0 }; dmgRate.set(user, r); } return ++r.n <= 20;
@@ -407,10 +408,10 @@ module.exports = function createSecurity(opts) {
     setInterval(() => { const n = Date.now(); for (const [k, r] of dmgRate) if (n - r.t > 5000) dmgRate.delete(k); }, 60000).unref();
     function expectedMaxHp(map, id) {
         const db = getDB(); try {
-            if (String(id) === '424242') { const d = db.npcDB && db.npcDB.wboss_golem; return d && d.hp > 0 ? d.hp : 1800; }
+            if (String(id) === '424242') { const d = db.npcDB && db.npcDB.wboss_golem; return d && d.hp > 0 ? d.hp : BAL.mobTable(50, 'world').hp; }
             const m = db.worldData && hasOwn(db.worldData, map) ? db.worldData[map] : null; if (!m || !Array.isArray(m.entities)) return 0;
             const e = m.entities.find(o => o && String(o.id) === String(id)); if (!e) return 0;
-            const d = e.dbKey && db.npcDB && hasOwn(db.npcDB, e.dbKey) ? db.npcDB[e.dbKey] : null; const hp = e.maxHp || (d && d.hp) || e.hp || 0; return hp > 0 ? Math.min(100000, hp) : 0;
+            const d = e.dbKey && db.npcDB && hasOwn(db.npcDB, e.dbKey) ? db.npcDB[e.dbKey] : null; const hp = e.maxHp || (d && d.hp) || e.hp || 0; return hp > 0 ? Math.min(2000000, hp) : 0;
         } catch (e) { return 0; }
     }
 
@@ -435,5 +436,5 @@ module.exports = function createSecurity(opts) {
         return null;
     }
 
-    return { slog, rotate, STRICT, knownItem, learnItems, strike, strikeCount, lockedUntil, clearLock, checkSave, cleanTree, checkCollections, cleanSyncEquip, checkMove, hitCap, dmgOk, expectedMaxHp, chatCheck, weakPassword, scrub, scrubDeep, spend, totals, credits, _known: known };
+    return { slog, rotate, STRICT, knownItem, learnItems, strike, strikeCount, lockedUntil, clearLock, checkSave, cleanTree, checkCollections, cleanSyncEquip, checkMove, hitCap, dmgPerSec, dmgOk, expectedMaxHp, chatCheck, weakPassword, scrub, scrubDeep, spend, totals, credits, _known: known };
 };

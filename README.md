@@ -267,7 +267,7 @@ Jogador, NPCs e criaturas escolhem a vista pelo movimento (com histerese de ~8 q
 - **Pets (12)**: gato, cachorro, coelho, raposa, coruja, slime, lobinho, fada, golem, dragãozinho de gelo/fogo e fênix, de comum a lendário, com atributos em % (moedas, XP, dano, crítico, sorte, regen de HP/mana, velocidade). Nível máx. 10 (+6% dos bônus por nível); o pet recebe 35% do XP ganho.
 - **Seguir**: direção por steering com colisão (sólidos estáticos, água para não voadores), teleporte com poeira se preso/longe/troca de mapa; animações idle/andar/dormir, 4 direções, sombra, ordenação por y e culling.
 - **Painel**: ícone abaixo do nível (tecla `P`). Modos: seguir, atacar (nunca mata, só ajuda no alvo do jogador), coletar itens, só moedas, coletar tudo. A coleta usa o mesmo caminho do jogador (`invSpaceFor` + `addInvItem`), raio 160, recarga de 1,2 s; itens soltos pelo jogador (`np`), encantados ou de outro dono são ignorados; inventário cheio deixa o item no chão.
-- **Montarias (9)**: cavalos marrom/branco/de guerra, lobo gigante, cavalo esqueleto, cavalo de fogo, unicórnio, pantera e dragão (+40% a +80% de velocidade). Total de velocidade (pet + montaria) limitado a +80% (`Pets.cfg.SPD_CAP`). Tecla `V` (botão ao lado de Ação no celular). **Montado na montaria comum o jogador luta normalmente** (corpo a corpo, arco e magia, com gasto de flechas/runas; ser atingido não desmonta). Pets nível 10+ também são montáveis, mas **não se luta montado no pet** (ver abaixo). Monta e anda montado em QUALQUER lugar (interiores, casa, masmorras, loja, banco, NPCs, pesca, portais, bordas, mapa-múndi): não há desmontar automático por local ou ação; só desmonta ao morrer, por comando (V/botão) ou ao reconectar (o estado montado nunca é persistido). A hitbox do jogador não muda.
+- **Montarias (9)**: cavalos marrom/branco/de guerra, lobo gigante, cavalo esqueleto, cavalo de fogo, unicórnio, pantera e dragão (+40% a +80% de velocidade). Total de velocidade (pet + montaria) limitado a +80% (`Pets.cfg.SPD_CAP`). Tecla `V` (botão ao lado de Ação no celular). **Montado na montaria comum o jogador luta normalmente** (corpo a corpo, arco e magia, com gasto de flechas/runas; ser atingido não desmonta). Pets nível 10+ também são montáveis e **também se luta montado neles** (ver abaixo). Monta e anda montado em QUALQUER lugar (interiores, casa, masmorras, loja, banco, NPCs, pesca, portais, bordas, mapa-múndi): não há desmontar automático por local ou ação; só desmonta ao morrer, por comando (V/botão) ou ao reconectar (o estado montado nunca é persistido). A hitbox do jogador não muda.
 - **Como obter**: drops raríssimos (tabela abaixo), baús, pesca, lojas (Mercador: Pet Gato, Sela Cavalo Branco; Fazendeiro: Pet Coelho, Sela Cavalo Marrom) e craft (Sela Cavalo Marrom).
 - **Chances de drop (dev)** — `Pets.cfg.DROP_CH` em `public/pets.js`. Nada é garantido. Por morte/evento há **uma única rolagem** de "pet OU montaria"; se acertar, sorteia um candidato da lista da criatura (`DROP`/`SRC`). Pet/montaria **lendário** (raridade 4) só sai em metade das rolagens que acertam. A sorte (`Stats.luckMul`/pet de sorte) multiplica a rolagem em **no máximo 1,5x** (`Pets.cfg.LUCK_CAP`).
 
@@ -285,8 +285,9 @@ Jogador, NPCs e criaturas escolhem a vista pelo movimento (com histerese de ~8 q
 - **Evolução das montarias**: cada sela tem nível 1..30 e XP própria, em `player.mounts[id] = {lvl, xp, name?}` (o formato antigo `1` é migrado para nível 1). Ganha ~1 XP a cada 40 px cavalgados + 1 XP a cada 10 s andando montado; o XP para subir é `250 * 1,2^(nível-1)` (nível 10 em ~20 min, 20 em ~2 h, 30 em ~14 h cavalgando). A velocidade é a base `x (1 + até 20% no nível 30)` e continua sob o teto global de +80% (o dragão já chega nele; o ganho dele vem do bônus secundário). Cada espécie ganha um bônus secundário a cada fase (só montado): Marrom moedas +2%, Branco regen +3%, de Guerra XP +2%, Lobo/Pantera sorte +2%, Esqueleto regen de mana +4%, de Fogo XP +2%, Unicórnio regen +4%, Dragão XP +3% (por fase, até 3 fases).
 - **Fases visuais** (níveis 10/20/30): 1 arreios; 2 aura (e armadura de cavalo de guerra nos cavalos comuns); 3 penacho/crista e aura forte com faíscas; cavalo de fogo deixa rastro de brasas; o dragão cresce +5% por fase (até +15%, só visual, a hitbox não muda). Os outros jogadores veem a fase pelo campo `ms` (0..3) do `/api/sync` (sanitizado em `extras.cleanMountStage`).
 - **Painel**: aba Montarias (tecla `P`) mostra nome (editável, 14 caracteres), nível, fase, barra de XP, bônus atuais e o que vem no próximo nível/fase.
+- **XP da montaria vindo do seu XP** (`playerData.mountPct`, 0..40, passos de 5, padrão 0%): controle "XP do jogador para a montaria" no painel de Montarias (como o dos Mímicos). A montaria **equipada** (montado ou não) recebe essa % de todo XP que o jogador ganha em qualquer perícia, além do XP de cavalgar (que continua igual). O jogador recebe o resto: a soma é exata (restos acumulados, nada se perde) e a montaria nível 30 não recebe mais (o excedente volta ao jogador). **Ordem com os Mímicos**: primeiro os Mímicos (`player.mimicPct`), depois a montaria, e **juntos desviam no máximo 70%**: a montaria recebe `min(%, 70 - %Mímicos)`, então com a montaria ligada o jogador sempre fica com **30% ou mais** (Mímicos sozinhos continuam podendo ir a 100%). O painel mostra "Você recebe X% / Mímicos Y% / Montaria Z%" e avisa quando o limite reduz a fatia. Implementação: `addXP` (index.html) chama `Pets.xpShare(xp final)`; o servidor clampa `mountPct` (`extras.cleanPetData`: 41 vira 40, valores ruins viram 0, passos de 5) e o orçamento de XP de montaria (`security.js`) subiu para cap 150.000 / 30.000 por minuto, pois agora ela também cresce com o XP do jogador (que já tem orçamento próprio). Curva de níveis inalterada (`250 x 1,2^(nível-1)`): estimativa para um jogador de ~70 mil XP/h, a 40% leva ~11 min para o nível 10 e ~9 h para o 30 só pelo XP compartilhado (somando cavalgar, ~7 h); a 10% leva o dobro ou mais, então não dá para "rushar" sem jogar de verdade.
 - **Servidor**: `extras.cleanPetData` limita nível 1..30, XP >= 0 e abaixo do necessário, ids por whitelist e nome só com letras/números; `security.checkCollections` impõe orçamento de XP de montaria por minuto (montaria nova começa no nível 1) e reverte só a montaria suspeita.
-- **Pet nível 10+ vira montaria**: no nível 10 (máximo) o pet fica grande o bastante para o jogador montar nele. Botão **Montar no pet** no painel (tecla `P`) e tecla `V` (se houver montaria comum equipada, `V` monta nela; o painel do pet tem botão próprio). Montado: o pet cresce (1,5x ou mais, só visual), o jogador senta (4 direções; ajuste fino por espécie), o seguidor some mas **o jogador NÃO pode atacar montado no pet** (ataque por tecla/clique/arco/magia é bloqueado com "Desmonte do pet para lutar"; quem quer lutar monta a montaria comum ou desmonta). Os **atributos do pet valem SEMPRE, montado ou não**: equipado, o pet dá o valor **base** (`Pets.petBase`: 40% do valor no nível 1 subindo linear até 100% no nível 10); **montado** (nível 10+) os atributos sobem (`PM_MUL` = 1,5x) e entra a velocidade extra de 8% mais 2% por raridade (só montado; teto `SPD_CAP` +80% somado a atributos). Desmontado o pet segue, coleta e ajuda a atacar nos modos de sempre. Montado, o seguidor some; ao desmontar reaparece ao lado e os pets seguem o jogador em qualquer mapa (teleportam junto nos portais). Não se luta montado no pet (ataque por tecla/clique/arco/magia bloqueado com "Desmonte do pet para lutar"); ser atingido NÃO desmonta mais; montaria comum continua lutando normalmente. A hitbox do jogador não muda. Montar no pet e montar na montaria comum são exclusivos. Ao subir o pet para o nível 10 aparece o aviso. Os outros jogadores veem o pet crescido pelo campo `m` em `pet {id,l,m}` do `/api/sync` (`extras.cleanPetSync` só aceita `m` com nível 10). Painel do pet mostra por atributo "base X% / montado Y%" com o lado ativo destacado.
+- **Pet nível 10+ vira montaria**: no nível 10 (máximo) o pet fica grande o bastante para o jogador montar nele. Botão **Montar no pet** no painel (tecla `P`) e tecla `V` (se houver montaria comum equipada, `V` monta nela; o painel do pet tem botão próprio). Montado: o pet cresce (1,5x ou mais, só visual), o jogador senta (4 direções; ajuste fino por espécie), o seguidor some e **o jogador PODE lutar montado no pet**, igual às montarias comuns (corpo a corpo, arco e magia com gasto de flechas/runas, habilidades da árvore e de set); a mensagem "Desmonte do pet para lutar" e os bloqueios foram removidos. Os **atributos do pet valem SEMPRE, montado ou não**: equipado, o pet dá o valor **base** (`Pets.petBase`: 40% do valor no nível 1 subindo linear até 100% no nível 10); **montado** (nível 10+) os atributos sobem (`PM_MUL` = 1,5x) e entra a velocidade extra de 8% mais 2% por raridade (só montado; teto `SPD_CAP` +80% somado a atributos). Desmontado o pet segue, coleta e ajuda a atacar nos modos de sempre. Montado, o seguidor some; ao desmontar reaparece ao lado e os pets seguem o jogador em qualquer mapa (teleportam junto nos portais). Ser atingido NÃO desmonta (nem no pet nem na montaria); só desmonta ao morrer, por comando ou ao reconectar. Visual conferido em frente/costas/perfil com espada, arco e cajado (sem sobreposição estranha). A hitbox do jogador não muda. Montar no pet e montar na montaria comum são exclusivos. Ao subir o pet para o nível 10 aparece o aviso. Os outros jogadores veem o pet crescido pelo campo `m` em `pet {id,l,m}` do `/api/sync` (`extras.cleanPetSync` só aceita `m` com nível 10). Painel do pet mostra por atributo "base X% / montado Y%" com o lado ativo destacado.
 - **Depuração**: `Pets.state()`, `Pets.isMounted()`, `Pets.isPetMounted()`, `Pets.mountPet()`, `Pets._P`.
 
 ## Itens Mímicos (`public/mimic.js`, `mimicnames.js`, `specialquests.js`)
@@ -304,11 +305,197 @@ Equipamentos raros e "vivos" que **evoluem com o personagem** e que **só o admi
 - **Servidor**: `mimicnames.js` guarda a lista branca de nomes e `cleanMimicData` (chamado em `/api/save`): nomes inventados saem, `lvl` 1..50, `xp` 0..1e7, `skin` só liberada, `mst/msk` dos itens recalculados e `mimicPct` 0..100.
 - **Testes/depuração** (admin): `Mimic.grant(nome)` (só funciona com conta admin), `Mimic.addXp(nome, n)`, `Mimic.setPct(50)`, `Mimic.state()`, `Mimic.setSkin(nome, id)`, `Mimic.setSkinAll(classe, id)`. Integração: ganchos em `addXP`, `applyDamage`, `useItem`, `Stats.tipHtml`, ícones (`icons.js`, a chave de cache inclui a aparência) e desenho do personagem (`art.js`).
 
+## Balanceamento (v2): XP do RuneScape, vida 100+10/nível, dano em faixa fixa (`public/balance.js`)
+
+Toda a matemática do jogo mora em **um único arquivo**, `public/balance.js` (UMD: `window.Balance` no navegador e `require('./public/balance.js')` no servidor). O cliente (`index.html`, `skilltree.js`, `pets.js`...), o servidor (`security.js`, `server.js`) e o simulador usam as mesmas funções. As chaves internas de itens/perícias não mudaram (a Defesa é a única perícia nova: `defence`).
+
+**Constantes que você pode mexer** (todas no topo de `balance.js`):
+
+| Constante | Padrão | Efeito |
+|---|---|---|
+| `XP_RATE` | 1,5 | multiplicador global de TODO ganho de XP (1 = ritmo puro do RuneScape). Também por ambiente: `XP_RATE=2 node server.js` (o servidor entrega o valor ao navegador em `/balance.js`) |
+| `XP_PER_DMG` | 0,16 | XP base por ponto de dano **causado** (x`XP_RATE` = 0,24) |
+| `TAKEN_XP` | 1,33 | XP base por ponto de dano **sofrido**, para Vitalidade e para Defesa (cada uma) |
+| `TIER_K` | 0,018 | escala de XP dos ofícios por nível (recursos melhores): 1x no nível 1, ~2,8x no 99 |
+| `LEVEL_POWER(L)` | 8,5 + 0,5 L + 0,011 L² | "ESCALA" do dano: dano-base do nível L sem arma |
+| `RATING_W` | 0,05 | cada ponto de poder de arma (`bonusDmg`) soma 5% ao dano-base |
+| `HP_BASE`/`HP_PER_LEVEL` | 100 / 10 | vida = 100 + 10 x (nível de Vitalidade - 1) |
+| `MP_BASE`/`MP_PER_LEVEL` | 50 / 5 | mana = 50 + 5 x (nível de Magia - 1) |
+| `HEAL_MULT`/`MP_MULT` | 10 / 5 | itens guardam valores "brutos" (Peixe 8 = antigo); na hora de usar viram x10 de vida e x5 de mana |
+| `ARMOR_W`, `DEF_K`, `DEF_K_LVL` | 4, 60, 2 | armadura/defesa (veja abaixo) |
+| `MOBS` | tabela | nível e camada de cada criatura (`[nível, 'common'|'elite'|'boss'...]`) |
+| `TIERS` | tabela | por camada: golpes do jogador para matar (`hits`) e golpes do monstro para matar o jogador (`ttd`) |
+
+### Fórmulas
+
+- **XP por nível** (RuneScape): `xp(L) = floor(1/4 * soma_{l=1}^{L-1} floor(l + 300 * 2^(l/7)))`. Vale para TODAS as perícias (combate e ofícios). O save guarda o **XP total** (`{level, xp, next}`, `next` = XP total do próximo nível); o nível é sempre derivado do XP (`levelForXp`). Conferência: nível 2 = 83, 10 = 1.154, 50 = 101.333, 99 = 13.034.431.
+
+| Nível | XP total | Nível | XP total |
+|---|---|---|---|
+| 2 | 83 | 5 | 388 |
+| 10 | 1.154 | 15 | 2.411 |
+| 20 | 4.470 | 25 | 7.842 |
+| 30 | 13.363 | 40 | 37.224 |
+| 50 | 101.333 | 60 | 273.742 |
+| 70 | 737.627 | 80 | 1.986.068 |
+| 90 | 5.346.332 | 99 | 13.034.431 |
+
+
+- **Pontos de habilidade** continuam `floor((nível - 1) / 2)`. Humano continua +5% de XP e o desvio de XP para os Mímicos continua funcionando (acontece antes, em `addXP`).
+- **Vida máxima** = `100 + 10 x (Vitalidade - 1)` + classe (Guerreiro +30) + raça (Anão +40, Orc +20) + bônus da árvore (já x10: Vigor +40/rank...). **Mana máx.** = `50 + 5 x (Magia - 1)` + classe (Mago +40) + raça (Elfo +20, Orc -10), mínimo 30. Subir de nível de Vitalidade/Magia soma +10 de vida / +5 de mana na hora.
+- **Regeneração**: 2% da vida máxima a cada 5 s; mana `1,25/s + 0,6% da máxima`; passivas da árvore e fonte de pets/pescados já na escala nova (x10 vida, x5 mana).
+- **Dano do jogador** (corpo a corpo, à distância e mágico usam a mesma função, `Balance.playerDmgRange(nível, poder, estilo)`):
+  - `base = LEVEL_POWER(nível da perícia) x (1 + 0,05 x poder)`, em que poder = `bonusDmg` da arma (+ munição, + dano da magia ativa e dano mágico, + poção de força).
+  - Cada golpe é um inteiro uniforme em **[floor(0,9 x base), ceil(1,5 x base)]**. Nunca 0/1 por sorte e **não existe erro** de ataque do jogador. O crítico (x1,5, de `Stats`) multiplica depois. A dica da arma mostra `Dano: 9-17` (faixa para o seu nível atual).
+  - Habilidades ativas: `base x multiplicador do rank (2 a 4,2) x (1 + dano%) x 0,92..1,08` (por isso 400 a 1.500 em nível alto). Pets em modo ataque: ~5 x (1 + nível/3) + bônus.
+- **Defesa**: perícia nova. `R = Defesa + 4 x (armadura equipada + poção)`; redução = `R / (R + 60 + 2 x nível do monstro)` (teto 80%). A chance de o monstro acertar é `0,80 + 0,02 x (nível do monstro - Defesa)` (entre 50% e 97%); quando erra aparece "Esquivou". Dano de monstros acima do seu nível de combate sobe 4% por nível de diferença (mob +20 níveis = x1,8; teto x3,5); abaixo, cai (piso x0,5).
+- **XP de combate**: a perícia ofensiva (Combate/Arquearia/Magia) ganha `0,16 x XP_RATE` por ponto de dano **causado**, limitado à vida que o alvo ainda tinha (sem overkill). **Defesa e Vitalidade** ganham `1,33 x XP_RATE` por ponto de dano **sofrido** (depois da redução e da barreira, sem XP para esquiva, bloqueio total, cura ou morte). Fator de relevância do monstro: nível < metade do seu nível de combate = x0,25; entre metade e igual sobe linear; igual ou maior = x1. Pets não dão XP; habilidades ativas dão XP pelo dano. O nível de combate é `0,5 x max(Combate, Arquearia, Magia) + 0,25 x (Defesa + Vitalidade)`.
+
+| Nível | Vida máx. (base) | Mana máx. (base) | Poder de arma típico | Dano normal (arma típica) | Média | Redução de armadura típica |
+|---|---|---|---|---|---|---|
+| 1 | 100 | 50 | 4.2 | 9-17 | 13 | 30% |
+| 5 | 140 | 70 | 5.1 | 12-22 | 17 | 34% |
+| 10 | 190 | 95 | 6.2 | 17-29 | 23 | 37% |
+| 20 | 290 | 145 | 8.4 | 29-49 | 39 | 42% |
+| 30 | 390 | 195 | 10.6 | 45-77 | 61 | 44% |
+| 40 | 490 | 245 | 12.8 | 68-114 | 91 | 46% |
+| 50 | 590 | 295 | 15.0 | 96-161 | 129 | 47% |
+| 60 | 690 | 345 | 17.2 | 130-218 | 174 | 48% |
+| 70 | 790 | 395 | 19.4 | 172-288 | 230 | 49% |
+| 80 | 890 | 445 | 21.6 | 222-371 | 297 | 49% |
+| 90 | 990 | 495 | 23.8 | 281-469 | 375 | 50% |
+| 99 | 1080 | 540 | 25.8 | 341-570 | 456 | 50% |
+
+
+Armas e ativas nos níveis altos (melhor arma do nível):
+
+| Nível | Melhor arma do nível | Golpe normal | Ativa x3 (média) | Ativa x4,2 com +30% de bônus |
+|---|---|---|---|---|
+| 30 | poder 18 | 57-96 | 190 | 346 |
+| 60 | poder 30 | 175-293 | 586 | 1066 |
+| 99 | poder 34 | 402-672 | 1343 | 2444 |
+
+
+- **Tempo para subir** (simulado, 50% de aproveitamento do tempo em combate, `XP_RATE` = 1,5; lenhador sem tempo de deslocamento leva ~49 h para o 99):
+
+| Nível | Combate/Arquearia/Magia (h) | Vitalidade e Defesa (h) |
+|---|---|---|
+| 10 | 0.1 | 0.0 |
+| 20 | 0.3 | 0.1 |
+| 30 | 0.7 | 0.2 |
+| 40 | 1.3 | 0.5 |
+| 50 | 2.4 | 1.1 |
+| 60 | 4.6 | 2.4 |
+| 70 | 9.1 | 5.4 |
+| 80 | 18.2 | 12.7 |
+| 90 | 37.5 | 30.0 |
+| 99 | 73.3 | 66.2 |
+
+
+- **Monstros**: tabela por nível (`Balance.mobTable(nível, camada)`): vida = golpes para matar x dano médio de um jogador típico do nível; dano = vida do jogador do nível / (golpes para morrer x (1 - redução típica) x 0,8). Comuns ~7 golpes para matar e ~15 para morrer, chefes ~30 / ~7, elites 14 / 10, Colosso de Pedra 250 / 6, Kharzul 60 / 6. Criaturas de recurso (vaca, galinha...) não atacam. Nível, vida e dano ficam na definição (`level`, `hp`, `dmin`, `dmax`, `maxHit = dmax`, `balV = 2`); o ataque do monstro sorteia em `[dmin, dmax]`. Criaturas criadas no editor DEV (sem entrada em `MOBS`) são estimadas pelo `maxHit` antigo e marcadas `balV`.
+
+| Criatura | Nv | Camada | Vida | Dano | Golpes para matar | Golpes para morrer |
+|---|---|---|---|---|---|---|
+| `rabbit_base` | 1 | critter | 35 | - | 2.7 | - |
+| `chicken_base` | 1 | critter | 35 | - | 2.7 | - |
+| `sheep_base` | 2 | critter | 35 | - | 2.5 | - |
+| `cow_base` | 2 | critter | 35 | - | 2.5 | - |
+| `pig_base` | 2 | critter | 35 | - | 2.5 | - |
+| `rat_base` | 2 | trash | 40 | 6-11 | 2.9 | 23.4 |
+| `bat_base` | 3 | trash | 45 | 6-12 | 3.0 | 24.5 |
+| `slime_base` | 3 | light | 75 | 9-16 | 5.0 | 17.7 |
+| `goblin_base` | 4 | light | 80 | 10-17 | 5.2 | 18.0 |
+| `deer_base` | 5 | critter | 45 | - | 2.6 | - |
+| `snake_base` | 5 | light | 85 | 11-19 | 5.0 | 17.6 |
+| `wolf_base` | 7 | common | 135 | 15-26 | 6.9 | 15.1 |
+| `boar_base` | 7 | common | 135 | 15-26 | 6.9 | 15.1 |
+| `salt_slime` | 9 | light | 110 | 14-25 | 5.0 | 18.2 |
+| `spider_base` | 9 | common | 155 | 17-30 | 7.0 | 15.1 |
+| `orc_base` | 10 | common | 160 | 18-32 | 7.0 | 15.2 |
+| `ghost_base` | 10 | common | 160 | 18-32 | 7.0 | 15.2 |
+| `swamp_snake` | 11 | common | 170 | 20-34 | 6.9 | 14.9 |
+| `bog_slime` | 12 | light | 130 | 17-30 | 5.0 | 18.1 |
+| `skeleton_base` | 12 | common | 180 | 21-36 | 6.9 | 14.9 |
+| `marsh_wisp` | 13 | common | 190 | 22-38 | 7.0 | 15.0 |
+| `drowned` | 14 | common | 200 | 23-40 | 7.0 | 15.0 |
+| `goblin_brute` | 14 | common | 200 | 23-40 | 7.0 | 15.0 |
+| `forest_wisp` | 15 | common | 210 | 24-42 | 7.0 | 15.1 |
+| `darkmage_base` | 16 | common | 220 | 26-44 | 7.0 | 14.9 |
+| `dune_snake` | 16 | common | 220 | 26-44 | 7.0 | 14.9 |
+| `whelp_base` | 16 | elite | 440 | 39-66 | 14.0 | 9.9 |
+| `venom_spider` | 17 | common | 230 | 27-46 | 6.9 | 15.0 |
+| `dire_wolf` | 18 | common | 250 | 28-48 | 7.0 | 15.0 |
+| `sand_skeleton` | 20 | common | 270 | 31-52 | 6.9 | 15.0 |
+| `troll_base` | 20 | boss | 1.150 | 66-111 | 29.5 | 7.0 |
+| `grave_ghost` | 22 | common | 300 | 33-56 | 7.0 | 15.1 |
+| `goblin_chief` | 22 | boss | 1.300 | 71-120 | 30.2 | 7.0 |
+| `zombie` | 24 | common | 330 | 36-61 | 7.0 | 14.9 |
+| `ice_bat` | 24 | common | 330 | 36-61 | 7.0 | 14.9 |
+| `golem_base` | 24 | boss | 1.400 | 77-129 | 29.8 | 7.0 |
+| `ent_elder` | 26 | boss | 1.550 | 82-138 | 30.1 | 7.0 |
+| `sand_wraith` | 28 | common | 400 | 41-69 | 7.1 | 14.9 |
+| `frost_wolf` | 30 | common | 430 | 43-73 | 7.0 | 15.0 |
+| `sand_golem` | 30 | boss | 1.850 | 93-156 | 30.3 | 7.0 |
+| `skeleton_knight` | 32 | common | 470 | 46-77 | 7.1 | 15.0 |
+| `frost_ghost` | 33 | common | 490 | 47-80 | 7.1 | 15.0 |
+| `apprentice` | 36 | common | 550 | 51-86 | 7.1 | 15.0 |
+| `crypt_knight` | 36 | elite | 1.100 | 77-129 | 14.1 | 10.0 |
+| `troll_elder` | 38 | boss | 2.550 | 115-193 | 30.2 | 7.0 |
+| `necromancer` | 40 | elite | 1.250 | 84-142 | 13.7 | 10.0 |
+| `dragon_boss` | 40 | boss | 2.750 | 121-202 | 30.2 | 7.0 |
+| `ice_golem` | 42 | boss | 2.950 | 126-212 | 30.3 | 7.0 |
+| `mummy_king` | 43 | boss | 3.050 | 129-216 | 30.2 | 7.0 |
+| `dark_knight` | 44 | elite | 1.450 | 92-155 | 13.9 | 10.0 |
+| `arcane_golem` | 45 | boss | 3.250 | 135-226 | 30.0 | 7.0 |
+| `fire_whelp` | 46 | elite | 1.600 | 96-161 | 14.2 | 10.0 |
+| `ash_bat` | 47 | common | 810 | 65-110 | 7.0 | 15.0 |
+| `lich_boss` | 48 | boss | 3.600 | 143-240 | 30.1 | 7.0 |
+| `ember_skeleton` | 49 | elite | 1.750 | 102-171 | 14.2 | 10.0 |
+| `wboss_golem` | 50 | world | 32.000 | 174-291 | 249.0 | 6.0 |
+| `frost_giant` | 52 | boss | 4.100 | 154-258 | 30.0 | 7.0 |
+| `lava_golem` | 54 | boss | 4.350 | 160-268 | 29.9 | 7.0 |
+| `forgotten_king` | 55 | boss | 4.500 | 163-273 | 30.0 | 7.0 |
+| `mad_mage` | 58 | boss | 4.950 | 171-287 | 30.1 | 7.0 |
+| `warlord` | 58 | boss | 4.950 | 171-287 | 30.1 | 7.0 |
+| `drake` | 62 | boss | 5.500 | 183-306 | 29.8 | 7.0 |
+| `black_dragon` | 78 | raid | 17.000 | 266-445 | 60.2 | 6.0 |
+
+
+  Contra monstros 20 níveis acima do jogador típico (dano x1,8 pelo nível, mais acerto e menos redução):
+
+| Jogador | Monstro +20 níveis | Dano médio por golpe | Golpes para morrer | Golpes para matar |
+|---|---|---|---|---|
+| 10 | 30 | 75 | 2.6 | 19 |
+| 30 | 50 | 105 | 3.8 | 15 |
+| 50 | 70 | 135 | 4.5 | 12 |
+| 70 | 90 | 165 | 4.9 | 12 |
+
+
+- **Cura**: `Balance.healOf(bruto) = bruto x 10` (Pão 60, Peixe 80, Salmão 140, Poção de Vida 200, Poção Maior 400, Peixe-dragão 480); mana `x 5` (Poção de Mana 75). Descrições antigas ("Cura 20 HP") são reescritas na tela por `Balance.fixDesc`. Dica de armadura mostra `Defesa +4 x defBonus`; dica de munição/amuleto mostra `Dano +5% x bônus`.
+- **Requisitos de nível** de armas, armaduras, minérios, receitas e magias foram **dobrados** (`Balance.reqLevel`: Aço 20, Mithril 30, Dragão 60...). Conquistas por nível e recompensas de XP de missões/diárias foram reescaladas (x2 nos níveis, x6 e x4 no XP).
+
+### Segurança e migração
+
+- `security.js` usa `Balance`: o nível é derivado do XP (nível sem XP = revertido), orçamento de XP por perícia de ~4.600 XP/s sustentados ou 1.000.000 de uma vez (jogo limpo nunca chega perto; VIP x4 e humano x1,05 inclusos), `maxHp <= 100 + 10 x (Vit-1) + 70 (classe/raça) + árvore + 40` (mana análoga), golpe máximo `Balance.hitCap(nível)` (melhor arma do nível x habilidade até x4,2 x dano% da árvore x crítico x conjunto/marca, com folga; habilidades ativas só existem a partir do nível 5) e dano por segundo `hitCap x 3,3` (L1: 54 / 179 por s; L30: 2.229 / 7.356; L99: 42.137 / 139.053). A vida dos monstros vem do catálogo/mundo do servidor (`expectedMaxHp`, até 2.000.000). Admin continua isento.
+- **Migração das contas** (`playerData.balV = 2`, idempotente): o nível de cada perícia é preservado; o XP antigo vira o XP mínimo daquele nível na tabela nova **mais a mesma fração de progresso** dentro do nível (save com só o nível = XP mínimo do nível). A Defesa nasce igual ao nível de Combate antigo. Vida e mana máximas são recalculadas pela fórmula nova (com classe, raça e árvore) e curadas por inteiro; inventário e o resto não mudam. Roda **no servidor ao iniciar** (`balanceMigrate` em `server.js`: contas, `npcDB` salvo e criaturas do mundo salvo; também depois de `/api/restore`) e **no cliente no login** (caso o servidor entregue um save antigo). Um cliente desatualizado que tente salvar sem `balV` recebe `409 {code:'OUTDATED'}` ("recarregue a página").
+- Monstros do `npcDB`/mundo salvos antes do balanceamento (sem `balV`) são convertidos uma vez; os que o admin editar depois no DEV já saem com `balV` e valem como digitados.
+
+### Como ajustar
+
+1. Edite as constantes de `public/balance.js` (ou a tabela `MOBS`/`TIERS`) e rode `node tools/sim_balance.js` (ver abaixo) para ver XP/vida/dano/tempo por nível e golpes para matar/morrer por criatura, até ficar saudável e monotônico.
+2. Mais rápido/lento para todos: `XP_RATE`. Combate mais letal ou mais fácil: `TIERS[...].ttd`. Monstros mais duros: `TIERS[...].hits`. Armas mais fortes: `RATING_W`.
+3. Mexeu no dano ou na vida? Os tetos do servidor acompanham sozinhos (`hitCap`, `dmgPerSecCap`, `maxHpAllowed` são derivados das mesmas fórmulas).
+
+### Simulador e testes
+
+`tools/sim_balance.js` reproduz as fórmulas e imprime as tabelas deste capítulo (`node tools/sim_balance.js [xp|hp|time|mobs]`). O teste de navegador do balanceamento cobre: faixa de dano fixa e XP por dano (guerreiro, arqueiro, mago), Defesa/Vitalidade só ao apanhar (fraco x forte), comida e poções, morte e renascimento, chefes, auditoria de todos os monstros (sem `undefined`/NaN/0), migração de conta antiga, relogin, conta nível 99 jogando limpo (ativa acima de 400 de dano e zero strikes no `security.log`) e celular 844x390.
+
 ## Árvore de Habilidades (`public/skillnodes.js`, `skilltree.js`)
 - **Abrir**: tecla **K**, botão de estrela ao lado de Social/Diário (no celular, na fileira do topo) ou cartão na aba Perícias. Modal grande com abas Guerreiro / Arqueiro / Mago (★ marca a árvore da sua classe, mas qualquer um pode investir em qualquer árvore). Arraste para mover, roda/pinça para zoom, botões +, − e ajustar. Toque/clique num nó para ver descrição, rank atual e próximo, pré-requisitos e o botão Aprender.
 - **Pontos**: `floor((nível - 1) / 2)` por perícia (Combate -> Guerreiro, Arquearia -> Arqueiro, Magia -> Mago), não transferíveis entre árvores (nível 3 = 1 ponto, nível 99 = 49). A UI mostra "Pontos: X disponíveis / Y totais".
 - **Nós** (`skillnodes.js` é compartilhado cliente/servidor): ~19 passivas por árvore (rank 1-5, 1 ponto por rank) somam atributos em `Stats.addSource('skilltree')` e bônus próprios (dano %, dano de habilidade %, vida/mana máx., regenerações, redução de recarga); 6 ativas por árvore (rank 1-3, 2 pontos por rank) vão para a barra de habilidades.
-- **Barra**: teclas **Q E F G**, botões redondos acima da barra rápida (celular: acima dos botões Ação/Atacar), recarga circular com contagem, custo de mana/flechas no canto. Teclas não disparam com chat aberto, modal aberto ou campo de texto focado. Bloqueadas montado em pet ("Desmonte do pet para lutar.").
+- **Barra**: 4 slots, teclas **Q E F G** em um **selo dourado bem visível** no canto de cada slot (no celular o selo mostra a ordem 1-4), mais a **recarga base** (embaixo à esquerda), o **custo** de mana/flechas (embaixo à direita) e a recarga circular com contagem. O slot da habilidade de set é roxo, com selo **Z** (celular: SET). Teclas não disparam com chat aberto, modal aberto ou campo de texto focado. Funcionam montado (montaria ou pet).
+- **Editar a barra** (qualquer ativa aprendida em qualquer slot): **botão direito** num slot remove; passar o mouse mostra um **×** vermelho e a dica "Clique direito: remover · Arraste: reordenar"; **arraste** um slot para outro para trocar de lugar ou **para fora da barra** para remover; **clique num slot vazio** (ou no lápis ✎ + clique num ocupado) abre o seletor com todas as ativas aprendidas (nome, rank, custo, recarga e o slot atual), inclusive "Esvaziar o slot"; escolher uma que já está na barra troca as duas de lugar. No celular: **toque longo** num slot (ou o botão ✎) liga o modo editar (× em todos os slots, toque para trocar, arraste para reordenar). Dentro da árvore (K) há a faixa **"Sua barra"** no rodapé (mesmas teclas, × e arrastar; com um nó ativo selecionado, tocar num slot vazio o equipa) e o painel do nó tem "Equipar na barra: Q/E/F/G" mostrando o que cada slot substitui e "Remover da barra". Tudo salva em `skillTree.bar` e o servidor saneia (ids inexistentes, repetidos ou não aprendidos viram vazio).
 - **Requisitos de arma** (mensagens claras): Guerreiro = arma corpo a corpo; Arqueiro = arco + flechas (gasta flechas, respeita "poupar munição"); Mago = cajado + mana (a mana agora regenera sozinha: 0,25 + 0,6% da máxima por segundo, mais passivas).
 - **Ativas**: Guerreiro Golpe Poderoso, Grito de Guerra, Investida, Furor, Muralha, Terremoto. Arqueiro Tiro Preciso (crítico garantido), Disparo Múltiplo, Passo Sombrio, Marca da Presa, Flecha Perfurante, Chuva de Flechas. Mago Bola de Fogo, Raio de Gelo, Cura (Menor/Maior), Nova Arcana, Escudo Arcano, Tempestade.
 - **Dano**: dano-base da perícia x multiplicador do rank x (1 + dano% + dano de habilidades%), sempre via `applyDamage` (crítico, roubo de vida, XP, loot, relatório ao servidor, Mímicos e pets). Linha de visão (`LOS`) para mirar e para projéteis (batem na parede). Área: até 8 alvos, lista de inimigos em cache de 200 ms. Pets em modo ataque ajudam como de costume.
@@ -322,7 +509,7 @@ Equipamentos raros e "vivos" que **evoluem com o personagem** e que **só o admi
 - Um conjunto **completo** equipado libera uma habilidade especial num slot dedicado (tecla **Z**, botão com brilho ao lado da barra; some quando o set é desfeito). Recarga guardada em `skillTree.cd`.
 - **Mímico** (todas as peças da classe, recarga 60-120 s, poder cresce com o nível médio das peças): Guerreiro **Fúria Imortal** (barreira + dano + roubo de vida), Arqueiro **Tempestade Fantasma** (chuva espectral), Mago **Eclipse Arcano** (explosão que atordoa e devolve mana).
 - **Evolutivos** (3+ peças, recarga 90-150 s): Bronze Pele de Bronze, Ferro Pele de Ferro, Aço Giro de Aço, Ouro Toque Dourado, Mithril Passo Mítrico, Escama de Dragão Sopro de Dragão, Patrulheiro Olho de Falcão, Couro de Dragão Flecha Dragão, Místico Surto Místico, Arcano Nova Congelante. Conjuntos de 2 peças não têm habilidade.
-- Mostrado em "Habilidade do Set: nome - descrição" nas dicas dos itens, no painel Mímico, na aba Equip. e na barra. Não exige tipo de arma; bloqueada montado em pet.
+- Mostrado em "Habilidade do Set: nome - descrição" nas dicas dos itens, no painel Mímico, na aba Equip. e na barra. Não exige tipo de arma; funciona montado (montaria ou pet).
 
 ## Dev: dar itens (`public/gift.js`) e itens colocados no mundo
 - **Presentes**: DEV > *Presentes*. Busca jogador (online/offline) e item do catálogo inteiro, quantidade 1..2.147.483.647 e mensagem opcional. `POST /api/admin/give` (admin verificado no servidor, rate limit, whitelist de itens) grava no **correio do mercado** (`db.market.mail`): id único, entrega atômica com confirmação após salvar, não duplica ao relogar e fica na fila se a mochila estiver cheia (chega online em até ~20 s). Registrado em `DATA_DIR/admin-gifts.log` e `security.log`; histórico em `GET /api/admin/gifts`, busca em `GET /api/admin/search`. Presentes não entram nos tetos anti-trapaça.

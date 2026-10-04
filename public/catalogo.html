@@ -49,6 +49,7 @@ footer { text-align:center; color:var(--dim); padding:20px; font-size:.85rem; }
 </nav>
 <main id="main"></main>
 <footer>MiniScape 2D · catálogo gerado a partir de <code>catalog.js</code> · desenhos feitos por código (canvas)</footer>
+<script src="balance.js"></script>
 <script src="labels.js"></script>
 <script src="catalog.js"></script>
 <script src="art.js"></script>
@@ -77,7 +78,7 @@ footer { text-align:center; color:var(--dim); padding:20px; font-size:.85rem; }
       const d = C.CREATURES[k]; const card = el('div', 'card'); const cv = document.createElement('canvas'); cv.width = 300; cv.height = 210; card.appendChild(cv);
       const body = el('div', 'body'); body.innerHTML =
         '<h3>' + d.name + '<span class="tag ' + g + '">' + g + '</span></h3><div class="desc">' + d.desc + '</div>' +
-        '<div class="stats">' + (d.hp ? '<span class="stat">❤ Vida <b>' + d.hp + '</b></span><span class="stat">⚔ Dano máx <b>' + d.maxHit + '</b></span><span class="stat">✨ XP <b>' + d.xp + '</b></span>' : '') +
+        '<div class="stats">' + (d.hp ? '<span class="stat">Nv <b>' + (d.level || '?') + '</b></span><span class="stat">❤ Vida <b>' + d.hp + '</b></span><span class="stat">⚔ Dano <b>' + (d.dmax > 0 ? d.dmin + '-' + d.dmax : '—') + '</b></span>' : '') +
         '<span class="stat">🧭 ' + BEH[d.behavior] + '</span><span class="stat">📍 ' + d.biome + '</span></div>' +
         (d.lootStr ? '<div class="drops"><b>Drops:</b><br>' + lootHtml(d.lootStr) + '</div>' : '') +
         (d.shopStr ? '<div class="drops"><b>Vende:</b><br>' + shopHtml(d.shopStr) + '</div>' : '') +

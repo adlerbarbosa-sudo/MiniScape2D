@@ -3,7 +3,7 @@
      poder cresce com o nível médio das peças Mímicas (1..50).
    - Conjuntos evolutivos (Gear.SETS com 3+ peças): bronze, ferro, aço, ouro, mithril, escama de dragão, patrulheiro, couro de dragão, místico e arcano. Recarga 90-180 s, efeito menor.
    - Desfez o conjunto: o botão some. A recarga é guardada em playerData.skillTree.cd (ids de set na lista branca do servidor), então relogar não reinicia.
-   - Sem peso de arma: funcionam com qualquer arma; não funcionam montado em pet. Danos passam pela fila limitada de SkillTree (mesmos tetos do servidor). Efeitos visuais locais.
+   - Sem peso de arma: funcionam com qualquer arma; funcionam montado (montaria ou pet). Danos passam pela fila limitada de SkillTree (mesmos tetos do servidor). Efeitos visuais locais.
    Mostra "Habilidade do Set: X — ..." nas dicas dos itens do conjunto e no painel Mímico. */
 (function () {
     'use strict';
@@ -25,7 +25,7 @@
 
     def('mimic_guerreiro', { name: 'Fúria Imortal', ic: 'rage2', col: '#c070ff', sk: 'combat', cd: (v) => Math.round(120 - v * 1.2),
         desc: (v) => 'Barreira de ' + Math.round(40 + v * 0.6) + '% da vida máx., +' + Math.round(25 + v * 0.7) + '% de dano e +10% de roubo de vida por ' + Math.round(8 + v / 5) + ' s.',
-        run(v) { A.setBarrier(pctHp(40 + v * 0.6) + 10, 8 + v / 5, '#c070ff'); A.addBuff('fury', 8 + v / 5, { dmg: Math.round(25 + v * 0.7), st: { lifesteal: 10 }, name: 'Fúria Imortal', col: '#c070ff', ic: 'rage2' }); A.ring(player.x, player.y + 4, 8, 120, '#c070ff', 28, 7); A.flash(player.x, player.y - 14, 80, '#c070ff', 22); A.burst(player.x, player.y - 14, '#e0b0ff', 26, 2.4); A.callout('FÚRIA IMORTAL!', '#d8a0ff'); A.sfx('quest'); return true; } });
+        run(v) { A.setBarrier(pctHp(40 + v * 0.6) + 100, 8 + v / 5, '#c070ff'); A.addBuff('fury', 8 + v / 5, { dmg: Math.round(25 + v * 0.7), st: { lifesteal: 10 }, name: 'Fúria Imortal', col: '#c070ff', ic: 'rage2' }); A.ring(player.x, player.y + 4, 8, 120, '#c070ff', 28, 7); A.flash(player.x, player.y - 14, 80, '#c070ff', 22); A.burst(player.x, player.y - 14, '#e0b0ff', 26, 2.4); A.callout('FÚRIA IMORTAL!', '#d8a0ff'); A.sfx('quest'); return true; } });
     def('mimic_arqueiro', { name: 'Tempestade Fantasma', ic: 'rain', col: '#8affd8', sk: 'ranged', cd: (v) => Math.round(110 - v * 1.2),
         desc: (v) => 'Chuva de flechas espectrais num raio de 150 px: ' + Math.round(6 + v / 10) + ' saraivadas, até 8 alvos cada.',
         run(v) {
@@ -38,8 +38,8 @@
         desc: (v) => 'Explosão de ' + (170) + ' px: dano ×' + (3 * sc(v)).toFixed(1).replace('.', ',') + ' em até 8 inimigos, atordoa e devolve ' + Math.round(25 + v / 2) + '% da mana.',
         run(v) { ringBlast(170, 3 * sc(v), 'magic', 60, '#9a6aff'); A.mana(player.stats.maxMp * (25 + v / 2) / 100); A.flash(player.x, player.y - 20, 130, '#2a0a5a', 26); A.callout('ECLIPSE ARCANO!', '#c8a0ff'); A.sfx('thunder'); return true; } });
 
-    def('bronze', { name: 'Pele de Bronze', ic: 'shield', col: '#d08a4a', cd: () => 90, desc: () => 'Barreira de 20% da vida máx. por 10 s.', run() { A.setBarrier(pctHp(20) + 6, 10, '#d08a4a'); A.ring(player.x, player.y + 4, 8, 56, '#d08a4a', 22, 5); A.callout('Pele de Bronze', '#d08a4a'); A.sfx('accept'); return true; } });
-    def('iron', { name: 'Pele de Ferro', ic: 'shield2', col: '#aab4c0', cd: () => 110, desc: () => 'Barreira de 30% da vida máx. e +15% de redução de dano por 10 s.', run() { A.setBarrier(pctHp(30) + 8, 10, '#aab4c0'); A.addBuff('ferro', 10, { st: { dr: 15 }, name: 'Pele de Ferro', col: '#aab4c0', ic: 'shield2' }); A.ring(player.x, player.y + 4, 8, 64, '#cfd8e0', 24, 6); A.flash(player.x, player.y - 14, 56, '#aab4c0', 16); A.callout('Pele de Ferro!', '#cfd8e0'); A.sfx('accept'); return true; } });
+    def('bronze', { name: 'Pele de Bronze', ic: 'shield', col: '#d08a4a', cd: () => 90, desc: () => 'Barreira de 20% da vida máx. por 10 s.', run() { A.setBarrier(pctHp(20) + 60, 10, '#d08a4a'); A.ring(player.x, player.y + 4, 8, 56, '#d08a4a', 22, 5); A.callout('Pele de Bronze', '#d08a4a'); A.sfx('accept'); return true; } });
+    def('iron', { name: 'Pele de Ferro', ic: 'shield2', col: '#aab4c0', cd: () => 110, desc: () => 'Barreira de 30% da vida máx. e +15% de redução de dano por 10 s.', run() { A.setBarrier(pctHp(30) + 80, 10, '#aab4c0'); A.addBuff('ferro', 10, { st: { dr: 15 }, name: 'Pele de Ferro', col: '#aab4c0', ic: 'shield2' }); A.ring(player.x, player.y + 4, 8, 64, '#cfd8e0', 24, 6); A.flash(player.x, player.y - 14, 56, '#aab4c0', 16); A.callout('Pele de Ferro!', '#cfd8e0'); A.sfx('accept'); return true; } });
     def('steel', { name: 'Giro de Aço', ic: 'sword2', col: '#8ac0ff', sk: 'combat', cd: () => 100, desc: () => 'Giro em volta de você: dano ×3 em até 8 inimigos (ao seu redor).', run() { if (!A.aoe(player.x, player.y, 110, 1, true).length) return 'Nenhum inimigo ao alcance do Giro.'; A.slashFx(player.x, player.y - 8, 0, 54, '#8ac0ff', 14); A.slashFx(player.x, player.y - 8, Math.PI, 54, '#cfe6ff', 14); ringBlast(110, 3, 'combat', 0, '#8ac0ff'); A.callout('Giro de Aço!', '#8ac0ff'); A.sfx('hit'); return true; } });
     def('gold', { name: 'Toque Dourado', ic: 'clover', col: '#ffd24a', cd: () => 120, desc: () => '+15% de crítico e +30% de sorte por 15 s.', run() { A.addBuff('ouro', 15, { st: { crit: 15, luck: 30 }, name: 'Toque Dourado', col: '#ffd24a', ic: 'clover' }); A.ring(player.x, player.y + 4, 8, 70, '#ffd24a', 24, 5); A.burst(player.x, player.y - 14, '#ffe27a', 22, 2); A.callout('Toque Dourado!', '#ffd24a'); A.sfx('quest'); return true; } });
     def('mithril', { name: 'Passo Mítrico', ic: 'speed', col: '#9ae0ff', cd: () => 100, desc: () => '+25% de velocidade por 12 s e intocável por 1,5 s.', run() { A.addBuff('mithril', 12, { st: { moveSpd: 25 }, name: 'Passo Mítrico', col: '#9ae0ff', ic: 'speed' }); A.S.invuln = A.S.frame + Math.round(1.5 * FR); A.ring(player.x, player.y + 4, 6, 60, '#9ae0ff', 20, 4); A.callout('Passo Mítrico!', '#9ae0ff'); A.sfx('portal'); return true; } });
@@ -73,13 +73,13 @@
     function cdLeft() { const a = activeSet(); return a ? A.cdMs(a.id) / 1000 : 0; }
     function cast() {
         if (!hasHud() || !A.canCastKeys()) return false; const a = activeSet(); if (!a) { A.say1('Nenhuma habilidade de set liberada: equipe o conjunto completo.', '#9ad3ff'); return false; }
-        if (player.stats.hp <= 0) return false; if (A.isPetRide()) { A.say1('Desmonte do pet para lutar.'); return false; }
+        if (player.stats.hp <= 0) return false;
         const k = K[a.id], ms = A.cdMs(a.id); if (ms > 0) { A.say1(k.name + ' em recarga (' + Math.ceil(ms / 1000) + ' s).'); return false; }
         const v = levelFor(a), out = k.run(v); if (out !== true) { A.say1(out); return false; }
         A.setCd(a.id, k.cd(v)); player.actionAnim = 15; return true;
     }
     function slot() {
-        const a = activeSet(); if (!a) return null; const k = K[a.id], v = levelFor(a), left = A.cdMs(a.id) / 1000, bad = player.stats.hp <= 0 || A.isPetRide();
+        const a = activeSet(); if (!a) return null; const k = K[a.id], v = levelFor(a), left = A.cdMs(a.id) / 1000, bad = player.stats.hp <= 0;
         return { id: a.id, key: 'Z', col: k.col, ic: k.ic, left, total: k.cd(v), ok: !bad, title: 'Habilidade do Set: ' + k.name + ' (Z)\n' + k.desc(v) + '\nRecarga: ' + k.cd(v) + ' s' };
     }
     ST.setExtra({ cast, slot, clear() { }, tick() { } });

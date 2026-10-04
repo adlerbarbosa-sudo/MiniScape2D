@@ -41,7 +41,7 @@
         Object.assign(it, o || {}); if (recipe) { it.recipe = recipe; it.craftQty = craftQty || 1; }
         ITEMS[name] = it; return it;
     }
-    const REQ = (k, l) => ({ skill: SK[k], lvl: l });
+    const REQ = (k, l) => ({ skill: SK[k], lvl: window.Balance ? Balance.reqLevel(l) : l });   // balanceamento v2: níveis x2 (a escala de XP agora vai a 99)
 
     /* ===== GUERREIRO: capacetes, armaduras, escudos e espadas por material ===== */
     def('Bronze Helmet', '⛑️', 'head', 'Elmo simples de bronze.', { defBonus: 1, set: 'bronze', hat: 'helmet', req: REQ('c', 1) }, 'Bronze Bar,2', 2.0);
@@ -126,12 +126,12 @@
                 Object.keys(GOLD_DROPS).forEach((nk) => { const d = npcDB[nk]; if (!d || d.hp <= 0 || /Gold Ore/.test(d.lootStr || '')) return; d.lootStr = (d.lootStr ? d.lootStr + '|' : '') + 'Gold Ore,' + GOLD_DROPS[nk] + ',' + (nk === 'dragon_boss' ? 4 : 2); });
                 Object.keys(SHOP).forEach((nk) => { const d = npcDB[nk]; if (!d) return; const cur = (d.shopStr || '').split('|').filter(Boolean); const have = new Set(cur.map((s) => s.split(',')[0].trim())); SHOP[nk].forEach((e) => { if (!have.has(e[0]) && itemDB[e[0]]) cur.push(e[0] + ',' + e[1]); }); d.shopStr = cur.join('|'); });
             }
-            if (window.Content && Content.SMELT && !Content.SMELT.some((r) => r.id === 'gold')) Content.SMELT.push({ id: 'gold', needs: [['Gold Ore', 2]], out: 'Gold Bar', xp: 55, lvl: 12 });
+            if (window.Content && Content.SMELT && !Content.SMELT.some((r) => r.id === 'gold')) Content.SMELT.push({ id: 'gold', needs: [['Gold Ore', 2]], out: 'Gold Bar', xp: 55, lvl: 24 });
         } catch (e) { console.error('Gear.merge', e); }
         try {   // magias novas (as runas novas servem para algo). No 1º merge o spellbookDB ainda não existe (zona morta do let): tenta de novo no login.
             if (!spellbookDB.some((s) => s.id === 'earth_strike')) {
-                spellbookDB.push({ id: 'earth_strike', name: 'Golpe de Terra', lvl: 9, req: { 'Earth Rune': 1, 'Air Rune': 1, 'Mind Rune': 1 }, dmg: 6, color: '#b08a4a' });
-                spellbookDB.push({ id: 'fire_strike', name: 'Golpe de Fogo', lvl: 14, req: { 'Fire Rune': 1, 'Air Rune': 1, 'Mind Rune': 1 }, dmg: 8, color: '#ff7a3a' });
+                spellbookDB.push({ id: 'earth_strike', name: 'Golpe de Terra', lvl: 18, req: { 'Earth Rune': 1, 'Air Rune': 1, 'Mind Rune': 1 }, dmg: 6, color: '#b08a4a' });
+                spellbookDB.push({ id: 'fire_strike', name: 'Golpe de Fogo', lvl: 28, req: { 'Fire Rune': 1, 'Air Rune': 1, 'Mind Rune': 1 }, dmg: 8, color: '#ff7a3a' });
             }
         } catch (e) { }
     }

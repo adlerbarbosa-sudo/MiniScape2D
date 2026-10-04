@@ -5,11 +5,12 @@
     const KIND = {
         hit: { fill: '#fff3c4', line: '#7a1f12', size: 18 }, big: { fill: '#ffd36a', line: '#8a1a0a', size: 22 }, crit: { fill: '#ff9a2a', line: '#5a0a00', size: 28 },
         miss: { fill: '#cfd6de', line: '#2a3038', size: 13 }, hurt: { fill: '#ff6a55', line: '#3a0a06', size: 19 },
-        block: { fill: '#7fc3ff', line: '#0c2440', size: 14 }, heal: { fill: '#6ff09a', line: '#0c3a1c', size: 15 }, xp: { fill: '#e6c8ff', line: '#301048', size: 13 }
+        block: { fill: '#7fc3ff', line: '#0c2440', size: 14 }, dodge: { fill: '#d8f0ff', line: '#12304a', size: 14 }, heal: { fill: '#6ff09a', line: '#0c3a1c', size: 15 }, xp: { fill: '#e6c8ff', line: '#301048', size: 13 }
     };
     // cria o texto flutuante de dano (usa a lista do jogo: floatingTexts)
     function dmg(list, x, y, val, kind) {
-        const k = KIND[kind] || KIND.hit; const text = kind === 'crit' ? 'CRIT! ' + val : kind === 'big' ? val + '!' : kind === 'miss' ? 'Errou' : kind === 'block' ? 'Bloqueou' : kind === 'heal' ? '+' + val : String(val);
+        const k = KIND[kind] || KIND.hit; const nv = (window.Balance && typeof val === 'number') ? Balance.fmtK(val) : val;   // 12345 vira "12,3k" (legível com 3 a 4 dígitos)
+        const text = kind === 'crit' ? 'CRIT! ' + nv : kind === 'big' ? nv + '!' : kind === 'miss' ? 'Errou' : kind === 'dodge' ? 'Esquivou' : kind === 'block' ? 'Bloqueou' : kind === 'heal' ? '+' + nv : String(nv);
         list.push({ x, y, text, dmg: true, kind, age: 0, life: kind === 'crit' ? 78 : 56, vx: (Math.random() - 0.5) * 0.7, k });
     }
     function drawDmg(ctx, ft) {

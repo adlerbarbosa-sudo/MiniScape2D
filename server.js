@@ -22,6 +22,8 @@ const createSocial = require('./social');
 const createExtras = require('./extras');
 const wsServer = require('./wsserver');
 const createSecurity = require('./security');
+const BAL = require('./public/balance.js');        // balanceamento v2 (XP, vida, dano, monstros): mesma fonte do cliente
+const SKILLNODES = require('./public/skillnodes.js');
 const createSQ = require('./specialquests');
 const { cleanSQ } = createSQ;
 
@@ -60,6 +62,10 @@ app.use('/api/sync', express.json({ limit: '64kb' }));
 app.use('/api/save', (req, res, next) => auth(req, res, next), (req, res, next) => userLimit('save', 150, 60000)(req, res, next), express.json({ limit: '8mb' }));   // login e limite por usuário ANTES de ler o corpo grande
 app.use('/api/restore', (req, res, next) => auth(req, res, () => adminOnly(req, res, next)), express.json({ limit: '30mb' }));
 app.use(express.json({ limit: '64kb' }));
+app.get('/balance.js', (req, res, next) => {   // XP_RATE (env) chega ao cliente: o mesmo valor vale no navegador e no servidor
+    if (!(+process.env.XP_RATE > 0)) return next();
+    try { const src = fs.readFileSync(path.join(__dirname, 'public', 'balance.js'), 'utf8'); res.type('application/javascript').set('Cache-Control', 'no-cache').send('self.MS_XP_RATE=' + (+process.env.XP_RATE) + ';\n' + src); } catch (e) { next(); }
+});
 app.use(express.static(path.join(__dirname, 'public'), { dotfiles: 'ignore', index: 'index.html' }));
 
 /* ---------------- BANCO DE DADOS (em memória + disco) ---------------- */
@@ -165,6 +171,7 @@ let worldStr = db.worldData ? JSON.stringify(db.worldData) : '';
 let dbStr = JSON.stringify([db.itemDB, db.npcDB]);
 
 let dirty = false, flushTimer = null, lastSnap = 0, lastFlushMs = 0, lastBak = 0, flushErrs = 0;
+let balMigrated = null;   // resultado da migração de balanceamento no início (aplicada depois que as funções de gravação existem)
 /* O banco é regravado inteiro (JSON). Com milhares de contas isso custa CPU: o intervalo cresce com a duração da última gravação (8x), sem nunca passar de 30 s. STORAGE=sqlite só grava o que mudou. */
 function markDirty() { dirty = true; if (!flushTimer) flushTimer = setTimeout(flushDB, Math.min(30000, Math.max(1500, lastFlushMs * 8))); }
 /* operações que mexem em itens/moedas (mercado, troca, presente, missão, save com pendência) gravam NA HORA antes de responder: uma queda logo depois não faz o servidor "esquecer" algo que o cliente já viu.
@@ -174,6 +181,17 @@ function persistNow() {
     if (lastFlushMs < 150) { flushDB(true); dirty = true; if (!flushTimer) flushTimer = setTimeout(flushDB, 1500); }   // grava já (sem fsync: sobrevive a kill -9) e confirma com fsync logo depois
     else { if (flushTimer) clearTimeout(flushTimer); flushTimer = setTimeout(flushDB, 50); }
 }
+/* ---------- balanceamento v2: migração única das contas, do catálogo de monstros e do mundo salvo (idempotente: playerData.balV, def.balV) ---------- */
+function balanceMigrate() {
+    const out = { accounts: 0, mobs: 0, ents: 0 };
+    const treeBonus = (tree, lv) => { const r = SKILLNODES.clean(tree, lv, Date.now()), b = SKILLNODES.bonusAll(r.tree); return { hp: b.maxHp || 0, mp: b.maxMp || 0 }; };
+    for (const name of Object.keys(db.users)) { const u = db.users[name]; if (u && u.playerData && typeof u.playerData === 'object' && !(u.playerData.balV >= BAL.VERSION)) { try { BAL.migratePlayer(u.playerData, { tree: treeBonus }); out.accounts++; } catch (e) { console.error('[balanceamento] conta ' + name + ':', e.message); } } }
+    if (db.npcDB) out.mobs = BAL.applyNpcDB(db.npcDB);
+    if (db.worldData) out.ents = BAL.applyWorld(db.worldData, db.npcDB || {});
+    return out;
+}
+try { balMigrated = balanceMigrate(); if (balMigrated.accounts || balMigrated.mobs || balMigrated.ents) { console.log('[balanceamento] migrado: ' + balMigrated.accounts + ' conta(s), ' + balMigrated.mobs + ' monstro(s) do catálogo, ' + balMigrated.ents + ' criatura(s) do mundo.'); worldStr = db.worldData ? JSON.stringify(db.worldData) : ''; dbStr = JSON.stringify([db.itemDB, db.npcDB]); markDirty(); } } catch (e) { console.error('[balanceamento] falha na migração:', e); }
+
 /* grava de forma atômica (arquivo temporário + fsync + rename + fsync da pasta) e mantém cópias: .bak (a cada gravação se o banco é pequeno; no máx. 1 por minuto se é grande) e snapshots de hora em hora (últimos 12) */
 function flushDB(fast) {
     if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
@@ -636,6 +654,7 @@ app.post('/api/save', (req, res) => {
         }
         let pdLen = 0; try { pdLen = (playerData && typeof playerData === 'object' && !Array.isArray(playerData)) ? JSON.stringify(playerData).length : -1; } catch (e) { pdLen = -1; }   // JSON profundo demais estoura a pilha: tratado como inválido
         if (pdLen < 0 || pdLen > 1500000) { sec.slog('SAVE-REJECT', req.user, ip, 'playerData inválido/grande (' + pdLen + ')', true); return res.status(400).json({ error: 'Não foi possível salvar o seu progresso agora. Tente de novo em instantes.', code: 'INVALID' }); }
+        if (playerData && typeof playerData === 'object' && !Array.isArray(playerData) && !(playerData.balV >= BAL.VERSION)) { sec.slog('SAVE-OUTDATED', req.user, ip, 'save sem balV (cliente desatualizado)'); return res.status(409).json({ error: 'O jogo foi atualizado (novo balanceamento). Recarregue a página (Ctrl+F5) para continuar.', code: 'OUTDATED' }); }
         const r = sec.checkSave(req.user, req.role, playerData, ip);
         if (r.error) { sec.slog('SAVE-REJECT', req.user, ip, r.error, true); return res.status(400).json({ error: r.error, code: 'INVALID' }); }
         const pd = r.pd; const pendSig = (x) => x ? JSON.stringify([x.mkt || null, x.escrow || null, (x.mailDone || []).length, (x.tradeDone || []).length, (x.mailDone || []).slice(-1)[0] || '', (x.tradeDone || []).slice(-1)[0] || '']) : '';
@@ -724,14 +743,14 @@ function doSync(user, b, ip) {
         for (const log of b.combatLogs.slice(0, 20)) {
             if (!log || (typeof log.id !== 'number' && typeof log.id !== 'string')) continue;
             const id = String(log.id); if (!ID_RE.test(id) || RESERVED.has(id.toLowerCase())) continue;
-            const rawDmg = num(log.dmg); let dmg = Math.max(0, Math.min(900, rawDmg)); let maxHp = Math.max(1, Math.min(100000, num(log.maxHp, 10)));
+            const rawDmg = num(log.dmg); let dmg = Math.max(0, Math.min(250000, rawDmg)); let maxHp = Math.max(1, Math.min(2000000, num(log.maxHp, 10)));
             if (sec.STRICT() && role !== 'admin') {
                 if (dmg > cap) { sec.strike(user, ip, 'dmg', 1, 'golpe ' + Math.round(rawDmg) + ' acima do teto ' + cap + ' (mob ' + id + ' em ' + map + ')'); dmg = cap; }
                 if (dmg > 0 && !sec.dmgOk(user, now)) { sec.slog('RATE:dmg', user, ip, 'mais de 20 relatórios de dano por segundo'); continue; }
                 const ex = sec.expectedMaxHp(map, id); if (ex > 0) maxHp = ex;   // a vida máxima vem do catálogo do servidor, não do cliente
             }
             if (dmg > 0 && sec.STRICT() && role !== 'admin' && mobPos[map] && mobPos[map][id] && Math.hypot(mobPos[map][id].x - px, mobPos[map][id].y - py) > 1400) { sec.slog('FAR-HIT', user, ip, 'golpe em mob ' + id + ' a ' + Math.round(Math.hypot(mobPos[map][id].x - px, mobPos[map][id].y - py)) + 'px (ignorado)'); continue; }   // o alcance máximo do jogo é ~220 px; 1400 cobre atraso de rede com folga
-            if (dmg > 0) { const bd = dmgBudget[user] || (dmgBudget[user] = { t: now, d: 0 }); if (now - bd.t > 1000) { bd.t = now; bd.d = 0; } bd.d += dmg; if (bd.d > 3000) continue; }   // teto de dano por segundo (era 1500: habilidades da árvore dão golpes maiores; o cliente limita a si mesmo a ~1100/s)
+            if (dmg > 0) { const bd = dmgBudget[user] || (dmgBudget[user] = { t: now, d: 0 }); if (now - bd.t > 1000) { bd.t = now; bd.d = 0; } bd.d += dmg; if (bd.d > (role === 'admin' ? 1e9 : sec.dmgPerSec(user))) continue; }   // teto de dano por segundo (Balance.dmgPerSecCap: melhor arma/habilidade/crítico do nível mais atual do jogador; o cliente limita a si mesmo bem abaixo)
             let sm = serverMobs[map][id];
             if (!sm) {
                 if (Object.keys(serverMobs[map]).length >= 400) continue;
@@ -903,7 +922,7 @@ app.post('/api/restore', auth, adminOnly, userLimit('restore', 4, 60000), (req, 
     const restored = normalizeDB(dbData); restored.sessions = db.sessions;
     if (!hasOwn(restored.users, req.user)) restored.users[req.user] = db.users[req.user];   // quem restaura não perde o acesso
     restored.users[req.user].role = 'admin';
-    db = restored; social.rebind(db); extras.rebind(db); for (const m of Object.keys(serverMobs)) delete serverMobs[m]; hydrateDeaths(); worldStr = db.worldData ? JSON.stringify(db.worldData) : ''; dbStr = JSON.stringify([db.itemDB, db.npcDB]);
+    db = restored; try { balanceMigrate(); } catch (e) { console.error('[balanceamento] restauração:', e.message); } social.rebind(db); extras.rebind(db); for (const m of Object.keys(serverMobs)) delete serverMobs[m]; hydrateDeaths(); worldStr = db.worldData ? JSON.stringify(db.worldData) : ''; dbStr = JSON.stringify([db.itemDB, db.npcDB]);
     db.mapVersion = Math.max(Date.now(), db.mapVersion + 1); db.chatVer++; markDirty(); flushDB();
     res.json({ success: true, mapVersion: db.mapVersion });
 });

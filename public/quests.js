@@ -25,7 +25,7 @@
         { id: 'q_brew', giver: 'priest_npc', req: 'q_slime', title: 'Poções para os Feridos', intro: 'Use o caldeirão ao lado da igreja: erva curativa + frasco vazio. Traga 3 Poção de Vida.', done: 'Os feridos agradecem. Que a luz te guie!', obj: { type: 'have', item: 'Health Potion', qty: 3 }, reward: { coins: 150, xp: { alchemy: 100 } } },
         { id: 'q_mana', giver: 'wizard_npc', req: 'q_silk', title: 'Elixir Arcano', intro: 'Preciso de 2 Poção de Mana. Flor de mana só cresce na horta com sementes do Fazendeiro.', done: 'Excelente! O poder flui. Pegue estas runas.', obj: { type: 'have', item: 'Mana Potion', qty: 2 }, reward: { coins: 200, xp: { magic: 120, alchemy: 40 }, items: [['Water Rune', 20]] } },
         { id: 'q_steel', giver: 'smith_npc', req: 'q_bars', title: 'Aço da Guarda', intro: 'A guarda quer aço! Leve Minério de Ferro e 2 Carvão por barra à fornalha. Traga 2 Barra de Aço. Carvão se minera na mina.', done: 'Aço puro! Tome, você mereceu.', obj: { type: 'have', item: 'Steel Bar', qty: 2 }, reward: { coins: 300, xp: { smithing: 150 }, items: [['Steel Sword', 1]] } },
-        { id: 'q_mithril', giver: 'smith_npc', req: 'q_steel', title: 'O Brilho do Mithril', intro: 'Mithril raro brilha no covil. Precisa de picareta de aço e Mineração 15. Traga 1 Barra de Mithril (1 minério + 3 carvão).', done: 'Uma lenda forjada! O reino agradece.', obj: { type: 'have', item: 'Mithril Bar', qty: 1 }, reward: { coins: 900, xp: { smithing: 400, mining: 200 } } }
+        { id: 'q_mithril', giver: 'smith_npc', req: 'q_steel', title: 'O Brilho do Mithril', intro: 'Mithril raro brilha no covil. Precisa de picareta de aço e Mineração 30. Traga 1 Barra de Mithril (1 minério + 3 carvão).', done: 'Uma lenda forjada! O reino agradece.', obj: { type: 'have', item: 'Mithril Bar', qty: 1 }, reward: { coins: 900, xp: { smithing: 400, mining: 200 } } }
 ,
         { id: 'q_cata', giver: 'guard_npc', req: 'q_steel', title: 'Sombras nas Catacumbas', intro: 'Há uma entrada nas profundezas do Covil do Dragão: as Catacumbas. Derrote 5 Cavaleiros Esqueléticos lá dentro.', done: 'Coragem de verdade! Tome, você mereceu.', obj: { type: 'kill', mob: 'skeleton_knight', qty: 5 }, reward: { coins: 500, xp: { combat: 300 }, items: [['Greater Health Potion', 3]] } },
         { id: 'q_lich', giver: 'guard_npc', req: 'q_cata', title: 'O Rei sem Coroa', intro: 'O Lich Rei Ossian comanda os mortos. Destrua-o e o reino dormirá em paz.', done: 'Ele caiu! Uma lenda nasce hoje. O reino é seu devedor.', obj: { type: 'kill', mob: 'lich_boss', qty: 1 }, reward: { coins: 2000, xp: { combat: 1200, hp: 300 }, items: [['Soul Gem', 1]] } }
@@ -47,7 +47,8 @@
     const itemName = (n) => (itemDB[n] ? itemDB[n].icon + ' ' + itemDB[n].name : n);
     const mobName = (k) => (npcDB[k] ? npcDB[k].name : k);
     const objText = (q) => q.obj.type === 'have' ? `Entregar ${q.obj.qty}× ${itemName(q.obj.item)}` : `Derrotar ${q.obj.qty}× ${mobName(q.obj.mob)}`;
-    const rewardText = (r) => [r.coins ? `${r.coins} moedas` : '', ...Object.keys(r.xp || {}).map((k) => `${r.xp[k]} XP de ${(player.stats.skills[k] || {}).name || k}`), ...(r.items || []).map((i) => `${i[1]}× ${itemName(i[0])}`)].filter(Boolean).join(' · ');
+    const XPQ = 6;   // balanceamento v2: recompensas de XP das missões x6 (a tabela de XP é a do RuneScape)
+    const rewardText = (r) => [r.coins ? `${r.coins} moedas` : '', ...Object.keys(r.xp || {}).map((k) => `${r.xp[k] * XPQ} XP de ${(player.stats.skills[k] || {}).name || k}`), ...(r.items || []).map((i) => `${i[1]}× ${itemName(i[0])}`)].filter(Boolean).join(' · ');
 
     function accept(id) {
         const q = byId(id); if (!q || !available(q)) return;
@@ -61,7 +62,7 @@
         if (q.obj.type === 'have' && !removeInvItem(q.obj.item, q.obj.qty)) ok = false;
         if (ok) { if (r.coins && !addInvItem('Coins', r.coins)) ok = false; (r.items || []).forEach((i) => { if (ok && itemDB[i[0]] && !addInvItem(i[0], i[1])) ok = false; }); }
         if (!ok) { player.inventory = inv; setActionText('Mochila cheia! Libere espaço para a recompensa.', '#e74c3c'); return; }
-        Object.keys(r.xp || {}).forEach((k) => addXP(k, r.xp[k]));
+        Object.keys(r.xp || {}).forEach((k) => addXP(k, r.xp[k] * XPQ));
         st()[id] = { s: 'done', p: q.obj.qty };
         if (window.Sfx) Sfx.play('quest'); setActionText(`Missão concluída: ${q.title}!`, '#2ecc71'); addFloatingText(player.x, player.y - 30, 'Missão concluída!', '#f1c40f');
         saveDataLogic(); updateUI(); render(); refreshTracker();

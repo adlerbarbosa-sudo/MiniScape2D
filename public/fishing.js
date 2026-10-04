@@ -660,7 +660,7 @@
         if (typeof player === 'undefined' || !player || !player.buffs) { const h0 = $('fb-hud'); if (h0 && h0.innerHTML) h0.innerHTML = ''; return; }
         const now = Date.now(), act = []; for (const k of Object.keys(player.buffs)) { const b = player.buffs[k]; if (!BUFN[k]) continue; if (!b || b.until <= now) { delete player.buffs[k]; continue; } act.push([k, b]); }
         css(); let h = $('fb-hud'); const gc = $('game-container'); if (!gc) return; if (!h) { h = document.createElement('div'); h.id = 'fb-hud'; gc.appendChild(h); }
-        const sig = act.map((a) => a[0] + a[1].v).join(','); if (sig !== buffSig || force) { buffSig = sig; h.innerHTML = act.map((a) => '<span class="fb-c" data-k="' + a[0] + '" title="' + BUFN[a[0]] + ' +' + a[1].v + (BUFPCT[a[0]] ? '%' : '') + '"><svg viewBox="0 0 16 16">' + BSVG[a[0]] + '</svg><i></i></span>').join(''); }
+        const sig = act.map((a) => a[0] + a[1].v).join(','); if (sig !== buffSig || force) { buffSig = sig; h.innerHTML = act.map((a) => '<span class="fb-c" data-k="' + a[0] + '" title="' + BUFN[a[0]] + ' +' + (a[0] === 'regen' ? Balance.healOf(a[1].v) : a[0] === 'mregen' ? Balance.mpOf(a[1].v) : a[1].v) + (BUFPCT[a[0]] ? '%' : '') + '"><svg viewBox="0 0 16 16">' + BSVG[a[0]] + '</svg><i></i></span>').join(''); }
         act.forEach((a) => { const e = h.querySelector('[data-k="' + a[0] + '"] i'); if (e) { const s = Math.max(0, Math.round((a[1].until - now) / 1000)), t = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); if (e.textContent !== t) e.textContent = t; } });
     }
     let regT = 0;
@@ -668,7 +668,7 @@
         try {
             if (typeof player === 'undefined' || !player || !player.stats || typeof currentUser === 'undefined' || !currentUser) return; renderBuffs();
             const now = Date.now(); if (now - regT < 3000) return; regT = now;
-            const r = buffV('regen'), m = buffV('mregen');
+            const r = Balance.healOf(buffV('regen')), m = Balance.mpOf(buffV('mregen'));   // balanceamento v2: vida 10x e mana 5x
             if (r > 0 && player.stats.hp > 0 && player.stats.hp < player.stats.maxHp) { const h = Math.min(r, player.stats.maxHp - player.stats.hp); player.stats.hp += h; player.stats.hp = Math.min(player.stats.maxHp, player.stats.hp); try { Fx.dmg(floatingTexts, player.x, player.y - 50, h, 'heal'); updateUI(); } catch (e) { } if (S) S.hpLast = Math.max(S.hpLast, player.stats.hp); }
             if (m > 0 && player.stats.mp < player.stats.maxMp) { player.stats.mp = Math.min(player.stats.maxMp, player.stats.mp + m); try { updateUI(); } catch (e) { } }
         } catch (e) { }

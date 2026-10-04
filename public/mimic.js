@@ -76,7 +76,7 @@
     const SET_N = {}; CLS_IDS.forEach((c) => { SET_N[c] = LIST.filter((p) => p.cls === c).length; });
     const SKEYS = ['crit', 'critDmg', 'moveSpd', 'atkSpd', 'lifesteal', 'luck', 'dr', 'spellDmg', 'save'];   // chaves do Stats
     const LBL = { defBonus: 'Defesa', bonusDmg: 'Dano', crit: 'Crítico', critDmg: 'Dano crítico', moveSpd: 'Vel. de movimento', atkSpd: 'Vel. de ataque', lifesteal: 'Roubo de vida', luck: 'Sorte', dr: 'Redução de dano', spellDmg: 'Dano mágico', save: 'Poupar munição/runas', dmgPct: 'Dano', mregen: 'Regen. de mana' };
-    const FMT = { defBonus: (v) => '+' + v, bonusDmg: (v) => '+' + v, crit: (v) => fnum(v) + '%', critDmg: (v) => '+' + fnum(v) + '%', moveSpd: (v) => '+' + fnum(v) + '%', atkSpd: (v) => '+' + fnum(v) + '%', lifesteal: (v) => fnum(v) + '%', luck: (v) => '+' + fnum(v) + '%', dr: (v) => fnum(v) + '%', spellDmg: (v) => '+' + fnum(v), save: (v) => fnum(v) + '%', dmgPct: (v) => '+' + fnum(v) + '%', mregen: (v) => '+' + fnum(v) + '%' };
+    const FMT = { defBonus: (v) => '+' + Math.round(v * (window.Balance ? Balance.ARMOR_W : 1)), bonusDmg: (v) => '+' + Math.round(v * (window.Balance ? Balance.RATING_W * 100 : 1)) + '%', crit: (v) => fnum(v) + '%', critDmg: (v) => '+' + fnum(v) + '%', moveSpd: (v) => '+' + fnum(v) + '%', atkSpd: (v) => '+' + fnum(v) + '%', lifesteal: (v) => fnum(v) + '%', luck: (v) => '+' + fnum(v) + '%', dr: (v) => fnum(v) + '%', spellDmg: (v) => '+' + fnum(v), save: (v) => fnum(v) + '%', dmgPct: (v) => '+' + fnum(v) + '%', mregen: (v) => '+' + fnum(v) + '%' };
     const ORDER = ['defBonus', 'bonusDmg', 'dmgPct', 'crit', 'critDmg', 'moveSpd', 'atkSpd', 'lifesteal', 'luck', 'dr', 'spellDmg', 'save', 'mregen'];
     const KEYLBL = (cls, k) => (k === 'dmgPct' ? (cls === 'mago' ? 'Dano mágico' : cls === 'arqueiro' ? 'Dano à distância' : 'Dano corpo a corpo') : LBL[k]);
     // bônus de set: base (escala com o nível médio) + marcos fixos (nível médio 10/25/50)
@@ -530,7 +530,7 @@ body.mimic-open #qb{display:none!important}`;
         let h = `<div class="mm-h"><span class="mm-t">Itens Mímicos</span>${CLS_IDS.map((c) => `<button class="mm-tab${tab === c ? ' on' : ''}" data-a="tab" data-n="${c}">${esc(CLS[c].short)} ${LIST.filter((p) => p.cls === c && owned(p.n)).length}/${SET_N[c]}</button>`).join('')}<button class="mm-x" data-a="close" aria-label="Fechar">×</button></div><div class="mm-body">`;
         h += `<div class="mm-box"><div class="mm-sec">XP desviado ao Mímico</div><div class="mm-pcts">${[0, 10, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100].map((v) => `<button class="mm-pb${pct === v ? ' on' : ''}" data-a="pct" data-n="${v}">${v}%</button>`).join('')}</div>` +
             `<div class="mm-split" title="Divisão do XP"><i class="a" style="width:${100 - pct}%"></i><i class="b" style="width:${pct}%"></i></div>` +
-            `<div><b>Você recebe ${100 - pct}%</b> · <b style="color:#c58bff">Mímicos ${pct}%</b></div>` +
+            `<div><b>Você recebe ${(window.Pets && Pets.mixInfo && Pets.mixInfo().mount > 0 && tg.length) ? Pets.mixInfo().you : 100 - pct}%</b> · <b style="color:#c58bff">Mímicos ${pct}%</b>${(window.Pets && Pets.mixInfo && Pets.mixInfo().mount > 0 && tg.length) ? ` · <b style="color:#ffb347">Montaria ${Pets.mixInfo().mount}%</b>` : ''}</div>` +
             `<div class="mm-note">${eqN === 0 ? 'Nenhuma peça Mímica equipada: por enquanto o XP fica todo com você.' : tg.length === 0 ? 'Todas as peças equipadas estão no nível máximo: o XP fica todo com você.' : 'Dividido igualmente entre ' + tg.length + ' peça' + (tg.length > 1 ? 's' : '') + ' equipada' + (tg.length > 1 ? 's' : '') + ' abaixo do nível ' + MAXLVL + '. Vale para toda perícia e combate.'}</div></div>`;
         h += setBox(tab);
         const ownedCls = LIST.filter((p) => p.cls === tab && owned(p.n)), pvS = S.ui.pvStage;
@@ -612,7 +612,7 @@ body.mimic-open #qb{display:none!important}`;
     window.Mimic = {
         PIECES, LIST, CLS, SETB, SK, SKIN_IDS, SPECIAL, MAXLVL, cfg, merge, grant, takeMail, setPct, addXp: addXpTo, need, statsAt, setInfo, bonus, equipped, where, is: isMimic, brief, tipHtml, iconOverlay, iconKey, overlay, open, close, toggle, divert, syncAll,
         setSkin, setSkinAll, skinOf, skinUnlocked, stageOf, useSkinItem, previewEquip, drawPreviews,
-        pct: () => (gameOn() ? player.mimicPct | 0 : 0), lvl: (n) => (gameOn() ? lvlOf(n) : 1),
+        pct: () => (gameOn() ? player.mimicPct | 0 : 0), effPct: () => (gameOn() && ensure() && targets().length ? player.mimicPct | 0 : 0), lvl: (n) => (gameOn() ? lvlOf(n) : 1),
         state: () => ({ mimic: gameOn() ? player.mimic : null, skins: gameOn() ? player.mimicSkins : null, pct: gameOn() ? player.mimicPct : 0, acc: S.acc, open: S.ui.open }), _S: S
     };
 })();

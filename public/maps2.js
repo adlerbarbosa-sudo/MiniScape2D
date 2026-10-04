@@ -183,6 +183,7 @@
     CR.forEach((c) => { const b = BASE[c[2]] || [30, 40], s = c[4];
         CREATURES[c[0]] = { name: c[1], group: c[15] || 'monstro', species: c[2], behavior: c[3], range: c[5], speed: c[6], w: Math.round(b[0] * s), h: Math.round(b[1] * s), hp: c[7], maxHit: c[8], xp: c[9], c1: c[10], c2: c[11], lootStr: c[12], dialog: '', shopStr: '', desc: c[13], biome: c[14] };
     });
+    try { if (window.Balance) Balance.applyNpcDB(CREATURES); } catch (e) { }   // balanceamento v2
     function mergeCreatures() {
         if (typeof npcDB === 'undefined') return;
         Object.keys(CREATURES).forEach((k) => { const cur = npcDB[k]; if (!cur || !cur.species) npcDB[k] = Object.assign({}, CREATURES[k]); });

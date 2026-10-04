@@ -20,6 +20,7 @@
         'Colossus Core': { name: 'Colossus Core', icon: '💎', type: 'resource', stackable: true, weight: 1.5, desc: 'Coração do Colosso de Pedra. Vale uma fortuna.', value: 700 }
     };
     const BOSS = { name: 'Colosso de Pedra', group: 'chefe', species: 'golem', behavior: 'neutral', range: 220, speed: 0.6, w: 100, h: 110, hp: 1800, maxHit: 18, xp: 0, c1: '#7b8794', c2: '#ff9d3a', lootStr: '', dialog: '', shopStr: '', desc: 'Um colosso ancestral que desperta a cada hora. Chame os amigos!' };
+    try { if (window.Balance) Balance.applyMob('wboss_golem', BOSS); } catch (e) { }   // balanceamento v2: Colosso (vida e dano por nível)
     try { if (window.CATALOG) { Object.assign(CATALOG.ITEMS, NEW_ITEMS); CATALOG.CREATURES.wboss_golem = BOSS; } } catch (e) { }
 
     /* ---------- contadores ---------- */
@@ -36,17 +37,18 @@
     const A = [];
     const ach = (id, name, title, desc, cur, need, reward) => A.push({ id, name, title, desc, cur, need, reward: reward || 100 });
     [['woodcutting', 'Lenhador', 10, 'Lenhador Mestre', 30], ['mining', 'Minerador', 10, 'Mestre das Minas', 30], ['fishing', 'Pescador', 10, 'Pescador Mestre', 30]].forEach(([s, t1, n1, t2, n2]) => {
+        n1 = Balance.reqLevel(n1); n2 = Balance.reqLevel(n2);   // balanceamento v2: metas de nível x2 (a escala de XP vai até 99)
         const nm = (player0) => s;
         ach('a_' + s + '1', t1, t1, `Chegue ao nível ${n1} de ${s === 'woodcutting' ? 'Corte de Lenha' : s === 'mining' ? 'Mineração' : 'Pesca'}.`, () => lvl(s), n1, 120);
         ach('a_' + s + '2', t2, t2, `Chegue ao nível ${n2} de ${s === 'woodcutting' ? 'Corte de Lenha' : s === 'mining' ? 'Mineração' : 'Pesca'}.`, () => lvl(s), n2, 500);
     });
-    ach('a_cook', 'Cozinheiro', 'Cozinheiro', 'Chegue ao nível 15 de Culinária.', () => lvl('cooking'), 15, 150);
-    ach('a_smith', 'Ferreiro', 'Ferreiro', 'Chegue ao nível 20 de Ferraria.', () => lvl('smithing'), 20, 200);
-    ach('a_farm', 'Fazendeiro', 'Fazendeiro', 'Chegue ao nível 15 de Agricultura.', () => lvl('farming'), 15, 150);
-    ach('a_alch', 'Alquimista', 'Alquimista', 'Chegue ao nível 15 de Alquimia.', () => lvl('alchemy'), 15, 200);
-    ach('a_ench', 'Encantador', 'Encantador', 'Chegue ao nível 15 de Encantamento.', () => lvl('enchanting'), 15, 250);
-    ach('a_cmb1', 'Guerreiro', 'Guerreiro', 'Chegue ao nível 20 de Combate.', () => lvl('combat'), 20, 200);
-    ach('a_cmb2', 'Campeão', 'Campeão', 'Chegue ao nível 40 de Combate.', () => lvl('combat'), 40, 800);
+    ach('a_cook', 'Cozinheiro', 'Cozinheiro', 'Chegue ao nível 30 de Culinária.', () => lvl('cooking'), 30, 150);
+    ach('a_smith', 'Ferreiro', 'Ferreiro', 'Chegue ao nível 40 de Ferraria.', () => lvl('smithing'), 40, 200);
+    ach('a_farm', 'Fazendeiro', 'Fazendeiro', 'Chegue ao nível 30 de Agricultura.', () => lvl('farming'), 30, 150);
+    ach('a_alch', 'Alquimista', 'Alquimista', 'Chegue ao nível 30 de Alquimia.', () => lvl('alchemy'), 30, 200);
+    ach('a_ench', 'Encantador', 'Encantador', 'Chegue ao nível 30 de Encantamento.', () => lvl('enchanting'), 30, 250);
+    ach('a_cmb1', 'Guerreiro', 'Guerreiro', 'Chegue ao nível 40 de Combate.', () => lvl('combat'), 40, 200);
+    ach('a_cmb2', 'Campeão', 'Campeão', 'Chegue ao nível 80 de Combate.', () => lvl('combat'), 80, 800);
     ach('a_k100', 'Caçador', 'Caçador', 'Derrote 100 criaturas.', totalKills, 100, 200);
     ach('a_k1000', 'Matador', 'Matador', 'Derrote 1000 criaturas.', totalKills, 1000, 1000);
     ach('a_nat', 'Naturalista', 'Naturalista', 'Derrote 12 espécies diferentes (Bestiário).', species, 12, 300);
@@ -93,7 +95,7 @@
         const pick = (arr) => arr[Math.floor(r() * arr.length)];
         if (r() < 0.5 || !mobs.length) out.push({ k: 'kill', need: [6, 12, 20][t], p: 0 }); else out.push({ k: 'mob', mob: pick(mobs), need: [4, 8, 14][t], p: 0 });
         const used = new Set(); while (out.length < 3 && used.size < skills.length) { const s = pick(skills); if (used.has(s)) continue; used.add(s); out.push({ k: 'skill', skill: s, need: [6, 12, 20][t] + (s === 'smithing' || s === 'alchemy' ? -2 : 0), p: 0 }); }
-        out.forEach((q) => { q.coins = 40 + t * 45 + Math.floor(r() * 25); q.xp = 60 + t * 90; q.done = false; q.claimed = false; });
+        out.forEach((q) => { q.coins = 40 + t * 45 + Math.floor(r() * 25); q.xp = 240 + t * 360; q.done = false; q.claimed = false; });
         return out;
     }
     function daily() {
@@ -210,9 +212,9 @@
     }
     function bossReward(h) {
         const e = bossEntity(); if (!e || !(e._dealt > 0) || player.wbDone === h) return; player.wbDone = h; cnt('wboss');
-        const mult = Math.min(2, 1 + e._dealt / 1800), coins = Math.round(600 * mult); const give = (n, q) => { if (itemDB[n] && !addInvItem(n, q)) { try { gameMaps[currentMap].entities.push({ id: newEntId(), type: 'ground_item', item: n, qty: q, x: player.x + Math.random() * 30 - 15, y: player.y + 10, w: 20, h: 20, active: true, life: 6000 }); } catch (er) { } } };
+        const mult = Math.min(2, 1 + e._dealt / Math.max(1, e.maxHp || 1800)), coins = Math.round(600 * mult); const give = (n, q) => { if (itemDB[n] && !addInvItem(n, q)) { try { gameMaps[currentMap].entities.push({ id: newEntId(), type: 'ground_item', item: n, qty: q, x: player.x + Math.random() * 30 - 15, y: player.y + 10, w: 20, h: 20, active: true, life: 6000 }); } catch (er) { } } };
         give('Coins', coins); give('Colossus Core', 1); give('Mithril Bar', 2); give('Greater Health Potion', 2); if (Math.random() < 0.5) give('Soul Gem', 1);
-        addXP('combat', 400); addXP('hp', 400); sfx('levelup'); try { setActionText(`Colosso derrotado! Recompensa: ${coins} moedas e tesouros (você causou ${e._dealt} de dano).`, '#e8c469'); Art.burst(player.x, player.y - 12, '#ffd24a', 26, 2); } catch (er) { }
+        addXP('combat', 3000); sfx('levelup'); try { setActionText(`Colosso derrotado! Recompensa: ${coins} moedas e tesouros (você causou ${e._dealt} de dano).`, '#e8c469'); Art.burst(player.x, player.y - 12, '#ffd24a', 26, 2); } catch (er) { }
         try { saveDataLogic(); updateUI(); } catch (er) { } checkAch();
     }
 

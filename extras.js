@@ -200,6 +200,7 @@ module.exports = function createExtras(ctx) {
             } pd.mounts = out;
         }
         if (pd.mount !== undefined) pd.mount = cleanMountId(pd.mount);
+        if (pd.mountPct !== undefined) { const n = Math.floor(Number(pd.mountPct)); pd.mountPct = Number.isFinite(n) ? Math.floor(Math.max(0, Math.min(40, n)) / 5) * 5 : 0; }   // % do XP do jogador que vai para a montaria equipada: 0..40, passos de 5
         if (pd.petsOpts !== undefined) { const v = pd.petsOpts; pd.petsOpts = (v && typeof v === 'object' && !Array.isArray(v)) ? { auto: v.auto === false ? false : true } : { auto: true }; }
     }
 

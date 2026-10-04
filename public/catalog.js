@@ -53,6 +53,8 @@
         barkeep_npc:   { name: 'Taverneiro', group: 'npc', species: 'barkeep', behavior: 'npc', w: 32, h: 44, hp: 0, maxHit: 0, xp: 0, c1: '#8a3b2a', c2: '#e0ac7a', lootStr: '', dialog: 'Uma caneca? Temos carne assada e peixe fresco!', shopStr: 'Cooked Meat,15|Cooked Fish,20|Health Potion,40', desc: 'Vende comida pronta.', biome: 'Taverna' }
     };
 
+    try { if (root.Balance) root.Balance.applyNpcDB(CREATURES); } catch (e) { }   // balanceamento v2: vida/dano por nível (public/balance.js)
+
     /* ---------- ITENS NOVOS (soltos pelos monstros, cozinha, forja) ---------- */
     const ITEMS = {
         'Raw Beef':     { name: 'Raw Beef', icon: '🥩', type: 'resource', stackable: true, weight: 0.8, desc: 'Carne de vaca crua. Cozinhe na fogueira.', cooksInto: 'Cooked Beef', cookXp: 14 },

@@ -43,8 +43,8 @@
         rock_copper: { ore: 'Copper Ore', hp: 2, color: '#d35400', lvl: 1, tier: 1, xp: 20, label: 'Rocha de cobre' },
         rock_tin: { ore: 'Tin Ore', hp: 2, color: '#bdc3c7', lvl: 1, tier: 1, xp: 20, label: 'Rocha de estanho' },
         rock_iron: { ore: 'Iron Ore', hp: 3, color: '#7f8c8d', lvl: 1, tier: 1, xp: 25, label: 'Rocha de ferro' },
-        rock_coal: { ore: 'Coal', hp: 3, color: '#2b2b33', lvl: 5, tier: 1, xp: 32, label: 'Veio de carvão' },
-        rock_mithril: { ore: 'Mithril Ore', hp: 5, color: '#4f86d6', lvl: 15, tier: 3, xp: 70, label: 'Veio de mithril', toolName: 'Steel Pickaxe' }
+        rock_coal: { ore: 'Coal', hp: 3, color: '#2b2b33', lvl: 10, tier: 1, xp: 32, label: 'Veio de carvão' },
+        rock_mithril: { ore: 'Mithril Ore', hp: 5, color: '#4f86d6', lvl: 30, tier: 3, xp: 70, label: 'Veio de mithril', toolName: 'Steel Pickaxe' }
     };
     const TIER = { 'Bronze Pickaxe': 1, 'Iron Pickaxe': 2, 'Steel Pickaxe': 3, 'Mithril Pickaxe': 4 };
     const tierOf = (it) => (it && (it.tier || TIER[it.name])) || 1;
@@ -56,8 +56,8 @@
 
     /* ============================ FORNALHA ============================ */
     const SMELT = [
-        { id: 'mithril', needs: [['Mithril Ore', 1], ['Coal', 3]], out: 'Mithril Bar', xp: 70, lvl: 20 },
-        { id: 'steel', needs: [['Iron Ore', 1], ['Coal', 2]], out: 'Steel Bar', xp: 42, lvl: 10 },
+        { id: 'mithril', needs: [['Mithril Ore', 1], ['Coal', 3]], out: 'Mithril Bar', xp: 70, lvl: 40 },
+        { id: 'steel', needs: [['Iron Ore', 1], ['Coal', 2]], out: 'Steel Bar', xp: 42, lvl: 20 },
         { id: 'iron', needs: [['Iron Ore', 1]], out: 'Iron Bar', xp: 25, lvl: 1 },
         { id: 'bronze', needs: [['Copper Ore', 1], ['Tin Ore', 1]], out: 'Bronze Bar', xp: 15, lvl: 1 }
     ];
@@ -79,9 +79,9 @@
     const CROPS = {
         wheat: { seed: 'Wheat Seed', out: 'Wheat', name: 'Trigo', secs: 150, xp: 12, lvl: 1, col: '#e6c85a' },
         carrot: { seed: 'Carrot Seed', out: 'Carrot', name: 'Cenoura', secs: 120, xp: 10, lvl: 1, col: '#e8862a' },
-        potato: { seed: 'Potato Seed', out: 'Potato', name: 'Batata', secs: 210, xp: 16, lvl: 5, col: '#c8a86a' },
-        herb: { seed: 'Herb Seed', out: 'Healing Herb', name: 'Erva curativa', secs: 180, xp: 20, lvl: 3, col: '#57c46a' },
-        mana: { seed: 'Mana Seed', out: 'Mana Blossom', name: 'Flor de mana', secs: 300, xp: 28, lvl: 10, col: '#7aa8ff' }
+        potato: { seed: 'Potato Seed', out: 'Potato', name: 'Batata', secs: 210, xp: 16, lvl: 10, col: '#c8a86a' },
+        herb: { seed: 'Herb Seed', out: 'Healing Herb', name: 'Erva curativa', secs: 180, xp: 20, lvl: 6, col: '#57c46a' },
+        mana: { seed: 'Mana Seed', out: 'Mana Blossom', name: 'Flor de mana', secs: 300, xp: 28, lvl: 20, col: '#7aa8ff' }
     };
     const farm = () => { if (!player.farm || typeof player.farm !== 'object') player.farm = {}; return player.farm; };
     const cropState = (o) => { const s = farm()[o.id]; if (!s || !CROPS[s.crop]) return null; const c = CROPS[s.crop], el = (Date.now() - s.at) / 1000; return { crop: s.crop, c, el, k: Math.max(0, Math.min(1, el / c.secs)), ready: el >= c.secs }; };
@@ -115,10 +115,10 @@
     /* ============================ ALQUIMIA ============================ */
     const BREW = [
         { out: 'Health Potion', needs: [['Healing Herb', 2], ['Empty Vial', 1]], xp: 25, lvl: 1 },
-        { out: 'Mana Potion', needs: [['Mana Blossom', 2], ['Empty Vial', 1]], xp: 35, lvl: 4 },
-        { out: 'Greater Health Potion', needs: [['Healing Herb', 3], ['Slime Ball', 1], ['Empty Vial', 1]], xp: 55, lvl: 8 },
-        { out: 'Strength Potion', needs: [['Healing Herb', 1], ['Boar Tusk', 1], ['Empty Vial', 1]], xp: 70, lvl: 12 },
-        { out: 'Guard Potion', needs: [['Healing Herb', 1], ['Bat Wing', 1], ['Empty Vial', 1]], xp: 80, lvl: 15 }
+        { out: 'Mana Potion', needs: [['Mana Blossom', 2], ['Empty Vial', 1]], xp: 35, lvl: 8 },
+        { out: 'Greater Health Potion', needs: [['Healing Herb', 3], ['Slime Ball', 1], ['Empty Vial', 1]], xp: 55, lvl: 16 },
+        { out: 'Strength Potion', needs: [['Healing Herb', 1], ['Boar Tusk', 1], ['Empty Vial', 1]], xp: 70, lvl: 24 },
+        { out: 'Guard Potion', needs: [['Healing Herb', 1], ['Bat Wing', 1], ['Empty Vial', 1]], xp: 80, lvl: 30 }
     ];
     const nm = (n) => (itemDB[n] ? itemDB[n].icon + ' ' + itemDB[n].name : n);
     function openCauldron() {
@@ -140,8 +140,8 @@
     /* ============================ ENCANTAMENTO ============================ */
     const ENCH = [
         { lvl: 1, needs: [['Slime Ball', 3]], coins: 50, xp: 40 },
-        { lvl: 8, needs: [['Spider Silk', 3], ['Bat Wing', 2]], coins: 150, xp: 90 },
-        { lvl: 15, needs: [['Ectoplasm', 3], ['Dragon Scale', 1]], coins: 400, xp: 200 }
+        { lvl: 16, needs: [['Spider Silk', 3], ['Bat Wing', 2]], coins: 150, xp: 90 },
+        { lvl: 30, needs: [['Ectoplasm', 3], ['Dragon Scale', 1]], coins: 400, xp: 200 }
     ];
     const SLOTS = [['weapon', 'Arma'], ['shield', 'Escudo'], ['body', 'Tronco'], ['head', 'Cabeça']];
     function openEnchant() {
