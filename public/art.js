@@ -50,6 +50,15 @@
         g.strokeStyle = OUT; g.lineWidth = w + 2; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.lineTo(x2, y2); g.stroke();
         g.strokeStyle = col; g.lineWidth = w; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.lineTo(x2, y2); g.stroke();
     }
+    /* braço articulado: ombro redondo, braço, cotovelo (junta visível), antebraço mais fino e punho */
+    function arm2(g, x0, y0, x1, y1, x2, y2, w, col, cuff) {
+        g.lineCap = 'round'; g.lineJoin = 'round';
+        limb(g, x0, y0, x1, y1, w, col); limb(g, x1, y1, x2, y2, w * 0.86, col);
+        g.fillStyle = col; g.beginPath(); g.arc(x1, y1, w * 0.5, 0, TAU); g.fill();   // cotovelo (cobre a emenda do contorno)
+        g.strokeStyle = shade(col, -0.35); g.lineWidth = 0.7; g.beginPath(); g.arc(x1, y1, w * 0.46, 0.4, 2.6); g.stroke();
+        g.fillStyle = col; g.beginPath(); g.arc(x0, y0, w * 0.56, 0, TAU); g.fill();   // ombro
+        if (cuff) { const dx = x2 - x1, dy = y2 - y1, d = Math.hypot(dx, dy) || 1, cx = x2 - dx / d * 1.8, cy = y2 - dy / d * 1.8; g.strokeStyle = cuff; g.lineWidth = w * 0.9; g.lineCap = 'butt'; g.beginPath(); g.moveTo(cx - dy / d * 0.01, cy + dx / d * 0.01); g.lineTo(cx + dx / d * 1.6, cy + dy / d * 1.6); g.stroke(); g.lineCap = 'round'; }
+    }
     function lg(g, x0, y0, x1, y1, stops) { const gr = g.createLinearGradient(x0, y0, x1, y1); stops.forEach(s => gr.addColorStop(s[0], s[1])); return gr; }
     function rg(g, x, y, r0, r1, stops) { const gr = g.createRadialGradient(x, y, r0, x, y, r1); stops.forEach(s => gr.addColorStop(s[0], s[1])); return gr; }
     function glow(g, x, y, r, col, a) { g.fillStyle = rg(g, x, y, 0, r, [[0, alpha(col, a)], [1, alpha(col, 0)]]); g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill(); }
@@ -1350,10 +1359,10 @@
         // --- mãos (geometria)
         const info = { bob: bob * sy, hy: (hy - LG) * sy, hand: null, handL: null, sx, sy };
         const headXf = () => { g.translate(0, hy + 7); g.scale(HK, HK / sy); g.translate(0, -(hy + 7)); };
-        const lift = atk * 3.6;
+        const lift = o.bow ? 0 : atk * 3.6;
         let wa0;   // braço de arma: frente = direita da tela; costas = esquerda da tela; lado = braço próximo
         if (side) {
-            const a = -0.25 + atk * 1.7 + armSw * 0.5; wa0 = { a, x: 1 + 2 * cos(a) - 12 * sin(a), y: -29 - bob + 2 * sin(a) + 12 * cos(a) };
+            const a = o.bow ? (-0.25 + armSw * 0.5 * (1 - atk) - atk * 1.2) : (-0.25 + atk * 1.7 + armSw * 0.5); wa0 = { a, x: 1 + 2 * cos(a) - 12 * sin(a), y: -29 - bob + 2 * sin(a) + 12 * cos(a) };
         } else {
             const hxx = SH + 2.4, ly = -14.6 - bob - armSw * 1.6, ry_ = -14.6 - bob + armSw * 1.6;
             if (back) wa0 = { a: 0, x: hxx + atk * 1.2, y: ry_ - lift }; else wa0 = { a: 0, x: -hxx - atk * 1.2, y: ly - lift };   // arma na mão DIREITA do personagem (frente: esquerda da tela; costas: direita da tela)
@@ -1387,7 +1396,7 @@
         }
         g.restore();
         // braço de trás (lado)
-        if (side) { limb2(g, 0, -29 - bob, -armSw * 3, -23, -armSw * 5, -17 - bob, 4, shade(shirt, -0.45)); ell(g, -armSw * 5, -16.4 - bob, 2.3, 2.3, skinD, OUT, 0.9); }
+        if (side && !(o.bow && atk > 0.02)) { arm2(g, 0, -29 - bob, -armSw * 2 - 1.2, -23, -armSw * 5, -17 - bob, 4, shade(shirt, -0.45)); ell(g, -armSw * 5, -16.4 - bob, 2.3, 2.3, skinD, OUT, 0.9); }
         // objetos atrás do corpo (arma de costas, escudo de lado): desenhados sem a escala do corpo
         if (o.behind && (back || side)) { g.save(); g.scale(1 / sx, 1 / sy); g.translate(0, LG * sy); o.behind(g, info); g.restore(); }
         // cabelo atrás (frente/lado)
@@ -1433,9 +1442,14 @@
         // braços (frente/costas)
         if (!side) {
             const hxx = SH + 2.4, ly = -14.6 - bob - armSw * 1.6, ry_ = -14.6 - bob + armSw * 1.6;
-            const wl = back ? 0 : lift, wr = back ? lift : 0, wx = atk * 1.2;
-            limb2(g, -SH - 0.4, -27.4 - bob, -SH - 2.6, -21.6, -hxx - (back ? 0 : wx), ly - wl, aw, shirt); ell(g, -hxx - (back ? 0 : wx), ly + 0.6 - wl, 2.5, 2.5, skin, OUT, 0.9);
-            limb2(g, SH + 0.4, -27.4 - bob, SH + 2.6, -21.6, hxx + (back ? wx : 0), ry_ - wr, aw, shirt); ell(g, hxx + (back ? wx : 0), ry_ + 0.6 - wr, 2.5, 2.5, skin, OUT, 0.9);
+            const wl = back ? 0 : lift, wr = back ? lift : 0, wx = atk * 1.2, bt = o.bow ? atk : 0;
+            let lhx = -hxx - (back ? 0 : wx), lhy = ly - wl, rhx = hxx + (back ? wx : 0), rhy = ry_ - wr;
+            if (o.bow && bt > 0) {   // arqueiro: a mão da arma segura o arco; a outra sobe até a corda (no peito)
+                if (back) { lhx = lhx + (1 - lhx) * 0.0; rhx = rhx + (-1.5 - rhx) * bt; rhy = rhy + (-25 - rhy) * bt; }
+                else { rhx = rhx + (1.5 - rhx) * bt; rhy = rhy + (-25 - rhy) * bt; }
+            }
+            arm2(g, -SH - 0.4, -27.4 - bob, -SH - 3.8, -21 - bob * 0.5, lhx, lhy, aw, shirt); ell(g, lhx, lhy + 0.6, 2.5, 2.5, skin, OUT, 0.9);
+            arm2(g, SH + 0.4, -27.4 - bob, SH + 3.8, -21 - bob * 0.5, rhx, rhy, aw, shirt); ell(g, rhx, rhy + 0.6, 2.5, 2.5, skin, OUT, 0.9);
             if (o.armor) { armorPad(g, AT, AC, -SH - 0.6, -28.4 - bob, -1); armorPad(g, AT, AC, SH + 0.6, -28.4 - bob, 1); }
         }
         // cabeça (em frente/costas gira de leve para o lado do movimento ou do alvo: 3/4 suave)
@@ -1466,7 +1480,10 @@
         g.restore();   // headXf
         // braço da frente (lado)
         if (side) {
-            const a = wa0.a; g.save(); g.translate(1, -29 - bob); g.rotate(a); limb2(g, 0, 0, 1, 6, 2, 11, 4.4, shirt); ell(g, 2, 12, 2.6, 2.6, skin, OUT, 0.9); g.restore();
+            if (o.bow && atk > 0.02) {   // mão de puxar: do ombro até a corda, na altura do arco
+                const hx2 = wa0.x - 9.5 - 4 * atk, hy2 = wa0.y - 1; arm2(g, 0, -29 - bob, (hx2 - 0.5) * 0.5 - 2.6, (hy2 - 29 - bob) / 2 + 3.4, hx2, hy2, 4, shade(shirt, -0.18)); ell(g, hx2, hy2, 2.4, 2.4, skin, OUT, 0.9);
+            }
+            const a = wa0.a; g.save(); g.translate(1, -29 - bob); g.rotate(a); arm2(g, 0, 0, 2.6, 5.8, 2, 11, 4.4, shirt); ell(g, 2, 12, 2.6, 2.6, skin, OUT, 0.9); g.restore();
             if (o.armor) armorPad(g, AT, AC, 1, -29.2 - bob, 1);
         }
         g.restore();
@@ -1746,12 +1763,22 @@
         for (let a = 0; a < 6; a++) { const r = a * 1.0472 + 0.5; ell(g, cx + Math.cos(r) * (rx - 1.9), cy + Math.sin(r) * (ry - 1.9), 0.55, 0.55, lt); }
         ell(g, cx, cy, rx * 0.36, ry * 0.3, lt, OUT, 0.8);
     }
-    function underFn(g, info) { try { root.Mimic.under(g, _W.view, _W.eq, info, _W.now); } catch (e) { } }
+    function shieldOnBack(g, info) {   // arqueiros levam o escudo nas costas
+        if (!_W.shBack) return; const sh = _W.sh, sx = info.sx || 1, sy = info.sy || 1;
+        drawShieldFace(g, 0, -23 * sy - (info.bob || 0), 6.6 * sx, 8 * sy, gearCol(sh, '#9aa3ad'), shieldKind(sh));
+    }
+    function underFn(g, info) {
+        try { if (_W.shBack && _W.view === 'front') { const sx = info.sx || 1, sy = info.sy || 1; drawShieldFace(g, -4.4 * sx, -25 * sy - (info.bob || 0), 6.6 * sx, 8 * sy, gearCol(_W.sh, '#9aa3ad'), shieldKind(_W.sh)); } } catch (e) { }
+        try { if (_W.eq && _W.eq.body && _W.eq.body.mimic) root.Mimic.under(g, _W.view, _W.eq, info, _W.now); } catch (e) { }
+    }
     function behindFn(g, info) {   // arma de costas / escudo de lado e de costas: ficam ATRÁS do tronco (o escudo é carregado no braço, não nas costas)
         const W = _W;
         if (W.view === 'back') {
-            if (W.sh) { const c = gearCol(W.sh, '#9aa3ad'), H = info.handL, k = shieldKind(W.sh); ell(g, H.x - 2.6, H.y - 3.6, 2.5, 8.4, shade(c, -0.32), OUT, 1.1); ell(g, H.x - 2.2, H.y - 3.6, 1.2, 6.6, shade(c, 0.02), null); if (k === 'dragon') for (let i = -2; i <= 2; i++) tri(g, H.x - 4.6, H.y - 3.6 + i * 3, H.x - 7.2, H.y - 3.6 + i * 3.4, H.x - 4.6, H.y - 2.2 + i * 3, '#d8d0c0', OUT, 0.5); }
+            if (W.sh && !W.shBack) { const c = gearCol(W.sh, '#9aa3ad'), H = info.handL, k = shieldKind(W.sh); ell(g, H.x - 2.6, H.y - 3.6, 2.5, 8.4, shade(c, -0.32), OUT, 1.1); ell(g, H.x - 2.2, H.y - 3.6, 1.2, 6.6, shade(c, 0.02), null); if (k === 'dragon') for (let i = -2; i <= 2; i++) tri(g, H.x - 4.6, H.y - 3.6 + i * 3, H.x - 7.2, H.y - 3.6 + i * 3.4, H.x - 4.6, H.y - 2.2 + i * 3, '#d8d0c0', OUT, 0.5); }
             if (W.wp) drawWeapon(g, W.wp, info.hand, 'back', W.anim, W.skin);
+        } else if (W.view === 'side' && W.sh && W.shBack) {
+            const sdd = 2.6 + W.D.sh * 0.25, c = gearCol(W.sh, '#9aa3ad'), cx = -(sdd + 2.2) * W.D.sx, cy = -21 * W.D.sy - info.bob;
+            ell(g, cx, cy, 2.6, 8.2, shade(c, -0.3), OUT, 1.1); ell(g, cx - 0.2, cy, 1.4, 6.6, shade(c, 0.05), null);
         } else if (W.view === 'side' && W.sh) {
             const sdd = 2.6 + W.D.sh * 0.25, c = gearCol(W.sh, '#9aa3ad'), cx = (sdd + 3.2) * W.D.sx, cy = -19.5 * W.D.sy - info.bob;
             ell(g, cx, cy, 2.6, 8.2, shade(c, -0.3), OUT, 1.1); ell(g, cx + 0.2, cy, 1.4, 6.6, shade(c, 0.05), null); ell(g, cx, cy, 0.9, 1.6, shade(c, 0.35), null);
@@ -1759,15 +1786,19 @@
     }
     function onBackFn() { }
     /* arco: a mão segura o CABO (centro do arco, origem); a corda fica atrás e puxa um pouco no disparo. Formas do Mímico: w_long, w_recurve, w_dragon, w_elven */
-    function drawBowShape(ctx, wp, pull) {
+    function drawBowShape(ctx, wp, pull, view) {
         const fm = typeof wp.mfm === 'string' ? wp.mfm : '', hexc = (typeof wp.col === 'string' && /^#[0-9a-fA-F]{6}$/.test(wp.col)) ? wp.col : '#a85a1a';
-        const P = { std: { L: 19, b: 8, r: 0, col: hexc, tip: '#e8d8a8', w: 3.2 }, w_long: { L: 25, b: 7, r: 0, col: '#8b5a2b', tip: '#d8c090', w: 2.8 }, w_recurve: { L: 20, b: 9.5, r: 5, col: '#6b3f1e', tip: '#e8b93c', w: 3.2 }, w_dragon: { L: 22, b: 9, r: 3.4, col: '#e8dec6', tip: '#c0392b', w: 3.4 }, w_elven: { L: 24, b: 9.5, r: 4, col: '#dcc690', tip: '#e8b93c', w: 2.6 } };
+        const P = { std: { L: 19, b: 8, r: 0, col: hexc, tip: '#e8d8a8', w: 3.2 }, w_long: { L: 25, b: 7, r: 0, col: '#8b5a2b', tip: '#d8c090', w: 2.8 }, w_recurve: { L: 20, b: 9.5, r: 5, col: '#6b3f1e', tip: '#e8b93c', w: 3.2 }, w_dragon: { L: 23, b: 9.5, r: 5, col: '#8e1b22', tip: '#e8b93c', w: 3.6 }, w_elven: { L: 24, b: 9.5, r: 4, col: '#dcc690', tip: '#e8b93c', w: 2.6 } };
         const B = P[fm] || P.std, N = 14, pt = (u, sg) => { const x = -B.b * u * u + B.r * Math.pow(Math.max(0, u - 0.62) / 0.38, 2) * 1; return [x, sg * u * B.L]; };
         ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-        const tipT = pt(1, -1), tipB = pt(1, 1), pl = pull * 5.5;
+        const tipT = pt(1, -1), tipB = pt(1, 1), pl = pull * 4;
         // corda
         ctx.strokeStyle = 'rgba(245,245,245,0.92)'; ctx.lineWidth = 0.9; ctx.beginPath(); ctx.moveTo(tipT[0], tipT[1]); ctx.lineTo(tipT[0] - 1 - pl, 0); ctx.lineTo(tipB[0], tipB[1]); ctx.stroke();
-        if (pull > 0.15) { ctx.strokeStyle = '#d8c090'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(tipT[0] - 1 - pl, 0); ctx.lineTo(B.tip === '#c0392b' ? 9 : 10, 0); ctx.stroke(); ctx.fillStyle = '#cfd8dc'; ctx.beginPath(); ctx.moveTo(10, -1.6); ctx.lineTo(14.5, 0); ctx.lineTo(10, 1.6); ctx.closePath(); ctx.fill(); }
+        if (pull > 0.12 && view === 'side') {   // flecha encaixada: da corda até além do cabo
+            const x0 = tipT[0] - 1 - pl; ctx.strokeStyle = OUT; ctx.lineWidth = 2.6; ctx.beginPath(); ctx.moveTo(x0, 0); ctx.lineTo(17, 0); ctx.stroke(); ctx.strokeStyle = '#d8c090'; ctx.lineWidth = 1.2; ctx.stroke();
+            ctx.fillStyle = '#cfd8dc'; ctx.strokeStyle = OUT; ctx.lineWidth = 0.6; ctx.beginPath(); ctx.moveTo(16.5, -2); ctx.lineTo(21, 0); ctx.lineTo(16.5, 2); ctx.closePath(); ctx.fill(); ctx.stroke();
+            ctx.fillStyle = '#e8483a'; ctx.beginPath(); ctx.moveTo(x0 + 0.4, 0); ctx.lineTo(x0 + 3.6, -2); ctx.lineTo(x0 + 4.4, 0); ctx.lineTo(x0 + 3.6, 2); ctx.closePath(); ctx.fill();
+        }
         // braços (afinam até a ponta): contorno primeiro, depois a cor
         for (const pass of [0, 1]) for (const sg of [-1, 1]) for (let k = 0; k < N; k++) {
             const a = pt(k / N, sg), b = pt((k + 1) / N, sg), w = (B.w * (1 - 0.5 * k / N)) + (pass ? 0 : 1.5);
@@ -1776,11 +1807,14 @@
         ctx.strokeStyle = 'rgba(255,255,255,0.28)'; ctx.lineWidth = 0.7; for (const sg of [-1, 1]) { ctx.beginPath(); for (let k = 1; k < N - 2; k++) { const a = pt(k / N, sg); ctx.lineTo(a[0] + 0.7, a[1]); } ctx.stroke(); }
         // pontas (nock)
         for (const t of [tipT, tipB]) ell(ctx, t[0], t[1], 1.5, 1.5, B.tip, OUT, 0.6);
-        if (fm === 'w_dragon') {
-            ctx.fillStyle = '#c0392b'; ctx.strokeStyle = OUT; ctx.lineWidth = 0.7;
-            for (const sg of [-1, 1]) for (let i = 0; i < 3; i++) { const a = pt(0.3 + i * 0.22, sg), l = 3.2 - i * 0.6; ctx.beginPath(); ctx.moveTo(a[0] + 0.6, a[1]); ctx.lineTo(a[0] + 0.6 + l, a[1] - sg * 1.8 - sg * l * 0.4); ctx.lineTo(a[0] + 0.6 + l * 0.2, a[1] - sg * 3.4); ctx.closePath(); ctx.fill(); ctx.stroke(); }
-            glow(ctx, 0, 0, 9, '#ff6a2a', 0.5);
-            for (const sg of [-1, 1]) { const a = pt(0.55, sg), t = pt(1, sg); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.quadraticCurveTo(a[0] - 5, (a[1] + t[1]) / 2, t[0] - 0.4, t[1] - sg * 0.5); ctx.strokeStyle = 'rgba(192,57,43,0.8)'; ctx.lineWidth = 0.9; ctx.stroke(); }
+        if (fm === 'w_dragon') {   // chifre de dragão: espinhos dourados nas costas dos braços e garras nas pontas
+            ctx.fillStyle = '#e8b93c'; ctx.strokeStyle = OUT; ctx.lineWidth = 0.6;
+            for (const sg of [-1, 1]) {
+                for (let i = 0; i < 4; i++) { const a = pt(0.2 + i * 0.2, sg), l = 3.6 - i * 0.6; ctx.beginPath(); ctx.moveTo(a[0] + 0.9, a[1] - sg * 1.3); ctx.lineTo(a[0] + 0.9 + l, a[1] + sg * 0.6 - sg * l * 0.2); ctx.lineTo(a[0] + 1, a[1] + sg * 1.4); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+                const t = pt(1, sg); ctx.beginPath(); ctx.moveTo(t[0] - 1.4, t[1]); ctx.quadraticCurveTo(t[0] + 2.5, t[1] + sg * 1.5, t[0] + 3.4, t[1] + sg * 5); ctx.quadraticCurveTo(t[0] + 0.6, t[1] + sg * 2.6, t[0] + 1.2, t[1] - sg * 0.2); ctx.closePath(); ctx.fill(); ctx.stroke();   // garra na ponta
+                ctx.strokeStyle = 'rgba(255,170,120,0.55)'; ctx.lineWidth = 0.6; ctx.beginPath(); for (let k = 1; k < N - 3; k++) { const a = pt(k / N, sg); ctx.lineTo(a[0] - 0.6, a[1]); } ctx.stroke(); ctx.strokeStyle = OUT;
+            }
+            for (const sg of [-1, 1]) { ctx.beginPath(); ctx.moveTo(1.2, sg * 1.4); ctx.quadraticCurveTo(5.4, sg * 4.6, 2.4, sg * 8); ctx.quadraticCurveTo(3, sg * 4.4, -0.4, sg * 3.2); ctx.closePath(); ctx.fillStyle = '#e8b93c'; ctx.fill(); ctx.stroke(); }   // asinhas douradas no cabo
         } else if (fm === 'w_elven') {
             ctx.fillStyle = B.tip; ctx.strokeStyle = OUT; ctx.lineWidth = 0.6;
             for (const sg of [-1, 1]) for (let i = 0; i < 3; i++) { const a = pt(0.28 + i * 0.22, sg); ctx.beginPath(); ctx.moveTo(a[0] + 0.8, a[1]); ctx.quadraticCurveTo(a[0] + 4.4, a[1] - sg * 1.2, a[0] + 1.2, a[1] - sg * 3.6); ctx.quadraticCurveTo(a[0] + 1.6, a[1] - sg * 1.4, a[0] + 0.8, a[1]); ctx.fill(); ctx.stroke(); }
@@ -1806,7 +1840,7 @@
         const wood = '#8b5a2b', woodL = '#b07a3f', mc = armorColor(wp, '#c9d1d8'), steel = wp.tool ? '#b9c2cc' : mc;
         const handle = (y0, y1, w) => { limb(ctx, 0, y0, 0, y1, w + 1.4, OUT); limb(ctx, 0, y0, 0, y1, w, wood); ctx.fillStyle = woodL; ctx.fillRect(-w / 2 + 0.3, y1, 0.9, y0 - y1); };
         if (wp.tool === 'magic') { handle(14, -24, 2.4); ctx.fillStyle = '#4a2f16'; ctx.fillRect(-1.8, -3, 3.6, 3); ell(ctx, 0, -29, anim > 0 ? 6 : 4.6, anim > 0 ? 6 : 4.6, rg(ctx, -1, -30, 0, 7, [[0, '#fff'], [0.4, anim > 0 ? '#1abc9c' : (/^#[0-9a-fA-F]{6}$/.test(wp.gem || '') ? wp.gem : '#6ec8ff')], [1, '#2b56b8']]), OUT, 0.9); glow(ctx, 0, -29, 14, /^#[0-9a-fA-F]{6}$/.test(wp.gem || '') ? wp.gem : '#6ec8ff', 0.4); }
-        else if (wp.tool === 'ranged') drawBowShape(ctx, wp, swing);
+        else if (wp.tool === 'ranged') drawBowShape(ctx, wp, swing, view);
         else if (wp.tool === 'axe') {
             handle(13, -21, 2.6);
             ctx.beginPath(); ctx.moveTo(1, -22); ctx.quadraticCurveTo(10, -27, 12, -17); ctx.quadraticCurveTo(11, -9, 3, -11); ctx.closePath(); paint(ctx, lg(ctx, 1, -24, 12, -10, [[0, shade(steel, 0.55)], [0.55, steel], [1, shade(steel, -0.35)]]), OUT, 1.1);
@@ -1832,10 +1866,10 @@
         _W.wp = wp; _W.sh = sh; _W.view = view; _W.anim = anim; _W.skin = L.skin || '#f1c27d'; _W.D = D;
         const o = _baseO; o.view = view; o.t = now; o.seed = 3; o.turn = turn || 0; o.lookX = turn || 0; o.mv = mv; o.ph = ph; o.atk = atk; o.sex = L.sex; o.race = L.race; o.hairStyle = L.hairStyle | 0; o.hair = L.hair; o.skin = L.skin; o.shirt = (body && body.robe) ? armorColor(body, L.shirt) : L.shirt; o.armorT = body ? gearTier(body) : null; o.armorCol = body ? armorColor(body, '#aab3bd') : null; o.pants = L.pants;
         o.armor = !!body && !body.robe; o.hat = hd ? (hd.hat === 'wizard' || hd.hat === 'hood' ? hd.hat : (helmKind(hd) === 'crown' ? 'crown' : 'helmet')) : null; o.hatStyle = hd ? helmKind(hd) : null; o.hatColor = armorColor(hd, '#b9c2cc'); o.beard = (L.sex !== 'f' && (L.beard === 1 || (L.beard === undefined && L.race === 'dwarf'))) ? shade(L.hair || '#5a3a1e', -0.08) : null;
-        o.behind = (wp || sh) ? behindFn : null; o.onBack = sh ? onBackFn : null; o.cape = null; o.apron = null; o.robe = !!(body && body.robe); o.pack = null; o.belt = null; o.boots = null; o.hatColor = o.hatColor;
-        _W.eq = equip; _W.now = now; o.under = (body && body.mimic && root.Mimic && root.Mimic.under && view !== 'back') ? underFn : null;
+        const bow = !!(wp && wp.tool === 'ranged'); o.bow = bow; _W.shBack = !!(bow && sh); o.behind = (wp || sh) ? behindFn : null; o.onBack = (bow && sh) ? shieldOnBack : (sh ? onBackFn : null); o.cape = null; o.apron = null; o.robe = !!(body && body.robe); o.pack = null; o.belt = null; o.boots = null; o.hatColor = o.hatColor;
+        _W.eq = equip; _W.now = now; o.under = (_W.shBack && view === 'front') || (body && body.mimic && root.Mimic && root.Mimic.under && view !== 'back') ? underFn : null;
         const info = human(ctx, o);
-        if (view === 'front' && sh) { const H = info.handL; drawShieldFace(ctx, H.x + 1.2, H.y - 4.4, 6.6, 7.8, gearCol(sh, '#9aa3ad'), shieldKind(sh)); }
+        if (view === 'front' && sh && !_W.shBack) { const H = info.handL; drawShieldFace(ctx, H.x + 1.2, H.y - 4.4, 6.6, 7.8, gearCol(sh, '#9aa3ad'), shieldKind(sh)); }
         if (wp && view !== 'back') drawWeapon(ctx, wp, info.hand, view, anim, _W.skin);
         if (equip && root.Mimic && ((hd && hd.mimic) || (body && body.mimic) || (wp && wp.mimic) || (sh && sh.mimic))) { try { root.Mimic.overlay(ctx, view, equip, info, now); } catch (e) { } }   // itens Mímicos (mimic.js)
         return info;

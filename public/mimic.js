@@ -387,7 +387,7 @@
             }
         } else if (fb === 'b_dragon') {
             for (const sg of sgs) {
-                const rx = side ? -2.4 * sx : sg * 4.6 * sx, ry = cy - 4.5, ph = now * 5.2, fl = -0.28 + Math.sin(ph) * 0.34, sc = (side ? 0.8 : 0.92) * scl, dir = side ? -1 : sg;
+                const rx = side ? -2.4 * sx : sg * 4.6 * sx, ry = cy - 4.5, ph = now * 5.2, fl = -0.28 + Math.sin(ph) * 0.34, sc = (side ? 0.88 : 1.02) * scl, dir = side ? -1 : sg;
                 const lag = (k) => Math.sin(ph - 0.7 - k * 0.35) * 0.1;   // pontas atrasam um pouco: bater de asa de verdade
                 const P = (x, y, k) => { const a = fl + (k || 0), ca = Math.cos(a), sa = Math.sin(a); return [(x * ca - y * sa) * sc, (x * sa + y * ca) * sc]; };
                 const E = P(8, -10), Wr = P(19, -23), T = [P(37, -19, lag(0)), P(35, -4, lag(1)), P(26, 8, lag(2)), P(15, 12, lag(3))], B0 = P(1, 7);
@@ -399,6 +399,9 @@
                 ctx.fillStyle = gr; ctx.fill(); ctx.strokeStyle = OUTC; ctx.lineWidth = 0.9; ctx.stroke();
                 ctx.strokeStyle = 'rgb(' + dark(cA, 0.35) + ')'; ctx.lineWidth = 1.5; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(E[0], E[1]); ctx.lineTo(Wr[0], Wr[1]); T.forEach((t) => { ctx.moveTo(Wr[0], Wr[1]); ctx.lineTo(t[0], t[1]); }); ctx.stroke();
                 ctx.strokeStyle = 'rgba(' + cB + ',0.75)'; ctx.lineWidth = 0.7; ctx.stroke();
+                ctx.fillStyle = 'rgb(' + dark(cB, 0.95) + ')'; ctx.strokeStyle = OUTC; ctx.lineWidth = 0.7;
+                const spk = (px, py, ang, l) => { const c = Math.cos(ang), n = Math.sin(ang); ctx.beginPath(); ctx.moveTo(px - n * 1.7, py + c * 1.7); ctx.quadraticCurveTo(px + c * l * 0.5 - n * 0.6, py + n * l * 0.5 + c * 0.6, px + c * l, py + n * l); ctx.quadraticCurveTo(px + c * l * 0.4 + n * 0.8, py + n * l * 0.4 - c * 0.8, px + n * 1.7, py - c * 1.7); ctx.closePath(); ctx.fill(); ctx.stroke(); };
+                spk(E[0], E[1], -1.25, 5.4); spk(Wr[0], Wr[1], -1.05, 8.2); for (let k = 0; k < 4; k++) spk(T[k][0], T[k][1], [-0.5, 0.1, 0.65, 1.2][k], 3.6);   // espinhos no cotovelo, no pulso e garras nas pontas
                 ctx.fillStyle = 'rgb(' + dark(cB, 0.9) + ')'; ctx.beginPath(); ctx.moveTo(Wr[0] - 1.4, Wr[1] + 0.4); ctx.lineTo(Wr[0] + 1, Wr[1] - 4.2); ctx.lineTo(Wr[0] + 2, Wr[1] + 0.6); ctx.closePath(); ctx.fill(); ctx.stroke();   // garra do pulso
                 ctx.restore();
             }
@@ -508,7 +511,9 @@
         if (B) bodyFront(ctx, view, B, info, now, thOf(B));
         if (H) headForm(ctx, view, H, info, now, thOf(H), H.hat);
         const eyeC = (it) => thOf(it).eye;
+        const FACES = false;   // olhos/dentes nas peças ficaram estranhos: só o brilho, as runas e as formas ficam
         const eye = (x, y, rx, ry, dir, c) => {
+            if (!FACES) return;
             ctx.fillStyle = c || TM.eye; ctx.strokeStyle = '#1b1109'; ctx.lineWidth = 0.5; ctx.beginPath(); ctx.ellipse(x, y, rx, blink ? 0.25 : ry, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
             if (!blink) { ctx.fillStyle = '#1b1109'; ctx.beginPath(); ctx.ellipse(x + (dir || 0) * 0.35, y + 0.1, rx * 0.38, ry * 0.8, 0, 0, Math.PI * 2); ctx.fill(); }
         };
@@ -518,14 +523,14 @@
                 eye(-2.4 * sx, cy - 3.4, 1.25, 1.2, 0, ec); eye(2.4 * sx, cy - 3.4, 1.25, 1.2, 0, ec);
                 if (sB >= 1) { eye(-7.2 * sx, cy - 6.4, 0.85, 0.8, 0, ec); eye(7.2 * sx, cy - 6.4, 0.85, 0.8, 0, ec); }   // olhos nos ombros
                 if (sB >= 2) eye(0, cy - 6.4, 0.95, 0.9, 0, ec);   // terceiro olho
-                const ty = cy + 5.6; ctx.strokeStyle = 'rgba(30,8,50,.85)'; ctx.lineWidth = 0.9; ctx.beginPath(); ctx.moveTo(-4.4 * sx, ty); ctx.quadraticCurveTo(0, ty + 1.4, 4.4 * sx, ty); ctx.stroke();
-                ctx.fillStyle = '#f7f1e0'; ctx.strokeStyle = '#1b1109'; ctx.lineWidth = 0.35; const nT = sB >= 2 ? 7 : 5, stp = sB >= 2 ? 1.35 : 2;
+                if (FACES) {const ty = cy + 5.6; ctx.strokeStyle = 'rgba(30,8,50,.85)'; ctx.lineWidth = 0.9; ctx.beginPath(); ctx.moveTo(-4.4 * sx, ty); ctx.quadraticCurveTo(0, ty + 1.4, 4.4 * sx, ty); ctx.stroke();
+                ctx.fillStyle = '#f7f1e0'; ctx.strokeStyle = '#1b1109'; ctx.lineWidth = 0.35; const nT = sB >= 2 ? 7 : 5, stp = sB >= 2 ? 1.35 : 2; }
                 for (let i = 0; i < nT; i++) { const tx = (-(nT - 1) / 2 + i) * stp * sx; const edge = i === 0 || i === nT - 1; ctx.beginPath(); ctx.moveTo(tx - 0.9, ty + 0.5 + (edge ? 0 : 0.5)); ctx.lineTo(tx, ty + (sB >= 2 ? 3.1 : 2.6)); ctx.lineTo(tx + 0.9, ty + 0.5 + (edge ? 0 : 0.5)); ctx.closePath(); ctx.fill(); ctx.stroke(); }
                 if (sB >= 1) { ctx.strokeStyle = 'rgba(' + colB(thOf(B), now) + ',' + (0.5 + 0.3 * pulse).toFixed(2) + ')'; ctx.lineWidth = 0.7; for (const sg of [-1, 1]) { const rx = sg * 8.6 * sx; ctx.beginPath(); ctx.moveTo(rx, cy - 1); ctx.lineTo(rx, cy + 7); for (let i = 0; i < 3; i++) { ctx.moveTo(rx - 0.9, cy + i * 2.6); ctx.lineTo(rx + 0.9, cy + i * 2.6); } ctx.stroke(); } }
             } else if (side) {
                 eye(3.2 * sx, cy - 3.4, 1.15, 1.2, 1, ec); if (sB >= 1) eye(3.6 * sx, cy - 6.4, 0.8, 0.75, 1, ec);
-                ctx.fillStyle = '#f7f1e0'; ctx.strokeStyle = '#1b1109'; ctx.lineWidth = 0.35; const nT = sB >= 2 ? 3 : 2;
-                for (let i = 0; i < nT; i++) { const ty = cy + 2.2 + i * 2.4; ctx.beginPath(); ctx.moveTo(4.6 * sx, ty); ctx.lineTo(2.8 * sx, ty + 0.9); ctx.lineTo(4.6 * sx, ty + 1.8); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+                if (FACES) {ctx.fillStyle = '#f7f1e0'; ctx.strokeStyle = '#1b1109'; ctx.lineWidth = 0.35; const nT = sB >= 2 ? 3 : 2;
+                for (let i = 0; i < nT; i++) { const ty = cy + 2.2 + i * 2.4; ctx.beginPath(); ctx.moveTo(4.6 * sx, ty); ctx.lineTo(2.8 * sx, ty + 0.9); ctx.lineTo(4.6 * sx, ty + 1.8); ctx.closePath(); ctx.fill(); ctx.stroke(); } }
                 if (sB >= 1) { ctx.strokeStyle = 'rgba(' + colB(thOf(B), now) + ',' + (0.5 + 0.3 * pulse).toFixed(2) + ')'; ctx.lineWidth = 0.7; ctx.beginPath(); ctx.moveTo(-1 * sx, cy - 2); ctx.lineTo(-1 * sx, cy + 6); ctx.moveTo(-2 * sx, cy); ctx.lineTo(0, cy); ctx.moveTo(-2 * sx, cy + 3); ctx.lineTo(0, cy + 3); ctx.stroke(); }
             } else {   // costas: costura com runa
                 ctx.strokeStyle = 'rgba(' + colB(thOf(B), now) + ',' + (0.5 + 0.3 * pulse).toFixed(2) + ')'; ctx.lineWidth = 0.9; ctx.beginPath(); ctx.moveTo(-3 * sx, cy - 5); ctx.lineTo(0, cy - 2); ctx.lineTo(3 * sx, cy - 5); ctx.moveTo(0, cy - 2); ctx.lineTo(0, cy + 6); ctx.stroke();
