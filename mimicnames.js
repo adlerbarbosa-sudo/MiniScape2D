@@ -18,7 +18,7 @@ const MAXLVL = 50;
 const stageOf = (lvl) => (lvl >= 50 ? 3 : lvl >= 25 ? 2 : lvl >= 10 ? 1 : 0);
 const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 function pInt(v, a, b, d) { v = Math.floor(Number(v)); return Number.isFinite(v) ? Math.max(a, Math.min(b, v)) : d; }
-const FORMS = ['h_drac', 'h_horns', 'h_wing', 'h_ears', 'h_crown', 'b_wings', 'b_dragon', 'b_cape', 'b_spikes', 'w_long', 'w_recurve', 'w_dragon', 'w_elven'];   // formas visuais (cosmético); h_ = peça de cabeça, b_ = peça de corpo
+const FORMS = ['h_drac', 'h_horns', 'h_wing', 'h_ears', 'h_crown', 'b_wings', 'b_dragon', 'b_cape', 'b_spikes', 'b_dracarm', 'w_long', 'w_recurve', 'w_dragon', 'w_elven'];   // formas visuais (cosmético); h_ = peça de cabeça, b_ = peça de corpo
 const skinOk = (id, lvl, owned) => typeof id === 'string' && hasOwn(SKINS, id) && (SKINS[id] > 0 ? lvl >= SKINS[id] : !!(owned && owned.includes(id)));
 /* playerData.mimic = { nome: {lvl 1..50, xp >= 0, skin?} } (só peças conhecidas), playerData.mimicSkins = [ids especiais liberados] e playerData.mimicPct = 0..100 (inteiro) */
 function cleanMimicData(pd) {

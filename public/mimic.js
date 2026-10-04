@@ -361,7 +361,7 @@
     const FORMS = {
         head: [['', 'Padrão'], ['h_drac', 'Elmo draconiano'], ['h_horns', 'Chifres'], ['h_wing', 'Elmo alado'], ['h_ears', 'Orelhas de lobo'], ['h_crown', 'Coroa de luz']],
         weapon: [['', 'Padrão'], ['w_long', 'Arco longo'], ['w_recurve', 'Arco recurvo'], ['w_dragon', 'Arco de dragão'], ['w_elven', 'Arco élfico']],
-        body: [['', 'Padrão'], ['b_wings', 'Asas de pena'], ['b_dragon', 'Asas de dragão'], ['b_cape', 'Capa'], ['b_spikes', 'Ombreiras de espinhos']]
+        body: [['', 'Padrão'], ['b_wings', 'Asas de pena'], ['b_dragon', 'Asas de dragão'], ['b_cape', 'Capa'], ['b_spikes', 'Ombreiras de espinhos'], ['b_dracarm', 'Armadura draconiana']]
     };
     const FORM_OK = (slot, id) => !id || ((FORMS[slot] || []).some((f) => f[0] === id));
     const fmOf = (it, pre) => (it && typeof it.mfm === 'string' && it.mfm.indexOf(pre) === 0 ? it.mfm : '');
@@ -414,7 +414,40 @@
         }
         ctx.restore();
     }
+    function dracArmor(ctx, view, info, now) {   // armadura draconiana: peitoral de escamas carmesim com friso dourado, ombreiras de chifres, cinto e saiotes
+        const sx = info.sx || 1, sy = info.sy || 1, cy = -22 * sy - (info.bob || 0), side = view === 'side', back = view === 'back';
+        const R = '#8e1b22', RD = '#3a0d10', RL = '#c0392b', G = '#e0b050', GD = '#8a6a22';
+        const gold = () => { ctx.strokeStyle = G; ctx.lineWidth = 0.9; ctx.stroke(); };
+        ctx.save(); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+        const hw = (side ? 3.9 : 6.8) * sx, top = cy - 8.2, bot = cy + 7.6;
+        // saiotes (placas sob o cinto)
+        ctx.fillStyle = RD; ctx.strokeStyle = OUTC; ctx.lineWidth = 0.7;
+        for (const k of (side ? [0] : [-1, 1])) { ctx.beginPath(); ctx.moveTo(k * hw * 0.95 - 2.6, bot); ctx.lineTo(k * hw * 0.95 + 2.6, bot); ctx.lineTo(k * hw * 0.95 + 1.6, bot + 4.4); ctx.lineTo(k * hw * 0.95 - 1.6, bot + 4.4); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+        // peitoral
+        const gr = ctx.createLinearGradient(0, top, 0, bot); gr.addColorStop(0, RL); gr.addColorStop(0.45, R); gr.addColorStop(1, RD);
+        ctx.beginPath(); ctx.moveTo(-hw, top + 1); ctx.quadraticCurveTo(0, top - 1.6, hw, top + 1); ctx.lineTo(hw * 0.78, bot); ctx.lineTo(-hw * 0.78, bot); ctx.closePath(); ctx.fillStyle = gr; ctx.fill(); ctx.strokeStyle = OUTC; ctx.lineWidth = 0.9; ctx.stroke();
+        // escamas
+        ctx.save(); ctx.clip(); ctx.strokeStyle = 'rgba(20,0,2,0.55)'; ctx.lineWidth = 0.55;
+        for (let r = 0; r < 5; r++) { const yy = top + 2.4 + r * 3.2; for (let c = -3; c <= 3; c++) { const xx = c * 3.4 * sx + (r % 2 ? 1.7 * sx : 0); ctx.beginPath(); ctx.arc(xx, yy, 1.9 * sx, 0.1, Math.PI - 0.1); ctx.stroke(); } }
+        ctx.restore();
+        ctx.beginPath(); ctx.moveTo(-hw, top + 1); ctx.quadraticCurveTo(0, top - 1.6, hw, top + 1); ctx.lineTo(hw * 0.78, bot); ctx.lineTo(-hw * 0.78, bot); ctx.closePath(); gold();
+        if (back) { ctx.strokeStyle = G; ctx.lineWidth = 1.1; ctx.beginPath(); ctx.moveTo(0, top); ctx.lineTo(0, bot); ctx.stroke(); ctx.fillStyle = G; for (let r = 0; r < 4; r++) { const yy = top + 1.6 + r * 4; ctx.beginPath(); ctx.moveTo(-1.5, yy + 1.8); ctx.lineTo(0, yy - 1.2); ctx.lineTo(1.5, yy + 1.8); ctx.closePath(); ctx.fill(); ctx.strokeStyle = OUTC; ctx.lineWidth = 0.5; ctx.stroke(); } }
+        else if (!side) {   // friso central e cabeça de dragão dourada no peito
+            ctx.strokeStyle = GD; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(0, top + 5.6); ctx.lineTo(0, bot); ctx.stroke();
+            ctx.fillStyle = G; ctx.beginPath(); ctx.moveTo(-3.6, top + 2.2); ctx.lineTo(-1.6, top + 3.2); ctx.lineTo(0, top + 6.2); ctx.lineTo(1.6, top + 3.2); ctx.lineTo(3.6, top + 2.2); ctx.lineTo(2.2, top + 5); ctx.lineTo(0.9, top + 7.4); ctx.lineTo(-0.9, top + 7.4); ctx.lineTo(-2.2, top + 5); ctx.closePath(); ctx.fill(); ctx.strokeStyle = OUTC; ctx.lineWidth = 0.55; ctx.stroke();
+            ctx.fillStyle = '#ffdf8a'; ctx.fillRect(-1.5, top + 4.2, 0.9, 0.7); ctx.fillRect(0.6, top + 4.2, 0.9, 0.7);
+        } else { ctx.strokeStyle = G; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(1.2, top + 3); ctx.lineTo(1.6, bot - 1); ctx.stroke(); }
+        // cinto
+        ctx.fillStyle = '#1d0a0a'; ctx.fillRect(-hw * 0.8, bot - 1.6, hw * 1.6, 2.4); ctx.strokeStyle = OUTC; ctx.lineWidth = 0.5; ctx.strokeRect(-hw * 0.8, bot - 1.6, hw * 1.6, 2.4);
+        if (!back) { ctx.fillStyle = G; ctx.fillRect(side ? 0.2 : -1.3, bot - 1.8, 2.6, 2.8); ctx.strokeRect(side ? 0.2 : -1.3, bot - 1.8, 2.6, 2.8); }
+        // ombreiras com chifres
+        const pauld = (x, sg) => { ctx.beginPath(); ctx.ellipse(x, cy - 6.4, 3.6, 3, sg * 0.3, 0, Math.PI * 2); ctx.fillStyle = R; ctx.fill(); ctx.strokeStyle = OUTC; ctx.lineWidth = 0.8; ctx.stroke(); ctx.strokeStyle = G; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.ellipse(x, cy - 6.4, 2.4, 1.9, sg * 0.3, 0, Math.PI * 2); ctx.stroke();
+            ctx.fillStyle = G; for (const [dx, dy, ang, h] of [[-1.2, -2.2, -0.35, 5.6], [1.4, -2, 0.3, 4.4]]) { ctx.save(); ctx.translate(x + dx * sg, cy - 6.4 + dy); ctx.rotate(ang * sg); ctx.beginPath(); ctx.moveTo(-1.5, 0); ctx.quadraticCurveTo(-0.6, -h * 0.6, sg * 0.8, -h); ctx.quadraticCurveTo(1.2, -h * 0.4, 1.5, 0); ctx.closePath(); ctx.fill(); ctx.strokeStyle = OUTC; ctx.lineWidth = 0.5; ctx.stroke(); ctx.restore(); } };
+        if (side) pauld(0.4 * sx, 1); else { pauld(-hw - 0.8, -1); pauld(hw + 0.8, 1); }
+        ctx.restore();
+    }
     function bodyFront(ctx, view, B, info, now, TH) {   // ombreiras de espinhos
+        if (fmOf(B, 'b_') === 'b_dracarm') return dracArmor(ctx, view, info, now);
         if (fmOf(B, 'b_') !== 'b_spikes') return; const sx = info.sx || 1, sy = info.sy || 1, cy = -22 * sy - (info.bob || 0), col = TH.col || '#8a5ad0', side = view === 'side';
         const spike = (x, y, a, h) => { ctx.save(); ctx.translate(x, y); ctx.rotate(a); ctx.beginPath(); ctx.moveTo(-2.4, 0); ctx.lineTo(0, -h); ctx.lineTo(2.4, 0); ctx.closePath(); ctx.fillStyle = col; ctx.fill(); ctx.strokeStyle = OUTC; ctx.lineWidth = 0.7; ctx.stroke(); ctx.fillStyle = TH.acc; ctx.beginPath(); ctx.moveTo(-0.9, -h * 0.55); ctx.lineTo(0, -h); ctx.lineTo(0.9, -h * 0.55); ctx.fill(); ctx.restore(); };
         if (side) { spike(0.5 * sx, cy - 6.6, -0.35, 7); spike(-1.6 * sx, cy - 6, -0.8, 5); }

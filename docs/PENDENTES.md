@@ -34,4 +34,5 @@ Leia o README.md antes de começar. Regras de trabalho: testar com Playwright em
 ## Lote 04/10 tarde
 - Grupo: XP compartilhado (50% aos próximos), bônus +10% por companheiro próximo (até 3), HUD novo à esquerda do mapa.
 - Fx remotos: números de dano, impacto, cone, raio, auras de buff/barreira (`au` no sync).
-- Ainda falta: Invasão (cliente), prestígio, armadura draconiana no estilo das referências, pernas dos monstros de frente, validação de XP no servidor.
+- Feito depois: Invasão no cliente (`public/invasao.js`), armadura draconiana (Mímico `b_dracarm`), pernas dos monstros de frente (`legF`), fx remotos de explosão/chuva de flechas. Validação de XP no servidor já existia (`security.js`, orçamentos de XP).
+- Falta: Prestígio (só proposta, sem implementação); testar Invasão com servidor real.
