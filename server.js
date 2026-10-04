@@ -67,6 +67,8 @@ app.get('/balance.js', (req, res, next) => {   // XP_RATE (env) chega ao cliente
     if (!(+process.env.XP_RATE > 0)) return next();
     try { const src = fs.readFileSync(path.join(__dirname, 'public', 'balance.js'), 'utf8'); res.type('application/javascript').set('Cache-Control', 'no-cache').send('self.MS_XP_RATE=' + (+process.env.XP_RATE) + ';\n' + src); } catch (e) { next(); }
 });
+const _idx = { m: 0, s: '' };   // index.html leva a versão do servidor embutida (window.__BUILD): quem está com a aba antiga aberta descobre que precisa recarregar
+app.get(['/', '/index.html'], (req, res, next) => { try { const f = path.join(__dirname, 'public', 'index.html'), st = fs.statSync(f); if (st.mtimeMs !== _idx.m) { _idx.m = st.mtimeMs; _idx.s = fs.readFileSync(f, 'utf8'); } res.set('Cache-Control', 'no-cache'); res.type('html').send(_idx.s.replace('<head>', '<head><script>window.__BUILD=' + JSON.stringify(CLIENT_VER) + ';</script>')); } catch (e) { next(); } });
 app.use(express.static(path.join(__dirname, 'public'), { dotfiles: 'ignore', index: 'index.html', setHeaders: (res, p) => { if (/\.(js|html|css|json)$/.test(p)) res.setHeader('Cache-Control', 'no-cache'); } }));   // sempre revalida: ninguém fica com versão velha do jogo
 /* versão do cliente = data do arquivo mais novo em public/: o jogo avisa quem está com uma versão velha para recarregar (senão os dois lados não se veem direito) */
 let CLIENT_VER = '0'; function calcVer() { try { let m = 0; const walk = (d, n) => { for (const f of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, f.name); if (f.isDirectory()) { if (n < 2) walk(p, n + 1); } else { const t = fs.statSync(p).mtimeMs; if (t > m) m = t; } } }; walk(path.join(__dirname, 'public'), 0); CLIENT_VER = String(Math.round(m)); } catch (e) { } }
@@ -790,10 +792,10 @@ function doSync(user, b, ip) {
         let fx = (prev && Array.isArray(prev.fx)) ? prev.fx.filter(f => now - f.t < 2500) : [];
         if (Array.isArray(b.fx) && (!prev || !prev.fxAt || now - prev.fxAt > 120)) {
             for (const f of b.fx.slice(0, 14)) {
-                if (!f || !/^(magic|ranged|ring|flash|bolt|slash|beam|cone|burst|arrow|dmg)$/.test(f.k)) continue;
+                if (!f || !/^(magic|ranged|ring|flash|bolt|slash|beam|cone|burst|arrow|dmg|xp)$/.test(f.k)) continue;
                 const col = (typeof f.c === 'string' && /^#[0-9a-fA-F]{6}$/.test(f.c)) ? f.c : '#1abc9c';
                 const o = { k: f.k, c: col, x: coord(f.x, px), y: coord(f.y, py), tx: coord(f.tx, px), ty: coord(f.ty, py), t: now + fx.length };
-                if (f.r !== undefined) o.r = Math.max(0, Math.min(f.k === 'dmg' ? 99999 : 400, Number(f.r) || 0));
+                if (f.r !== undefined) o.r = Math.max(0, Math.min((f.k === 'dmg' || f.k === 'xp') ? 99999 : 400, Number(f.r) || 0));
                 fx.push(o);
             }
             activePlayers[user].fxAt = now;

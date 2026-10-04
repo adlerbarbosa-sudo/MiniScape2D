@@ -812,7 +812,7 @@
                 try { if (window.Net) Net.onSync(data); } catch (e) { console.error(e); }
 
                 if (window.DropSync && data.drops) { DropSync.onSync(data.drops, data.dmine); DropSync.onDep(data.dep); }
-                if (data.ver) { if (!window._srvVer) window._srvVer = data.ver; else if (data.ver !== window._srvVer && !window._verWarn) { window._verWarn = 1; try { setActionText('Nova versão do jogo no ar! Recarregue a página (Ctrl+F5) para ver tudo certo online.', '#e8c469'); } catch (e) { } } }
+                if (data.ver) { const _mine = window.__BUILD || window._srvVer; if (!window._srvVer) window._srvVer = data.ver; if (_mine && data.ver !== _mine && !window._verWarn) { window._verWarn = 1; try { setActionText('Nova versão do jogo no ar! A página vai recarregar sozinha em instantes (Ctrl+F5 para já).', '#e8c469'); } catch (e) { } setTimeout(async () => { try { await saveDataNow(true); } catch (e) { } location.reload(); }, 90000); } }
                 if (data.toggles && typeof data.toggles === 'object') window.EventToggles = data.toggles;   // eventos ligados pelo admin (Fenda, Missões Especiais)
                 if(data.players) {
                     try { if (window.RemoteFx) RemoteFx.onSync(data.players); } catch (e) { }
@@ -1107,7 +1107,7 @@
             // parte do XP que vai para a montaria equipada (0..40%, depois dos Mímicos; pets.js). O jogador fica com o resto: soma exata.
             let _mxp = 0; try { if (window.Pets && Pets.xpShare) _mxp = Pets.xpShare(finalXP) | 0; } catch (e) { console.error(e); } const gainXP = finalXP - _mxp;
             const old = Balance.levelForXp(sk.xp); sk.xp = Math.min(Balance.MAX_XP, (Number(sk.xp) || 0) + gainXP);
-            const now = performance.now(), pp = _xpPop[sK] || (_xpPop[sK] = { a: 0, t: 0 }); pp.a += gainXP; if (pp.a > 0 && now - pp.t > 1100) { addFloatingText(player.x, player.y - 20, `+${fmtNum(pp.a)} XP`, '#f1c40f'); pp.a = 0; pp.t = now; }   // 0 XP (tudo desviado para os Mímicos) não mostra popup; golpes seguidos somam num popup só
+            const now = performance.now(), pp = _xpPop[sK] || (_xpPop[sK] = { a: 0, t: 0 }); pp.a += gainXP; if (pp.a > 0 && now - pp.t > 1100) { addFloatingText(player.x, player.y - 20, `+${fmtNum(pp.a)} XP`, '#f1c40f'); try { if (window.RemoteFx) RemoteFx.out('xp', '#f1c40f', player.x, player.y - 20, player.x, player.y - 20, pp.a); } catch (e) { } pp.a = 0; pp.t = now; }   // 0 XP (tudo desviado para os Mímicos) não mostra popup; golpes seguidos somam num popup só
             const nl = Balance.levelForXp(sk.xp); sk.level = nl; sk.next = Balance.xpNext(nl); const up = nl - old;
             if (up > 0) {
                 if (sK === 'hp') { player.stats.maxHp += Balance.HP_PER_LEVEL * up; player.stats.hp = Math.min(player.stats.maxHp, player.stats.hp + Balance.HP_PER_LEVEL * up); }
