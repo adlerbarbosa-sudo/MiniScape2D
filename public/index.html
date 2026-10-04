@@ -1612,9 +1612,10 @@
         canvas.addEventListener('touchend', () => clearTimeout(_lpTimer));
         canvas.addEventListener('touchcancel', () => clearTimeout(_lpTimer));
 
-        // montaria voadora (dragão, fênix): sobrevoa objetos baixos (cercas, barris, arbustos, caixotes...); prédios, árvores, rochas e muros continuam bloqueando
+        // montaria voadora (dragão, fênix): sobrevoa objetos baixos (cercas, barris, arbustos...) e monstros/NPCs comuns; prédios, árvores, rochas, muros e chefes bloqueiam
         const FLY_LOW = new Set(['fence_h', 'fence_v', 'barrel', 'crates', 'stump', 'bush', 'haystack', 'sign', 'campfire', 'mushrooms', 'lily', 'flowers', 'gravestone', 'bones', 'reeds', 'cactus', 'torch', 'banner', 'netrack']);
-        function flyOver(o) { return !!(o && o.type === 'decor' && FLY_LOW.has(o.kind) && window.Pets && Pets.flying && Pets.flying()); }
+        function isBossMob(o) { const d = npcDB[o.dbKey]; return !!((d && d.group === 'chefe') || /boss/.test(o.dbKey || '') || (o.wb && !o.iv)); }
+        function flyOver(o) { if (!o || !window.Pets || !Pets.flying) return false; const low = o.type === 'decor' && FLY_LOW.has(o.kind), mob = (o.type === 'enemy' || o.type === 'npc') && !isBossMob(o); return (low || mob) && Pets.flying(); }   // voando: passa por cima de objetos baixos, monstros e NPCs comuns; chefes bloqueiam
         // --- PATHFINDING (A*) : o personagem contorna casas, árvores e paredes em vez de travar ---
         const PF_CELL = 16; let pfKey = ''; let pfPath = [];
         const PF_SKIP = ['ground_item','fishing_spot','farm_plot','rift_gate','rift_next','portal','fire','paint','enemy'];
