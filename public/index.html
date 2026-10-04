@@ -1477,7 +1477,7 @@
                             if(cObj.type === 'cauldron') addMenuOption(`Preparar poções`, () => setPendingAction(cObj));
                             if(cObj.type === 'enchant_table') addMenuOption(`Encantar equipamento`, () => setPendingAction(cObj));
                             if(cObj.type === 'house_door') addMenuOption(`Entrar em casa`, () => setPendingAction(cObj));
-                            if(cObj.type === 'furniture') addMenuOption(cObj.fk === 'bed' ? `Descansar` : `Examinar`, () => setPendingAction(cObj));
+                            if(cObj.type === 'furniture') addMenuOption(cObj.fk === 'bed' ? `Descansar` : (window.World2 && World2.TRAIN && World2.TRAIN[cObj.fk] ? `Treinar` : `Examinar`), () => setPendingAction(cObj));
                             if(cObj.type === 'fire') addMenuOption(`Cozinhar`, () => setPendingAction(cObj));
                             if(cObj.type === 'bank') addMenuOption(`Usar Banco`, () => setPendingAction(cObj));
                             if(cObj.type === 'portal') addMenuOption(`Entrar`, () => setPendingAction(cObj));
@@ -1695,7 +1695,7 @@
                         let tW = player.pendingAutoAction.w || 30; let pType = player.pendingAutoAction.type;
                         if (pType === 'enemy') { if (player.equipment && player.equipment.weapon && (player.equipment.weapon.tool === 'magic' || player.equipment.weapon.tool === 'ranged')) { sD = attackRange(player.equipment.weapon) - 40; } else { sD = (tW / 2) + 12; } } 
                         else if (pType === 'fishing_spot' && window.Fishing && Fishing.arrived && dist > 0 && Fishing.arrived(player.x, player.y, player.pendingAutoAction, Math.hypot(player.pendingAutoAction.x + (player.pendingAutoAction.w||46)/2 - player.x, player.pendingAutoAction.y + (player.pendingAutoAction.h||46)/2 - player.y), dx / dist, dy / dist)) sD = Infinity;
-                        else if (pType === 'ground_item') sD = 10; else if (['npc', 'tree', 'rock_copper', 'rock_tin', 'rock_iron', 'furnace', 'anvil', 'bank', 'house'].includes(pType)) { sD = (tW / 2) + 15; }
+                        else if (pType === 'ground_item') sD = 10; else if (['npc', 'tree', 'rock_copper', 'rock_tin', 'rock_iron', 'furnace', 'anvil', 'bank', 'house', 'furniture'].includes(pType)) { sD = (tW / 2) + 15; }
                     }
 
                     if (dist > sD) {
@@ -1940,7 +1940,7 @@
                     }
                 });
 
-                Art.fxDraw(ctx); if (window.Fishing) Fishing.draw(ctx, T);
+                Art.fxDraw(ctx); if (window.Fishing) Fishing.draw(ctx, T); if (window.World2 && World2.drawOverlay) World2.drawOverlay(ctx, T);
                 if (rangedTarget && rangedTarget.active) { const _rt = rangedTarget, _cx = _rt.x + (_rt.w || 30) / 2, _by = _rt.y + (_rt.h || 30); ctx.strokeStyle = 'rgba(255,90,70,0.85)'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.ellipse(_cx, _by - 1, Math.max(12, (_rt.w || 30) * 0.42) + Math.sin(T * 6) * 1.2, Math.max(4, (_rt.w || 30) * 0.14), 0, 0, 6.283); ctx.stroke(); }
                 if (Math.hypot(player.destX - player.x, player.destY - player.y) > player.speed && !player.isPerformingAction && !player.pendingAutoAction) { ctx.fillStyle = 'rgba(255, 255, 255, 0.4)'; ctx.beginPath(); ctx.arc(player.destX, player.destY, 5, 0, Math.PI*2); ctx.fill(); }
                 if (player.isPerformingAction && !(window.Fishing && Fishing.busy())) { const prg = 1 - (player.actionTimer / player.actionDelay); ctx.fillStyle = '#222'; ctx.fillRect(player.x - 15, player.y - 25, 30, 6); ctx.fillStyle = '#3498db'; ctx.fillRect(player.x - 14, player.y - 24, 28 * prg, 4); }

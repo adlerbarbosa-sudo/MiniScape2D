@@ -162,7 +162,7 @@ module.exports = function createExtras(ctx) {
             const me = user.toLowerCase();
             const isAdmin = db.users[user] && db.users[user].role === 'admin';
             if (owner !== user && !isAdmin && !h.guests.some((g) => String(g).toLowerCase() === me)) return { ok: false, error: 'Casa de ' + owner + ': você não foi convidado.' };
-            return { ok: true, owner, items: h.items.slice(0, 60), guests: owner === user ? h.guests.slice(0, 30) : undefined };
+            return { ok: true, owner, items: h.items.slice(0, 80), guests: owner === user ? h.guests.slice(0, 30) : undefined };
         }
         if (b.a === 'guests') {
             const h = houseOf(user); if (!h) return { ok: false, error: 'Aguarde alguns segundos e tente de novo.' };

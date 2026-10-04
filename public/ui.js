@@ -296,7 +296,7 @@
         if (typeof o.type === 'string' && o.type.startsWith('rock_')) return [NODE_LABEL[o.type] || 'Rocha', 'Botão direito: minerar (precisa de picareta)'];
         if (o.type === 'fishing_spot') return ['Ponto de pesca', 'Botão direito: pescar (Rede ou Vara de Pesca)'];
         if (o.type === 'house_door') return ['Minha Casa', 'Botão direito: entrar. Só você decora a sua'];
-        if (o.type === 'furniture') return [o.name || 'Móvel', o.fk === 'bed' ? 'Botão direito: descansar' : 'Peça da casa'];
+        if (o.type === 'furniture') return [o.name || 'Móvel', o.fk === 'bed' ? 'Botão direito: descansar' : (window.World2 && World2.TRAIN && World2.TRAIN[o.fk] ? 'Botão direito: treinar' : 'Peça da casa')];
         if (o.type === 'farm_plot') return ['Canteiro', 'Botão direito: plantar ou colher'];
         if (o.type === 'cauldron') return ['Caldeirão de Alquimia', 'Botão direito: preparar poções'];
         if (o.type === 'enchant_table') return ['Mesa de Encantamento', 'Botão direito: encantar equipamento'];
