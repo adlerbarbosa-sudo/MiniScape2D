@@ -449,7 +449,7 @@
     /* ===== lobo gigante e pantera: predadores detalhados (pata digitígrada, trote, cauda, cabeça própria) ===== */
     const PRED = {
         lobo_gigante: { wolf: 1, c1: '#7b828d', c2: '#d9dde3', c3: '#474d57', len: 16.5, h: 8.6, by: -21.5, seatY: -31.5, eye: '#f0be3a', nose: '#1d1d22' },
-        pantera: { wolf: 0, c1: '#2c2c35', c2: '#5a5a68', c3: '#141419', len: 20, h: 6.4, by: -16, seatY: -25.2, eye: '#b6ff3c', nose: '#8a6672' }
+        pantera: { wolf: 0, c1: '#2c2c35', c2: '#5a5a68', c3: '#141419', len: 20, h: 5.8, by: -19.4, seatY: -28, eye: '#b6ff3c', nose: '#8a6672' }
     };
     function predator(id, v, o, rider) {
         const P = PRED[id], W = P.wolf, t = o.t, mv = o.mv, ph = o.ph, c1 = P.c1, c2 = P.c2, c3 = P.c3, cd = sh(c1, -0.25);
@@ -495,10 +495,10 @@
                 g.strokeStyle = 'rgba(0,0,0,.3)'; g.lineWidth = 0.8; g.beginPath(); g.moveTo(-14, by - 3); g.quadraticCurveTo(-7, by - 2, -7, by + 5); g.stroke();
             }
             // pescoço + cabeça
-            const nod = sin(t * 1.6) * 0.4 - (mv > 0.1 ? sin(ph * 2) * 0.5 : 0), hx = L - 0.5 + (W ? 4 : 4.5), hy = by - (W ? 7.5 : 0.6) + nod;
+            const nod = sin(t * 1.6) * 0.4 - (mv > 0.1 ? sin(ph * 2) * 0.5 : 0), hx = L - 0.5 + (W ? 4 : 6.5), hy = by - (W ? 7.5 : -0.8) + nod;
             g.beginPath(); g.moveTo(L - 9, by - H - 0.8); g.quadraticCurveTo(L - 2, by - H - (W ? 1.6 : 0), hx, hy - (W ? 3.4 : 4.6)); g.lineTo(hx + 1, hy + 5); g.quadraticCurveTo(L, by + 5, L - 8, by + H - 1); g.closePath(); g.fillStyle = c1; g.fill(); g.lineWidth = 1; g.strokeStyle = OUT; g.stroke();
             if (W) { ell(L - 2.4, by + 0.5, 6.6, 7.8, c2); poly([L - 8, by + 6, L - 6.2, by + 11, L - 3.6, by + 6.6], c2, 0.9); poly([L - 4, by + 6.8, L - 1.4, by + 11.6, L + 1.6, by + 5.4], c2, 0.9); poly([L - 1, by - 5, L + 3, by - 1, L + 1, by + 3], sh(c2, 0.1), 0); }
-            g.save(); g.translate(hx, hy); g.rotate(W ? 0.12 : 0.12); if (!W) g.scale(0.95, 0.95);
+            g.save(); g.translate(hx, hy); g.rotate(W ? 0.12 : 0.26); if (!W) g.scale(1.0, 1.0);
             if (W) {
                 ell(0, 0, 6.2, 5.2, c1); ell(8.2, 1.9, 6.6, 3, c1); ell(8.6, 3.4, 5.8, 1.6, c2, 0, 0); ell(13.6, 1.2, 1.7, 1.4, P.nose, 0, 0.6);
                 g.strokeStyle = '#1d1d22'; g.lineWidth = 0.8; g.beginPath(); g.moveTo(13, 3.6); g.quadraticCurveTo(8.6, 4.8, 5, 3.4); g.stroke(); poly([10.6, 3.8, 11.6, 3.8, 11.1, 5.6], '#f2f2f2', 0.6);
@@ -506,15 +506,15 @@
                 ell(2.6, -1, 1.9, 1.3, P.eye, -0.3, 0.7); ell(2.9, -1, 0.5, 0.9, '#1d1d22', 0, 0); ell(3, 4.4, 4, 1.6, c2, 0, 0); g.strokeStyle = c3; g.lineWidth = 1; g.beginPath(); g.moveTo(5.4, -3.6); g.lineTo(9.6, -1.2); g.stroke();
             } else {
                 // cabeça de pantera (referência): cunha longa e baixa, testa->nariz quase reta, focinho claro por baixo, boca longa, olho estreito inclinado, orelhas pequenas lá atrás
-                const hp = () => { g.beginPath(); g.moveTo(-5.4, -1.4); g.quadraticCurveTo(-4.6, -6.4, -0.6, -6.4); g.quadraticCurveTo(4.6, -5.6, 9.6, -1.8); g.quadraticCurveTo(11.8, -0.4, 11.4, 2.2); g.quadraticCurveTo(11, 3.8, 9.8, 4.2); g.quadraticCurveTo(9.2, 6.2, 6.6, 6.4); g.quadraticCurveTo(2.4, 7.4, -2, 6.6); g.quadraticCurveTo(-6.8, 4, -5.4, -1.4); g.closePath(); };
+                const hp = () => { g.beginPath(); g.moveTo(-5, -1); g.quadraticCurveTo(-4.4, -5.8, 0.4, -5.9); g.quadraticCurveTo(4.6, -5.9, 7, -3.6); g.quadraticCurveTo(8.6, -2.4, 10.6, -2); g.lineTo(11.6, -1); g.quadraticCurveTo(12.4, 0.6, 11.6, 2.4); g.quadraticCurveTo(10.8, 3.6, 9.4, 3.8); g.quadraticCurveTo(9.6, 6, 6.6, 6.8); g.quadraticCurveTo(2, 8.2, -2.6, 6.6); g.quadraticCurveTo(-6.8, 3.8, -5, -1); g.closePath(); };
                 const ear = (x, y, k, col) => { g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x - 0.6 * k, y - 3.6, x - 1.8 * k, y - 5); g.quadraticCurveTo(x + 1.2 * k, y - 5.2, x + 3.4 * k, y - 0.6); g.closePath(); g.fillStyle = col; g.fill(); g.lineWidth = 0.9; g.strokeStyle = OUT; g.stroke(); };
-                ear(-7.6, -2.4, 1.15, cd); ear(-4.6, -5, 1.15, c1); g.beginPath(); g.moveTo(-4, -5.4); g.quadraticCurveTo(-4.8, -7.8, -5.4, -8.8); g.quadraticCurveTo(-3.2, -8.6, -1.8, -6.2); g.closePath(); g.fillStyle = P.nose; g.globalAlpha = 0.6; g.fill(); g.globalAlpha = 1;
-                hp(); g.fillStyle = c1; g.fill(); g.save(); hp(); g.clip(); ell(8.8, 3.8, 4.8, 3.2, sh(c1, 0.5), 0, 0); ell(0, 6, 6, 1.6, sh(c1, 0.12), 0, 0); g.restore();   // focinho/queixo mais claros
+                ear(-7.2, -2.6, 1.2, cd); ear(-4.2, -5, 1.2, c1); g.beginPath(); g.moveTo(-3.8, -5.6); g.quadraticCurveTo(-4.8, -8.6, -5.6, -10); g.quadraticCurveTo(-2.6, -9.6, -1.2, -6.2); g.closePath(); g.fillStyle = P.nose; g.globalAlpha = 0.6; g.fill(); g.globalAlpha = 1;
+                hp(); g.fillStyle = c1; g.fill(); g.save(); hp(); g.clip(); ell(9, 3.8, 4.2, 3.6, sh(c1, 0.5), 0, 0); ell(0, 6.4, 6, 1.8, sh(c1, 0.12), 0, 0); g.restore();   // focinho/queixo mais claros
                 hp(); g.lineWidth = 1; g.lineJoin = 'round'; g.strokeStyle = OUT; g.stroke();
-                g.strokeStyle = 'rgba(215,215,230,.55)'; g.lineWidth = 0.8; g.lineCap = 'round'; g.beginPath(); g.moveTo(-3, -6.1); g.quadraticCurveTo(4, -5.3, 9.6, -2); g.stroke();   // brilho da testa
-                ell(11, 0.6, 1, 1.4, '#15101e', 0, 0.6);                                           // nariz
-                g.strokeStyle = '#0a0612'; g.lineWidth = 0.8; g.beginPath(); g.moveTo(10.8, 3.2); g.quadraticCurveTo(7.4, 4.4, 3.8, 4.8); g.quadraticCurveTo(2.8, 4.9, 2.4, 5.6); g.stroke();   // boca longa
-                glow(3.8, -2.4, 8, 'rgba(190,255,70,A)', 0.85); g.beginPath(); g.moveTo(1, -3.4); g.quadraticCurveTo(3.8, -5, 6.6, -2); g.quadraticCurveTo(3.8, -1.6, 1, -3.4); g.closePath(); g.fillStyle = P.eye; g.fill(); g.lineWidth = 0.7; g.strokeStyle = OUT; g.stroke(); ell(4, -2.8, 0.7, 1.1, '#0a0612', 0, 0);
+                g.strokeStyle = 'rgba(215,215,230,.55)'; g.lineWidth = 0.8; g.lineCap = 'round'; g.beginPath(); g.moveTo(-2.6, -5.9); g.quadraticCurveTo(3.4, -6.3, 7.4, -3.9); g.stroke();   // brilho da testa
+                ell(11.4, 0.1, 1.1, 1.4, '#15101e', 0, 0.6);                                           // nariz
+                g.strokeStyle = '#0a0612'; g.lineWidth = 0.8; g.beginPath(); g.moveTo(10, 3.4); g.quadraticCurveTo(6.6, 4.8, 3.6, 5); g.quadraticCurveTo(2.6, 5.1, 2.2, 5.8); g.stroke();   // boca longa
+                glow(4, -2.6, 5, 'rgba(190,255,70,A)', 0.6); g.beginPath(); g.moveTo(1.6, -3.4); g.quadraticCurveTo(4, -5, 6.4, -2.6); g.quadraticCurveTo(4, -1.8, 1.6, -3.4); g.closePath(); g.fillStyle = P.eye; g.fill(); g.lineWidth = 0.7; g.strokeStyle = OUT; g.stroke(); ell(4.1, -3, 0.6, 0.95, '#0a0612', 0, 0);
             }
             g.restore();
             // pernas perto
