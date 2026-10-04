@@ -41,6 +41,16 @@
             }
         },
         draw(ctx) {
+            if (on && typeof otherPlayers !== 'undefined' && typeof Quality !== 'undefined' && Quality.level > 0) {
+                const f = (performance.now() / 16) | 0;
+                for (const u in otherPlayers) {
+                    const o = otherPlayers[u]; if (!o || !o.au || o.map !== currentMap) continue; const x = o.displayX !== undefined ? o.displayX : o.x, y = o.displayY !== undefined ? o.displayY : o.y;
+                    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+                    if (o.au.f) { ctx.globalAlpha = 0.28 + 0.12 * Math.sin(f / 6); ctx.strokeStyle = o.au.f; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(x, y + 4, 17 + Math.sin(f / 8) * 2, 8, 0, 0, 6.3); ctx.stroke(); const g = ctx.createLinearGradient(0, y + 4, 0, y - 30); g.addColorStop(0, o.au.f); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.globalAlpha = 0.14; ctx.fillStyle = g; ctx.fillRect(x - 15, y - 30, 30, 34); }
+                    if (o.au.b) { ctx.globalAlpha = 0.22 + 0.1 * Math.sin(f / 7); ctx.fillStyle = o.au.b; ctx.beginPath(); ctx.ellipse(x, y - 14, 20, 28, 0, 0, 6.3); ctx.fill(); ctx.globalAlpha = 0.6; ctx.strokeStyle = o.au.b; ctx.lineWidth = 1.5; ctx.stroke(); }
+                    ctx.restore();
+                }
+            }
             for (const p of live) {
                 if (p.st) { const u = p.age / 22, a = 1 - u; ctx.save(); ctx.globalAlpha = a * 0.9; ctx.strokeStyle = p.c; ctx.fillStyle = p.c; ctx.lineCap = 'round';
                     if (p.k === 'ring') { const rr = p.r * (1 - (1 - u) * (1 - u)); ctx.lineWidth = 4 * a + 1; ctx.beginPath(); ctx.ellipse(p.x, p.y, rr, rr * 0.58, 0, 0, 6.3); ctx.stroke(); }

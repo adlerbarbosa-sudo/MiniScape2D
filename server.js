@@ -782,6 +782,7 @@ function doSync(user, b, ip) {
         look: (b.look !== undefined && cleanLook(b.look)) || (prev ? prev.look : null) || savedLook(user),
         pet: b.pet !== undefined ? extras.cleanPetSync(b.pet) : (prev ? prev.pet : null), mount: b.mount !== undefined ? extras.cleanMountId(b.mount) : (prev ? prev.mount : null), ms: b.ms !== undefined ? extras.cleanMountStage(b.ms) : (prev ? prev.ms : 0) };
     if (typeof b.emote === 'string' && /^[a-z]{2,10}$/.test(b.emote) && (!prev || !prev.emote || now - prev.emote.t > 1500)) activePlayers[user].emote = { k: b.emote, t: now };
+    try { if (b.au !== undefined) { const a = b.au, hx = (v) => (typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v)) ? v : null; activePlayers[user].au = (a && typeof a === 'object' && (hx(a.b) || hx(a.f))) ? { b: hx(a.b), f: hx(a.f) } : null; } else if (prev && prev.au) activePlayers[user].au = prev.au; } catch (e) { }
     try { if (b.tr !== undefined) { const t = b.tr; activePlayers[user].tr = (t && typeof t === 'object' && /^(dummy|archery|punchbag|library|hottub)$/.test(t.k)) ? { k: t.k, fx: Math.max(-1, Math.min(1, num(t.fx) | 0)), fy: Math.max(-1, Math.min(1, num(t.fy) | 0)) } : null; } else if (prev && prev.tr) activePlayers[user].tr = prev.tr; } catch (e) { }
     try {   // magias/flechas: eventos curtos só para os outros jogadores desenharem (sem efeito no jogo)
         let fx = (prev && Array.isArray(prev.fx)) ? prev.fx.filter(f => now - f.t < 2500) : [];

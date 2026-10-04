@@ -146,9 +146,11 @@
     // XP de grupo: quem causa dano repassa o XP base; juntamos por 1,2 s e mandamos num pedido só
     let _px = {}, _pxT = 0;
     window.partyShareXp = function (sk, x) {
-        if (!S.party || S.party.members.length < 2 || !(x > 0)) return; _px[sk] = (_px[sk] || 0) + x;
-        if (_pxT) return; _pxT = setTimeout(() => { const o = _px; _px = {}; _pxT = 0; Object.keys(o).forEach((k) => { socialCall('party_xp', { s: k, x: Math.round(o[k]) }, true).catch(() => { }); }); }, 1200);
+        if (!S.party || S.party.members.length < 2 || !(x > 0)) return 0; _px[sk] = (_px[sk] || 0) + x;
+        if (_pxT) return groupNear(); _pxT = setTimeout(() => { const o = _px; _px = {}; _pxT = 0; Object.keys(o).forEach((k) => { socialCall('party_xp', { s: k, x: Math.round(o[k]) }, true).catch(() => { }); }); }, 1200);
+        return groupNear();
     };
+    function groupNear() { let c = 0; try { S.party.members.forEach((m) => { const o = otherPlayers[m.u]; if (m.u !== window.currentUser && o && o.map === currentMap && Math.hypot((o.x || 0) - player.x, (o.y || 0) - player.y) < 1100) c++; }); } catch (e) { } return c; }
     function place() {
         const c = document.getElementById('gameCanvas'); const r = c ? c.getBoundingClientRect() : { right: window.innerWidth - 20, top: 10 };
         if (btn) { btn.style.left = Math.max(8, r.right - 118) + 'px'; btn.style.top = (r.top + 66) + 'px'; }
