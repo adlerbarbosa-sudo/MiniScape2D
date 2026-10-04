@@ -505,16 +505,16 @@
                 poly([-2.4, -3.8, -3.6, -10.6, 2, -4.6], c1, 0.9); poly([-2, -4.2, -2.8, -8.4, 0.8, -4.8], '#caa0a0', 0); poly([-4.6, -3, -7, -8.4, -1, -4.4], cd, 0.9);
                 ell(2.6, -1, 1.9, 1.3, P.eye, -0.3, 0.7); ell(2.9, -1, 0.5, 0.9, '#1d1d22', 0, 0); ell(3, 4.4, 4, 1.6, c2, 0, 0); g.strokeStyle = c3; g.lineWidth = 1; g.beginPath(); g.moveTo(5.4, -3.6); g.lineTo(9.6, -1.2); g.stroke();
             } else {
-                // cabeça de pantera: crânio largo, focinho em bloco, mandíbula forte, testa com arcada, orelhas curtas em pé
-                ell(-1.4, 3, 5.6, 3.4, sh(c1, 0.03));                                                  // bochecha / mandíbula
-                ell(0, 0, 6.4, 5.4, c1); rr(3, -0.8, 8, 5.6, 2.6, sh(c1, 0.06)); ell(8.6, 4.8, 3, 1.5, c1);   // crânio, focinho, queixo
-                poly([9.2, -0.8, 11.8, -0.4, 11.4, 1.8, 9.6, 1.8], P.nose, 0.8);                      // nariz largo
-                g.strokeStyle = '#0a0612'; g.lineWidth = 0.8; g.lineCap = 'round'; g.beginPath(); g.moveTo(10.6, 1.8); g.lineTo(10.2, 3.4); g.quadraticCurveTo(7, 4.4, 3.6, 3.8); g.stroke();
-                poly([9.4, 3.5, 10.4, 3.4, 9.9, 5.4], '#f6f2ff', 0.5); poly([6.6, 3.9, 7.5, 3.9, 7, 5.3], '#f6f2ff', 0.4);   // presas
-                poly([-3.4, -4, -4, -9.6, 1.6, -5], c1, 0.9); poly([-3, -4.8, -3.4, -8.2, 0.6, -5.4], P.nose, 0); poly([-6.2, -3.2, -7.4, -8.6, -3.4, -4.2], cd, 0.9);   // orelhas
-                glow(3, -1.4, 6.5, 'rgba(255,230,90,A)', 0.65); ell(3.2, -1.4, 2.4, 1.2, P.eye, -0.22, 0.7); ell(3.5, -1.4, 0.45, 1.05, '#0a0612', 0, 0);   // olho em amêndoa
-                g.strokeStyle = c3; g.lineWidth = 1.5; g.beginPath(); g.moveTo(0.4, -3.4); g.lineTo(6.2, -2.4); g.stroke();   // arcada (olhar feroz)
-                ell(-0.8, -3.6, 2.6, 0.7, c2, 0.15, 0);
+                // cabeça de pantera: perfil liso (testa -> focinho curvo), orelhas curtas arredondadas, olho em amêndoa brilhante
+                const hp = () => { g.beginPath(); g.moveTo(-5, -3.2); g.quadraticCurveTo(-3, -5.8, 1.5, -5.2); g.quadraticCurveTo(6, -4.4, 9.4, -1.2); g.quadraticCurveTo(11.8, 0, 11.6, 1.8); g.quadraticCurveTo(11, 3.2, 9.4, 3.6); g.quadraticCurveTo(8.4, 5.6, 5.6, 5.8); g.quadraticCurveTo(1, 6.8, -3, 5.2); g.quadraticCurveTo(-6.6, 2.4, -5, -3.2); g.closePath(); };
+                const ear = (x, y, k, col) => { g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x - 0.4 * k, y - 3.6, x - 1.6 * k, y - 5.2); g.quadraticCurveTo(x + 1.2 * k, y - 5.4, x + 3.6 * k, y - 0.8); g.closePath(); g.fillStyle = col; g.fill(); g.lineWidth = 0.9; g.strokeStyle = OUT; g.stroke(); };
+                ear(-6.8, -2.4, 1.25, cd); ear(-3.4, -4.2, 1.25, c1); g.beginPath(); g.moveTo(-2.6, -4.6); g.quadraticCurveTo(-3.4, -7, -4, -8); g.quadraticCurveTo(-1.8, -7.8, -0.4, -5.2); g.closePath(); g.fillStyle = P.nose; g.globalAlpha = 0.7; g.fill(); g.globalAlpha = 1;
+                hp(); g.fillStyle = c1; g.fill(); g.lineWidth = 1; g.lineJoin = 'round'; g.strokeStyle = OUT; g.stroke();
+                ell(1.6, 2.8, 3.2, 1.8, sh(c1, 0.1), 0, 0);                                            // bochecha
+                g.strokeStyle = 'rgba(190,160,255,.55)'; g.lineWidth = 0.8; g.lineCap = 'round'; g.beginPath(); g.moveTo(-3.6, -4.8); g.quadraticCurveTo(1.5, -5, 8.8, -1.6); g.stroke();   // brilho na testa
+                ell(11, 0.7, 1.5, 1.1, P.nose, 0, 0.7);                                                // nariz
+                g.strokeStyle = '#0a0612'; g.lineWidth = 0.8; g.beginPath(); g.moveTo(10.4, 2.8); g.quadraticCurveTo(7.8, 4, 5.4, 3.6); g.stroke();   // boca
+                glow(3.8, -1.2, 8, 'rgba(255,235,90,A)', 0.85); g.beginPath(); g.moveTo(1, -0.6); g.quadraticCurveTo(3.4, -3.4, 6.8, -1.2); g.quadraticCurveTo(3.8, 0.3, 1, -0.6); g.closePath(); g.fillStyle = P.eye; g.fill(); g.lineWidth = 0.7; g.strokeStyle = OUT; g.stroke(); ell(4, -1.3, 0.6, 1.1, '#0a0612', 0, 0);
             }
             g.restore();
             // pernas perto
