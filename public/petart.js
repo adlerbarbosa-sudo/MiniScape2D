@@ -383,9 +383,104 @@
         glow(0, -(big ? 22 : 20), r, 'rgba(' + col + ',A)', (st >= 3 ? 0.42 : 0.24) + sin(t * 3) * 0.04);
         if (st >= 3) { for (let i = 0; i < 7; i++) { const p = (t * 0.5 + i / 7) % 1, a = i * 2.4 + t; g.fillStyle = 'rgba(' + col + ',' + (0.85 * (1 - p)) + ')'; g.fillRect(sin(a) * (14 + p * 8) - 0.8, -6 - p * 36, 1.8, 1.8); } }
     }
+    /* =================== DRAGÃO (montaria): cresce por estágio — filhote (0), jovem (1), crescido (2), adulto (3) =================== */
+    const DPAL = [
+        { c: '#5fbf76', d: '#337a4a', bel: '#f2e4a8', wm: '#8fd9a0', wb: '#3d8a55', horn: '#f3e8c4', eye: '#ffe27a', sp: '#e8d28a' },
+        { c: '#45a45f', d: '#27663c', bel: '#ecd890', wm: '#6fc486', wb: '#2f7048', horn: '#eadcaa', eye: '#ffd24a', sp: '#e0c474' },
+        { c: '#2f8d4f', d: '#1c5a34', bel: '#e2c878', wm: '#3f9c66', wb: '#d9b45a', horn: '#e6d089', eye: '#ffc23a', sp: '#e6bf5a' },
+        { c: '#1f7048', d: '#10412a', bel: '#dcb85c', wm: '#1f6a5c', wb: '#e6c25a', horn: '#efd68a', eye: '#ffb02a', sp: '#f0c64a' }
+    ];
+    const DK = [0.8, 0.93, 1.07, 1.22], DHORN = [4, 7.5, 12, 17], DSPK = [1.8, 3, 4.4, 6], DHS = [1.22, 1.1, 1.02, 1.0], DWS = [0.72, 0.86, 1.0, 1.22];
+    function dWing(S, E, W, tips, back, P, near) {   // asa de dragão: membrana + braço e dedos ósseos
+        const pts = [S[0], S[1], E[0], E[1], W[0], W[1]]; tips.forEach((t) => { pts.push(t[0], t[1]); }); pts.push(back[0], back[1]);
+        poly(pts, near ? P.wm : sh(P.wm, -0.28), 1);
+        g.globalAlpha = 0.5; tips.forEach((t) => ln(W[0], W[1], t[0], t[1], 0.9, P.wb)); g.globalAlpha = 1;
+        ln(S[0], S[1], E[0], E[1], 2.6, P.wb); ln(E[0], E[1], W[0], W[1], 2, P.wb);
+        poly([W[0] - 1.5, W[1] + 1, W[0] + 0.6, W[1] - 5, W[0] + 1.6, W[1] + 0.5], P.horn, 0.7);
+    }
+    function dHeadSide(P, st, t) {   // origem no centro do crânio, olhando para +x
+        const hl = DHORN[st], jaw = 0.7 + sin(t * 2) * 0.3;
+        poly([-3, -4.6, -hl, -5 - hl * 0.55, -hl * 0.72, -3.6, -5.5, -1.5], P.horn, 0.9);   // chifre grande, curvado para trás
+        if (st >= 2) poly([-3.5, -2.4, -hl * 0.65, -2.2 - hl * 0.25, -5.5, 0.4], sh(P.horn, -0.12), 0.8);
+        ell(0, 0, 7.4, 6, P.c);
+        poly([3, -3.4, 13.5, -1.6, 14.5, 2.4, 12.5, 5.2, 3, 5.6], P.c, 1);   // focinho
+        ell(7, -3.4, 4.5, 1.6, sh(P.c, 0.12), -0.12, 0);
+        poly([2, 4.4, 12, 5.2, 11, 8 + jaw, 3.2, 8.6], sh(P.c, -0.22), 1);   // mandíbula
+        g.fillStyle = '#fbf6e6'; for (let i = 0; i < 4; i++) poly([5 + i * 2, 5.2, 6 + i * 2, 7.4 + jaw * 0.5, 7 + i * 2, 5.2], '#fbf6e6', 0.4);
+        ell(12.4, -0.5, 1, 0.8, '#1a0f0a', 0, 0);   // narina
+        poly([-4, 3, -10.5, 7.5, -3, 7], P.horn, 0.8);   // espinho da bochecha
+        ell(2.2, -2.6, 2.1, 1.7, P.eye, 0, 0.9); g.fillStyle = '#16100a'; g.fillRect(2, -4.2, 0.9, 3.3);   // olho de fenda
+        poly([-1.4, -5.6, 5.6, -3.4, 5.6, -2.2, -1.4, -3.8], sh(P.c, -0.45), 0.9);   // sobrancelha feroz
+        if (st >= 3) for (let i = 0; i < 3; i++) poly([-5 - i * 2.4, -4 + i * 1.5, -9 - i * 2.4, -7 + i * 2.2, -7 - i * 2.4, -2 + i * 1.2], sh(P.sp, -0.1 * i), 0.7);   // crista
+    }
+    function dragonMount(v, o, rider) {
+        const st = Math.max(0, Math.min(3, o.stage | 0)), P = DPAL[st], K = DK[st], t = o.t, mv = o.mv, ph = o.ph, WS = DWS[st];
+        const hov = 6 + sin(t * 3) * 1.6 + (mv > 0.1 ? 1.4 : 0), flap = sin(t * (mv > 0.1 ? 9 : 4.2)), cy = -25 - hov;
+        const seat = { x: (v === 'side' ? -1 : 0) * K, y: (cy - 7.5) * K };
+        g.save(); shadow(20 * K * (1 - hov * 0.012), 0.3 - hov * 0.006); g.scale(K, K);
+        const sp = DSPK[st], legSw = mv > 0.1 ? sin(ph) * 3.2 : 0;
+        const claw = (x, y, s) => { for (let i = -1; i <= 1; i++) poly([x + i * 1.6 * s - 0.7, y, x + i * 1.9 * s, y + 3.2, x + i * 1.6 * s + 0.7, y], P.horn, 0.5); };
+        const saddle = (x, y, w) => { rr(x - w / 2, y, w, 3.4, 1.6, '#6b3a1c', 0.8); rr(x - w / 2 + 1, y + 0.6, w - 2, 1.2, 0.6, '#b8863f', 0); };
+        if (v === 'side') {
+            const bx = 0;
+            dWing([-2, cy - 7], [-12 * WS - 2, cy - 21 * WS - flap * 4], [-27 * WS, cy - 30 * WS - flap * 9], [[-44 * WS, cy - 20 * WS - flap * 6], [-40 * WS, cy - 8 * WS - flap * 3], [-32 * WS, cy]], [-12, cy - 1], P, false);   // asa de trás
+            const tw = sin(t * 2.5) * 3; qc(-14, cy + 1, -30, cy + 9 + tw, -43, cy + 3 + tw * 1.4, 6, P.c); qc(-43, cy + 3 + tw * 1.4, -50, cy + 0 + tw * 1.4, -55, cy + 4 + tw * 1.6, 3, P.c);
+            poly([-52, cy + 4 + tw * 1.6, -62, cy - 1 + tw * 1.6, -58, cy + 6 + tw * 1.6, -62, cy + 9 + tw * 1.6], P.d, 1);   // ponta da cauda
+            if (st >= 2) for (let i = 0; i < 4; i++) poly([-18 - i * 8, cy - 1 + (i > 1 ? tw * 0.4 : 0), -20 - i * 8, cy - 4.4 - i * 0.4, -23 - i * 8, cy + 0.4], P.sp, 0.6);
+            // pernas de trás e de frente (distantes)
+            const leg = (hx, hy, fx, fy, w, c) => { const kx = (hx + fx) / 2 + 2.2, ky = (hy + fy) / 2 - 1; ln(hx, hy, kx, ky, w, c); ln(kx, ky, fx, fy, w * 0.78, c); claw(fx + 0.5, fy - 0.4, 0.8); };
+            leg(-9, cy + 6, -10 + legSw, cy + 21, 4.6, sh(P.d, -0.15)); leg(10, cy + 5, 12 - legSw, cy + 20, 3.8, sh(P.d, -0.15));
+            // corpo
+            ell(0, cy, 17.5, 9.2, P.c, 0, 1.1); ell(1, cy + 4.2, 14.5, 5.2, P.bel, 0, 0); g.globalAlpha = 0.35; for (let i = -3; i <= 3; i++) ln(i * 4 + 1, cy + 1.6, i * 4 + 1, cy + 8, 0.7, sh(P.bel, -0.4)); g.globalAlpha = 1;
+            for (let i = 0; i < 7; i++) poly([-13 + i * 3.8, cy - 8 - (i % 2) * 0.4, -12 + i * 3.8, cy - 9.2 - sp, -10.4 + i * 3.8, cy - 7.4], P.sp, 0.6);   // espinhos do dorso
+            ell(-9, cy + 3.5, 7.4, 7.6, P.c, 0, 1);   // coxa
+            // pescoço e cabeça
+            const nk = sin(t * 1.6) * 1, hx = 25, hy = cy - 20 + nk;
+            g.lineCap = 'round'; g.strokeStyle = OUT; g.lineWidth = 9.6; g.beginPath(); g.moveTo(9, cy - 3); g.quadraticCurveTo(19, cy - 6, hx - 3, hy + 3); g.stroke(); g.strokeStyle = P.c; g.lineWidth = 8; g.stroke();
+            g.strokeStyle = P.bel; g.lineWidth = 3.4; g.beginPath(); g.moveTo(10.5, cy - 0.6); g.quadraticCurveTo(19.5, cy - 3, hx - 2, hy + 6); g.stroke();
+            for (let i = 0; i < 4; i++) poly([6 + i * 4.4, cy - 7.6 - i * 2.4, 7.6 + i * 4.4, cy - 9.6 - sp * 0.8 - i * 2.4, 9 + i * 4.4, cy - 7.4 - i * 2.4], P.sp, 0.6);
+            g.save(); g.translate(hx, hy); const hs = DHS[st]; g.scale(hs, hs); dHeadSide(P, st, t); g.restore();
+            // sela e cavaleiro
+            saddle(seat.x / K, cy - 8.8, 14);
+            dWing([0, cy - 8], [-9 * WS, cy - 23 * WS - flap * 5], [-23 * WS, cy - 33 * WS - flap * 10], [[-40 * WS, cy - 24 * WS - flap * 7], [-36 * WS, cy - 11 * WS - flap * 3], [-28 * WS, cy - 1]], [-11, cy - 2], P, true);   // asa da frente (atrás do cavaleiro)
+            g.restore(); if (rider) rider(seat); g.save(); g.scale(K, K);
+            // asa da frente e pernas próximas
+
+            leg(-8, cy + 7, -9 - legSw, cy + 22, 5.2, P.c); leg(9, cy + 6, 11 + legSw, cy + 21, 4.2, P.c);
+        } else {
+            const fb = v === 'back';
+            const wing = (sg) => dWing([sg * 8, cy - 6], [sg * (20 * WS + 4), cy - 17 * WS - flap * 5], [sg * (34 * WS + 4), cy - 25 * WS - flap * 11], [[sg * (47 * WS + 4), cy - 9 * WS - flap * 7], [sg * (42 * WS + 4), cy + 4 * WS - flap * 3], [sg * (30 * WS + 4), cy + 7 * WS]], [sg * 10, cy + 4], P, sg > 0);
+            wing(-1); wing(1);
+            if (!fb) { g.restore(); if (rider) rider(seat); g.save(); g.scale(K, K); }
+            // cauda atrás (de costas vai pelo centro)
+            if (fb) { const tw = sin(t * 2.5) * 3; qc(0, cy + 6, tw, cy + 20, tw * 1.4, cy + 27, 6, P.c); poly([tw * 1.4 - 4, cy + 26, tw * 1.4, cy + 36, tw * 1.4 + 4, cy + 26], P.d, 1); }
+            const leg = (x, fx, w, c) => { ln(x, cy + 8, x * 1.05 + (x > 0 ? 1 : -1) * 1.5, cy + 15, w, c); ln(x * 1.05 + (x > 0 ? 1 : -1) * 1.5, cy + 15, fx, cy + 22, w * 0.8, c); claw(fx, cy + 21.5, 0.9); };
+            leg(-9, -10 + legSw, 4.6, sh(P.d, -0.1)); leg(9, 10 - legSw, 4.6, sh(P.d, -0.1));
+            ell(0, cy, fb ? 13 : 11.5, fb ? 9 : 11, P.c, 0, 1.1);
+            if (fb) { ell(-10.5, cy + 4.5, 6, 6.6, P.c, 0, 1); ell(10.5, cy + 4.5, 6, 6.6, P.c, 0, 1); for (let i = 0; i < 6; i++) poly([-2.2, cy - 8 + i * 3.2, 0, cy - 10 - sp + i * 3.2, 2.2, cy - 8 + i * 3.2], P.sp, 0.6); }
+            else { ell(0, cy + 2.4, 7.6, 8.6, P.bel, 0, 0); g.globalAlpha = 0.35; for (let i = 0; i < 5; i++) ln(-6, cy - 3 + i * 3, 6, cy - 3 + i * 3, 0.7, sh(P.bel, -0.4)); g.globalAlpha = 1;
+                const fl = (x) => { ln(x, cy + 5, x * 1.12, cy + 14, 4.6, P.c); ln(x * 1.12, cy + 14, x * 1.08, cy + 21, 3.6, P.c); claw(x * 1.08, cy + 20.5, 0.9); }; fl(-8.4); fl(8.4);
+                // pescoço e cabeça de frente
+                const hy = cy - 21 + sin(t * 1.6) * 0.8;
+                ell(0, cy - 11, 6.4, 8.6, P.c, 0, 1); ell(0, cy - 11, 3.6, 7.8, P.bel, 0, 0);
+                g.save(); g.translate(0, hy); const hs = DHS[st]; g.scale(hs, hs);
+                for (const s2 of [-1, 1]) { const hl = DHORN[st]; poly([s2 * 3.6, -5, s2 * (5 + hl * 0.55), -6 - hl * 0.75, s2 * (hl * 0.36 + 7), -4 - hl * 0.5, s2 * 6.4, -2], P.horn, 0.9); poly([s2 * 6.4, 2, s2 * 12.5, 5.6, s2 * 5.8, 5.8], P.horn, 0.8); }
+                ell(0, 0, 8.4, 6.8, P.c, 0, 1.1); ell(0, 3.4, 5.4, 4.6, sh(P.c, 0.1), 0, 1); ell(-1.8, 2.8, 0.9, 0.7, '#1a0f0a', 0, 0); ell(1.8, 2.8, 0.9, 0.7, '#1a0f0a', 0, 0);
+                poly([-4, 6.4, 0, 8.8 + sin(t * 2) * 0.4, 4, 6.4, 2.5, 5.2, -2.5, 5.2], sh(P.c, -0.2), 0.9); poly([-2.6, 6.2, -1.9, 8, -1.2, 6.2], '#fbf6e6', 0.4); poly([2.6, 6.2, 1.9, 8, 1.2, 6.2], '#fbf6e6', 0.4);
+                for (const s2 of [-1, 1]) { ell(s2 * 4.4, -2.4, 1.9, 1.5, P.eye, s2 * -0.3, 0.9); g.fillStyle = '#16100a'; g.fillRect(s2 * 4.4 - 0.4, -4, 0.9, 3.2); poly([s2 * 1, -2.4, s2 * 7.4, -5.6, s2 * 7.4, -4, s2 * 1, -0.8], sh(P.c, -0.45), 0.9); }
+                if (st >= 3) for (let i = -2; i <= 2; i++) poly([i * 2.4 - 1, -6, i * 2.8, -10.5 - (2 - Math.abs(i)) * 1.6, i * 2.4 + 1, -6], P.sp, 0.6);
+                g.restore();
+                saddle(0, cy - 12, 15);
+            }
+        }
+        g.restore();
+        if (v === 'back') { if (rider) rider(seat); }
+        return seat;
+    }
     const MOUNT_FN = {};
     Object.keys(HORSES).forEach((k) => { MOUNT_FN[k] = (v, o, r) => { aura(k, o.stage | 0, o.t, false); return horse(stg(HORSES[k], o.stage | 0, k), v, o, r); }; });
     Object.keys(BIG).forEach((k) => { MOUNT_FN[k] = (v, o, r) => { const st = o.stage | 0; aura(k, st, o.t, true); const seat = bigQuad(k, v, o, r); if (st >= 1) tackBig(v, seat, k, st, o.t); return seat; }; });
+    MOUNT_FN.dragao = (v, o, r) => { aura('dragao', o.stage | 0, o.t, true); return dragonMount(v, o, r); };
     function tackBig(v, seat, id, st, t) {   // arreios dos quadrúpedes grandes (por cima do corpo; o cavaleiro já foi desenhado)
         const tc = '#5a2f14', y0 = seat.y + 3;
         if (v === 'side') { ln(seat.x - 6, y0 + 1, seat.x - 7, y0 + 13, 1.8, tc); ln(seat.x + 5, y0 + 1, seat.x + 7, y0 + 13, 1.8, tc); ell(seat.x + 6.4, y0 + 7, 1.3, 1.3, '#e6c25a', 0, 0.4); if (st >= 3 && id !== 'dragao') { for (let i = 0; i < 4; i++) poly([seat.x - 10 + i * 3, y0 + 2, seat.x - 9 + i * 3, y0 - 3 - (id === 'dragao' ? 2 : 0), seat.x - 8 + i * 3, y0 + 2], '#ffd24a', 0.6); } }
@@ -402,7 +497,7 @@
     function mount(ctx, id, x, y, o, rider) {
         const f = MOUNT_FN[id]; g = ctx; o = o || {};
         const stage = Math.max(0, Math.min(3, o.stage | 0)), oo = { t: o.t || 0, ph: o.ph || 0, mv: o.mv || 0, stage };
-        const v = o.view || 'side', fl = v === 'side' && o.flip < 0 ? -1 : 1, sc = (o.scale || 1) * (id === 'dragao' ? 1 + stage * 0.05 : 1);   // o dragão cresce até +15% (só visual: a hitbox não muda)
+        const v = o.view || 'side', fl = v === 'side' && o.flip < 0 ? -1 : 1, sc = o.scale || 1;   // o dragão cresce por estágio dentro do próprio desenho (dragonMount); a hitbox não muda
         let seat = { x: 0, y: -30 };
         const M = g.getTransform();
         g.save(); g.translate(x, y); if (sc !== 1) g.scale(sc, sc); if (fl < 0) g.scale(-1, 1);

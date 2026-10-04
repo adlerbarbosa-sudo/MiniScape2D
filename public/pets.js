@@ -61,7 +61,7 @@
     const MSTAGE_DESC = { cav_marrom: ['Arreios de couro', 'Armadura de cavalo de guerra e aura', 'Penacho e aura forte com faíscas'], cav_branco: ['Arreios de couro', 'Armadura de cavalo de guerra e aura', 'Penacho e aura forte com faíscas'],
         cav_guerra: ['Arreios reforçados', 'Aura de guerra', 'Penacho e aura forte com faíscas'], lobo_gigante: ['Arreios', 'Aura gélida', 'Crista dourada e aura forte'], pantera: ['Arreios', 'Aura sombria', 'Crista dourada e aura forte'],
         cav_esqueleto: ['Arreios', 'Aura espectral', 'Aura espectral forte'], cav_fogo: ['Arreios', 'Rastro de brasas e aura', 'Penacho e aura forte'], unicornio: ['Arreios dourados', 'Aura de brilho', 'Penacho e aura forte'],
-        dragao: ['Arreios e +5% de tamanho', 'Aura e +10% de tamanho', '+15% de tamanho e aura forte'] };
+        dragao: ['Dragão jovem: cresce, asas maiores e chifres', 'Dragão crescido: espinhos dourados e aura', 'Dragão adulto: enorme, asas largas, crista e aura forte'] };
     const MODES = { follow: 'Seguir apenas', attack: 'Atacar (ajuda na luta)', items: 'Coletar itens', coins: 'Coletar só moedas', all: 'Coletar tudo' };
     const petItem = (id) => 'Pet ' + PETS[id][0], mountItem = (id) => 'Sela ' + MOUNTS[id][0];
     const dropMul = { v: 1 };   // multiplicador global de chance (balanceamento)
