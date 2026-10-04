@@ -94,13 +94,23 @@
         return o;
     }
     // reconstrói as peças da casa (só as do jogador local) dentro do mapa 'casa'
+    /* ---- a sala: paredes de verdade (sólidas), janelas, lareira, piso de tábuas. Montada aqui (nunca salva): vale para todas as casas ---- */
+    const HB = { x0: 60, y0: 156, x1: 840, y1: 556 };   // área do piso onde cabem móveis
+    function roomEntities() {
+        const W = (id, x, y, w, h) => ({ id: 'hf_w_' + id, hf: true, type: 'house_wall', name: 'Parede', x, y, w, h, active: true });
+        return [{ id: 'hf_room', hf: true, type: 'paint', room: true, name: 'Casa', color: '#2a1d12', x: 0, y: 0, w: 900, h: 640, active: true },
+            W('top', 30, 30, 840, 124), W('left', 30, 30, 32, 560), W('right', 838, 30, 32, 560), W('bl', 30, 560, 392, 30), W('br', 478, 560, 392, 30),
+            W('fire', 410, 100, 80, 56), W('out', 30, 620, 840, 20), W('outl', 30, 590, 392, 30), W('outr', 478, 590, 392, 30)];
+    }
     function refreshHouse() {
         const m = gameMaps && gameMaps.casa; if (!m) return;
         m.entities = (m.entities || []).filter((o) => o && !o.hf);
+        roomEntities().forEach((e) => m.entities.push(e));
         const items = (hctx && hctx.owner !== me()) ? hctx.items : houseData().items;
+        if (!(hctx && hctx.owner !== me())) items.forEach((it) => { const f = FURN[it.k]; if (!f) return; const sz = sizeOf(it.k, it.r | 0); it.x = Math.max(HB.x0, Math.min(HB.x1 - sz[0], it.x)); it.y = Math.max(HB.y0, Math.min(HB.y1 - sz[1], it.y)); });   // casas antigas (sem parede) são ajustadas para dentro da sala nova
         items.forEach((it, i) => { const e = furnEntity(it, i); if (e) m.entities.push(e); });
     }
-    function inHouseBounds(m, x, y, w, h) { return x > 60 && y > 60 && x + w < (m.width || 900) - 60 && y + h < (m.height || 640) - 90; }
+    function inHouseBounds(m, x, y, w, h) { return x >= HB.x0 && y >= HB.y0 && x + w <= HB.x1 && y + h <= HB.y1 && !(x < 500 && x + w > 400 && y + h > 500); }   // a faixa da porta fica livre
     function canPlace(k, r, x, y) {
         const m = gameMaps.casa, f = FURN[k]; if (!m || !f) return false; const sz = sizeOf(k, r);
         if (!inHouseBounds(m, x, y, sz[0], sz[1])) return false;
@@ -244,14 +254,18 @@
     const today = () => new Date().toISOString().slice(0, 10);
     /* ---- poses de treino: o personagem vai para o lugar certo de cada móvel ---- */
     function poseSpot(t) {
-        const mw = (gameMaps.casa && gameMaps.casa.width) || 900, mh = (gameMaps.casa && gameMaps.casa.height) || 640, cx = t.x + t.w / 2; let px = player.x, py = player.y;
-        tr.back = { x: player.x, y: player.y };
-        if (t.fk === 'hottub') { px = cx; py = t.y + t.h / 2 + 12; tr.back = { x: cx, y: t.y + t.h + 30 }; }
-        else if (t.fk === 'library') { px = cx; py = t.y + t.h + 40; }
-        else if (t.fk === 'archery') { px = cx; py = Math.min(mh - 80, t.y + t.h + 150); tr.tx = cx; tr.ty = t.y + t.h * 0.36; tr.R = Math.min(t.w, t.h) * 0.42; }
-        else if (t.fk === 'punchbag') { tr.dir = cx > mw / 2 ? 1 : -1; px = cx - tr.dir * (t.w / 2 + 26); py = t.y + t.h - 12; }
-        else if (t.fk === 'dummy') { px = cx; py = t.y + t.h + 8; }
-        player.x = px; player.y = py; player.destX = px; player.destY = py; tr.x = px; tr.y = py;
+        const r = (t.rot | 0) & 3, D = [[0, 1], [1, 0], [0, -1], [-1, 0]][r], dx = D[0], dy = D[1];   // lado para onde o móvel está virado (0 = para baixo)
+        const cx = t.x + t.w / 2, cy = t.y + t.h / 2, mw = (gameMaps.casa && gameMaps.casa.width) || 900;
+        const clamp = (x, y) => [Math.max(HB.x0 + 20, Math.min(HB.x1 - 20, x)), Math.max(HB.y0 + 24, Math.min(HB.y1 - 14, y))];
+        let px = player.x, py = player.y; tr.back = { x: player.x, y: player.y }; tr.rot = r; tr.face = { x: -dx, y: -dy };
+        if (t.fk === 'hottub') { px = cx; py = t.y + t.h / 2 + 12; tr.back = { x: cx, y: t.y + t.h + 30 }; tr.face = { x: 0, y: 1 }; }
+        else if (t.fk === 'library') { [px, py] = clamp(cx + dx * (t.w / 2 + 34), dy > 0 ? t.y + t.h + 40 : dy < 0 ? t.y - 30 : cy + 12); tr.face = { x: 0, y: 1 }; }   // senta do lado em que a estante está virada
+        else if (t.fk === 'archery') { [px, py] = clamp(cx + dx * (t.w / 2 + 150), dy > 0 ? t.y + t.h + 150 : dy < 0 ? t.y - 120 : t.y + t.h - 10); tr.tx = cx; tr.ty = t.y + t.h * 0.36; tr.R = Math.min(t.w, t.h) * 0.42; tr.showHits = r === 0; }
+        else if (t.fk === 'punchbag') { if (r & 1) { [px, py] = clamp(cx + dx * (t.w / 2 + 28), t.y + t.h - 12); tr.dir = -dx; tr.face = { x: -dx, y: 0 }; } else { tr.dir = cx > mw / 2 ? 1 : -1; [px, py] = clamp(cx - tr.dir * (t.w / 2 + 26), t.y + t.h - 12); tr.face = { x: tr.dir, y: 0 }; } }
+        else if (t.fk === 'dummy') { [px, py] = clamp(cx + dx * (t.w / 2 + 26), dy > 0 ? t.y + t.h + 10 : dy < 0 ? t.y - 22 : t.y + t.h - 6); }
+        player.x = px; player.y = py; player.destX = px; player.destY = py;
+        if (t.fk !== 'hottub') { try { ensurePlayerFree(); } catch (e) { } }   // nunca fica dentro de um móvel
+        tr.x = player.x; tr.y = player.y;
     }
     const BEAT = { dummy: [900, 330], punchbag: [480, 240], archery: [1700, 320] };
     function trainAnim() { const b = tr && BEAT[tr.fk]; if (!b || !tr.cycT) return 0; const el = performance.now() - tr.cycT; return el < b[1] ? 15 * (1 - el / b[1]) : 0; }
@@ -261,9 +275,9 @@
         if (!tr || !tr.on || currentMap !== 'casa') return null; const k = tr.fk;
         if (k === 'hottub' || k === 'library') return { skip: true };
         const body = eq && eq.body, head = eq && eq.head;
-        if (k === 'archery') return { facing: { x: 0, y: -1 }, anim: trainAnim(), equip: { weapon: BOW, shield: null, body, head } };
-        if (k === 'punchbag') return { facing: { x: tr.dir, y: 0 }, anim: trainAnim(), equip: { weapon: null, shield: null, body, head } };
-        if (k === 'dummy') return { facing: { x: 0, y: -1 }, anim: trainAnim() };
+        if (k === 'archery') return { facing: tr.face, anim: trainAnim(), equip: { weapon: BOW, shield: null, body, head } };
+        if (k === 'punchbag') return { facing: tr.face, anim: trainAnim(), equip: { weapon: null, shield: null, body, head } };
+        if (k === 'dummy') return { facing: tr.face, anim: trainAnim() };
         return null;
     }
     function swayAngle(o, k) {
@@ -285,7 +299,7 @@
     }
     function trainOverlay(ctx, T) {
         if (!tr || !tr.on || currentMap !== 'casa') return; const now = performance.now(), k = tr.fk, b = BEAT[k];
-        if (b) { const c = Math.floor((now - tr.t0b) / b[0]); if (c !== tr.cyc) { tr.cyc = c; tr.cycT = now; if (k === 'punchbag') tr.swingT = now + 110; else if (k === 'dummy') tr.shakeT = now + 130; else if (k === 'archery') tr.arrows.push({ t0: now + 160, x0: player.x + 9, y0: player.y - 14, hx: tr.tx + (Math.random() - 0.5) * tr.R * 1.3, hy: tr.ty + (Math.random() - 0.5) * tr.R * 1.3 }); } }
+        if (b) { const c = Math.floor((now - tr.t0b) / b[0]); if (c !== tr.cyc) { tr.cyc = c; tr.cycT = now; if (k === 'punchbag') tr.swingT = now + 110; else if (k === 'dummy') tr.shakeT = now + 130; else if (k === 'archery') tr.arrows.push({ t0: now + 160, x0: player.x + tr.face.x * 9, y0: player.y - 14 + tr.face.y * 4, hx: tr.tx + (Math.random() - 0.5) * tr.R * 1.3, hy: tr.ty + (Math.random() - 0.5) * tr.R * 1.3 }); } }
         const ent = tr.ent, px = player.x, py = player.y;
         if (k === 'archery') {
             for (let i = tr.arrows.length - 1; i >= 0; i--) {
@@ -295,7 +309,7 @@
                 const vy = (a.hy - a.y0) - Math.cos(u * Math.PI) * 18 * Math.PI, vx = a.hx - a.x0, an = Math.atan2(vy, vx);
                 ctx.save(); ctx.translate(x, y); ctx.rotate(an); ctx.lineCap = 'round'; ctx.strokeStyle = '#1c120a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-11, 0); ctx.lineTo(5, 0); ctx.stroke(); ctx.strokeStyle = '#d8c090'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(-11, 0); ctx.lineTo(5, 0); ctx.stroke(); ctx.fillStyle = '#dfe6ea'; ctx.beginPath(); ctx.moveTo(5, -2.2); ctx.lineTo(9, 0); ctx.lineTo(5, 2.2); ctx.fill(); ctx.fillStyle = '#c0392b'; ctx.beginPath(); ctx.moveTo(-11, 0); ctx.lineTo(-14, -2.4); ctx.lineTo(-9, -0.4); ctx.moveTo(-11, 0); ctx.lineTo(-14, 2.4); ctx.lineTo(-9, 0.4); ctx.fill(); ctx.restore();
             }
-            tr.stuck.forEach((s) => { ctx.save(); ctx.lineCap = 'round'; ctx.strokeStyle = '#1c120a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(s.x - 1.5, s.y + 9); ctx.stroke(); ctx.strokeStyle = '#d8c090'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(s.x - 1.5, s.y + 9); ctx.stroke(); ctx.fillStyle = '#c0392b'; ctx.fillRect(s.x - 3, s.y + 8, 3, 2); ctx.fillRect(s.x, s.y + 8, 3, 2); ctx.restore(); });
+            if (tr.showHits) tr.stuck.forEach((s) => { ctx.save(); ctx.lineCap = 'round'; ctx.strokeStyle = '#1c120a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(s.x - 1.5, s.y + 9); ctx.stroke(); ctx.strokeStyle = '#d8c090'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(s.x - 1.5, s.y + 9); ctx.stroke(); ctx.fillStyle = '#c0392b'; ctx.fillRect(s.x - 3, s.y + 8, 3, 2); ctx.fillRect(s.x, s.y + 8, 3, 2); ctx.restore(); });
             if (tr.hitT && now - tr.hitT < 220) { const q = (now - tr.hitT) / 220; ctx.save(); ctx.strokeStyle = 'rgba(255,240,160,' + (1 - q) + ')'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(tr.hitX, tr.hitY, 4 + q * 9, 0, 6.3); ctx.stroke(); ctx.restore(); }
         } else if (k === 'punchbag' && tr.swingT && now - tr.swingT < 140 && now > tr.swingT) {
             const q = (now - tr.swingT) / 140, bx = ent.x + ent.w / 2 - tr.dir * ent.w * 0.3, by = ent.y + ent.h * 0.58; ctx.save(); ctx.strokeStyle = 'rgba(255,240,170,' + (1 - q) + ')'; ctx.lineWidth = 2; for (let i = 0; i < 6; i++) { const a = i * 1.05 + 0.3; ctx.beginPath(); ctx.moveTo(bx + Math.cos(a) * (4 + q * 4), by + Math.sin(a) * (4 + q * 4)); ctx.lineTo(bx + Math.cos(a) * (9 + q * 9), by + Math.sin(a) * (9 + q * 9)); ctx.stroke(); } ctx.restore();
@@ -329,6 +343,7 @@
     }
     function stopTrain(msg, col) {
         if (!tr) return; const t = tr; tr = null; if (t.fk === 'hottub' && t.back) { player.x = t.back.x; player.y = t.back.y; player.destX = player.x; player.destY = player.y; }
+        try { ensurePlayerFree(); } catch (e) { }
         setActionText(msg || (t.n ? 'Treino encerrado: +' + t.xp + ' XP em ' + t.n + ' sessão(ões).' : 'Treino interrompido.'), col || '#bdc3c7');
     }
     function startTrain(t) {
@@ -478,6 +493,91 @@
     }
 
     /* ============================ DESENHO ============================ */
+    /* ---------- a sala (desenhada uma vez em um canvas e reaproveitada; só fogo, brasas e poeira animam) ---------- */
+    let _room = null;
+    function buildRoom() {
+        const c = document.createElement('canvas'); c.width = 900; c.height = 640; const g = c.getContext('2d'); let seed = 7; const R = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+        g.fillStyle = '#1a120c'; g.fillRect(0, 0, 900, 640);
+        // piso de tábuas
+        const fx = 62, fy = 150, fw = 776, fh = 412;
+        const cols = ['#a8773f', '#9c6e39', '#b0814a', '#a07038'];
+        for (let r = 0, y = fy; y < fy + fh; r++, y += 26) {
+            let x = fx - (r % 3) * 40; while (x < fx + fw) { const len = 110 + Math.floor(R() * 90); g.fillStyle = cols[Math.floor(R() * cols.length)]; g.fillRect(Math.max(x, fx), y, Math.min(len, fx + fw - Math.max(x, fx)), 26); g.fillStyle = 'rgba(50,28,10,.55)'; g.fillRect(x + len - 1, y, 1.5, 26); x += len; }
+            g.fillStyle = 'rgba(50,28,10,.6)'; g.fillRect(fx, y + 25, fw, 1.5);
+            g.strokeStyle = 'rgba(80,45,15,.18)'; g.lineWidth = 1; for (let k = 0; k < 3; k++) { const gy = y + 5 + k * 7 + R() * 3, gx = fx + R() * fw; g.beginPath(); g.moveTo(gx, gy); g.lineTo(gx + 40 + R() * 60, gy + R() * 2 - 1); g.stroke(); }
+        }
+        // sombras das paredes sobre o piso
+        let gr = g.createLinearGradient(0, fy, 0, fy + 46); gr.addColorStop(0, 'rgba(25,12,4,.55)'); gr.addColorStop(1, 'rgba(25,12,4,0)'); g.fillStyle = gr; g.fillRect(fx, fy, fw, 46);
+        gr = g.createLinearGradient(fx, 0, fx + 30, 0); gr.addColorStop(0, 'rgba(25,12,4,.45)'); gr.addColorStop(1, 'rgba(25,12,4,0)'); g.fillStyle = gr; g.fillRect(fx, fy, 30, fh);
+        gr = g.createLinearGradient(fx + fw, 0, fx + fw - 30, 0); gr.addColorStop(0, 'rgba(25,12,4,.45)'); gr.addColorStop(1, 'rgba(25,12,4,0)'); g.fillStyle = gr; g.fillRect(fx + fw - 30, fy, 30, fh);
+        // parede do fundo: papel de parede creme, friso e lambri de madeira
+        g.fillStyle = '#e6d5b2'; g.fillRect(40, 40, 820, 112);
+        g.fillStyle = 'rgba(160,120,70,.12)'; for (let x = 44; x < 860; x += 24) g.fillRect(x, 40, 10, 112);
+        g.fillStyle = 'rgba(120,80,40,.1)'; for (let x = 52; x < 860; x += 24) { g.beginPath(); g.arc(x, 74, 2.4, 0, 6.3); g.arc(x, 112, 2.4, 0, 6.3); g.fill(); }
+        g.fillStyle = '#6b4a2b'; g.fillRect(40, 112, 820, 40); g.fillStyle = '#7a5434'; for (let x = 44; x < 860; x += 54) { g.fillRect(x, 118, 46, 28); g.strokeStyle = 'rgba(30,15,5,.55)'; g.lineWidth = 1.5; g.strokeRect(x, 118, 46, 28); g.fillStyle = 'rgba(255,255,255,.07)'; g.fillRect(x + 2, 120, 42, 4); g.fillStyle = '#7a5434'; }
+        g.fillStyle = '#8a6238'; g.fillRect(40, 108, 820, 6); g.fillStyle = 'rgba(255,255,255,.18)'; g.fillRect(40, 108, 820, 1.5);   // corrimão
+        g.fillStyle = '#3f2813'; g.fillRect(40, 148, 820, 6); g.fillStyle = '#2a1a0a'; g.fillRect(40, 30, 820, 14); g.fillStyle = '#5a3a1a'; g.fillRect(40, 44, 820, 5);   // rodapé e sanca
+        // janelas com cortinas
+        const win = (wx) => {
+            const wy = 54, ww = 104, wh = 66;
+            gr = g.createLinearGradient(0, wy, 0, wy + wh); gr.addColorStop(0, '#9fd4f4'); gr.addColorStop(0.7, '#d8efe0'); gr.addColorStop(1, '#9ccf86'); g.fillStyle = gr; g.fillRect(wx, wy, ww, wh);
+            g.fillStyle = 'rgba(255,255,255,.85)'; g.beginPath(); g.ellipse(wx + 30, wy + 18, 14, 5, 0, 0, 6.3); g.ellipse(wx + 42, wy + 15, 10, 5, 0, 0, 6.3); g.fill(); g.fillStyle = '#ffe9a0'; g.beginPath(); g.arc(wx + 84, wy + 14, 6, 0, 6.3); g.fill();
+            g.fillStyle = '#5f9a4a'; g.beginPath(); g.moveTo(wx, wy + wh); g.quadraticCurveTo(wx + 30, wy + wh - 22, wx + 62, wy + wh - 8); g.quadraticCurveTo(wx + 86, wy + wh - 16, wx + ww, wy + wh - 6); g.lineTo(wx + ww, wy + wh); g.fill();
+            g.strokeStyle = '#4a2f16'; g.lineWidth = 5; g.strokeRect(wx, wy, ww, wh); g.lineWidth = 3; g.beginPath(); g.moveTo(wx + ww / 2, wy); g.lineTo(wx + ww / 2, wy + wh); g.moveTo(wx, wy + wh / 2); g.lineTo(wx + ww, wy + wh / 2); g.stroke();
+            g.strokeStyle = 'rgba(255,255,255,.28)'; g.lineWidth = 2; g.beginPath(); g.moveTo(wx + 8, wy + wh - 8); g.lineTo(wx + 22, wy + 8); g.stroke();
+            g.fillStyle = '#6b4a2b'; g.fillRect(wx - 7, wy + wh, ww + 14, 6); g.fillStyle = 'rgba(255,255,255,.15)'; g.fillRect(wx - 7, wy + wh, ww + 14, 1.5);
+            g.fillStyle = '#8a2b3a'; g.beginPath(); g.moveTo(wx - 9, wy - 6); g.lineTo(wx + 16, wy - 6); g.quadraticCurveTo(wx + 22, wy + 30, wx + 10, wy + wh + 2); g.lineTo(wx - 9, wy + wh + 2); g.closePath(); g.fill();
+            g.beginPath(); g.moveTo(wx + ww + 9, wy - 6); g.lineTo(wx + ww - 16, wy - 6); g.quadraticCurveTo(wx + ww - 22, wy + 30, wx + ww - 10, wy + wh + 2); g.lineTo(wx + ww + 9, wy + wh + 2); g.closePath(); g.fill();
+            g.strokeStyle = 'rgba(0,0,0,.25)'; g.lineWidth = 1; for (const sx of [-1, 1]) for (let k = 1; k < 4; k++) { const bx = sx < 0 ? wx - 9 + k * 5 : wx + ww + 9 - k * 5; g.beginPath(); g.moveTo(bx, wy - 4); g.lineTo(bx + sx * 1, wy + wh); g.stroke(); }
+            g.fillStyle = '#d9a93a'; g.fillRect(wx - 12, wy - 9, ww + 24, 4); g.beginPath(); g.arc(wx - 12, wy - 7, 3, 0, 6.3); g.arc(wx + ww + 12, wy - 7, 3, 0, 6.3); g.fill();
+            // feixe de luz no piso
+            g.save(); g.globalAlpha = 0.11; g.fillStyle = '#fff0b0'; g.beginPath(); g.moveTo(wx + 4, 158); g.lineTo(wx + ww - 4, 158); g.lineTo(wx + ww + 120, 330); g.lineTo(wx + 60, 330); g.closePath(); g.fill(); g.restore();
+        };
+        win(110); win(686);
+        // quadros
+        const frame = (qx, qy, qw, qh, kind) => { g.fillStyle = '#4a2f16'; g.fillRect(qx - 4, qy - 4, qw + 8, qh + 8); g.fillStyle = '#d9a93a'; g.fillRect(qx - 2, qy - 2, qw + 4, qh + 4); gr = g.createLinearGradient(0, qy, 0, qy + qh); gr.addColorStop(0, kind ? '#f3c78a' : '#a8d8f0'); gr.addColorStop(1, kind ? '#8a4a3a' : '#7fb06a'); g.fillStyle = gr; g.fillRect(qx, qy, qw, qh); g.fillStyle = kind ? '#3a2a4a' : '#4a7a5a'; g.beginPath(); g.moveTo(qx, qy + qh); g.lineTo(qx + qw * .35, qy + qh * .45); g.lineTo(qx + qw * .6, qy + qh * .75); g.lineTo(qx + qw * .8, qy + qh * .5); g.lineTo(qx + qw, qy + qh); g.fill(); };
+        frame(274, 66, 46, 34, 0); frame(580, 66, 46, 34, 1);
+        // lareira de pedra
+        const lx = 400, ly = 62, lw = 100, lh = 90;
+        g.fillStyle = '#8a8478'; g.fillRect(lx, ly + 10, lw, lh - 10); g.strokeStyle = 'rgba(40,36,30,.7)'; g.lineWidth = 1.2;
+        for (let r = 0; r < 7; r++) for (let q = 0; q < 6; q++) { const bx = lx + q * 17 + (r % 2) * 8, by = ly + 12 + r * 12; g.fillStyle = ['#8f897d', '#7d776b', '#9a9488'][(r + q) % 3]; g.fillRect(bx, by, 16, 11); g.strokeRect(bx, by, 16, 11); }
+        g.fillStyle = '#6b4a2b'; g.fillRect(lx - 8, ly, lw + 16, 12); g.fillStyle = 'rgba(255,255,255,.2)'; g.fillRect(lx - 8, ly, lw + 16, 2); g.strokeStyle = '#1c120a'; g.lineWidth = 1.5; g.strokeRect(lx - 8, ly, lw + 16, 12);
+        g.fillStyle = '#1a0f08'; g.beginPath(); g.moveTo(lx + 18, ly + lh); g.lineTo(lx + 18, ly + 38); g.quadraticCurveTo(lx + lw / 2, ly + 22, lx + lw - 18, ly + 38); g.lineTo(lx + lw - 18, ly + lh); g.closePath(); g.fill(); g.strokeStyle = '#3a2a1c'; g.lineWidth = 3; g.stroke();
+        g.fillStyle = '#4a3a2a'; g.fillRect(lx + 26, ly + lh - 8, lw - 52, 6);   // lenha
+        g.fillStyle = '#6a4a2a'; g.fillRect(lx + 30, ly + lh - 12, 40, 6); g.fillRect(lx + 44, ly + lh - 16, 36, 6);
+        // velas no console
+        for (const vx of [lx + 8, lx + lw - 14]) { g.fillStyle = '#f2ead2'; g.fillRect(vx, ly - 12, 6, 12); g.strokeStyle = '#1c120a'; g.lineWidth = 1; g.strokeRect(vx, ly - 12, 6, 12); }
+        // plantas nos cantos, tapete da porta
+        const pot = (px, py) => { g.fillStyle = '#b8683a'; g.beginPath(); g.moveTo(px - 10, py); g.lineTo(px + 10, py); g.lineTo(px + 7, py + 16); g.lineTo(px - 7, py + 16); g.closePath(); g.fill(); g.strokeStyle = '#3a1c0a'; g.lineWidth = 1.5; g.stroke(); g.fillStyle = '#3f8a4a'; for (let k = 0; k < 7; k++) { const a = -1.9 + k * 0.5; g.beginPath(); g.ellipse(px + Math.cos(a) * 9, py - 8 + Math.sin(a) * 9, 4, 9, a + 1.57, 0, 6.3); g.fill(); g.stroke(); } };
+        pot(82, 178); pot(818, 178);
+        g.fillStyle = '#8a2b2b'; g.fillRect(426, 536, 48, 24); g.strokeStyle = '#d9a93a'; g.lineWidth = 2; g.strokeRect(430, 540, 40, 16); g.strokeStyle = 'rgba(0,0,0,.4)'; g.lineWidth = 1; g.strokeRect(426, 536, 48, 24);
+        // paredes laterais e da frente (madeira escura com brilho interno)
+        g.fillStyle = '#4a2f16'; g.fillRect(30, 30, 32, 560); g.fillRect(838, 30, 32, 560); g.fillRect(30, 560, 392, 30); g.fillRect(478, 560, 392, 30);
+        g.fillStyle = '#6b4a2b'; g.fillRect(58, 150, 4, 410); g.fillRect(838, 150, 4, 410); g.fillRect(62, 556, 360, 4); g.fillRect(478, 556, 360, 4);
+        g.fillStyle = 'rgba(255,255,255,.1)'; g.fillRect(30, 30, 3, 560); g.fillRect(838, 30, 3, 560);
+        g.strokeStyle = 'rgba(20,10,4,.6)'; g.lineWidth = 1.5; for (let y = 60; y < 590; y += 40) { g.beginPath(); g.moveTo(30, y); g.lineTo(62, y); g.moveTo(838, y); g.lineTo(870, y); g.stroke(); }
+        // batente da porta
+        g.fillStyle = '#3f2813'; g.fillRect(414, 556, 10, 36); g.fillRect(476, 556, 10, 36); g.fillRect(414, 552, 72, 8); g.fillStyle = '#d9a93a'; g.fillRect(414, 552, 72, 2);
+        // luz suave geral
+        gr = g.createRadialGradient(450, 330, 80, 450, 330, 520); gr.addColorStop(0, 'rgba(255,200,120,.10)'); gr.addColorStop(1, 'rgba(10,5,0,.28)'); g.fillStyle = gr; g.fillRect(40, 40, 820, 530);
+        return c;
+    }
+    function drawRoom(ctx, o, T) {
+        if (!_room) _room = buildRoom(); ctx.drawImage(_room, o.x, o.y);
+        const t = T || 0;
+        // brilho quente da lareira no piso
+        const fl = 0.16 + 0.05 * Math.sin(t * 7) + 0.03 * Math.sin(t * 13.3);
+        const gr = ctx.createRadialGradient(450, 200, 10, 450, 210, 190); gr.addColorStop(0, 'rgba(255,170,70,' + fl + ')'); gr.addColorStop(1, 'rgba(255,170,70,0)'); ctx.fillStyle = gr; ctx.fillRect(250, 156, 400, 220);
+        // fogo
+        ctx.save(); ctx.beginPath(); ctx.rect(418, 100, 64, 52); ctx.clip();
+        for (let i = 0; i < 6; i++) { const ph = t * 3 + i * 1.7, fx = 432 + i * 7.5 + Math.sin(ph) * 2, hh = 20 + 8 * Math.sin(ph * 1.3 + i), col = i % 2 ? '#ff9a2a' : '#ff5a1a'; ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(fx - 5, 150); ctx.quadraticCurveTo(fx - 4 + Math.sin(ph) * 3, 150 - hh * 0.6, fx + Math.sin(ph * 1.2) * 2, 150 - hh); ctx.quadraticCurveTo(fx + 4, 150 - hh * 0.5, fx + 5, 150); ctx.closePath(); ctx.fill(); }
+        ctx.fillStyle = '#ffe27a'; for (let i = 0; i < 3; i++) { const ph = t * 4 + i * 2.1, fx = 440 + i * 10; ctx.beginPath(); ctx.moveTo(fx - 3, 150); ctx.quadraticCurveTo(fx, 150 - 14 - 5 * Math.sin(ph), fx + 3, 150); ctx.fill(); }
+        ctx.restore();
+        ctx.fillStyle = 'rgba(255,230,150,' + (0.35 + 0.15 * Math.sin(t * 9)) + ')'; for (const vx of [411, 485]) { ctx.beginPath(); ctx.ellipse(vx, 44, 3, 5, 0, 0, 6.3); ctx.fill(); }
+        // brasas e poeira de luz
+        for (let i = 0; i < 5; i++) { const q = (t * 0.5 + i / 5) % 1; ctx.fillStyle = 'rgba(255,190,90,' + (0.8 * (1 - q)) + ')'; ctx.fillRect(436 + Math.sin(i * 3 + t) * 16, 140 - q * 40, 1.6, 1.6); }
+        ctx.fillStyle = 'rgba(255,245,200,.35)'; for (let i = 0; i < 10; i++) { const x = 130 + ((i * 97 + t * 6) % 220) + (i > 5 ? 576 : 0) * 0, y = 170 + ((i * 53 + t * 5) % 150); ctx.fillRect(x, y, 1.5, 1.5); ctx.fillRect(x + 576, y, 1.5, 1.5); }
+    }
     /* ---------- móveis girados: vistas de frente / costas / lado com profundidade e sombra (não é mais a arte frontal girada) ---------- */
     const WOOD = '#8b6238', WOODD = '#5a3a1a', WOODK = '#3a2410';
     let _lay = null;
@@ -626,5 +726,5 @@
         setInterval(tickBtn, 400); setInterval(trainTick, 250); setInterval(ensureDevTab, 2000);
     }
     window.addEventListener('load', wire);
-    window.World2 = { houseKey: () => (hctx && hctx.owner ? 'casa_' + String(hctx.owner).toLowerCase().replace(/[^\w\-]/g, '_').slice(0, 34) : null), ITEMS, CREATURES, FURN, HOUSE_MAX, record, kills, beastList, beastProgress, placeInWorld, merge, drawEntity, enterHouse, editDoor, openDecor, buy, refreshHouse, drawOverlay, onLogin, TRAIN, trainPose, buildCatacombs, buildHouseShell };
+    window.World2 = { houseKey: () => (hctx && hctx.owner ? 'casa_' + String(hctx.owner).toLowerCase().replace(/[^\w\-]/g, '_').slice(0, 34) : null), ITEMS, CREATURES, FURN, HOUSE_MAX, record, kills, beastList, beastProgress, placeInWorld, merge, drawEntity, enterHouse, editDoor, openDecor, buy, refreshHouse, drawOverlay, onLogin, TRAIN, trainPose, drawRoom, inRoom: (x, y) => x > 70 && x < 830 && y > 160 && y < 552, training: () => !!(tr && tr.on), buildCatacombs, buildHouseShell };
 })();

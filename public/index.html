@@ -1244,7 +1244,7 @@
             const solid = m.entities.filter(o => o && o.active && !['ground_item','fishing_spot','farm_plot','rift_gate','rift_next','portal','fire','paint','enemy','npc'].includes(o.type));
             const hits = (x, y) => solid.some(o => { const h = getHitbox(o); return h && x - 10 < h.x + h.w && x + 10 > h.x && y - 10 < h.y + h.h && y + 10 > h.y; });
             if (!hits(player.x, player.y)) return;
-            for (let r = 20; r < 600; r += 20) for (let a = 0; a < 16; a++) { const x = player.x + Math.cos(a / 16 * 6.283) * r, y = player.y + Math.sin(a / 16 * 6.283) * r; if (x > 20 && y > 20 && x < W - 20 && y < H - 20 && !hits(x, y)) { player.x = x; player.y = y; player.destX = x; player.destY = y; return; } }
+            for (let r = 20; r < 600; r += 20) for (let a = 0; a < 16; a++) { const x = player.x + Math.cos(a / 16 * 6.283) * r, y = player.y + Math.sin(a / 16 * 6.283) * r; if (x > 20 && y > 20 && x < W - 20 && y < H - 20 && !(currentMap === 'casa' && window.World2 && World2.inRoom && !World2.inRoom(x, y)) && !hits(x, y)) { player.x = x; player.y = y; player.destX = x; player.destY = y; return; } }
             const sp = m.spawn || { x: W / 2, y: H / 2 }; player.x = sp.x; player.y = sp.y; player.destX = sp.x; player.destY = sp.y;
         }
         function respawnAtVillage() { const m = gameMaps['lumbridge']; const sp = (m && m.spawn) || { x: 400, y: 300 }; switchMap('lumbridge', sp.x, sp.y); }
@@ -1279,7 +1279,7 @@
 
             let cObj = null; let minDObj = 45;
             for(let o of cur) {
-                if(!o || !o.active || ['ground_item', 'paint', 'decor'].includes(o.type)) continue; 
+                if(!o || !o.active || ['ground_item', 'paint', 'decor', 'house_wall'].includes(o.type)) continue; 
                 let d = Math.hypot(player.x - (o.x + (o.w||30)/2), player.y - (o.y + (o.h||30)/2));
                 if (d < minDObj + ((o.w||30)/2)) { minDObj = d; cObj = o; }
             }
@@ -1467,7 +1467,7 @@
                 } else {
                     try {
                         let cObj = null; let cur = curM.entities || [];
-                        for (let i = cur.length - 1; i >= 0; i--) { let o = cur[i]; if (o && o.active && o.type !== 'paint' && o.type !== 'decor' && pos.x >= o.x && pos.x <= o.x + (o.w||30) && pos.y >= o.y && pos.y <= o.y + (o.h||30)) { cObj = o; break; } }
+                        for (let i = cur.length - 1; i >= 0; i--) { let o = cur[i]; if (o && o.active && o.type !== 'paint' && o.type !== 'decor' && o.type !== 'house_wall' && pos.x >= o.x && pos.x <= o.x + (o.w||30) && pos.y >= o.y && pos.y <= o.y + (o.h||30)) { cObj = o; break; } }
                         
                         osrsMenu.innerHTML = "";
                         if (cObj && cObj.type) { 
@@ -1536,7 +1536,7 @@
                 let cur = curM.entities || [];
                 for (let i = cur.length - 1; i >= 0; i--) { 
                     let o = cur[i]; 
-                    if (o && o.active && o.type !== 'paint' && o.type !== 'decor') { 
+                    if (o && o.active && o.type !== 'paint' && o.type !== 'decor' && o.type !== 'house_wall') { 
                         let ow = o.w || 30; let oh = o.h || 30;
                         if (pos.x >= o.x && pos.x <= o.x + ow && pos.y >= o.y && pos.y <= o.y + oh) { clickedEntity = o; break; } 
                     } 
@@ -1667,7 +1667,7 @@
         function update() {
             try {
                 let curM = gameMaps[currentMap]; if(!curM) return; let cur = curM.entities || []; let mapW = curM.width || 800; let mapH = curM.height || 600;
-                if (window.Stats) Stats.tick(); if(player.attackCooldown > 0) player.attackCooldown--; if(player.actionAnim > 0) player.actionAnim--; if (window.Art) Art.tickAll(); if (window.Env) Env.tick(curM);
+                if (window.Stats) Stats.tick(); if ((window._stuckT = (window._stuckT | 0) + 1) % 40 === 0 && !(window.World2 && World2.training && World2.training()) && Math.hypot((player.destX == null ? player.x : player.destX) - player.x, (player.destY == null ? player.y : player.destY) - player.y) < 3 && !(keys.w || keys.a || keys.s || keys.d || keys.arrowup || keys.arrowdown || keys.arrowleft || keys.arrowright)) { try { ensurePlayerFree(); } catch (e) { } } if(player.attackCooldown > 0) player.attackCooldown--; if(player.actionAnim > 0) player.actionAnim--; if (window.Art) Art.tickAll(); if (window.Env) Env.tick(curM);
 
                 if(player.regenTimer > 0) player.regenTimer--;
                 if(player.regenTimer <= 0) {
@@ -1848,7 +1848,8 @@
 
         function renderEntity(ctx, o, isHologram = false) {
             const T = performance.now() / 1000; const t = o.type;
-            if (t === 'paint') Art.drawPaint(ctx, o, T);
+            if (t === 'paint') { if (o.room && window.World2) World2.drawRoom(ctx, o, T); else Art.drawPaint(ctx, o, T); }
+            else if (t === 'house_wall') { /* invisível: a sala é desenhada pelo World2 */ }
             else if (t === 'house') Art.drawBuilding(ctx, o, T);
             else if (t === 'decor') Art.drawDecor(ctx, o, T);
             else if (t === 'tree') { if (o.active === false) Art.drawStump(ctx, o); else Art.drawTree(ctx, o, T); }
@@ -1912,6 +1913,8 @@
                         if(o.type === 'paint' && inView(o, 40)) { renderEntity(ctx, o, false); } 
                     });
                 }
+
+                if (currentMap === 'casa') { for (let i = 0; i < cur.length; i++) { const o = cur[i]; if (o && o.room) renderEntity(ctx, o, false); } }   // a sala da casa é desenhada ao vivo (fogo, luz) por cima do cache do chão
 
                 // DESENHA ITENS NO CHÃO
                 cur.forEach(o => { 

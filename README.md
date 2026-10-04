@@ -583,3 +583,9 @@ Botão **Jornada** (ou tecla `N`): recompensa diária com sequência de 7 dias, 
 - Fendas: cada andar sorteia 3–5 espécies e um tema (Etéreo, Abissal, Ígneo…, nome e cores novos); guardiões variam entre andares; chão com lajotas/veios; HUD fica embaixo, sem cobrir botões.
 - Personagens: proporção de RPG (cabeça menor, pernas maiores), nariz refeito por raça, arma sempre na mão direita e escudo na esquerda nas 3 vistas, armaduras/elmos/espadas/escudos com forma própria por tier.
 - Treino em casa com poses: banheira (personagem de sunga entra na água, vapor e bolhas), arco (afasta-se e atira flechas fictícias que ficam cravadas no alvo), saco de pancada (socos sem arma; o saco balança), biblioteca (senta numa cadeira e lê, virando páginas), manequim (golpeia e ele treme).
+
+## Casa (sala com paredes) e poses rotacionadas
+- A casa agora é uma sala aconchegante desenhada no cliente (`World2.drawRoom`): piso de tábuas, paredes com lambri, duas janelas com cortinas e raios de luz, lareira animada, quadros e plantas. Nada disso é salvo; paredes são entidades `house_wall` sólidas (runtime, `hf:true`).
+- Móveis são limitados à área interna (`HB`); itens antigos fora dela são reposicionados ao entrar.
+- Poses de treino respeitam a rotação do móvel (`r` 0..3): arco/boneco/saco ficam do lado para onde o móvel está virado, e a biblioteca senta do lado da estante.
+- Anti-travamento: ao sair do treino, e a cada ~40 frames parado, `ensurePlayerFree()` tira o jogador de dentro de objetos/cantos (vale também para mineração e lenha).
