@@ -360,6 +360,7 @@
     /* ---- formas (cosmético escolhido pelo jogador): cabeça h_*, corpo b_* ---- */
     const FORMS = {
         head: [['', 'Padrão'], ['h_drac', 'Elmo draconiano'], ['h_horns', 'Chifres'], ['h_wing', 'Elmo alado'], ['h_ears', 'Orelhas de lobo'], ['h_crown', 'Coroa de luz']],
+        weapon: [['', 'Padrão'], ['w_long', 'Arco longo'], ['w_recurve', 'Arco recurvo'], ['w_dragon', 'Arco de dragão'], ['w_elven', 'Arco élfico']],
         body: [['', 'Padrão'], ['b_wings', 'Asas de pena'], ['b_dragon', 'Asas de dragão'], ['b_cape', 'Capa'], ['b_spikes', 'Ombreiras de espinhos']]
     };
     const FORM_OK = (slot, id) => !id || ((FORMS[slot] || []).some((f) => f[0] === id));
@@ -610,7 +611,7 @@ body.mimic-open #qb{display:none!important}`;
             return `<button class="mm-sw${cur === id ? ' on' : ''}${ok ? '' : ' lock'}" style="background:${swatch(id)}" data-a="${name ? 'skin' : 'skinall'}" data-n="${esc(name || cls)}" data-s="${id}" title="${esc(tip)}" aria-label="${esc(th.n)}"></button>`; }).join('') + '</div>';
     }
     function formRow(p) {
-        const list = FORMS[p.slot]; if (!list) return ''; const cur = formOf(p.n);
+        const list = p.slot === 'weapon' ? (p.cls === 'arqueiro' ? FORMS.weapon : null) : FORMS[p.slot]; if (!list) return ''; const cur = formOf(p.n);
         return '<div class="mm-fm"><small>Forma:</small>' + list.map((f) => `<button class="mm-pb${cur === f[0] ? ' on' : ''}" data-a="form" data-n="${esc(p.n)}" data-s="${f[0]}">${esc(f[1])}</button>`).join('') + '</div>';
     }
     function pieceRow(p, cur) {

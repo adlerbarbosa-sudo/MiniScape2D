@@ -1758,6 +1758,40 @@
         }
     }
     function onBackFn() { }
+    /* arco: a mão segura o CABO (centro do arco, origem); a corda fica atrás e puxa um pouco no disparo. Formas do Mímico: w_long, w_recurve, w_dragon, w_elven */
+    function drawBowShape(ctx, wp, pull) {
+        const fm = typeof wp.mfm === 'string' ? wp.mfm : '', hexc = (typeof wp.col === 'string' && /^#[0-9a-fA-F]{6}$/.test(wp.col)) ? wp.col : '#a85a1a';
+        const P = { std: { L: 19, b: 8, r: 0, col: hexc, tip: '#e8d8a8', w: 3.2 }, w_long: { L: 25, b: 7, r: 0, col: '#8b5a2b', tip: '#d8c090', w: 2.8 }, w_recurve: { L: 20, b: 9.5, r: 5, col: '#6b3f1e', tip: '#e8b93c', w: 3.2 }, w_dragon: { L: 22, b: 9, r: 3.4, col: '#e8dec6', tip: '#c0392b', w: 3.4 }, w_elven: { L: 24, b: 9.5, r: 4, col: '#dcc690', tip: '#e8b93c', w: 2.6 } };
+        const B = P[fm] || P.std, N = 14, pt = (u, sg) => { const x = -B.b * u * u + B.r * Math.pow(Math.max(0, u - 0.62) / 0.38, 2) * 1; return [x, sg * u * B.L]; };
+        ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        const tipT = pt(1, -1), tipB = pt(1, 1), pl = pull * 5.5;
+        // corda
+        ctx.strokeStyle = 'rgba(245,245,245,0.92)'; ctx.lineWidth = 0.9; ctx.beginPath(); ctx.moveTo(tipT[0], tipT[1]); ctx.lineTo(tipT[0] - 1 - pl, 0); ctx.lineTo(tipB[0], tipB[1]); ctx.stroke();
+        if (pull > 0.15) { ctx.strokeStyle = '#d8c090'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(tipT[0] - 1 - pl, 0); ctx.lineTo(B.tip === '#c0392b' ? 9 : 10, 0); ctx.stroke(); ctx.fillStyle = '#cfd8dc'; ctx.beginPath(); ctx.moveTo(10, -1.6); ctx.lineTo(14.5, 0); ctx.lineTo(10, 1.6); ctx.closePath(); ctx.fill(); }
+        // braços (afinam até a ponta): contorno primeiro, depois a cor
+        for (const pass of [0, 1]) for (const sg of [-1, 1]) for (let k = 0; k < N; k++) {
+            const a = pt(k / N, sg), b = pt((k + 1) / N, sg), w = (B.w * (1 - 0.5 * k / N)) + (pass ? 0 : 1.5);
+            ctx.strokeStyle = pass ? B.col : OUT; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+        }
+        ctx.strokeStyle = 'rgba(255,255,255,0.28)'; ctx.lineWidth = 0.7; for (const sg of [-1, 1]) { ctx.beginPath(); for (let k = 1; k < N - 2; k++) { const a = pt(k / N, sg); ctx.lineTo(a[0] + 0.7, a[1]); } ctx.stroke(); }
+        // pontas (nock)
+        for (const t of [tipT, tipB]) ell(ctx, t[0], t[1], 1.5, 1.5, B.tip, OUT, 0.6);
+        if (fm === 'w_dragon') {
+            ctx.fillStyle = '#c0392b'; ctx.strokeStyle = OUT; ctx.lineWidth = 0.7;
+            for (const sg of [-1, 1]) for (let i = 0; i < 3; i++) { const a = pt(0.3 + i * 0.22, sg), l = 3.2 - i * 0.6; ctx.beginPath(); ctx.moveTo(a[0] + 0.6, a[1]); ctx.lineTo(a[0] + 0.6 + l, a[1] - sg * 1.8 - sg * l * 0.4); ctx.lineTo(a[0] + 0.6 + l * 0.2, a[1] - sg * 3.4); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+            glow(ctx, 0, 0, 9, '#ff6a2a', 0.5);
+            for (const sg of [-1, 1]) { const a = pt(0.55, sg), t = pt(1, sg); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.quadraticCurveTo(a[0] - 5, (a[1] + t[1]) / 2, t[0] - 0.4, t[1] - sg * 0.5); ctx.strokeStyle = 'rgba(192,57,43,0.8)'; ctx.lineWidth = 0.9; ctx.stroke(); }
+        } else if (fm === 'w_elven') {
+            ctx.fillStyle = B.tip; ctx.strokeStyle = OUT; ctx.lineWidth = 0.6;
+            for (const sg of [-1, 1]) for (let i = 0; i < 3; i++) { const a = pt(0.28 + i * 0.22, sg); ctx.beginPath(); ctx.moveTo(a[0] + 0.8, a[1]); ctx.quadraticCurveTo(a[0] + 4.4, a[1] - sg * 1.2, a[0] + 1.2, a[1] - sg * 3.6); ctx.quadraticCurveTo(a[0] + 1.6, a[1] - sg * 1.4, a[0] + 0.8, a[1]); ctx.fill(); ctx.stroke(); }
+        } else if (fm === 'w_recurve') {
+            ctx.strokeStyle = B.tip; ctx.lineWidth = 1; for (const sg of [-1, 1]) { const a = pt(0.12, sg), b2 = pt(0.2, sg); ctx.beginPath(); ctx.moveTo(a[0] - 1.6, a[1]); ctx.lineTo(b2[0] - 1.6, b2[1]); ctx.stroke(); }
+        }
+        // empunhadura (cabo) e gema
+        rrect(ctx, -2.2, -4.6, 4.4, 9.2, 1.6, fm === 'w_dragon' ? '#3a1f1a' : fm === 'w_elven' ? '#4f6b3a' : '#4a2f16', OUT, 0.9);
+        ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 0.6; for (let y = -3; y <= 3; y += 2) { ctx.beginPath(); ctx.moveTo(-2, y); ctx.lineTo(2, y + 1); ctx.stroke(); }
+        if (fm === 'w_elven') ell(ctx, 1.2, 0, 1.3, 1.3, '#7dffb0', OUT, 0.5); else if (fm === 'w_dragon') ell(ctx, 1.2, 0, 1.3, 1.3, '#ff8a3a', OUT, 0.5);
+    }
     function drawWeapon(ctx, wp, H, view, anim, skin) {
         const prg = anim > 0 ? anim / 15 : 0, swing = sin(prg * PI);
         const light = wp.tool === 'magic' || wp.tool === 'ranged';
@@ -1767,11 +1801,12 @@
         else if (view === 'back') rot = 0.34 + swing * (light ? 0.15 : 0.5);
         else if (view === 'side') rot = 0.72 + H.a * 0.45 + swing * (light ? 0.3 : 0.7);
         else rot = 0.3;
+        if (wp.tool === 'ranged') rot = rot * 0.3 - 0.04;   // arco fica quase na vertical
         ctx.rotate(rot);
         const wood = '#8b5a2b', woodL = '#b07a3f', mc = armorColor(wp, '#c9d1d8'), steel = wp.tool ? '#b9c2cc' : mc;
         const handle = (y0, y1, w) => { limb(ctx, 0, y0, 0, y1, w + 1.4, OUT); limb(ctx, 0, y0, 0, y1, w, wood); ctx.fillStyle = woodL; ctx.fillRect(-w / 2 + 0.3, y1, 0.9, y0 - y1); };
         if (wp.tool === 'magic') { handle(14, -24, 2.4); ctx.fillStyle = '#4a2f16'; ctx.fillRect(-1.8, -3, 3.6, 3); ell(ctx, 0, -29, anim > 0 ? 6 : 4.6, anim > 0 ? 6 : 4.6, rg(ctx, -1, -30, 0, 7, [[0, '#fff'], [0.4, anim > 0 ? '#1abc9c' : (/^#[0-9a-fA-F]{6}$/.test(wp.gem || '') ? wp.gem : '#6ec8ff')], [1, '#2b56b8']]), OUT, 0.9); glow(ctx, 0, -29, 14, /^#[0-9a-fA-F]{6}$/.test(wp.gem || '') ? wp.gem : '#6ec8ff', 0.4); }
-        else if (wp.tool === 'ranged') { ctx.strokeStyle = OUT; ctx.lineWidth = 4.4; ctx.beginPath(); ctx.arc(-4, -2, 15, -1.15, 1.15); ctx.stroke(); ctx.strokeStyle = (typeof wp.col === 'string' && /^#[0-9a-fA-F]{6}$/.test(wp.col)) ? wp.col : '#a85a1a'; ctx.lineWidth = 2.6; ctx.stroke(); ctx.strokeStyle = 'rgba(240,240,240,0.9)'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(2.2, -15); ctx.lineTo(2.2, 11); ctx.stroke(); }
+        else if (wp.tool === 'ranged') drawBowShape(ctx, wp, swing);
         else if (wp.tool === 'axe') {
             handle(13, -21, 2.6);
             ctx.beginPath(); ctx.moveTo(1, -22); ctx.quadraticCurveTo(10, -27, 12, -17); ctx.quadraticCurveTo(11, -9, 3, -11); ctx.closePath(); paint(ctx, lg(ctx, 1, -24, 12, -10, [[0, shade(steel, 0.55)], [0.55, steel], [1, shade(steel, -0.35)]]), OUT, 1.1);
