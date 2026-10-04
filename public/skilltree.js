@@ -170,14 +170,14 @@
         const q2 = g.createRadialGradient(32, 32, 0, 32, 32, 14); q2.addColorStop(0, 'rgba(255,255,255,.85)'); q2.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = q2; g.globalAlpha = 1; g.beginPath(); g.arc(32, 32, 14, 0, TAU); g.fill();
         return (glows[col] = c);
     }
-    function fx(o) { if (S.fx.length > 90) S.fx.shift(); o.t = 0; try { if (S.pl === player) { if (o.k === 'cone') rfx('cone', o.col, o.x, o.y, o.x + Math.cos(o.ang) * o.r, o.y + Math.sin(o.ang) * o.r, o.r); else if (o.k === 'beam') rfx('beam', o.col, o.x, o.y, o.x2, o.y2); } } catch (e) { } S.fx.push(o); return o; }
+    function fx(o) { if (S.fx.length > 90) S.fx.shift(); o.t = 0; try { if (S.pl === player) { if (o.k === 'arrow' && S.frame - (S._ra || -99) > 3) { S._ra = S.frame; rfx('arrow', '#d8c090', o.x, o.y0, o.x, o.y1); } else if (o.k === 'cone') rfx('cone', o.col, o.x, o.y, o.x + Math.cos(o.ang) * o.r, o.y + Math.sin(o.ang) * o.r, o.r); else if (o.k === 'beam') rfx('beam', o.col, o.x, o.y, o.x2, o.y2); } } catch (e) { } S.fx.push(o); return o; }
     const rfx = (k, c, x, y, tx, ty, r) => { try { if (window.RemoteFx) RemoteFx.out(k, c, x, y, tx === undefined ? x : tx, ty === undefined ? y : ty, r); } catch (e) { } };
     const ring = (x, y, r0, r1, col, life, w, sq) => (rfx('ring', col, x, y, x, y, r1), fx)({ k: 'ring', x, y, r0, r1, col, max: life || 24, w: w || 4, sq: sq == null ? 0.58 : sq });
     const flash = (x, y, r, col, life) => (rfx('flash', col, x, y, x, y, r), fx)({ k: 'flash', x, y, r, col, max: life || 14 });
     function bolt(x0, y0, x1, y1, col, life) { const n = 7, pts = []; for (let i = 0; i <= n; i++) { const k = i / n, j = (i === 0 || i === n) ? 0 : (rnd() - 0.5) * 22; pts.push(x0 + (x1 - x0) * k + j, y0 + (y1 - y0) * k + (i === 0 || i === n ? 0 : (rnd() - 0.5) * 8)); } rfx('bolt', col, x0, y0, x1, y1); fx({ k: 'bolt', pts, col, max: life || 12 }); }
     const slashFx = (x, y, ang, r, col, life) => (rfx('slash', col, x, y, x + Math.cos(ang) * r, y + Math.sin(ang) * r, r), fx)({ k: 'slash', x, y, ang, r, col, max: life || 12 });
     function sfx(n) { try { if (window.Sfx && Sfx.play) Sfx.play(n); } catch (e) { } }
-    const burst = (x, y, col, n, sp) => { try { Art.burst(x, y, col, n, sp); } catch (e) { } };
+    const burst = (x, y, col, n, sp) => { try { Art.burst(x, y, col, n, sp); if (S.pl === player && S.frame - (S._rb || -99) > 5) { S._rb = S.frame; rfx('burst', col, x, y, x, y, n); } } catch (e) { } };
     const puff = (x, y, col, n, rad, up) => { try { Art.puff(x, y, col, n, rad, up); } catch (e) { } };
     const callout = (name, col) => { try { addFloatingText(player.x, player.y - 62, name, col); } catch (e) { } };
     const pcx = () => (typeof renderPX === 'number' && renderPX) || player.x, pcy = () => (typeof renderPY === 'number' && renderPY) || player.y;

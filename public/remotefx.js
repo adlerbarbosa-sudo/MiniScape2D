@@ -20,6 +20,7 @@
                         const id = f.t + '|' + f.k + '|' + f.tx + '|' + f.ty + '|' + f.x; if (s[id]) continue; s[id] = 1;
                         if (first || !on || live.length >= 40) continue;   // na 1ª vez só marca como visto (evita repetir o que já passou)
                         if (f.k === 'dmg') { try { const ty = { '#dd3333': 'hit', '#ffe27a': 'crit', '#ff8a00': 'big', '#aaaaaa': 'miss' }[f.c] || 'hit'; if (Math.hypot(f.tx - player.x, f.ty - player.y) < 700) { Fx.dmg(floatingTexts, f.tx, f.ty, f.r || 0, ty); if (f.r > 0 && window.Art && Art.burst) Art.burst(f.tx, f.ty + 14, ty === 'hit' ? '#d33' : '#ffe27a', ty === 'hit' ? 5 : 10, ty === 'hit' ? 1 : 1.6); } } catch (e) { } continue; }
+                        if (f.k === 'burst') { try { if (Math.hypot(f.tx - player.x, f.ty - player.y) < 700 && window.Art && Art.burst) Art.burst(f.tx, f.ty, f.c, Math.min(14, Math.max(4, f.r || 8)), 1.2); } catch (e) { } continue; }
                         try { if (window.Sfx && Math.hypot(f.x - player.x, f.y - player.y) < 500) Sfx.play(f.k === 'magic' ? 'magic' : 'bow', 0.4); } catch (e) { }
                         if (f.k === 'magic' || f.k === 'ranged') live.push({ k: f.k, c: f.c, x: f.x, y: f.y, tx: f.tx, ty: f.ty, sp: f.k === 'ranged' ? 8 : 6, age: 0, trail: [] });
                         else live.push({ k: f.k, c: f.c, x: f.x, y: f.y, tx: f.tx, ty: f.ty, r: f.r || 40, age: 0, st: 1 });
@@ -56,6 +57,7 @@
                     if (p.k === 'ring') { const rr = p.r * (1 - (1 - u) * (1 - u)); ctx.lineWidth = 4 * a + 1; ctx.beginPath(); ctx.ellipse(p.x, p.y, rr, rr * 0.58, 0, 0, 6.3); ctx.stroke(); }
                     else if (p.k === 'flash') { ctx.globalCompositeOperation = 'lighter'; const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r); g.addColorStop(0, p.c); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.globalAlpha = a * 0.8; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.3); ctx.fill(); }
                     else if (p.k === 'slash') { const an = Math.atan2(p.ty - p.y, p.tx - p.x); ctx.lineWidth = 8 * a + 2; ctx.beginPath(); ctx.arc(p.x, p.y, p.r * 0.7, an - 0.9, an + 0.9); ctx.stroke(); }
+                    else if (p.k === 'arrow') { const yy = p.y + (p.ty - p.y) * Math.min(1, u * 1.6); ctx.globalAlpha = u < 0.62 ? 0.95 : a * 2.4; ctx.strokeStyle = '#d8c090'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(p.x, yy - 16); ctx.lineTo(p.x, yy); ctx.stroke(); ctx.fillStyle = '#e8eef4'; ctx.beginPath(); ctx.moveTo(p.x, yy + 4); ctx.lineTo(p.x - 2.5, yy - 2); ctx.lineTo(p.x + 2.5, yy - 2); ctx.fill(); }
                     else if (p.k === 'cone') { const an = Math.atan2(p.ty - p.y, p.tx - p.x); ctx.globalAlpha = a * 0.5; ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.arc(p.x, p.y, p.r * (0.55 + u * 0.45), an - 0.6, an + 0.6); ctx.closePath(); ctx.fill(); }
                     else { ctx.globalCompositeOperation = 'lighter'; ctx.lineWidth = 5 * a + 1; ctx.beginPath(); ctx.moveTo(p.x, p.y); const mx = (p.x + p.tx) / 2 + Math.sin(p.age) * 8, my = (p.y + p.ty) / 2 + Math.cos(p.age * 2) * 8; ctx.lineTo(mx, my); ctx.lineTo(p.tx, p.ty); ctx.stroke(); }
                     ctx.restore(); continue; }

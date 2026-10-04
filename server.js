@@ -788,7 +788,7 @@ function doSync(user, b, ip) {
         let fx = (prev && Array.isArray(prev.fx)) ? prev.fx.filter(f => now - f.t < 2500) : [];
         if (Array.isArray(b.fx) && (!prev || !prev.fxAt || now - prev.fxAt > 120)) {
             for (const f of b.fx.slice(0, 14)) {
-                if (!f || !/^(magic|ranged|ring|flash|bolt|slash|beam|cone|dmg)$/.test(f.k)) continue;
+                if (!f || !/^(magic|ranged|ring|flash|bolt|slash|beam|cone|burst|arrow|dmg)$/.test(f.k)) continue;
                 const col = (typeof f.c === 'string' && /^#[0-9a-fA-F]{6}$/.test(f.c)) ? f.c : '#1abc9c';
                 const o = { k: f.k, c: col, x: coord(f.x, px), y: coord(f.y, py), tx: coord(f.tx, px), ty: coord(f.ty, py), t: now + fx.length };
                 if (f.r !== undefined) o.r = Math.max(0, Math.min(f.k === 'dmg' ? 99999 : 400, Number(f.r) || 0));
