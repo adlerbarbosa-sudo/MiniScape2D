@@ -646,7 +646,7 @@
        'front'/'back' não espelham com a direção (só 'side' espelha); st.turn (-1..1) = para onde olha, st.lookY = cima/baixo.
        ============================================================ */
     function legS(g, st, hx, hy, off, stride, lf, w, col, shoe, sl) {   // perna de perfil com passada e pé levantando
-        const a = sin(st.ph + off) * st.mv, lift = max(0, cos(st.ph + off)) * st.mv * lf, fx0 = hx + a * stride, fy0 = -0.5 - lift, lh = (-hy - 0.5) / 2 + 0.1 + st.mv * (-hy) * 0.06, K = ik(hx, hy, fx0, fy0, lh, lh, 1), fx = K[2], fy = K[3];
+        const a = sin(st.ph + off) * st.mv, lift = max(0, cos(st.ph + off)) * st.mv * lf, fx0 = hx + a * stride, fy0 = -0.5 - lift, lh = (-hy - 0.5) / 2 + 0.1 + st.mv * (-hy) * 0.025, K = ik(hx, hy, fx0, fy0, lh, lh, 1), fx = K[2], fy = K[3];
         limb2(g, hx, hy, K[0], K[1], fx, fy, w, col);
         ell(g, fx + sl * 0.3, fy, sl, max(1.2, w * 0.36), shoe, OUT, 0.9);
     }
@@ -1400,9 +1400,9 @@
         // pernas (desenhadas no referencial do chão)
         g.save(); g.translate(0, LG);
         if (side) {
-            const hipH = -legY, lL = (hipH - 1) / 2 + 0.12 + mv * 1.3;   // joelho sempre dobra para a frente; passo com pé que levanta na fase de balanço
+            const hipH = -legY, lL = (hipH - 1) / 2 + 0.1 + mv * 0.3;   // joelho sempre dobra para a frente; passo com pé que levanta na fase de balanço
             for (const far of [1, 0]) {
-                const p = ph + (far ? 0 : PI), fxx = Math.sin(p) * mv * 4.6, lift = Math.max(0, Math.cos(p)) * mv * 3.4, K = ik(0, legY, fxx, -1 - lift, lL, lL, 1);
+                const p = ph + (far ? 0 : PI), fxx = Math.sin(p) * mv * 4.2, lift = Math.max(0, Math.cos(p)) * mv * 3, K = ik(0, legY, fxx, -1 - lift, lL, lL, 1);
                 limb2(g, 0, legY, K[0], K[1], K[2], K[3], 5, far ? pantsD : pants); const sc = far ? shade(boots, -0.15) : boots;
                 ell(g, K[2] + 1.6, K[3], 4.2, 2.05, sc, OUT, 0.9, -Math.cos(p) * mv * 0.12); if (!far) ell(g, K[2] + 2, K[3] - 0.6, 2.4, 0.8, shade(boots, 0.25));
             }
@@ -1914,7 +1914,7 @@
         else { ctx.fillStyle = 'rgba(0,0,0,' + (0.3 - bobS * 0.04) + ')'; ctx.beginPath(); ctx.ellipse(px, py + 8, (10 - bobS * 0.8) * D.sx, 3.6 - bobS * 0.2, 0, 0, TAU); ctx.fill(); }
         ctx.save(); ctx.translate(px, py + 8); ctx.scale(view === 'side' ? flip : 1, 1);
         if (p.turn > 0.03) ctx.scale(1 - 0.18 * p.turn, 1);
-        const lean = view === 'side' ? 0.055 * p.mv : sin(p.ph) * 0.03 * p.mv; if (lean) { ctx.translate(0, -9); ctx.rotate(lean); ctx.translate(0, 9); }
+        const lean = view === 'side' ? 0.02 * p.mv : sin(p.ph) * 0.03 * p.mv; if (lean) { ctx.translate(0, -9); ctx.rotate(lean); ctx.translate(0, 9); }
         root.__rodOut = !!(isMain && root.Fishing && root.Fishing.rodOut && root.Fishing.rodOut());   // pescando: a linha da vara é desenhada pelo fishing.js
         renderPerson(ctx, view, p.mv, p.ph, anim, equip, L, now, view === 'side' ? 0 : p.lx); root.__rodOut = false;
         ctx.restore();
