@@ -48,7 +48,7 @@ function cleanRift(r) {
     const o = { board: nul(), claimed: nul(), best: nul(), day: nul(), comm: nul(), cclaim: nul() };
     if (!r || typeof r !== 'object') return o;
     const bad = (u) => typeof u !== 'string' || u.length > 40 || ['__proto__', 'constructor', 'prototype'].includes(u);
-    if (r.board && typeof r.board === 'object') for (const w of Object.keys(r.board).slice(-8)) { if (!WK_RE.test(w) || !r.board[w] || typeof r.board[w] !== 'object') continue; const b = nul(); let n = 0; for (const u of Object.keys(r.board[w])) { if (n >= 500) break; const e = r.board[w][u]; if (bad(u) || !e || typeof e !== 'object') continue; b[u] = { s: int(e.s, 0, 100000, 0), f: int(e.f, 0, 6, 0), l: int(e.l, 1, 30, 1), t: int(e.t, 0, 4e12, 0) }; n++; } o.board[w] = b; }
+    if (r.board && typeof r.board === 'object') for (const w of Object.keys(r.board).slice(-8)) { if (!WK_RE.test(w) || !r.board[w] || typeof r.board[w] !== 'object') continue; const b = nul(); let n = 0; for (const u of Object.keys(r.board[w])) { if (n >= 500) break; const e = r.board[w][u]; if (bad(u) || !e || typeof e !== 'object') continue; b[u] = { s: int(e.s, 0, 100000, 0), f: int(e.f, 0, 300, 0), l: int(e.l, 1, 30, 1), t: int(e.t, 0, 4e12, 0) }; n++; } o.board[w] = b; }
     for (const f of ['claimed', 'cclaim']) if (r[f] && typeof r[f] === 'object') for (const w of Object.keys(r[f]).slice(-8)) { if (!WK_RE.test(w) || !r[f][w] || typeof r[f][w] !== 'object') continue; const b = nul(); for (const u of Object.keys(r[f][w]).slice(0, 600)) if (!bad(u) && r[f][w][u] === 1) b[u] = 1; o[f][w] = b; }
     if (r.best && typeof r.best === 'object') { let n = 0; for (const u of Object.keys(r.best)) { if (n++ >= 5000) break; if (!bad(u)) o.best[u] = int(r.best[u], 0, 30, 0); } }
     if (r.day && typeof r.day === 'object') { for (const u of Object.keys(r.day).slice(0, 5000)) { const e = r.day[u]; if (!bad(u) && e && typeof e.d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(e.d)) o.day[u] = { d: e.d, n: int(e.n, 0, 100, 0) }; } }
@@ -170,7 +170,7 @@ module.exports = function createEngageSrv(ctx) {
 
 
     /* ---------- Fendas (masmorra escalonada): o cliente joga a corrida; o servidor decide nível liberado, pontuação, recompensa e placar ---------- */
-    const RIFT_FLOORS = 6, RIFT_MAXLVL = 30, RIFT_REWARDED_PER_DAY = 4, RIFT_MIN_SEC_PER_FLOOR = 18, RIFT_MAX_MS = 45 * 60000;
+    const RIFT_SEAL = 6, RIFT_MAXFLOORS = 300, RIFT_MAXLVL = 30, RIFT_REWARDED_PER_DAY = 4, RIFT_MIN_SEC_PER_FLOOR = 5, RIFT_MAX_MS = 3 * 3600000, RIFT_REWARD_FLOORS = 40;   // infinita: o andar 6 'sela' (libera o próximo nível); chefe a cada 5; prêmio conta até 40 andares
     const RIFT_MODS = [
         { id: 'furia', n: 'Fúria', d: 'Inimigos causam +25% de dano. Recompensa +25%.', dmg: 1.25, rw: 1.25 },
         { id: 'gigantes', n: 'Gigantes', d: 'Inimigos têm +40% de vida. Recompensa +20%.', hp: 1.4, rw: 1.2 },
@@ -189,7 +189,7 @@ module.exports = function createEngageSrv(ctx) {
         const pk = 'S' + (E.weekIdx(t) - 1), ptop = riftTop(pk), pi = ptop.findIndex((r) => r.u === user), cm = rf.comm[wk] || { t: 0, by: nul() }, goal = riftGoal();
         const best = hasOwn(rf.best, user) ? rf.best[user] : 0, c = topCombat(user);
         const cWeek = rf.cclaim[wk] && rf.cclaim[wk][user] === 1;
-        return { ok: true, wk, mod: { id: md.id, n: md.n, d: md.d }, left: E.msToNextWeek(t), floors: RIFT_FLOORS, best, maxLvl: Math.min(RIFT_MAXLVL, best + 1), baseLvl: c.L,
+        return { ok: true, wk, mod: { id: md.id, n: md.n, d: md.d }, left: E.msToNextWeek(t), seal: RIFT_SEAL, best, maxLvl: Math.min(RIFT_MAXLVL, best + 1), baseLvl: c.L,
             top: top.slice(0, 20).map((r, i) => ({ pos: i + 1, u: r.u, s: r.s, f: r.f, l: r.l })), me: idx >= 0 ? { pos: idx + 1, s: top[idx].s, f: top[idx].f, l: top[idx].l } : null, total: top.length,
             rewarded: used, rewardCap: RIFT_REWARDED_PER_DAY,
             prev: pi >= 0 && pi < 3 ? { pos: pi + 1, claimed: !!(rf.claimed[pk] && rf.claimed[pk][user]) } : null,
@@ -199,20 +199,20 @@ module.exports = function createEngageSrv(ctx) {
         const st = riftState(user), lvl = int(b.lvl, 1, RIFT_MAXLVL, 1); if (lvl > st.maxLvl) return fail('Nível de Fenda ainda bloqueado: vença o nível ' + (lvl - 1) + ' primeiro.', 'LOCKED');
         const t = now(), md = riftMod(t), bl = Math.max(3, Math.min(80, Math.round(st.baseLvl * 0.5 + lvl * 2)));
         const id = t.toString(36) + Math.floor(Math.random() * 1e6).toString(36); runs[user] = { id, t0: t, lvl, bl, mod: md.id };
-        return { ok: true, id, lvl, bl, floors: RIFT_FLOORS, mod: { id: md.id, n: md.n, d: md.d, dmg: md.dmg || 1, hp: md.hp || 1, more: md.more || 1, dark: md.dark || 0 } };
+        return { ok: true, id, lvl, bl, seal: RIFT_SEAL, mod: { id: md.id, n: md.n, d: md.d, dmg: md.dmg || 1, hp: md.hp || 1, more: md.more || 1, dark: md.dark || 0 } };
     }
     function riftEnd(user, b) {
         const r = hasOwn(runs, user) ? runs[user] : null; if (!r || r.id !== b.id) return fail('Esta corrida não existe mais.', 'NORUN');
         delete runs[user]; const t = now(), el = t - r.t0, rf = R(), wk = E.weekKey(t), md = riftMod(r.t0);
-        let fc = int(b.fc, 0, RIFT_FLOORS, 0); const maxByTime = Math.floor(el / (RIFT_MIN_SEC_PER_FLOOR * 1000)); if (el > RIFT_MAX_MS) fc = 0; fc = Math.min(fc, maxByTime);
-        const cleared = fc >= RIFT_FLOORS && b.cl === true; if (!cleared && fc >= RIFT_FLOORS) fc = RIFT_FLOORS - 1;
-        const sec2 = Math.floor(el / 1000), score = fc < 1 ? 0 : fc * 100 + (cleared ? 300 + Math.max(0, Math.floor((480 - sec2) / 2)) : 0) + r.lvl * 40;
+        let fc = int(b.fc, 0, RIFT_MAXFLOORS, 0); const maxByTime = Math.floor(el / (RIFT_MIN_SEC_PER_FLOOR * 1000)); if (el > RIFT_MAX_MS) fc = Math.min(fc, 60); fc = Math.min(fc, maxByTime);
+        const cleared = fc >= RIFT_SEAL;
+        const sec2 = Math.floor(el / 1000), score = fc < 1 ? 0 : fc * 100 + Math.floor(fc / 5) * 150 + r.lvl * 40;
         const out = { ok: true, fc, cleared, score, lvl: r.lvl, secs: sec2, shards: 0, coins: 0, capped: false, newBest: false };
         if (fc >= 1) {
             if (!rf.board[wk]) rf.board[wk] = nul(); const cur = rf.board[wk][user]; if (!cur || score > cur.s) { rf.board[wk][user] = { s: score, f: fc, l: r.lvl, t }; out.newBest = true; }
             const day = E.dayKey(t); let dd = rf.day[user]; if (!dd || dd.d !== day) dd = rf.day[user] = { d: day, n: 0 };
             if (dd.n < RIFT_REWARDED_PER_DAY) {
-                dd.n++; const sh = Math.max(1, Math.round((fc + (cleared ? 4 : 0)) * (1 + r.lvl * 0.05) * (md.rw || 1))), co = Math.round(fc * (60 + 12 * r.bl) * (md.rw || 1));
+                dd.n++; const ef = Math.min(fc, RIFT_REWARD_FLOORS), sh = Math.max(1, Math.round((ef + (cleared ? 4 : 0)) * (1 + r.lvl * 0.05) * (md.rw || 1))), co = Math.round(ef * (60 + 12 * r.bl) * (md.rw || 1));
                 const ok = deliver(user, { coins: co, items: [['Fragmento de Fenda', sh]] }, 'Fenda nível ' + r.lvl); if (ok) { out.shards = sh; out.coins = co; } else out.err = 'Correio cheio: esvazie o correio para receber as recompensas.';
                 if (!cm0(rf, wk)) rf.comm[wk] = { t: 0, by: nul() }; const cm = rf.comm[wk]; cm.by[user] = (cm.by[user] || 0) + fc; cm.t += fc;
             } else out.capped = true;

@@ -5,7 +5,7 @@
 (function () {
     'use strict';
     const LOW = new Set(['fence_h', 'fence_v', 'barrel', 'crates', 'stump', 'bush', 'haystack', 'sign', 'lamp', 'campfire', 'well', 'cart', 'crystal', 'mushrooms', 'lily', 'flowers', 'gravestone', 'bones', 'reeds', 'lava', 'netrack', 'sarcophagus', 'torch', 'fountain', 'cactus', 'banner']);
-    const NOBLOCK = new Set(['ground_item', 'fishing_spot', 'farm_plot', 'portal', 'fire', 'paint', 'enemy', 'npc', 'furnace', 'anvil', 'bank', 'cauldron', 'enchant_table', 'house_door', 'edge_exit']);
+    const NOBLOCK = new Set(['ground_item', 'fishing_spot', 'farm_plot', 'rift_gate', 'rift_next', 'portal', 'fire', 'paint', 'enemy', 'npc', 'furnace', 'anvil', 'bank', 'cauldron', 'enchant_table', 'house_door', 'edge_exit']);
     let cacheArr = null, cacheLen = -1, cacheT = 0, rects = [], memo = new Map(), memoT = 0;
     function build(cur) {
         const out = [];

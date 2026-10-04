@@ -1240,7 +1240,7 @@
         // se o mundo mudou e o jogador ficou "dentro" de uma construção, tira ele de lá (procura o ponto livre mais próximo)
         function ensurePlayerFree() {
             const m = gameMaps[currentMap]; if (!m || !m.entities) return; const W = m.width || 800, H = m.height || 600;
-            const solid = m.entities.filter(o => o && o.active && !['ground_item','fishing_spot','farm_plot','portal','fire','paint','enemy','npc'].includes(o.type));
+            const solid = m.entities.filter(o => o && o.active && !['ground_item','fishing_spot','farm_plot','rift_gate','rift_next','portal','fire','paint','enemy','npc'].includes(o.type));
             const hits = (x, y) => solid.some(o => { const h = getHitbox(o); return h && x - 10 < h.x + h.w && x + 10 > h.x && y - 10 < h.y + h.h && y + 10 > h.y; });
             if (!hits(player.x, player.y)) return;
             for (let r = 20; r < 600; r += 20) for (let a = 0; a < 16; a++) { const x = player.x + Math.cos(a / 16 * 6.283) * r, y = player.y + Math.sin(a / 16 * 6.283) * r; if (x > 20 && y > 20 && x < W - 20 && y < H - 20 && !hits(x, y)) { player.x = x; player.y = y; player.destX = x; player.destY = y; return; } }
@@ -1573,7 +1573,7 @@
 
         // --- PATHFINDING (A*) : o personagem contorna casas, árvores e paredes em vez de travar ---
         const PF_CELL = 16; let pfKey = ''; let pfPath = [];
-        const PF_SKIP = ['ground_item','fishing_spot','farm_plot','portal','fire','paint','enemy'];
+        const PF_SKIP = ['ground_item','fishing_spot','farm_plot','rift_gate','rift_next','portal','fire','paint','enemy'];
         function pfBlockedFn(cur, mapW, mapH) {
             const cols = Math.ceil(mapW / PF_CELL), rows = Math.ceil(mapH / PF_CELL); const grid = new Uint8Array(cols * rows); const m = 11;
             for (const o of cur) {
@@ -1640,7 +1640,7 @@
         function mobStep(o, cur, ex, ey, ed, spd, ow, oh) {
             let nx = o.x + (ex/ed)*spd; let ny = o.y + (ey/ed)*spd; let cx = false, cy = false;
             for (let wo of cur) {
-                if(!wo || !wo.active || ['ground_item','fishing_spot','farm_plot','portal','paint','enemy','npc'].includes(wo.type) || wo === o) continue;
+                if(!wo || !wo.active || ['ground_item','fishing_spot','farm_plot','rift_gate','rift_next','portal','paint','enemy','npc'].includes(wo.type) || wo === o) continue;
                 let hb = getHitbox(wo); if (!hb) continue;
                 const bw = Math.max(10, ow * 0.7), bh = Math.max(8, oh * 0.4);   // colisão pelos "pés" do bicho, não pela imagem toda
                 const ov = (px, py) => { const bx = px + (ow - bw) / 2, by = py + oh - bh; return bx < hb.x + hb.w && bx + bw > hb.x && by < hb.y + hb.h && by + bh > hb.y; };
@@ -1684,7 +1684,7 @@
                     let nX = player.x + mx; let nY = player.y + my; let colX = false, colY = false; let pw = 10, ph = 10;
                     
                     for(let o of cur) {
-                        if(!o || !o.type || !o.active || ['ground_item','fishing_spot','farm_plot','portal','fire','paint'].includes(o.type)) continue;
+                        if(!o || !o.type || !o.active || ['ground_item','fishing_spot','farm_plot','rift_gate','rift_next','portal','fire','paint'].includes(o.type)) continue;
                         let hb = getHitbox(o); if (!hb) continue;
                         let wasInside = (player.x-pw < hb.x+hb.w && player.x+pw > hb.x && player.y-ph < hb.y+hb.h && player.y+ph > hb.y);
                         if (wasInside && (o.type === 'enemy' || o.type === 'npc')) continue;
@@ -1692,6 +1692,7 @@
                         if(player.x-pw < hb.x+hb.w && player.x+pw > hb.x && nY-ph < hb.y+hb.h && nY+ph > hb.y) colY = true;
                     }
                     if(!colX) player.x = nX; if(!colY) player.y = nY;
+                    player.destX = player.x; player.destY = player.y;   // destino = onde parou: sem isso o frame seguinte "voltava" um passo e virava para o lado contrário ao soltar a tecla
                     if(Math.abs(mx) > Math.abs(my)) { player.facing.x = mx > 0 ? 1 : -1; player.facing.y = 0; } else { player.facing.x = 0; player.facing.y = my > 0 ? 1 : -1; }
                 } else {
                     const dx = player.destX - player.x; const dy = player.destY - player.y; const dist = Math.hypot(dx, dy); 
@@ -1708,7 +1709,7 @@
                         let sdx = dx, sdy = dy, sdist = dist; const wp = getSteerPoint(cur, mapW, mapH); if (wp) { sdx = wp.x - player.x; sdy = wp.y - player.y; sdist = Math.hypot(sdx, sdy) || 1; }
                         const _sp2 = window.Stats ? Stats.spd(true) : player.speed; const mx = (sdx / sdist) * _sp2; const my = (sdy / sdist) * _sp2; let nX = player.x + mx; let nY = player.y + my; let colX = false, colY = false; let pw = 10, ph = 10;
                         for(let o of cur) {
-                            if(!o || !o.type || !o.active || ['ground_item','fishing_spot','farm_plot','portal','fire','paint'].includes(o.type)) continue;
+                            if(!o || !o.type || !o.active || ['ground_item','fishing_spot','farm_plot','rift_gate','rift_next','portal','fire','paint'].includes(o.type)) continue;
                             let hb = getHitbox(o); if (!hb) continue;
                             let wasInside = (player.x-pw < hb.x+hb.w && player.x+pw > hb.x && player.y-ph < hb.y+hb.h && player.y+ph > hb.y);
                             if (wasInside && (o.type === 'enemy' || o.type === 'npc')) continue;
@@ -1917,7 +1918,8 @@
                     if (!o || !o.type || o.type === 'ground_item' || o.type === 'paint') return;
                     if (!inView(o, (o.type === 'enemy' || o.type === 'npc') ? 120 : 60)) return;
                     if (!o.active && !(o.type === 'tree' || (typeof o.type === 'string' && o.type.startsWith('rock')))) return;   // árvore/rocha esgotada ficam como toco/pedra vazia
-                    let sy = o.y + (o.h || 30); if (o.type === 'decor' && (o.kind === 'flowers' || o.kind === 'bones' || o.kind === 'lily' || o.kind === 'mushrooms')) sy -= 1000;   // decoração rasteira fica sempre atrás
+                    let sy = o.y + (o.h || 30); if (o.type === 'decor' && (o.kind === 'flowers' || o.kind === 'bones' || o.kind === 'lily' || o.kind === 'mushrooms')) sy -= 1000;
+                    if (o.type === 'farm_plot' || o.type === 'rift_next') sy -= 1000;   // canteiro e fissura são chão: quem anda por cima aparece na frente   // decoração rasteira fica sempre atrás
                     renderQueue.push({ type: 'entity', obj: o, sortY: sy });
                 });
                 

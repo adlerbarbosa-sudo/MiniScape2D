@@ -301,7 +301,7 @@
     function puffAt(x, y, n) { try { if (window.Art && Art.puff) Art.puff(x, y, 'rgba(205,195,170,', n || 6, 5, 0.5); } catch (e) { } }
 
     /* ============================ COLISÃO DOS SEGUIDORES ============================ */
-    const NOSOLID = ['ground_item', 'fishing_spot', 'farm_plot', 'portal', 'fire', 'paint', 'enemy', 'npc', 'house_door'];
+    const NOSOLID = ['ground_item', 'fishing_spot', 'farm_plot', 'rift_gate', 'rift_next', 'portal', 'fire', 'paint', 'enemy', 'npc', 'house_door'];
     function solids() {
         const m = gameMaps[currentMap]; if (!m) return [];
         const now = performance.now();
