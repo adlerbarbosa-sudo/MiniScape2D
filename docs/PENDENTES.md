@@ -21,3 +21,12 @@ Leia o README.md antes de começar. Regras de trabalho: testar com Playwright em
 - Falta o evento Invasão no cliente (spawn dos invasores; precisa de teste multiplayer no servidor real).
 - Teste em produção das Fendas/Reforja/Casa (o ambiente de desenvolvimento não tem `express`; a lógica de servidor foi testada em módulo e o cliente com o servidor simulado).
 - Prestígio: não implementado (a Maestria após o nível 99 já cumpre o papel). Guildas não existem; a meta coletiva vive nas Fendas.
+
+## Multiplayer / Eventos / Visuais (lote 15:43–15:49)
+- `drops.js`: drops, árvores/rochas esgotadas e fogueiras compartilhados via sync; coleta arbitrada em `POST /api/drop` (precisa de teste online em produção).
+- Equipamento/auras: payload enxuto + reenvio periódico; servidor usa equipamento salvo como fallback.
+- Eventos: Dev > "Eventos" liga/desliga Fenda (padrão DESLIGADA) e Missões Especiais (`/api/admin/events`).
+- Mímicos: formas (capacete draconiano, asas, capa...) e luz própria no escuro; asas animadas.
+- Árvores por espécie no editor (níveis em econ.js); 4 novas casas (stone_house, longhouse, manor, cabin).
+- Terreno de cor livre orgânico (`c:#hex` em terrain.js).
+- Monstros humanoides: braços/armas reproporcionados, armas de perfil mais naturais.

@@ -174,7 +174,7 @@
         tri(g, hx - 8, hy - 1, hx - 13, hy - 5, hx - 8, hy + 3, skinD, OUT, 1);
         g.restore();
         // braço da frente + machado (empunhado para cima, ao lado da cabeça; no ataque desce em arco)
-        held(g, 13 + lean, -36 - bob, -0.2 + atk * 2.3 + sw * 0.3, 11, 6.5, skin, skinD, 0.32 + atk * 1.75, g2 => {
+        held(g, 13 + lean, -36 - bob, -0.2 + atk * 2.3 + sw * 0.3, 9.5, 5.6, skin, skinD, 0.32 + atk * 1.75, g2 => {
             g2.fillStyle = '#5b3a1e'; g2.strokeStyle = OUT; g2.lineWidth = 1; g2.beginPath(); g2.rect(-1.6, -26, 3.2, 34); g2.fill(); g2.stroke();
             g2.beginPath(); g2.moveTo(1.4, -25); g2.quadraticCurveTo(13, -28, 12, -16); g2.quadraticCurveTo(13, -8, 1.4, -11); g2.closePath(); paint(g2, lg(g2, 1, -25, 13, -12, [[0, '#e8ecf0'], [1, '#7c8590']]), OUT, 1.2);
         });
@@ -370,7 +370,7 @@
         limb2(g, -7, -24 - bob, -7 + sw * 4, -13, -8 + sw * 8, -1, 11, skinD); limb2(g, 8, -24 - bob, 8 - sw * 4, -13, 9 - sw * 8, -1, 11, skin);
         ell(g, -8 + sw * 8, 0, 8, 3, '#2e2a22', OUT, 1.2); ell(g, 9 - sw * 8, 0, 8, 3, '#332e26', OUT, 1.2);
         // braço de trás
-        limb2(g, -17, -47 - bob, -25, -34 - bob, -24 - sw * 5, -20 - bob, 10, skinD); ell(g, -24 - sw * 5, -18 - bob, 6, 5.4, skinD, OUT, 1.1);
+        limb2(g, -17, -47 - bob, -23, -37 - bob, -22 - sw * 4, -26 - bob, 8.4, skinD); ell(g, -22 - sw * 4, -24 - bob, 5, 4.6, skinD, OUT, 1.1);
         g.save(); g.translate(lean, 0);
         g.beginPath(); g.moveTo(-18, -22 - bob); g.bezierCurveTo(-26, -40 - bob, -18, -56 - bob + br, 0, -55 - bob + br); g.bezierCurveTo(20, -56 - bob, 26, -40 - bob, 18, -22 - bob); g.bezierCurveTo(8, -18 - bob, -8, -18 - bob, -18, -22 - bob); g.closePath();
         paint(g, lg(g, -24, -56, 24, -20, [[0, skinL], [0.6, skin], [1, skinD]]), OUT, 1.5);
@@ -392,7 +392,7 @@
         g.strokeStyle = '#5a4030'; g.lineWidth = 1.2; for (let i = 0; i < 4; i++) { g.beginPath(); g.moveTo(hx - 6 + i * 3.4, hy - 8); g.lineTo(hx - 8 + i * 3.4 + sin(t * 2 + i) * 0.8, hy - 14); g.stroke(); }
         g.restore();
         // braço + tacape (apoiado para cima; no ataque desce pesado)
-        held(g, 19 + lean, -47 - bob, -0.15 + atk * 2.3 + sw * 0.15, 20, 10, skin, skinD, 0.3 + atk * 1.75, g2 => {
+        held(g, 19 + lean, -47 - bob, -0.15 + atk * 2.3 + sw * 0.15, 16, 8.4, skin, skinD, 0.3 + atk * 1.75, g2 => {
             g2.beginPath(); g2.moveTo(-3, 6); g2.lineTo(3, 6); g2.lineTo(6, -30); g2.quadraticCurveTo(5, -44, -5, -42); g2.quadraticCurveTo(-9, -34, -3, 6); g2.closePath();
             paint(g2, lg(g2, -8, 0, 8, 0, [[0, '#8a6238'], [1, '#4a3018']]), OUT, 1.3);
             g2.strokeStyle = 'rgba(0,0,0,0.3)'; g2.lineWidth = 1; for (let i = 0; i < 4; i++) { g2.beginPath(); g2.moveTo(-3, -4 - i * 8); g2.lineTo(3, -2 - i * 8); g2.stroke(); }
@@ -650,7 +650,7 @@
         poly(g, [hx + 5.4, hy - 1.4, hx + 12.5, hy + 2, hx + 5.6, hy + 3.4], skin, OUT, 1); ell(g, hx + 10.4, hy + 2, 0.7, 0.6, skinD);
         eyeLk(g, hx + 3.2, hy - 1.6, 2.4, 2.2, '#ffe75a', '#b3131b', 0.6); g.strokeStyle = '#27381a'; g.lineWidth = 1.2; g.beginPath(); g.moveTo(hx + 0.6, hy - 4.2); g.lineTo(hx + 6, hy - 2.6); g.stroke();
         g.strokeStyle = '#3a0d0d'; g.lineWidth = 1.1; g.beginPath(); g.moveTo(hx + 1.2, hy + 4.2); g.quadraticCurveTo(hx + 5, hy + 5.8 + atk * 2, hx + 8, hy + 3.9); g.stroke(); tri(g, hx + 3, hy + 4.4, hx + 4.8, hy + 4.4, hx + 3.9, hy + 6.6, '#fff');
-        held(g, 1 + lean, -22 - bob, 0.95 + atk * 1.5 - sw * 0.25, 8, 3.6, skin, skin, 0.85 + atk * 1.3, g2 => {
+        held(g, 1 + lean, -22 - bob, 0.4 + atk * 1.5 - sw * 0.25, 7.5, 3.8, skin, skin, 0.7 + atk * 1.3, g2 => {
             poly(g2, [-1.7, -1.5, 1.7, -1.5, 1.5, -15, 0, -19, -1.5, -15], '#d3dae1', OUT, 1); g2.fillStyle = '#9aa3ad'; g2.fillRect(0.2, -14, 1.2, 12);
             g2.fillStyle = '#5b3a1e'; g2.fillRect(-3.4, -2.4, 6.8, 2.3); g2.fillRect(-1, 0, 2, 4);
         });
@@ -674,7 +674,7 @@
         g.fillStyle = '#4a0c0c'; g.beginPath(); g.moveTo(hx + 1, hy + 5.2); g.quadraticCurveTo(hx + 5, hy + 7.4 + atk * 2, hx + 9.4, hy + 4.8); g.lineTo(hx + 9, hy + 4); g.lineTo(hx + 1, hy + 4); g.fill();
         tri(g, hx + 4.4, hy + 5.4, hx + 6.2, hy + 5.2, hx + 5.8, hy + 0.8, '#f4efd8', OUT, 0.8);
         g.restore();
-        held(g, 5 + lean, -35 - bob, 0.75 + atk * 1.55 - sw * 0.2, 10, 6.4, skin, skinD, 0.5 + atk * 1.5, g2 => {
+        held(g, 5 + lean, -35 - bob, 0.35 + atk * 1.55 - sw * 0.2, 9, 5.6, skin, skinD, 0.8 + atk * 1.5, g2 => {
             g2.fillStyle = '#5b3a1e'; g2.strokeStyle = OUT; g2.lineWidth = 1; g2.beginPath(); g2.rect(-1.6, -26, 3.2, 34); g2.fill(); g2.stroke();
             g2.beginPath(); g2.moveTo(1.4, -25); g2.quadraticCurveTo(13, -28, 12, -16); g2.quadraticCurveTo(13, -8, 1.4, -11); g2.closePath(); paint(g2, '#aab3bd', OUT, 1.2); g2.fillStyle = '#e8ecf0'; g2.beginPath(); g2.moveTo(2, -23.5); g2.quadraticCurveTo(10.5, -25.5, 10.6, -17); g2.lineTo(6, -17); g2.closePath(); g2.fill();
         });
@@ -693,14 +693,14 @@
         rrect(g, hx - 1, hy + 3.6, 7, 2.4 + jaw * 0.6, 1.1, boneD, OUT, 0.9);
         g.fillStyle = '#1a1010'; g.beginPath(); g.ellipse(hx + 2.6, hy - 0.6, 2.2, 2.4, 0, 0, TAU); g.fill(); g.fillStyle = '#ff2e2e'; g.fillRect(hx + 2.6 + (st.turn || 0) * 0.3, hy - 1, 1.3, 1.3);
         tri(g, hx + 5.4, hy + 1.2, hx + 6.6, hy + 1.2, hx + 6.2, hy + 2.6, '#1a1010'); g.strokeStyle = '#1a1010'; g.lineWidth = 0.7; for (let i = 0; i < 3; i++) { g.beginPath(); g.moveTo(hx + 1.4 + i * 2, hy + 3.8); g.lineTo(hx + 1.4 + i * 2, hy + 5.3 + jaw * 0.3); g.stroke(); }
-        held(g, 1 + lean, -32 - bob, 0.95 + atk * 1.4 - sw * 0.25, 9, 2.6, bone, bone, 0.85 + atk * 1.3, g2 => {
+        held(g, 1 + lean, -32 - bob, 0.4 + atk * 1.4 - sw * 0.25, 8.5, 2.8, bone, bone, 0.7 + atk * 1.3, g2 => {
             poly(g2, [-1.6, -2, 1.6, -2, 1.4, -19, 0, -23, -1.4, -19], '#d6dde2', OUT, 1); g2.fillStyle = '#9aa3ad'; g2.fillRect(0.2, -18, 1, 14); g2.fillStyle = '#6b4a24'; g2.fillRect(-4, -3, 8, 2.2); g2.fillRect(-1, -1, 2, 5);
         });
     }
     function trollSide(g, st) {
         const { t, mv, ph, atk, c1, c2 } = st; const sw = sin(ph) * mv, bob = abs(sin(ph)) * mv * 2.2, br = sin(t * 2 + st.seed) * 0.8, skin = c1, skinD = shade(skin, -0.38), skinL = shade(skin, 0.22), lean = atk * 5;
         legS(g, st, -2, -24 - bob, 0, 7, 4, 11, skinD, '#2e2a22', 8); legS(g, st, 3, -24 - bob, PI, 7, 4, 11, skin, '#332e26', 8);
-        limb2(g, -4, -47 - bob, -sw * 5 - 3, -34 - bob, -sw * 7 - 4, -20 - bob, 9.4, skinD); ell(g, -sw * 7 - 4, -18 - bob, 5.4, 5, skinD, OUT, 1.1);
+        limb2(g, -4, -47 - bob, -sw * 4 - 3, -37 - bob, -sw * 6 - 4, -26 - bob, 8, skinD); ell(g, -sw * 6 - 4, -24 - bob, 4.8, 4.4, skinD, OUT, 1.1);
         g.save(); g.translate(lean, 0);
         g.beginPath(); g.moveTo(-12, -22 - bob); g.bezierCurveTo(-20, -40 - bob, -14, -56 - bob + br, -2, -55 - bob + br); g.bezierCurveTo(12, -56 - bob, 17, -40 - bob, 12, -22 - bob); g.bezierCurveTo(4, -18 - bob, -6, -18 - bob, -12, -22 - bob); g.closePath(); paint(g, skin, OUT, 1.5);
         g.fillStyle = alpha(skinD, 0.5); g.beginPath(); g.moveTo(5, -54 - bob + br); g.bezierCurveTo(17, -40 - bob, 12, -26 - bob, 9, -20 - bob); g.lineTo(4, -20 - bob); g.bezierCurveTo(8, -34 - bob, 8, -46 - bob, 5, -54 - bob + br); g.fill();
@@ -714,7 +714,7 @@
         tri(g, hx + 6.4, hy + 6, hx + 9.4, hy + 6, hx + 8.2, hy - 0.4, '#f2ecd0', OUT, 0.8);
         g.strokeStyle = '#5a4030'; g.lineWidth = 1.2; for (let i = 0; i < 3; i++) { g.beginPath(); g.moveTo(hx - 4 + i * 3.4, hy - 7.4); g.lineTo(hx - 5.4 + i * 3.4 + sin(t * 2 + i) * 0.8, hy - 13); g.stroke(); }
         g.restore();
-        held(g, 5 + lean, -46 - bob, 0.7 + atk * 1.6 - sw * 0.15, 19, 10, skin, skinD, 0.45 + atk * 1.55, g2 => {
+        held(g, 5 + lean, -46 - bob, 0.3 + atk * 1.6 - sw * 0.15, 15, 8.4, skin, skinD, 0.65 + atk * 1.55, g2 => {
             g2.beginPath(); g2.moveTo(-3, 6); g2.lineTo(3, 6); g2.lineTo(6, -30); g2.quadraticCurveTo(5, -44, -5, -42); g2.quadraticCurveTo(-9, -34, -3, 6); g2.closePath(); paint(g2, '#6c4a28', OUT, 1.3);
             g2.fillStyle = 'rgba(255,220,160,0.18)'; g2.fillRect(-2, -40, 2.2, 44);
             for (let i = 0; i < 4; i++) tri(g2, 4 + (i % 2) * 2, -14 - i * 5, 9 + (i % 2) * 2, -12 - i * 5, 4 + (i % 2) * 2, -9 - i * 5, '#c8ccd2', OUT, 0.8);
