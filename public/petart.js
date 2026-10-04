@@ -498,19 +498,24 @@
             const nod = sin(t * 1.6) * 0.4 - (mv > 0.1 ? sin(ph * 2) * 0.5 : 0), hx = L - 0.5 + (W ? 4 : 4.5), hy = by - (W ? 7.5 : 0.6) + nod;
             g.beginPath(); g.moveTo(L - 9, by - H - 0.8); g.quadraticCurveTo(L - 2, by - H - (W ? 1.6 : 0), hx, hy - (W ? 3.4 : 4.6)); g.lineTo(hx + 1, hy + 5); g.quadraticCurveTo(L, by + 5, L - 8, by + H - 1); g.closePath(); g.fillStyle = c1; g.fill(); g.lineWidth = 1; g.strokeStyle = OUT; g.stroke();
             if (W) { ell(L - 2.4, by + 0.5, 6.6, 7.8, c2); poly([L - 8, by + 6, L - 6.2, by + 11, L - 3.6, by + 6.6], c2, 0.9); poly([L - 4, by + 6.8, L - 1.4, by + 11.6, L + 1.6, by + 5.4], c2, 0.9); poly([L - 1, by - 5, L + 3, by - 1, L + 1, by + 3], sh(c2, 0.1), 0); }
-            g.save(); g.translate(hx, hy); g.rotate(W ? 0.12 : 0.35);
+            g.save(); g.translate(hx, hy); g.rotate(0.12); if (!W) g.scale(1.22, 1.22);
             if (W) {
                 ell(0, 0, 6.2, 5.2, c1); ell(8.2, 1.9, 6.6, 3, c1); ell(8.6, 3.4, 5.8, 1.6, c2, 0, 0); ell(13.6, 1.2, 1.7, 1.4, P.nose, 0, 0.6);
                 g.strokeStyle = '#1d1d22'; g.lineWidth = 0.8; g.beginPath(); g.moveTo(13, 3.6); g.quadraticCurveTo(8.6, 4.8, 5, 3.4); g.stroke(); poly([10.6, 3.8, 11.6, 3.8, 11.1, 5.6], '#f2f2f2', 0.6);
                 poly([-2.4, -3.8, -3.6, -10.6, 2, -4.6], c1, 0.9); poly([-2, -4.2, -2.8, -8.4, 0.8, -4.8], '#caa0a0', 0); poly([-4.6, -3, -7, -8.4, -1, -4.4], cd, 0.9);
                 ell(2.6, -1, 1.9, 1.3, P.eye, -0.3, 0.7); ell(2.9, -1, 0.5, 0.9, '#1d1d22', 0, 0); ell(3, 4.4, 4, 1.6, c2, 0, 0); g.strokeStyle = c3; g.lineWidth = 1; g.beginPath(); g.moveTo(5.4, -3.6); g.lineTo(9.6, -1.2); g.stroke();
             } else {
-                ell(0, 0, 5.2, 4.6, c1); ell(5.6, 2, 3.2, 2.6, sh(c1, 0.1)); ell(9.6, 1.2, 1.5, 1.2, P.nose, 0, 0.6); ell(6.6, 3.8, 3.2, 1.3, c3, 0, 0);
-                g.strokeStyle = '#0a0612'; g.lineWidth = 0.8; g.beginPath(); g.moveTo(9.4, 3.4); g.quadraticCurveTo(6.6, 4.4, 4.2, 3.2); g.stroke(); poly([7, 3.6, 8, 3.6, 7.5, 5.4], '#f6f2ff', 0.6);
-                ell(-2.4, -4.8, 2.4, 2.8, c1, 0.2); ell(-2.2, -4.6, 1.2, 1.6, P.nose, 0.2, 0); ell(-4.8, -3.8, 2.2, 2.6, cd, -0.2);
-                glow(2.4, -0.8, 6, 'rgba(255,230,90,A)', 0.55); ell(2.4, -0.8, 1.8, 1.2, P.eye, -0.25, 0.7); ell(2.7, -0.8, 0.4, 0.9, '#0a0612', 0, 0);
-                g.strokeStyle = 'rgba(230,220,255,.8)'; g.lineWidth = 0.5; for (let i = 0; i < 3; i++) { g.beginPath(); g.moveTo(8, 2.4 + i * 0.5); g.lineTo(13, 1 + i * 1.6); g.stroke(); }
-                ell(-0.5, -3.4, 2, 0.8, c2, 0.3, 0);
+                // cabeça de felino: crânio largo e redondo, focinho muito curto, bochechas, orelhas triangulares
+                ell(0, 0.4, 6.4, 5.6, c1); ell(-1.8, 3.4, 4.6, 2.8, sh(c1, 0.04), 0, 0);        // crânio + bochecha
+                ell(5.6, 2.2, 3.2, 2.6, sh(c1, 0.1)); ell(6.4, 3.6, 2.6, 1.3, c3, 0, 0);           // focinho curto + queixo escuro
+                poly([6.8, 0.2, 9.2, 0.4, 8.6, 2.2, 7, 2.2], P.nose, 0.7);                         // nariz
+                g.strokeStyle = '#0a0612'; g.lineWidth = 0.7; g.beginPath(); g.moveTo(8, 2.2); g.lineTo(8, 3.2); g.moveTo(8, 3.2); g.quadraticCurveTo(6.4, 4.4, 4.4, 3.6); g.stroke();
+                poly([6.6, 3.6, 7.6, 3.6, 7.1, 5.4], '#f6f2ff', 0.5);
+                poly([-2.6, -3.6, -3.6, -10.6, 2.2, -4.8], c1, 0.9); poly([-2.4, -4.4, -3, -8.6, 0.8, -5], P.nose, 0);     // orelha de lá/de cá
+                poly([-5.6, -2.6, -8, -8.6, -2.8, -4], cd, 0.9);
+                glow(2.6, -0.4, 6, 'rgba(255,230,90,A)', 0.6); ell(2.8, -0.4, 2.1, 1.3, P.eye, -0.3, 0.7); ell(3.1, -0.4, 0.45, 1, '#0a0612', 0, 0);
+                g.strokeStyle = 'rgba(230,220,255,.85)'; g.lineWidth = 0.5; for (let i = 0; i < 3; i++) { g.beginPath(); g.moveTo(7, 2.8 + i * 0.5); g.lineTo(12.4, 1.2 + i * 1.7); g.stroke(); }
+                ell(-0.5, -3.6, 2.4, 0.8, c2, 0.2, 0);
             }
             g.restore();
             // pernas perto
