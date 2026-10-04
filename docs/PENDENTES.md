@@ -7,7 +7,7 @@ Leia o README.md antes de começar. Regras de trabalho: testar com Playwright em
 - Frente 2 (itens/ofícios): venda a NPC (`sell`), nível mínimo em todos os equipamentos, árvores/rochas/Culinária/Artesanato por nível, ações mais rápidas com o nível, Mímicos com `cdr`, bug de rolagem da cor do Mímico (verificado).
 
 - Frente 3 (engajamento): interface Jornada (`public/engage_ui.js`, tecla N): diária, missões, Códice, Maestria, Colosso; progresso enviado por `Engage.prog`.
+- Pacotes de Conteúdo: Injetor de Expansão do Dev com pré-visualização, validação, desfazer e anti-duplicação (`public/packs.js`).
 
 ## Falta
 - Falta o evento Invasão no cliente (spawn dos invasores; precisa de teste multiplayer no servidor real).
-- Sistema de Pacotes de Conteúdo (JSON declarativo, sem deploy, validado, em DATA_DIR/packs, com desfazer) para itens, monstros, receitas, lojas, mapas.

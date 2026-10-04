@@ -144,9 +144,9 @@
                 <!-- IMPORTAÇÃO UNIVERSAL E BLINDADA -->
                 <div id="dev-import" class="dev-sub-content">
                     <h3 style="color:#2ecc71; margin-top:0;">Injetor de Expansão</h3>
-                    <p style="font-size:0.75rem; color:#bdc3c7; line-height: 1.4;">Cole o código <b>Base64</b> ou <b>JSON puro</b> abaixo.</p>
+                    <p style="font-size:0.75rem; color:#bdc3c7; line-height: 1.4;">Cole o pacote (<b>JSON puro</b> ou <b>Base64</b>). Use <b>Pré-visualizar</b> antes; dá para <b>desfazer</b> o último. Sem deploy.</p>
                     <textarea id="dev-import-code" class="dev-input" style="height:120px; font-family:monospace; resize: none; margin-bottom: 10px;" placeholder="Cole o código Base64 ou texto JSON aqui..."></textarea>
-                    <button class="dev-save-btn" onclick="importDevCode()" style="background:#8e44ad; font-size: 1rem;">Injetar pacote</button>
+                    <div style="display:flex;flex-wrap:wrap;gap:6px"><button class="dev-save-btn" onclick="importDevCode(true)" style="background:#2c7a9b;font-size:.9rem">Pré-visualizar</button><button class="dev-save-btn" onclick="importDevCode()" style="background:#8e44ad; font-size: 1rem;">Injetar pacote</button><button class="dev-save-btn" id="dev-import-undo" onclick="undoDevPack()" style="background:#7f4a2a;font-size:.8rem">Desfazer último</button><button class="dev-save-btn" onclick="document.getElementById('dev-import-code').value=Packs.sample()" style="background:#444;font-size:.8rem">Modelo</button></div><div id="dev-import-report" style="margin-top:8px;font-size:.74rem;line-height:1.4;max-height:220px;overflow:auto"></div>
                 </div>
                 
                 <div id="dev-map" class="dev-sub-content active"><div class="dev-row" style="margin-bottom: 5px;"><input type="text" id="dev-search" class="dev-input" placeholder="Buscar entidade..." oninput="filterDevEntities(this.value)" style="flex: 1; border-color: #5d4037;"><button class="dev-save-btn" style="width: auto; margin:0; background:#3d2e24;" onclick="toggleDevView()" title="Alternar Vista">Vista</button></div><div id="dev-entity-list"></div><div class="dev-row" style="margin-top: 8px;"><input type="number" id="spawn-w" class="dev-input" placeholder="Largura (W)"><input type="number" id="spawn-h" class="dev-input" placeholder="Altura (H)"></div><div class="dev-form-group" style="margin-top: 5px;"><input type="text" id="spawn-img" class="dev-input" placeholder="URL Imagem PNG (Opcional)"></div><button onclick="toggleDevBuild()" id="btn-build-mode" style="width: 100%; padding: 10px; background: #e67e22; color: white; border: none; font-weight: bold; cursor: pointer; margin-top:5px; border-radius:4px;">Modo Construção: OFF</button><p style="font-size: 0.7rem; color: #f1c40f; margin-top:10px;">ESQUERDO: Colocar | DIREITO: <b>Apagar</b></p></div>
@@ -182,6 +182,7 @@
 <script src="fx.js"></script>
     <script src="life.js"></script>
     <script src="fishing.js"></script>
+    <script src="packs.js"></script>
     <script src="hub.js"></script>
     <script src="engage.js"></script>
     <script src="engage_ui.js"></script>
@@ -1134,39 +1135,28 @@
         async function downloadServerBackup() { try { let data = await api('/backup'); if(data.error) { setActionText(data.error, '#e74c3c'); return; } delete data._status; let dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data)); let dlAnchorElem = document.createElement('a'); dlAnchorElem.setAttribute("href", dataStr); dlAnchorElem.setAttribute("download", "miniscape_backup.json"); dlAnchorElem.click(); setActionText("Backup baixado!", "#3498db"); } catch(e) { setActionText("Erro no backup.", "#e74c3c"); } }
         async function restoreServerBackup() { let code = document.getElementById('db-restore-code').value.trim(); if(!code) return; try { let parsed = JSON.parse(code); let data = await api('/restore', { dbData: parsed }); if(data.error) { setActionText(data.error, '#e74c3c'); return; } if(data.success) { setActionText("DB Restaurado com Sucesso!"); setTimeout(()=>location.reload(), 1500); } } catch(e) { setActionText("JSON inválido.", "#e74c3c"); } }
 
-        function importDevCode() {
-            const codeInput = document.getElementById('dev-import-code').value.trim(); 
-            if (!codeInput) { setActionText("Cole o código!", "#e74c3c"); return; }
-            
-            try { 
-                let parsed = null;
-                if (codeInput.startsWith('{')) {
-                    parsed = JSON.parse(codeInput);
-                } else {
-                    let cleanBase64 = codeInput.replace(/[^A-Za-z0-9+/=]/g, ''); 
-                    let binaryStr = atob(cleanBase64);
-                    let bytes = new Uint8Array(binaryStr.length);
-                    for (let i = 0; i < binaryStr.length; i++) { bytes[i] = binaryStr.charCodeAt(i); }
-                    let decodedStr = new TextDecoder('utf-8').decode(bytes);
-                    parsed = JSON.parse(decodedStr); 
-                }
-
-                if(parsed.items) Object.assign(itemDB, parsed.items); 
-                if(parsed.npcs) Object.assign(npcDB, parsed.npcs); 
-                if(parsed.maps) { 
-                    Object.keys(parsed.maps).forEach(mId => { 
-                        if(gameMaps[mId]) { 
-                            if(parsed.maps[mId].entities) { gameMaps[mId].entities = gameMaps[mId].entities.concat(parsed.maps[mId].entities); } 
-                        } else { gameMaps[mId] = parsed.maps[mId]; } 
-                    }); 
-                }
-                saveDataLogic(true, true); updateUI(); buildDevEntityList(); loadDevMapManager();
-                document.getElementById('dev-import-code').value = ''; 
-                setActionText("Importado com sucesso!", "#2ecc71"); alert("Pacote injetado com sucesso!"); 
-            } catch(e) { 
-                console.error("Erro na Importação:", e);
-                setActionText("Código inválido.", "#e74c3c"); 
-            }
+        /* Injetor de Expansão: pacotes de conteúdo (packs.js). "dry" = só pré-visualiza; sem dry aplica, salva no servidor (que valida de novo) e permite desfazer. */
+        async function importDevCode(dry) {
+            const box = document.getElementById('dev-import-code'), out = document.getElementById('dev-import-report'); const say = (h, c) => { if (out) { out.style.color = c || '#bdc3c7'; out.innerHTML = h; } };
+            const esc = (t) => String(t).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+            if (userRole !== 'admin') return say('Somente administradores.', '#e74c3c');
+            let p; try { p = Packs.parse(box.value); } catch (e) { return say('Código inválido: ' + esc(e.message), '#e74c3c'); }
+            const ctx = { itemDB, npcDB, maps: gameMaps }, r = Packs.check(p, ctx);
+            const rep = '<b>' + esc(r.lines.join(' ')) + '</b>' + (r.errors.length ? '<br><span style="color:#e74c3c">Erros (nada foi aplicado):<br>• ' + r.errors.slice(0, 15).map(esc).join('<br>• ') + '</span>' : '') + (r.warns.length ? '<br><span style="color:#f1c40f">Avisos:<br>• ' + r.warns.slice(0, 15).map(esc).join('<br>• ') + '</span>' : '');
+            if (r.errors.length) return say(rep, '#bdc3c7'); if (dry) return say(rep + '<br><span style="color:#2ecc71">Pacote válido. Clique em "Injetar pacote" para aplicar.</span>');
+            const snap = Packs.apply(p, ctx);
+            try { buildDevEntityList(); loadDevMapManager(); updateUI(); } catch (e) { }
+            let ok = false; try { ok = await saveDataLogic(true, true); } catch (e) { }
+            if (ok === true) { Packs.pushUndo(snap); box.value = ''; say(rep + '<br><span style="color:#2ecc71">Pacote "' + esc(p.name) + '" injetado e salvo no servidor. Os jogadores recebem na próxima sincronização.</span>'); setActionText('Pacote injetado!', '#2ecc71'); }
+            else { Packs.restore(snap, ctx); try { buildDevEntityList(); loadDevMapManager(); } catch (e) { } say(rep + '<br><span style="color:#e74c3c">O servidor não aceitou o pacote; nada foi alterado.</span>', '#bdc3c7'); }
+            const u = document.getElementById('dev-import-undo'); if (u) u.textContent = Packs.undoInfo() ? 'Desfazer: ' + Packs.undoInfo() : 'Nada para desfazer';
+        }
+        async function undoDevPack() {
+            const out = document.getElementById('dev-import-report'); const s = Packs.popUndo(); if (!s) { if (out) out.textContent = 'Nada para desfazer.'; return; }
+            Packs.restore(s, { itemDB, npcDB, maps: gameMaps }); try { buildDevEntityList(); loadDevMapManager(); updateUI(); } catch (e) { }
+            let ok = false; try { ok = await saveDataLogic(true, true); } catch (e) { }
+            if (out) { out.style.color = ok === true ? '#2ecc71' : '#e74c3c'; out.textContent = ok === true ? 'Pacote "' + s.name + '" desfeito.' : 'Desfeito aqui, mas o servidor não confirmou. Tente salvar de novo.'; }
+            const u = document.getElementById('dev-import-undo'); if (u) u.textContent = Packs.undoInfo() ? 'Desfazer: ' + Packs.undoInfo() : 'Nada para desfazer';
         }
 
         function filterDevEntities(term) { let val = removeAccents(term).toLowerCase(); document.querySelectorAll('.dev-ent-item').forEach(el => { let txt = removeAccents(el.getAttribute('data-name')).toLowerCase(); if(txt.includes(val)) el.style.display = devViewMode === 'list' ? 'flex' : 'flex'; else el.style.display = 'none'; }); if(devViewMode === 'list') { document.querySelectorAll('.dev-ent-cat').forEach(cat => { let hasVisible = false; let next = cat.nextElementSibling; while(next && next.classList.contains('dev-ent-item')) { if(next.style.display !== 'none') hasVisible = true; next = next.nextElementSibling; } cat.style.display = hasVisible ? 'block' : 'none'; }); } }

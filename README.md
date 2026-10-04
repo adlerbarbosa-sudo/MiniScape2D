@@ -531,6 +531,12 @@ Armas e ativas nos níveis altos (melhor arma do nível):
 - **Recarga (`cdr`)**: Mímicos ganham `cdr` (anel/amuleto/elmo/capuz/chapéu; ~15% com o set no nível 50) e há as joias craftáveis **Anel do Foco** (4%) e **Amuleto do Tempo** (6%). Soma com a árvore, teto 40%, mínimo 1,5 s.
 - O editor de itens do Dev agora **preserva** os campos que ele não mostra (crítico, set, requisitos...) ao salvar um item existente.
 
+## Pacotes de Conteúdo (adicionar itens, monstros e mapas sem deploy)
+
+Dev > **Injetor de Expansão** (só admin). Cole um pacote JSON (ou o mesmo JSON em Base64), clique em **Pré-visualizar** (valida e lista erros/avisos sem mudar nada) e depois em **Injetar pacote**: o jogo aplica, salva no servidor (que valida de novo e guarda backup do mundo) e todos os jogadores recebem na próxima sincronização. **Desfazer último** restaura os itens, monstros e mapas que o pacote tocou. Reaplicar o mesmo pacote não duplica entidades (elas levam a marca `pk` com o nome do pacote). O botão **Modelo** insere um exemplo.
+
+Formato (arquivo `public/packs.js` tem o cabeçalho completo): `name` (obrigatório), `items` (chave = nome do item; equipamentos com `slot` e `req: {skill, lvl}`; `sell` = preço de venda ao NPC), `npcs` (chave = id sem espaços; `hp`, `maxHit`, `xp`, `lootStr`...), `maps` (mapa novo com `width`, `height`, `entities`; mapa que já existe só recebe as entidades, a menos que `"replace": true`) e `entities` (lista de entidades acrescentadas a mapas existentes, por id do mapa). Dá para pedir ao Claude "gere um pacote com ..." e colar aqui.
+
 ## Jornada (tecla N)
 
 Botão **Jornada** (ou tecla `N`): recompensa diária com sequência de 7 dias, missões diárias e semanais (+ bônus por concluir todas), Códice (mapas, espécies, chefes, abates), Maestria após o nível 99 (bônus pequenos e com teto em Stats) e placar semanal do Colosso. Tudo que dá recompensa é decidido no servidor (`engagesrv.js`, `/api/engage`) e chega pelo correio; o cliente (`public/engage_ui.js`) só mostra e informa progresso de coleta, pesca, cozinha e fabricação (`Engage.prog`, em lote, com teto por minuto no servidor). `addXP(skill, n, true)` entrega XP bruto (sem multiplicadores) para recompensas de missão.
