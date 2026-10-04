@@ -1967,12 +1967,14 @@
                 });
                 
                 // === Y-SORTING ===
-                let renderQueue = []; const _flyNow = !!(window.Pets && Pets.flying && Pets.flying());
+                let renderQueue = []; const _houses = cur.filter(h => h && h.active !== false && h.type === 'house' && h.w); const _flyNow = !!(window.Pets && Pets.flying && Pets.flying());
                 cur.forEach(o => {
                     if (!o || !o.type || o.type === 'ground_item' || o.type === 'paint') return;
                     if (!inView(o, (o.type === 'enemy' || o.type === 'npc') ? 120 : 60)) return;
                     if (!o.active && !(o.type === 'tree' || (typeof o.type === 'string' && o.type.startsWith('rock')))) return;   // árvore/rocha esgotada ficam como toco/pedra vazia
                     let sy = o.y + (o.h || 30); if (o.type === 'decor' && (o.kind === 'flowers' || o.kind === 'bones' || o.kind === 'lily' || o.kind === 'mushrooms')) sy -= 1000;
+                    if (o.type === 'house_door') sy = 1e7;   // plaquinha "Casa de fulano": sempre por cima de tudo (antes ficava atrás do prédio)
+                    else if (o.type === 'decor' && o.kind === 'sign') { for (const hh of _houses) { if (o.x + (o.w || 20) > hh.x && o.x < hh.x + hh.w && o.y < hh.y + hh.h && o.y + (o.h || 20) > hh.y - 40) { sy = Math.max(sy, hh.y + hh.h + 0.5); } } }   // placa na frente da casa, não atrás
                     if (_flyNow && flyOver(o)) sy -= 1000;   // sobrevoando: o dragão passa por cima da cerca, não por baixo
                     if (o.type === 'farm_plot' || o.type === 'rift_next') sy -= 1000;   // canteiro e fissura são chão: quem anda por cima aparece na frente   // decoração rasteira fica sempre atrás
                     renderQueue.push({ type: 'entity', obj: o, sortY: sy });
