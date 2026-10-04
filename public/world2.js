@@ -303,6 +303,22 @@
         if (k === 'dummy') return { facing: tr.face, anim: trainAnim() };
         return null;
     }
+    /* outros jogadores treinando (estado vem do sync): mesma pose do treino, só visual */
+    function trainState() { if (!tr || !tr.on || currentMap !== 'casa') return null; return { k: tr.fk, fx: Math.sign(tr.face ? tr.face.x : 0), fy: Math.sign(tr.face ? tr.face.y : 1) }; }
+    function remotePose(op, eq) {
+        const t = op && op.tr; if (!t || !BEAT[t.k] && t.k !== 'library' && t.k !== 'hottub') return null;
+        const b = BEAT[t.k]; let anim = 0; if (b) { const el = (performance.now() % b[0]); anim = el < b[1] ? 15 * (1 - el / b[1]) : 0; }
+        const body = eq && eq.body, head = eq && eq.head, face = { x: t.fx || 0, y: t.fy === undefined ? 1 : t.fy };
+        if (t.k === 'archery') return { facing: face, anim, equip: { weapon: BOW, shield: null, body, head } };
+        if (t.k === 'punchbag') return { facing: face, anim, equip: { weapon: null, shield: null, body, head } };
+        if (t.k === 'dummy') return { facing: face, anim };
+        return null;
+    }
+    function remoteDeco(c, px, py, t, T) {
+        if (!t) return;
+        if (t.k === 'library') drawBook(c, px, py - 30, T);
+        else if (t.k === 'hottub') { c.save(); c.globalAlpha = 0.5; c.fillStyle = '#fff'; for (let i = 0; i < 3; i++) { const u = ((performance.now() / 1200) + i / 3) % 1; c.beginPath(); c.arc(px - 6 + i * 6 + Math.sin(u * 9 + i) * 2, py - 40 - u * 22, 2 + u * 2, 0, 6.3); c.fill(); } c.restore(); }
+    }
     function swayAngle(o, k) {
         if (!tr || !tr.on || tr.fk !== k || tr.id !== o.id) return 0; const now = performance.now();
         if (k === 'punchbag') { const dt = (now - (tr.swingT || 1e12)) / 1000; if (dt < 0 || dt > 3) return 0; return -tr.dir * 0.4 * Math.exp(-2 * dt) * Math.cos(dt * 7.5); }
@@ -759,5 +775,5 @@
         }, 7000);
     }
     window.addEventListener('load', wire);
-    window.World2 = { houseKey: () => (hctx && hctx.owner ? 'casa_' + String(hctx.owner).toLowerCase().replace(/[^\w\-]/g, '_').slice(0, 34) : null), ITEMS, CREATURES, FURN, HOUSE_MAX, record, kills, beastList, beastProgress, placeInWorld, merge, drawEntity, enterHouse, editDoor, openDecor, buy, refreshHouse, drawOverlay, onLogin, TRAIN, trainPose, drawRoom, inRoom: (x, y) => x > 70 && x < 830 && y > 160 && y < 552, training: () => !!(tr && tr.on), buildCatacombs, buildHouseShell };
+    window.World2 = { houseKey: () => (hctx && hctx.owner ? 'casa_' + String(hctx.owner).toLowerCase().replace(/[^\w\-]/g, '_').slice(0, 34) : null), ITEMS, CREATURES, FURN, HOUSE_MAX, record, kills, beastList, beastProgress, placeInWorld, merge, drawEntity, enterHouse, editDoor, openDecor, buy, refreshHouse, drawOverlay, onLogin, TRAIN, trainPose, trainState, remotePose, remoteDeco, drawRoom, inRoom: (x, y) => x > 70 && x < 830 && y > 160 && y < 552, training: () => !!(tr && tr.on), buildCatacombs, buildHouseShell };
 })();

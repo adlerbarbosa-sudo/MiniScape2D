@@ -171,10 +171,11 @@
         return (glows[col] = c);
     }
     function fx(o) { if (S.fx.length > 90) S.fx.shift(); o.t = 0; S.fx.push(o); return o; }
-    const ring = (x, y, r0, r1, col, life, w, sq) => fx({ k: 'ring', x, y, r0, r1, col, max: life || 24, w: w || 4, sq: sq == null ? 0.58 : sq });
-    const flash = (x, y, r, col, life) => fx({ k: 'flash', x, y, r, col, max: life || 14 });
-    function bolt(x0, y0, x1, y1, col, life) { const n = 7, pts = []; for (let i = 0; i <= n; i++) { const k = i / n, j = (i === 0 || i === n) ? 0 : (rnd() - 0.5) * 22; pts.push(x0 + (x1 - x0) * k + j, y0 + (y1 - y0) * k + (i === 0 || i === n ? 0 : (rnd() - 0.5) * 8)); } fx({ k: 'bolt', pts, col, max: life || 12 }); }
-    const slashFx = (x, y, ang, r, col, life) => fx({ k: 'slash', x, y, ang, r, col, max: life || 12 });
+    const rfx = (k, c, x, y, tx, ty, r) => { try { if (window.RemoteFx) RemoteFx.out(k, c, x, y, tx === undefined ? x : tx, ty === undefined ? y : ty, r); } catch (e) { } };
+    const ring = (x, y, r0, r1, col, life, w, sq) => (rfx('ring', col, x, y, x, y, r1), fx)({ k: 'ring', x, y, r0, r1, col, max: life || 24, w: w || 4, sq: sq == null ? 0.58 : sq });
+    const flash = (x, y, r, col, life) => (rfx('flash', col, x, y, x, y, r), fx)({ k: 'flash', x, y, r, col, max: life || 14 });
+    function bolt(x0, y0, x1, y1, col, life) { const n = 7, pts = []; for (let i = 0; i <= n; i++) { const k = i / n, j = (i === 0 || i === n) ? 0 : (rnd() - 0.5) * 22; pts.push(x0 + (x1 - x0) * k + j, y0 + (y1 - y0) * k + (i === 0 || i === n ? 0 : (rnd() - 0.5) * 8)); } rfx('bolt', col, x0, y0, x1, y1); fx({ k: 'bolt', pts, col, max: life || 12 }); }
+    const slashFx = (x, y, ang, r, col, life) => (rfx('slash', col, x, y, x + Math.cos(ang) * r, y + Math.sin(ang) * r, r), fx)({ k: 'slash', x, y, ang, r, col, max: life || 12 });
     function sfx(n) { try { if (window.Sfx && Sfx.play) Sfx.play(n); } catch (e) { } }
     const burst = (x, y, col, n, sp) => { try { Art.burst(x, y, col, n, sp); } catch (e) { } };
     const puff = (x, y, col, n, rad, up) => { try { Art.puff(x, y, col, n, rad, up); } catch (e) { } };
@@ -224,6 +225,7 @@
     function shoot(o) {   // kind: 'orb'|'arrow'; tgt: homing; vx,vy: reto; pierce: quantos inimigos atravessa; onHit(p, t)
         if (S.pj.length >= 28) S.pj.shift();
         const p = Object.assign({ x: player.x, y: player.y - 14, vx: 0, vy: 0, sp: 8, tgt: null, kind: 'orb', r: 6, col: '#ffb04a', life: 70, pierce: 1, hits: [], dmg: 0, sk: 'combat', mode: '', tr: [], th: 0, tn: 0, walls: true, dist: 0 }, o);
+        try { const tx = p.tgt ? ex(p.tgt) : p.x + (p.vx || 1) / (Math.hypot(p.vx, p.vy) || 1) * 320, ty = p.tgt ? ey(p.tgt) : p.y + (p.vy || 0) / (Math.hypot(p.vx, p.vy) || 1) * 320; rfx(p.kind === 'arrow' ? 'ranged' : 'magic', p.col, p.x, p.y, tx, ty); } catch (e) { }
         S.pj.push(p); return p;
     }
     function stepPj() {
