@@ -531,6 +531,10 @@ Armas e ativas nos níveis altos (melhor arma do nível):
 - **Recarga (`cdr`)**: Mímicos ganham `cdr` (anel/amuleto/elmo/capuz/chapéu; ~15% com o set no nível 50) e há as joias craftáveis **Anel do Foco** (4%) e **Amuleto do Tempo** (6%). Soma com a árvore, teto 40%, mínimo 1,5 s.
 - O editor de itens do Dev agora **preserva** os campos que ele não mostra (crítico, set, requisitos...) ao salvar um item existente.
 
+## Jornada (tecla N)
+
+Botão **Jornada** (ou tecla `N`): recompensa diária com sequência de 7 dias, missões diárias e semanais (+ bônus por concluir todas), Códice (mapas, espécies, chefes, abates), Maestria após o nível 99 (bônus pequenos e com teto em Stats) e placar semanal do Colosso. Tudo que dá recompensa é decidido no servidor (`engagesrv.js`, `/api/engage`) e chega pelo correio; o cliente (`public/engage_ui.js`) só mostra e informa progresso de coleta, pesca, cozinha e fabricação (`Engage.prog`, em lote, com teto por minuto no servidor). `addXP(skill, n, true)` entrega XP bruto (sem multiplicadores) para recompensas de missão.
+
 ## Textos para o jogador e nomes em português (`public/labels.js`)
 - As **chaves internas** dos itens (`'Bronze Sword'`, `'Iron Bar'`...) não mudam (saves, receitas, servidor, `itemnames.json`). O que o jogador lê vem de `itemLabel(nome)` / `Labels.tr(texto)` em `labels.js`: nome em português para todo item do catálogo, perícias (Combat→Combate...), magias e estações. Uma observação da tela (MutationObserver) troca nomes em inglês em painéis, dicas e menus (não mexe em campos de texto, chat nem no painel Dev) e `setActionText`/`addFloatingText` também passam por `Labels.tr`. Item novo em inglês: acrescente em `Labels.ITEM`; `Labels.missing()` lista o que ficou sem rótulo.
 - Regras de texto ao jogador: nunca citar admin/Dev, servidor/cliente, limites técnicos, códigos HTTP ou como a segurança funciona; mensagens curtas, em português, tom de fantasia medieval. Itens exclusivos (Mímicos) só têm lore/efeito na descrição, nunca como se obtêm (presentes e missões especiais continuam existindo, só não são citados ao jogador).

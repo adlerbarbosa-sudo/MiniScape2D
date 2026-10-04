@@ -183,6 +183,8 @@
     <script src="life.js"></script>
     <script src="fishing.js"></script>
     <script src="hub.js"></script>
+    <script src="engage.js"></script>
+    <script src="engage_ui.js"></script>
     <script src="mobile.js"></script>
     <script src="qol.js"></script>
     <script src="bank.js"></script>
@@ -1029,7 +1031,7 @@
             const snap = JSON.stringify(player.inventory);
             inf.reqs.forEach(r => removeInvItem(r.n, r.q * k));
             if (!addInvItem(iName, inf.per * k)) { const back = JSON.parse(snap); player.inventory.length = 0; back.forEach(x => player.inventory.push(x)); return fail('Mochila cheia!'); }
-            const made = inf.per * k, xp = Balance.craftXp(inf.reqs.length, k); addXP('crafting', xp);
+            const made = inf.per * k, xp = Balance.craftXp(inf.reqs.length, k); addXP('crafting', xp); try { if (window.Engage && Engage.prog) Engage.prog('craft', made); } catch (e) { }
             const msg = `Criou ${made > 1 ? made + '× ' : ''}${itemLabel(iName)}! (+${xp} XP)`; setActionText(msg);
             try { saveDataLogic(); } catch (e) { } updateUI();
             return { ok: true, n: k, made, msg };
@@ -1051,11 +1053,11 @@
         
         // XP: valores "base RS" x XP_RATE x (escala de recurso por nível, só nos ofícios) x VIP modesto x impulso de iniciante x evento x 5% humano; frações sorteadas. Nível = tabela do RuneScape (balance.js)
         const _xpPop = {};
-        function addXP(sK, a) {
+        function addXP(sK, a, raw) {
             const sk = player.stats.skills[sK]; if (!sk || !(a > 0)) return;
-            let mult = Balance.roleXpMul(userRole) * Balance.earlyMul(sk.level);   // VIP modesto (+10%/+15%) e impulso de iniciante (balance.js)
-            try { if (window.Engage && Engage.xpMul) mult *= Engage.xpMul(sK); } catch (e) { }   // evento Lua Cheia (+10%, deterministico pelo relogio do servidor), engage.js
-            let f = a * Balance.XP_RATE * mult; if (!Balance.isCombatSkill(sK)) f *= Balance.tierScale(sk.level); if (player.race === 'human') f *= 1.05;
+            let mult = raw ? 1 : Balance.roleXpMul(userRole) * Balance.earlyMul(sk.level);   // VIP modesto (+10%/+15%) e impulso de iniciante (balance.js)
+            try { if (!raw && window.Engage && Engage.xpMul) mult *= Engage.xpMul(sK); } catch (e) { }   // evento Lua Cheia (+10%, deterministico pelo relogio do servidor), engage.js
+            let f = raw ? a : a * Balance.XP_RATE * mult; if (!raw && !Balance.isCombatSkill(sK)) f *= Balance.tierScale(sk.level); if (!raw && player.race === 'human') f *= 1.05;
             const fl = Math.floor(f), finalXP = fl + (Math.random() < f - fl ? 1 : 0); if (!(finalXP > 0)) return;
             // parte do XP que vai para a montaria equipada (0..40%, depois dos Mímicos; pets.js). O jogador fica com o resto: soma exata.
             let _mxp = 0; try { if (window.Pets && Pets.xpShare) _mxp = Pets.xpShare(finalXP) | 0; } catch (e) { console.error(e); } const gainXP = finalXP - _mxp;
@@ -1734,7 +1736,7 @@
                         else if (player.actionType === 'smelt') { if (window.Content) Content.finishSmelt(); else player.isPerformingAction = false; }
                         else if (player.actionType === 'smelt_brz') { if (getInvCount('Copper Ore') > 0 && getInvCount('Tin Ore') > 0) { removeInvItem('Copper Ore', 1); removeInvItem('Tin Ore', 1); if (addInvItem('Bronze Bar', 1)) addXP('smithing', 15); } player.isPerformingAction = false; }
                         else if (player.actionType === 'smelt_iron') { if (getInvCount('Iron Ore') > 0) { removeInvItem('Iron Ore', 1); if (addInvItem('Iron Bar', 1)) addXP('smithing', 25); } player.isPerformingAction = false; }
-                        else if (player.actionType === 'cook') { const raw = (window.Progress ? Progress.cookable() : player.inventory.find(i => itemDB[i.name] && itemDB[i.name].cooksInto)); if (raw) { const def = itemDB[raw.name]; removeInvItem(raw.name, 1); const _cout = (window.Fishing && Fishing.cookOut(def)) || def.cooksInto; if (!addInvItem(_cout, 1)) { addInvItem(raw.name, 1); setActionText('Mochila cheia!', '#e74c3c'); player.isPerformingAction = false; } else addXP('cooking', def.cookXp || 10); addFloatingText(player.x, player.y - 20, "Cozinhou!", "#f1c40f"); Art.burst(obj.x + (obj.w||30)/2, obj.y + 4, '#ffb03a', 6, 0.8); } if (!(window.Progress ? Progress.cookable() : player.inventory.find(i => itemDB[i.name] && itemDB[i.name].cooksInto))) { player.isPerformingAction = false; setActionText("Nada mais para cozinhar.", "#bdc3c7"); } }
+                        else if (player.actionType === 'cook') { const raw = (window.Progress ? Progress.cookable() : player.inventory.find(i => itemDB[i.name] && itemDB[i.name].cooksInto)); if (raw) { const def = itemDB[raw.name]; removeInvItem(raw.name, 1); const _cout = (window.Fishing && Fishing.cookOut(def)) || def.cooksInto; if (!addInvItem(_cout, 1)) { addInvItem(raw.name, 1); setActionText('Mochila cheia!', '#e74c3c'); player.isPerformingAction = false; } else addXP('cooking', def.cookXp || 10); try { if (window.Engage && Engage.prog) Engage.prog('cook', 1); } catch (e) { } addFloatingText(player.x, player.y - 20, "Cozinhou!", "#f1c40f"); Art.burst(obj.x + (obj.w||30)/2, obj.y + 4, '#ffb03a', 6, 0.8); } if (!(window.Progress ? Progress.cookable() : player.inventory.find(i => itemDB[i.name] && itemDB[i.name].cooksInto))) { player.isPerformingAction = false; setActionText("Nada mais para cozinhar.", "#bdc3c7"); } }
 
                         if(obj.hp !== undefined && obj.hp <= 0) { obj.active = false; player.isPerformingAction = false; player.actionToolItem = null; addFloatingText(obj.x, obj.y, "Vazio", "#bdc3c7"); saveDataLogic(); setTimeout(() => { obj.active = true; obj.hp = obj.maxHp; saveDataLogic(); }, 10000); } 
                         else if (player.isPerformingAction) { player.actionTimer = player.actionDelay; } 

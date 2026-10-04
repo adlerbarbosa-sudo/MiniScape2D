@@ -6,6 +6,8 @@ Leia o README.md antes de começar. Regras de trabalho: testar com Playwright em
 - Frente 1 (habilidades): MP e recarga, `cdr`, Aljava Mágica e capstones, bug de direção (verificado: personagem fica virado para onde andou).
 - Frente 2 (itens/ofícios): venda a NPC (`sell`), nível mínimo em todos os equipamentos, árvores/rochas/Culinária/Artesanato por nível, ações mais rápidas com o nível, Mímicos com `cdr`, bug de rolagem da cor do Mímico (verificado).
 
+- Frente 3 (engajamento): interface Jornada (`public/engage_ui.js`, tecla N): diária, missões, Códice, Maestria, Colosso; progresso enviado por `Engage.prog`.
+
 ## Falta
-- Frente 3 (engajamento): o servidor (`engagesrv.js`, rotas `/api/engage` e `/api/daily`) e o núcleo (`public/engage.js`) estão prontos; falta a INTERFACE do cliente (recompensa diária, missões diárias/semanais, Códice, Maestria, eventos, placar do Colosso) e enviar o progresso (`prog`).
+- Falta o evento Invasão no cliente (spawn dos invasores; precisa de teste multiplayer no servidor real).
 - Sistema de Pacotes de Conteúdo (JSON declarativo, sem deploy, validado, em DATA_DIR/packs, com desfazer) para itens, monstros, receitas, lojas, mapas.

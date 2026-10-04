@@ -72,7 +72,7 @@
     function finishSmelt() {
         const r = smeltRec; player.isPerformingAction = false; smeltRec = null; if (!r || !hasNeeds(r)) return;
         const snap = JSON.stringify(player.inventory); r.needs.forEach((n) => removeInvItem(n[0], n[1]));
-        if (addInvItem(r.out, 1)) { addXP('smithing', r.xp); addFloatingText(player.x, player.y - 18, '+' + r.out, '#f1c40f'); } else { player.inventory = JSON.parse(snap); setActionText('Mochila cheia!', '#e74c3c'); }
+        if (addInvItem(r.out, 1)) { addXP('smithing', r.xp); try { if (window.Engage && Engage.prog) Engage.prog('craft', 1); } catch (e) { }  addFloatingText(player.x, player.y - 18, '+' + r.out, '#f1c40f'); } else { player.inventory = JSON.parse(snap); setActionText('Mochila cheia!', '#e74c3c'); }
     }
 
     /* ============================ AGRICULTURA ============================ */

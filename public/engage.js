@@ -7,7 +7,7 @@
 (function (root, factory) {
     const core = factory();
     if (typeof module === 'object' && module.exports) module.exports = core; else root.EngageCore = core;
-    if (typeof window !== 'undefined' && typeof document !== 'undefined') { try { core._ui(root); } catch (e) { console.error('[engage]', e); } }
+    if (typeof window !== 'undefined' && typeof document !== 'undefined') { try { if (core._ui) core._ui(root); } catch (e) { console.error('[engage]', e); } }
 })(typeof self !== 'undefined' ? self : this, function () {
     'use strict';
     const HR = 3600000, DAY = 86400000, BRT = -3 * HR;

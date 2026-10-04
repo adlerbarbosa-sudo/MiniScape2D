@@ -446,7 +446,7 @@
             const before = cntOf(sp.raw);
             if (!bag(sp.raw, q)) ok = false; else {
                 q = Math.max(1, cntOf(sp.raw) - before);
-                const xp = Math.round(XPB[sp.rar] * (0.7 + 0.6 * f.t) * (bt ? bt.xp : 0.6) * xpMult()); addXP('fishing', xp);
+                const xp = Math.round(XPB[sp.rar] * (0.7 + 0.6 * f.t) * (bt ? bt.xp : 0.6) * xpMult()); addXP('fishing', xp); try { if (window.Engage && Engage.prog) Engage.prog('fish', 1); } catch (e) { } if (sp.rar >= 2) { try { if (window.Engage && Engage.prog) Engage.prog('rare', 1); } catch (e) { } }
                 res = recordFish(sp, f.cm, f.kg); const col = RARC[sp.rar];
                 addFloatingText(player.x, player.y - 28, sp.n + ' ' + f.cm + ' cm', col); addPickupText(sp.raw, q);
                 say(sp.n + ' ' + f.cm + ' cm · ' + fmtKg(f.kg) + ' kg' + (giant ? ' · EXEMPLAR GIGANTE (x2)!' : '') + (res.rec && !res.first ? ' · Novo recorde!' : '') + (res.first ? ' · Nova espécie no diário!' : ''), col);
@@ -469,7 +469,7 @@
             let name = 'Raw Fish', sp = null;
             if (commons.length && rnd() < 0.45) { sp = commons[Math.floor(rnd() * commons.length)]; name = sp.raw; }
             if (!addInvItem(name, 1)) { if (!(name !== 'Raw Fish' && addInvItem('Raw Fish', 1))) break; sp = null; name = 'Raw Fish'; }
-            got++; addXP('fishing', Math.round(5 * xpMult())); addPickupText(name, 1);
+            got++; addXP('fishing', Math.round(5 * xpMult())); try { if (window.Engage && Engage.prog) Engage.prog('fish', 1); } catch (e) { } addPickupText(name, 1);
             if (sp) { const z2 = sizeRoll(sp, null); z2.t *= 0.7; const cm = Math.round(lerp(sp.cm[0], sp.cm[1], z2.t)), kg = Math.round(lerp(sp.kg[0], sp.kg[1], Math.pow(z2.t, 1.5)) * 100) / 100, r = recordFish(sp, cm, kg); lines.push(sp.n + ' ' + cm + ' cm' + (r.first ? ' (nova espécie!)' : '')); }
         }
         if (!got) { say('Mochila cheia!', '#e74c3c'); return false; }
