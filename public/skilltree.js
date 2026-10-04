@@ -49,6 +49,7 @@
         if (player.skillTree && typeof player.skillTree.ap === 'object') { st.ap = { hp: Math.max(0, +player.skillTree.ap.hp | 0), mp: Math.max(0, +player.skillTree.ap.mp | 0) }; }   // vida/mana já embutidas no maxHp/maxMp salvos
         else st.ap = { hp: 0, mp: 0 };
         while (st.bar.length < BAR_N) st.bar.push(null); st.bar.length = BAR_N; player.skillTree = st; S.lvSig = ''; S.buffs.length = 0; S.barrier = null; S.invuln = 0; S.dash = null; S.Q.length = 0; S.pj.length = 0; S.zn.length = 0; S.fx.length = 0; S.marks.length = 0; S.status.length = 0; S.tok = 8; S.win.length = 0;
+        { const pr = player.skillTree.pr; if (pr) { const ks = Object.keys(pr), lim = prTotal(); for (let i = lim; i < ks.length; i++) delete pr[ks[i]]; } }   // nunca mais Prestígios que pontos
         recompute(); S.free = freeAll(); S.baselined = true;
     }
     function ensure() { if (!gameOn()) return null; if (S.pl !== player) init(); return player.skillTree; }
@@ -731,8 +732,14 @@
         const s = $('sk-side'); if (!s) return; const id = S.ui.sel; if (!id || !NODES[id] || NODES[id].tree !== S.ui.tab) { const T = TREES[S.ui.tab]; s.innerHTML = '<div class="sk-ih"><img class="sk-big" src="' + Icons.skillUrl(S.ui.tab === 'warrior' ? 'sword' : S.ui.tab === 'archer' ? 'bow' : 'wand') + '" alt=""><div><b class="sk-nm">' + esc(T.name) + '</b><div class="sk-tg">' + esc(T.blurb) + '</div></div></div><p class="sk-d">Toque num nó para ver os detalhes e gastar pontos. <b>Hexágonos</b> são habilidades <b>ativas</b> (vão para a barra); <b>círculos</b> são <b>passivas</b>; o <b>grande círculo dourado</b> no fim da árvore é o <b>poder final</b>, que você liga e desliga.</p><p class="sk-d">Os pontos desta árvore vêm do nível de <b>' + esc(T.skillName) + '</b>: 1 ponto a cada 2 níveis.</p>' + (player.cls === S.ui.tab || (!player.cls && S.ui.tab === 'warrior') ? '<p class="sk-d rec">★ Árvore recomendada para a sua classe.</p>' : ''); return; }
         const n = NODES[id], r = rankOf(id), pt = points(n.tree), why = SN.canLearn(player.skillTree.pts[n.tree], id, pt.free);
         let h = nodeHtml(n, false); h += '<div class="sk-act">';
-        if (r >= n.max) h += SN.prOn(player.skillTree, id) ? '<button type="button" class="sk-b go" disabled style="color:#ffd24a">✦ Prestígio ativo</button>' : '<button type="button" class="sk-b go" data-a="prest" style="color:#ffd24a;border-color:#ffd24a">✦ Prestigiar (dobra os efeitos)</button>';
+        if (r >= n.max) h += '<button type="button" class="sk-b go" disabled>Rank máximo</button>';
         else h += '<button type="button" class="sk-b go" data-a="learn" ' + (why ? 'disabled' : '') + '>' + (r ? 'Melhorar para o rank ' + (r + 1) : 'Aprender') + ' <small>(' + n.cost + (n.cost > 1 ? ' pontos' : ' ponto') + ')</small></button>' + (why ? '<div class="sk-why">' + esc(why) + '</div>' : '');
+        { const hasPr = !!(player.skillTree.pr && player.skillTree.pr[id]), fr = prFree();
+            if (r >= n.max || hasPr) {
+                h += '<div class="sk-why" style="color:#ffd24a">✦ Pontos de Prestígio: ' + fr + ' livre' + (fr === 1 ? '' : 's') + ' de ' + prTotal() + '</div>';
+                if (hasPr) h += '<button type="button" class="sk-b" data-a="unprest" style="color:#ffd24a;border-color:#ffd24a">' + (r >= n.max ? '✦ Prestígio ativo' : '✦ Prestígio atribuído (inativo até o rank máximo)') + ' · remover (devolve o ponto)</button>';
+                else h += '<button type="button" class="sk-b go" data-a="prest" ' + (fr < 1 ? 'disabled' : '') + ' style="color:#ffd24a;border-color:#ffd24a">✦ Prestigiar <small>(1 ponto de Prestígio)</small></button>' + (fr < 1 ? '<div class="sk-why">Prestigie uma perícia no nível 99 para ganhar pontos.</div>' : '');
+            } }
         if (n.kind === 'c' && r > 0) { const on = capOn(id); h += '<button type="button" class="sk-b tgl' + (on ? ' on' : '') + '" data-a="togcap" data-id="' + id + '">' + (on ? 'Ligado · tocar para desligar (X)' : 'Desligado · tocar para ligar (X)') + '</button>'; }
         h += '</div>'; if (n.kind === 'a' && r > 0) h += barSlotsHtml(id);
         s.innerHTML = h;
@@ -748,6 +755,7 @@
         if (a === 'close') closeUI(); else if (a === 'tab') { S.ui.tab = b.dataset.t; S.ui.sel = null; try { localStorage.setItem('ms_sk_tab', S.ui.tab); } catch (er) { } renderAll(); fitView(); }
         else if (a === 'zin') zoomAt(V.cw / 2, V.ch / 2, 1.25); else if (a === 'zout') zoomAt(V.cw / 2, V.ch / 2, 1 / 1.25); else if (a === 'fit') fitView();
         else if (a === 'learn') { const r = learn(S.ui.sel); if (!r.ok) say(r.msg, '#e67e22'); }
+        else if (a === 'unprest') { const r = unprestigeNode(S.ui.sel); say(r.msg, r.ok ? '#ffd24a' : '#e67e22'); renderAll(); }
         else if (a === 'prest') { const r = prestigeNode(S.ui.sel); say(r.msg, r.ok ? '#ffd24a' : '#e67e22'); renderAll(); }
         else if (a === 'togcap') toggleCap(b.dataset.id || S.ui.sel); else if (a === 'slot') setSlot(S.ui.sel, +b.dataset.i); else if (a === 'unslot') clearSlot(S.ui.sel);
         else if (a === 'reset') { const tr = S.ui.tab, pt = points(tr); if (pt.spent > 0) { S.ui.confirm = { tree: tr, spent: pt.spent, cost: resetCost(tr), have: getInvCount('Coins') }; renderConfirm(); } }
@@ -771,9 +779,18 @@
         S.barSig = ''; sfx('accept'); try { Art.burst(player.x, player.y - 14, TREES[n.tree].color2, 10, 1.2); } catch (e) { }
         try { saveDataLogic(); } catch (e) { } renderAll(); return { ok: true, msg: n.name + ' → rank ' + ranks[id] };
     }
+    const prTotal = () => { const p = player && player.prestige; let n = 0; if (p && typeof p === 'object') for (const k of Object.keys(p)) n += Math.max(0, Math.min(5, p[k] | 0)); return n; };
+    const prUsed = () => { const st = player && player.skillTree; return st && st.pr ? Object.keys(st.pr).length : 0; };
+    const prFree = () => Math.max(0, prTotal() - prUsed());
+    function unprestigeNode(id) {
+        const st = ensure(); if (!st || !st.pr || !st.pr[id]) return { ok: false, msg: 'Esta habilidade não tem Prestígio.' };
+        delete st.pr[id]; recompute(); S.barSig = ''; try { saveDataLogic(true); } catch (e) { }
+        return { ok: true, msg: 'Prestígio removido de ' + NODES[id].name + ' (1 ponto devolvido).' };
+    }
     function prestigeNode(id) {
         const st = ensure(), n = NODES[id]; if (!st || !n) return { ok: false, msg: 'Habilidade inexistente.' };
-        if (rankOf(id) < n.max) return { ok: false, msg: 'Chegue ao rank máximo para prestigiar.' }; if (SN.prOn(st, id)) return { ok: false, msg: 'Já tem Prestígio.' };
+        if (rankOf(id) < n.max) return { ok: false, msg: 'Chegue ao rank máximo para prestigiar.' }; if (st.pr && st.pr[id]) return { ok: false, msg: 'Já tem Prestígio.' };
+        if (prFree() < 1) return { ok: false, msg: 'Sem pontos de Prestígio: prestigie uma perícia no nível 99 para ganhar 1 ponto (✦ Prestígio).' };
         if (!st.pr) st.pr = {}; st.pr[id] = 1; recompute(); S.barSig = '';
         try { Art.burst(player.x, player.y - 16, '#ffd24a', 16, 1.6); ring(player.x, player.y + 4, 8, 70, '#ffd24a', 22, 4); sfx('accept'); saveDataLogic(true); } catch (e) { }
         return { ok: true, msg: '✦ ' + n.name + ' alcançou o Prestígio!' };
@@ -1001,7 +1018,7 @@
     }
     window.addEventListener('load', () => setTimeout(wire, 50));
     window.SkillTree = {
-        open: openUI, close: closeUI, toggle: toggleUI, learn, reset, prestigeNode, prestigeReset, prOn, cast, castId, points, toggleCap, capOn, capCost: () => ({ shot: wpn() && wpn().tool === 'ranged' ? shotMp(wpn()) : 0, vigor: vigorMp() }), costOf, cdOf, cdTime, primaryCap, learnedCaps, totalFree, ensure, adopt, recompute, validate, rankOf, learnedActives, ACT, resetCost,
+        open: openUI, close: closeUI, toggle: toggleUI, learn, reset, prestigeNode, unprestigeNode, prestigeReset, prOn, prFree, prTotal, cast, castId, points, toggleCap, capOn, capCost: () => ({ shot: wpn() && wpn().tool === 'ranged' ? shotMp(wpn()) : 0, vigor: vigorMp() }), costOf, cdOf, cdTime, primaryCap, learnedCaps, totalFree, ensure, adopt, recompute, validate, rankOf, learnedActives, ACT, resetCost,
         setSlot, clearSlot, removeAt, setCollapsed, isCollapsed: barCollapsed, resetBarPos, barRect: () => (bar ? bar.getBoundingClientRect() : null), swapSlots, openPicker: (i) => { const el = bar && bar.querySelector('.sk-s[data-i="' + i + '"]'); if (el) openPick(i, el); }, setEdit, isEdit: () => !!S.edit, bar: () => (ensure() ? player.skillTree.bar.slice() : []), isOpen: () => S.ui.open,
         aura: () => { try { if (S.pl !== player) return null; let f = null; for (const b of S.buffs) if (b.until > S.frame) { f = (b.id === 'grito' || b.id === 'furor' || b.id === 'fury') ? '#ff6a2a' : (f || '#f1c40f'); } const br = S.barrier && S.barrier.hp > 0 && S.barrier.until > S.frame ? S.barrier.col : null; const ok = (v) => /^#[0-9a-fA-F]{6}$/.test(v || '') ? v : null; return (ok(br) || f) ? { b: ok(br), f } : null; } catch (e) { return null; } },
         state: () => ({ tree: ensure() ? JSON.parse(JSON.stringify(player.skillTree)) : null, frame: S.frame, buffs: S.buffs.map((b) => ({ id: b.id, left: b.until - S.frame })), barrier: S.barrier && { hp: S.barrier.hp, max: S.barrier.max }, invuln: S.invuln - S.frame, queue: S.Q.length, pj: S.pj.length, zones: S.zn.length, fx: S.fx.length, bonus: S.bonus, dmgPct: S.dmgPct, skd: S.skd, cdr: cdrNow(), tok: S.tok, caps: Object.assign({}, (player.skillTree && player.skillTree.tg) || {}) }),

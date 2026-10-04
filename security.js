@@ -215,6 +215,10 @@ module.exports = function createSecurity(opts) {
             const old = getDB().users && hasOwn(getDB().users, user) ? getDB().users[user].playerData : null, ot = old && old.skillTree && typeof old.skillTree === 'object' ? old.skillTree : {}, opr = ot.pr && typeof ot.pr === 'object' ? ot.pr : {}, opts = ot.pts && typeof ot.pts === 'object' ? ot.pts : {};
             for (const id of Object.keys(r.tree.pr || {})) { const n = SN.NODES[id]; if (opr[id] === 1) continue; if (SN.rankOf(r.tree.pts[n.tree], id) >= n.max || SN.rankOf(opts[n.tree], id) >= n.max) continue; delete r.tree.pr[id]; slog('SKILLTREE', user, ip, 'prestígio de habilidade removido (rank máximo não atingido): ' + id); }
         } catch (e) { }
+        try {   // cada estrela de Prestígio de perícia vale 1 ponto: nunca mais habilidades prestigiadas que pontos (as já salvas têm prioridade)
+            const total = Object.values(pd.prestige && typeof pd.prestige === 'object' ? pd.prestige : {}).reduce((a, v) => a + int(v, 0, 5, 0), 0), ids = Object.keys(r.tree.pr || {});
+            if (ids.length > total) { const old = getDB().users && hasOwn(getDB().users, user) && getDB().users[user].playerData && getDB().users[user].playerData.skillTree && getDB().users[user].playerData.skillTree.pr || {}; ids.sort((a, b) => (old[b] === 1 ? 1 : 0) - (old[a] === 1 ? 1 : 0)); for (const id of ids.slice(total)) delete r.tree.pr[id]; slog('SKILLTREE', user, ip, 'prestígios de habilidade acima dos pontos: ' + (ids.length - total) + ' removido(s)'); }
+        } catch (e) { }
         { const bb = SN.bonusAll(r.tree); r.tree.ap = { hp: Math.round(bb.maxHp || 0), mp: Math.round(bb.maxMp || 0) }; }
         pd.skillTree = r.tree; return r.tree.ap;
     }
