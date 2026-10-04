@@ -21,16 +21,18 @@
     function pool(target, tiers) {
         const M = (window.Balance && Balance.MOBS) || {}, out = [];
         Object.keys(M).forEach((k) => { const e = M[k]; if (!tiers.includes(e[1]) || !npcDB[k]) return; const d = npcDB[k]; if (d.group === 'npc' || d.behavior === 'npc' || d.behavior === 'passive' || d.behavior === 'skittish') return; out.push({ k, lv: e[0], tier: e[1], gap: Math.abs(e[0] - target) }); });
-        out.sort((a, b) => a.gap - b.gap); return out.slice(0, 6);
+        out.sort((a, b) => a.gap - b.gap); const near = out.filter((e) => e.gap <= (tiers.includes('boss') ? 26 : 16)); return (near.length >= 3 ? near : out.slice(0, 6));   // janela larga: o andar sorteia entre várias espécies
     }
-    function derive(key, lv, tier, mod) {
-        const base = npcDB[key]; if (!base) return null; const id = 'rf_' + key + '_' + lv + '_' + tier + '_' + (mod.id || '');
+    /* variações temáticas: mesma criatura com outro nome e cores (cada andar tem um tema) */
+    const THEMES = [['Etéreo', '#6ec8ff', '#d4f6ff'], ['Abissal', '#2a2a7a', '#7a7aff'], ['Ígneo', '#c0392b', '#ffb040'], ['Gélido', '#8fd0ff', '#ffffff'], ['Peçonhento', '#3f9a52', '#c8ff7a'], ['Sombrio', '#4a2a6a', '#b07aff'], ['Dourado', '#d9a93a', '#fff0a0'], ['Ósseo', '#cfc8b0', '#f4efdc'], ['Carmesim', '#8a1a3a', '#ff6a8a'], ['Musgoso', '#4a6a2a', '#a8d068']];
+    function derive(key, lv, tier, mod, th) {
+        const base = npcDB[key]; if (!base) return null; const TH = th != null ? THEMES[th % THEMES.length] : null; const id = 'rf_' + key + '_' + lv + '_' + tier + '_' + (mod.id || '') + (TH ? '_t' + (th % THEMES.length) : '');
         if (npcDB[id]) return id;
         const s = Balance.mobTable(lv, tier), d = Object.assign({}, base);
         const hp = Math.max(10, Math.round(s.hp * (mod.hp || 1))), dm = mod.dmg || 1;
         d.level = lv; d.tier = tier; d.hp = hp; d.hpBase = hp; d.hpLvl = 0; d.dmin = Math.round(s.dmin * dm); d.dmax = Math.round(s.dmax * dm); d.maxHit = d.dmax; d.hit = s.dmax > 0 ? Math.round(s.avg * dm / 1.2) : 0;
         d.xp = Math.max(1, Math.round(Balance.defaultXp(hp) * 0.6)); d.balV = (Balance.VERSION || 2); d.adm = true; d.behavior = 'aggressive'; d.range = Math.max(Number(d.range) || 0, 260); d.lootStr = ''; d.rift = 1;
-        d.name = base.name; d.group = tier === 'boss' ? 'chefe' : (base.group || 'monstro');
+        d.name = TH ? (tier === 'boss' ? 'Guardião ' + TH[0] + ': ' + base.name : base.name + ' ' + TH[0]) : base.name; d.group = tier === 'boss' ? 'chefe' : (base.group || 'monstro'); if (TH) { d.c1 = TH[1]; d.c2 = TH[2]; }
         npcDB[id] = d; run.keys.push(id); return id;
     }
     function mobEnt(key, x, y, n) {
@@ -45,13 +47,25 @@
         const R = rng((run.seedBase + f * 7919) | 0), pal = PAL[(f + run.lvl) % PAL.length], E = [];
         E.push({ id: 'rf_fl0', type: 'paint', name: 'Chão', color: pal[0], x: 0, y: 0, w: W, h: H, active: true }, { id: 'rf_fl1', type: 'paint', name: 'Chão', color: pal[1], x: 60, y: 60, w: W - 120, h: H - 120, active: true });
         for (let i = 0; i < 5; i++) E.push({ id: 'rf_pt' + i, type: 'paint', name: 'Chão', color: 'rgba(160,120,255,.07)', x: Math.round(80 + R() * (W - 260)), y: Math.round(80 + R() * (H - 240)), w: 120 + Math.round(R() * 100), h: 80 + Math.round(R() * 90), active: true });
+        {   // acabamento visual: lajotas, veios luminosos e paredes escuras (tudo 'paint', sem colisão)
+            let ti = 0; const P_ = (x, y, w, h, c) => E.push({ id: 'rf_v' + (ti++), type: 'paint', name: 'Chão', color: c, x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h), active: true });
+            const acc = ['110,200,255', '255,120,70', '150,255,160', '200,130,255', '255,220,110'][(f + run.lvl) % 5];
+            for (let gy = 60, r = 0; gy < H - 60; gy += 80, r++) for (let gx = 60, c = 0; gx < W - 60; gx += 80, c++) { if ((r + c) % 2) P_(gx, gy, Math.min(80, W - 60 - gx), Math.min(80, H - 60 - gy), 'rgba(0,0,0,.09)'); }
+            for (let gx = 140; gx < W - 60; gx += 80) P_(gx, 60, 2, H - 120, 'rgba(' + acc + ',.07)');
+            for (let gy = 140; gy < H - 60; gy += 80) P_(60, gy, W - 120, 2, 'rgba(' + acc + ',.07)');
+            for (let v = 0; v < 5; v++) { let x = 100 + R() * (W - 260), y = 100 + R() * (H - 300); for (let sg = 0; sg < 4; sg++) { const hz = sg % 2 === 0, len = 30 + R() * 70; P_(x - 3, y - 3, hz ? len + 6 : 9, hz ? 9 : len + 6, 'rgba(' + acc + ',.10)'); P_(x, y, hz ? len : 3, hz ? 3 : len, 'rgba(' + acc + ',.55)'); if (hz) x += len * (R() < .5 ? 1 : -1); else y += len; } }
+            P_(0, 0, W, 60, 'rgba(0,0,0,.55)'); P_(0, H - 60, W, 60, 'rgba(0,0,0,.55)'); P_(0, 60, 60, H - 120, 'rgba(0,0,0,.55)'); P_(W - 60, 60, 60, H - 120, 'rgba(0,0,0,.55)');
+            P_(58, 58, W - 116, 3, 'rgba(' + acc + ',.45)'); P_(58, H - 61, W - 116, 3, 'rgba(' + acc + ',.45)'); P_(58, 58, 3, H - 116, 'rgba(' + acc + ',.45)'); P_(W - 61, 58, 3, H - 116, 'rgba(' + acc + ',.45)');
+        }
         const DK = (window.CATALOG && CATALOG.DECOR) || {}, SC = window.SCALE_DECOR || 1.3, D = (kind, x, y) => ({ id: 'rf_d' + x + '_' + y, type: 'decor', kind, name: DK[kind] ? DK[kind].name : kind, x, y, w: Math.round((DK[kind] ? DK[kind].w : 30) * SC), h: Math.round((DK[kind] ? DK[kind].h : 30) * SC), active: true });
         const kinds = ['crystal', 'bones', 'statue']; for (let i = 0; i < 7; i++) { const x = Math.round(90 + R() * (W - 220)), y = Math.round(90 + R() * (H - 340)); E.push(D(kinds[Math.floor(R() * kinds.length)], x, y)); }
         const boss = f % BOSS_EVERY === 0, raw = run.bl + f * 1.5, lv = Math.min(95, Math.round(raw)), xs = Math.max(0, raw - 95), md = Object.assign({}, run.mod, { hp: (run.mod.hp || 1) * (1 + 0.06 * xs), dmg: (run.mod.dmg || 1) * (1 + 0.03 * xs), id: (run.mod.id || '') + (xs > 0 ? 'x' + Math.round(xs) : '') });   // além do nível 95 os monstros só ganham vida/dano
         const n = boss ? 4 : Math.round(Math.min(4 + f, 10) * (run.mod.more || 1)); const tiers = f >= 15 ? ['elite', 'common'] : f >= 4 ? ['common', 'elite'] : ['light', 'common'];
-        const P = pool(lv, tiers); if (!P.length) return null;
-        for (let i = 0; i < n; i++) { const p = P[Math.floor(R() * P.length)], key = derive(p.k, Math.min(95, lv + (R() < .25 ? 2 : 0)), p.tier === 'light' ? 'common' : p.tier, md); if (!key) continue; const d = npcDB[key]; E.push(mobEnt(key, Math.round(100 + R() * (W - 260)), Math.round(100 + R() * (H - 400)), i)); }
-        if (boss) { const B = pool(lv + 8, ['boss']); if (B.length) { const key = derive(B[0].k, Math.min(95, lv + 6), 'boss', md); if (key) E.push(mobEnt(key, W / 2 - 30, 110, 99)); } }
+        const P0 = pool(lv, tiers); if (!P0.length) return null;
+        const th = Math.floor(R() * THEMES.length), P = []; const bag = P0.slice();   // 3 a 5 espécies diferentes por andar, sorteadas
+        for (let i = 0, m = Math.min(bag.length, 3 + Math.floor(R() * 3)); i < m; i++) P.push(bag.splice(Math.floor(R() * bag.length), 1)[0]);
+        for (let i = 0; i < n; i++) { const p = P[Math.floor(R() * P.length)], key = derive(p.k, Math.min(95, lv + (R() < .25 ? 2 : 0)), p.tier === 'light' ? 'common' : p.tier, md, th); if (!key) continue; E.push(mobEnt(key, Math.round(100 + R() * (W - 260)), Math.round(100 + R() * (H - 400)), i)); }
+        if (boss) { const B = pool(lv + 8, ['boss']); if (B.length) { const pick = B.filter((b2) => b2.k !== run.lastBoss), c = pick.length ? pick : B, bp = c[Math.floor(R() * c.length)]; run.lastBoss = bp.k; const key = derive(bp.k, Math.min(95, lv + 6), 'boss', md, th + 3); if (key) E.push(mobEnt(key, W / 2 - 30, 110, 99)); } }
         return { id: 'fenda', name: 'Fenda Instável', tmp: true, env: md.dark ? 'dark' : 'dim', catalogV: 2, width: W, height: H, color: '#120d1c', gridX: null, gridY: null, spawn: { x: W / 2 - 12, y: H - 120 }, entities: E };
     }
     function enter(f) {
@@ -117,7 +131,7 @@
 
     /* ---------- HUD ---------- */
     function hudUpdate(alive) {
-        if (!hud) { hud = document.createElement('div'); hud.id = 'rift-hud'; hud.style.cssText = 'position:absolute;right:56px;top:78px;white-space:nowrap;z-index:55;background:rgba(24,14,40,.88);color:#e6d8ff;border:1px solid #8a5ad8;border-radius:8px;padding:4px 10px;font:12px/1.3 sans-serif;display:none;align-items:center;gap:8px;pointer-events:auto'; (document.getElementById('game-container') || document.body).appendChild(hud); hud.addEventListener('click', (e) => { if (e.target.dataset.leave && run && confirm('Sair da Fenda? Os andares já vencidos contam para a sua pontuação.')) finish(false); }); }
+        if (!hud) { hud = document.createElement('div'); hud.id = 'rift-hud'; hud.style.cssText = 'position:absolute;left:50%;transform:translateX(-50%);bottom:92px;white-space:nowrap;z-index:55;background:rgba(24,14,40,.88);color:#e6d8ff;border:1px solid #8a5ad8;border-radius:8px;padding:4px 10px;font:12px/1.3 sans-serif;display:none;align-items:center;gap:8px;pointer-events:auto'; (document.getElementById('game-container') || document.body).appendChild(hud); hud.addEventListener('click', (e) => { if (e.target.dataset.leave && run) gameConfirm('Sair da Fenda? Os andares já vencidos contam para a sua pontuação.', { title: '🔮 Fenda', ok: 'Sair', cancel: 'Ficar' }).then((ok) => { if (ok && run) finish(false); }); }); }
         const s = Math.floor((Date.now() - run.t0) / 1000), mm = Math.floor(s / 60), ss = String(s % 60).padStart(2, '0');
         hud.style.display = 'flex'; hud.innerHTML = '🔮 <b>Fenda nv ' + run.lvl + '</b> · ' + esc(run.mod.n) + ' · Andar <b>' + run.floor + '</b> · ' + (alive > 0 ? alive + ' inimigo' + (alive > 1 ? 's' : '') : 'limpo') + ' · ' + mm + ':' + ss + ' <button data-leave="1" style="background:#4a2a40;color:#e6d8ff;border:1px solid #8a5a8a;border-radius:5px;padding:1px 7px;cursor:pointer">Sair</button>';
     }

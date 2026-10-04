@@ -11,7 +11,7 @@ Leia o README.md antes de começar. Regras de trabalho: testar com Playwright em
 - Pacote "Terras Sombrias" (porto, navio, 7 mapas de alto nível) em `docs/packs/`, gerado por `tools/gen-sombrio.js`; auditoria/auto-ligação de mapas no Dev.
 - Pacote de exemplo "Reinos de Solaris" (7 mapas, chefes, itens) em `docs/packs/`, gerado por `tools/gen-expansion.js`.
 
-- Casa: novo editor com inventário/estoque, preview que segue o mouse, girar (R) e móveis de treino com XP diária limitada (`public/world2.js`).
+- Casa: novo editor com inventário/estoque, preview que segue o mouse, girar (R) e móveis de treino automáticos com XP fixa editável no Dev (`public/world2.js`).
 - Fendas (`public/fendas.js`, `engagesrv.js`): masmorra de 6 andares, níveis 1-30, modificador semanal, placar semanal, pódio e meta comunitária. Reforja com afixos (`public/reforja.js`).
 
 ## Falta

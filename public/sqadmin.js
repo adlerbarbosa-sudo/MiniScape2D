@@ -38,8 +38,8 @@
         const b = e.target.closest('[data-a]'); const row = e.target.closest('[data-id]'); if (!b || !row) return; const id = row.dataset.id, q = quests.find((x) => x.id === id); if (!q) return;
         if (b.dataset.a === 'toggle') act('toggle', { id, active: !q.active }).then((r) => { if (r && r.ok) status(q.active ? 'Missão desativada.' : 'Missão ativada.', '#2ecc71'); });
         else if (b.dataset.a === 'edit') form(q);
-        else if (b.dataset.a === 'reset') { if (confirm('Zerar resgates e progresso de "' + q.name + '"? Todos poderão resgatar de novo.')) act('reset', { id }); }
-        else if (b.dataset.a === 'del') { if (confirm('Apagar a missão "' + q.name + '"?')) act('delete', { id }); }
+        else if (b.dataset.a === 'reset') { gameConfirm('Zerar resgates e progresso de "' + q.name + '"? Todos poderão resgatar de novo.', { danger: true, ok: 'Zerar' }).then((ok) => { if (ok) act('reset', { id }); }); }
+        else if (b.dataset.a === 'del') { gameConfirm('Apagar a missão "' + q.name + '"?', { danger: true, ok: 'Apagar' }).then((ok) => { if (ok) act('delete', { id }); }); }
     }
     function opts(list, sel) { return list.map((k) => `<option value="${esc(k[0])}" ${k[0] === sel ? 'selected' : ''}>${esc(k[1])}</option>`).join(''); }
     function form(q) {

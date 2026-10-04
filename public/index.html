@@ -162,6 +162,7 @@
     </div>
 
     <!-- SCRIPT GIGANTE E UNIFICADO DO JOGO -->
+    <script src="dialog.js"></script>
     <script src="balance.js"></script>
     <script src="econ.js"></script>
     <script src="labels.js"></script>
@@ -288,7 +289,7 @@
             let res; try { res = await fetch(API_BASE + path, opts); } finally { clearTimeout(to); }
             let data = {}; try { data = await res.json(); } catch (e) {}
             if (res.status === 401 && data.code === 'session_replaced') { onSessionReplaced(); data._status = 401; return data; }
-            if (res.status === 401 && data.code === 'AUTH' && authToken) { authToken = null; alert('Sua sessão expirou. Entre novamente.'); location.reload(); }
+            if (res.status === 401 && data.code === 'AUTH' && authToken) { authToken = null; gameAlert('Sua sessão expirou. Entre novamente.').then(() => location.reload()); }
             data._status = res.status; return data;
         }
 
@@ -604,7 +605,7 @@
             if (userRole !== 'admin') return;
             const fresh = buildDefaultWorld(); const ids = Object.keys(fresh); const existing = ids.filter(k => gameMaps[k]);
             const msg = existing.length ? 'Instalar o mundo medieval novo?\n\nIsto SUBSTITUI os mapas: ' + existing.join(', ') + '.\nMapas com outros nomes não são tocados. Um arquivo de backup do servidor será baixado antes.' : 'Instalar os mapas novos?';
-            if (!confirm(msg)) return false;
+            if (!(await gameConfirm(msg, { title: 'Instalar mundo', danger: true, ok: 'Instalar' }))) return false;
             if (!isOfflineMode && existing.length) { try { await downloadServerBackup(); } catch (e) {} }
             ids.forEach(k => { const old = gameMaps[k]; if (old) { fresh[k].gridX = old.gridX; fresh[k].gridY = old.gridY; } gameMaps[k] = fresh[k]; });
             currentMap = 'lumbridge'; { const sp = fresh.lumbridge.spawn || { x: 400, y: 300 }; player.x = sp.x; player.y = sp.y; player.destX = sp.x; player.destY = sp.y; } player.pendingAutoAction = null; player.isPerformingAction = false;
@@ -1585,18 +1586,23 @@
             }
             return { cols, rows, grid };
         }
-        function pfFind(cur, mapW, mapH, sx, sy, gx, gy) {
+        function pfFind(cur, mapW, mapH, sx, sy, gx, gy, _skip) {
+            _skip = _skip || [];
             const { cols, rows, grid } = pfBlockedFn(cur, mapW, mapH);
             const cl = (v, max) => Math.max(0, Math.min(max - 1, v));
             const s = { x: cl(Math.floor(sx / PF_CELL), cols), y: cl(Math.floor(sy / PF_CELL), rows) };
             let g = { x: cl(Math.floor(gx / PF_CELL), cols), y: cl(Math.floor(gy / PF_CELL), rows) };
             grid[s.y * cols + s.x] = 0;   // sempre pode sair de onde está
-            if (grid[g.y * cols + g.x]) {   // destino bloqueado (ex.: clicou na casa) -> célula livre mais próxima
-                let best = null, bd = 1e9;
-                for (let r = 1; r < 12 && !best; r++) for (let y = g.y - r; y <= g.y + r; y++) for (let x = g.x - r; x <= g.x + r; x++) {
-                    if (x < 0 || y < 0 || x >= cols || y >= rows || grid[y * cols + x]) continue;
-                    const d = Math.hypot(x - g.x, y - g.y) + Math.hypot(x - s.x, y - s.y) * 0.01; if (d < bd) { bd = d; best = { x, y }; }
+            const blockedGoal = !!grid[g.y * cols + g.x];
+            if (blockedGoal) {   // destino bloqueado (ex.: clicou na casa) -> célula livre mais próxima
+                // célula livre mais próxima do alvo; entre as quase-igualmente próximas, a do LADO DO JOGADOR (não dá a volta no objeto)
+                const cand = []; let dmin = 1e9;
+                for (let y = g.y - 12; y <= g.y + 12; y++) for (let x = g.x - 12; x <= g.x + 12; x++) {
+                    if (x < 0 || y < 0 || x >= cols || y >= rows || grid[y * cols + x] || _skip.includes(y * cols + x)) continue;
+                    const dg = Math.hypot(x - g.x, y - g.y); cand.push([x, y, dg]); if (dg < dmin) dmin = dg;
                 }
+                let best = null, bd = 1e9;
+                for (const c of cand) { if (c[2] > dmin + 1.6) continue; const d = Math.hypot(c[0] - s.x, c[1] - s.y); if (d < bd) { bd = d; best = { x: c[0], y: c[1] }; } }
                 if (!best) return null; g = best;
             }
             const N = cols * rows, gs = new Float32Array(N).fill(1e9), from = new Int32Array(N).fill(-1), closed = new Uint8Array(N);
@@ -1616,7 +1622,7 @@
                     if (ng < gs[ni]) { gs[ni] = ng; from[ni] = cur0; hpush(ng + h(nx, ny), ni); }
                 }
             }
-            const gi = g.y * cols + g.x; if (from[gi] === -1 && !(s.x === g.x && s.y === g.y)) return null;
+            const gi = g.y * cols + g.x; if (from[gi] === -1 && !(s.x === g.x && s.y === g.y)) { if (blockedGoal && _skip.length < 10) return pfFind(cur, mapW, mapH, sx, sy, gx, gy, _skip.concat([gi])); return null; }   // célula escolhida inalcançável (bolsão): tenta a próxima
             const pts = []; let c = gi; while (c !== -1 && c !== s.y * cols + s.x) { pts.push({ x: (c % cols) * PF_CELL + PF_CELL / 2, y: ((c / cols) | 0) * PF_CELL + PF_CELL / 2 }); c = from[c]; }
             pts.reverse();
             // suaviza: remove pontos com linha de visão livre

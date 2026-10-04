@@ -1129,10 +1129,10 @@
     const HAIR_NAMES = ['Curto', 'Repartido', 'Espetado', 'Ondulado', 'Longo liso', 'Longo com franja', 'Rabo de cavalo', 'Coque'];
     function D_(sx, sy, sh, wa, hp, hr, iris) { return { sx, sy, sh, wa, hp, hr, iris }; }
     const DIMS = {
-        human: { m: D_(1, 1, 6.2, 5.2, 5.6, 7.2, '#4a3020'), f: D_(0.97, 0.975, 5.3, 3.9, 5.7, 7.0, '#4a3020') },
-        elf: { m: D_(0.96, 1.06, 5.6, 4.6, 5.2, 6.8, '#2f8f6a'), f: D_(0.93, 1.04, 4.9, 3.6, 5.3, 6.6, '#3a7fb0') },
+        human: { m: D_(1, 1.05, 6.2, 5.2, 5.6, 7.2, '#4a3020'), f: D_(0.97, 1.02, 5.3, 3.9, 5.7, 7.0, '#4a3020') },
+        elf: { m: D_(0.96, 1.1, 5.6, 4.6, 5.2, 6.8, '#2f8f6a'), f: D_(0.93, 1.08, 4.9, 3.6, 5.3, 6.6, '#3a7fb0') },
         dwarf: { m: D_(1.08, 0.9, 6.9, 6.2, 6.4, 7.6, '#2a2a3a'), f: D_(1.04, 0.9, 6.0, 4.8, 6.3, 7.4, '#2a2a3a') },
-        orc: { m: D_(1.1, 1.03, 7.2, 6.0, 5.8, 7.6, '#d8a020'), f: D_(1.05, 1.0, 6.3, 4.6, 5.6, 7.3, '#d8a020') }
+        orc: { m: D_(1.1, 1.06, 7.2, 6.0, 5.8, 7.6, '#d8a020'), f: D_(1.05, 1.03, 6.3, 4.6, 5.6, 7.3, '#d8a020') }
     };
     function dimsOf(sex, race) { const r = DIMS[race] || DIMS.human; return sex === 'f' ? r.f : r.m; }
     const _defLook = { sex: 'm', race: 'human', hairStyle: 0, hair: '#6b4a2a', skin: '#f1c27d', shirt: '#3b7dd8', pants: '#4a3a2a', beard: 0 };
@@ -1234,9 +1234,12 @@
 
     function faceFront(g, o, D, hy, hr, skin, hc, atk, F) {
         const race = o.race || 'human', irisC = D.iris, skinD = shade(skin, -0.25);
-        // nariz e bochechas
-        g.save(); g.globalAlpha = 0.55; g.strokeStyle = skinD; g.lineWidth = 0.9; g.lineCap = 'round'; g.beginPath(); g.moveTo(0.2, hy + 1.2); g.lineTo(-0.4, hy + 2.6); g.lineTo(0.9, hy + 2.7); g.stroke(); g.restore();
-        if (race === 'dwarf') ell(g, 0.1, hy + 2.3, 1.7, 1.3, shade(skin, -0.08), skinD, 0.7);
+        // nariz: ponta suave com sombra por baixo e brilho (sem o traço em 'L')
+        { const nw = race === 'dwarf' ? 1.9 : race === 'orc' ? 1.8 : race === 'elf' ? 1.0 : 1.35, tipY = hy + (race === 'elf' ? 2.1 : 2.3);
+          g.save(); g.strokeStyle = skinD; g.globalAlpha = 0.28; g.lineWidth = 0.8; g.lineCap = 'round'; g.beginPath(); g.moveTo(-0.9, hy + 0.7); g.quadraticCurveTo(-0.6, hy + 1.6, -nw * 0.7, tipY - 0.2); g.stroke(); g.restore();
+          ell(g, 0, tipY, nw, 0.95, shade(skin, race === 'orc' ? -0.2 : race === 'dwarf' ? -0.1 : -0.06), skinD, 0.55);
+          ell(g, -nw * 0.25, tipY - 0.3, nw * 0.4, 0.3, shade(skin, 0.28));
+          g.save(); g.strokeStyle = shade(skin, -0.5); g.globalAlpha = 0.65; g.lineWidth = 0.7; g.lineCap = 'round'; g.beginPath(); g.moveTo(-nw * 0.55, tipY + 0.75); g.lineTo(-nw * 0.25, tipY + 0.75); g.moveTo(nw * 0.25, tipY + 0.75); g.lineTo(nw * 0.55, tipY + 0.75); g.stroke(); g.restore(); }
         ell(g, -hr * 0.66, hy + 2.7, 1.6, 1.0, 'rgba(225,100,100,0.3)'); ell(g, hr * 0.66, hy + 2.7, 1.6, 1.0, 'rgba(225,100,100,0.3)');
         // olhos
         const ey = hy + 0.6, ex = race === 'elf' ? 3.1 : 3.0, ew = race === 'elf' ? 1.75 : 1.6, eh = race === 'orc' ? 1.5 : 1.85;
@@ -1261,8 +1264,11 @@
     }
     function faceSide(g, o, D, hy, hr, skin, hc, atk, F) {
         const race = o.race || 'human', skinD = shade(skin, -0.25), ex = 4.2;
-        // nariz
-        tri(g, 6.3, hy - 0.4, race === 'dwarf' ? 9.6 : 8.6, hy + 2.3, 6.0, hy + 2.7, skin, OUT, 0.85); g.fillStyle = skin; g.fillRect(5.5, hy - 0.2, 1.4, 2.6);
+        // nariz de perfil: ponte suave, ponta arredondada (por raça)
+        { const n = race === 'elf' ? 1.9 : race === 'dwarf' ? 2.7 : race === 'orc' ? 2.1 : 1.6;
+          g.beginPath(); g.moveTo(6.4, hy - 1.2); g.quadraticCurveTo(7.2 + n * 0.55, hy + 0.2, 7.0 + n, hy + (race === 'elf' ? 1.5 : 2.0)); g.quadraticCurveTo(7.0 + n * 0.8, hy + 3.0 + (race === 'dwarf' ? 0.3 : 0), 6.2, hy + 2.9); g.closePath(); paint(g, skin, OUT, 0.85);
+          ell(g, 6.6 + n * 0.55, hy + 1.1, 0.5, 0.35, shade(skin, 0.28));
+          if (race === 'orc' || race === 'dwarf') ell(g, 6.5 + n * 0.5, hy + 2.7, 0.6, 0.35, shade(skin, -0.55)); }
         // olho
         ell(g, ex, hy + 0.5, 1.45, 1.75, '#fff', 'rgba(18,10,8,0.55)', 0.6); ell(g, ex + 0.5, hy + 0.65, 0.95, 1.25, D.iris); ell(g, ex + 0.6, hy + 0.7, 0.5, 0.7, '#0c0806'); ell(g, ex + 0.2, hy + 0.1, 0.35, 0.35, '#fff');
         g.strokeStyle = F ? '#1a100c' : shade(skin, -0.55); g.lineWidth = F ? 0.95 : 0.8; g.lineCap = 'round'; g.beginPath(); g.moveTo(ex - 1.5, hy - 0.4); g.quadraticCurveTo(ex, hy - 2.2, ex + 1.8, hy - 0.4); g.stroke();
@@ -1336,24 +1342,27 @@
         const sw = sin(ph) * mv, bob = abs(sin(ph)) * mv * 1.2, br = sin(t * 2.2 + (o.seed || 0)) * 0.5;
         const SH = D.sh, WA = D.wa, HP = D.hp, hr = D.hr, sd = 2.6 + SH * 0.25;
         const shirtD = shade(shirt, -0.35), shirtL = shade(shirt, 0.22), skinD = shade(skin, -0.22), pantsD = shade(pants, -0.3);
-        const legY = -13 - bob, armSw = sw * 0.9, hy = -37 - bob + br, aw = 4.2;
+        const LG = 3.2, HK = 0.87;   // LG: pernas mais longas (o resto do corpo sobe); HK: cabeça menor (proporção de RPG)
+        const legY = -13 - LG - bob, armSw = sw * 0.9, hy = -37 - bob + br, aw = 4.2;
         const sx = D.sx, sy = D.sy;
         const covered = !!(o.hat && COVER[o.hat]);
         const hc = hair;
         // --- mãos (geometria)
-        const info = { bob: bob * sy, hy: hy * sy, hand: null, handL: null, sx, sy };
+        const info = { bob: bob * sy, hy: (hy - LG) * sy, hand: null, handL: null, sx, sy };
+        const headXf = () => { g.translate(0, hy + 7); g.scale(HK, HK / sy); g.translate(0, -(hy + 7)); };
         const lift = atk * 3.6;
         let wa0;   // braço de arma: frente = direita da tela; costas = esquerda da tela; lado = braço próximo
         if (side) {
             const a = -0.25 + atk * 1.7 + armSw * 0.5; wa0 = { a, x: 1 + 2 * cos(a) - 12 * sin(a), y: -29 - bob + 2 * sin(a) + 12 * cos(a) };
         } else {
             const hxx = SH + 2.4, ly = -14.6 - bob - armSw * 1.6, ry_ = -14.6 - bob + armSw * 1.6;
-            if (back) wa0 = { a: 0, x: -hxx - atk * 1.2, y: ly - lift }; else wa0 = { a: 0, x: hxx + atk * 1.2, y: ry_ - lift };
-            info.handL = { x: -hxx * sx, y: ly * sy };
+            if (back) wa0 = { a: 0, x: hxx + atk * 1.2, y: ry_ - lift }; else wa0 = { a: 0, x: -hxx - atk * 1.2, y: ly - lift };   // arma na mão DIREITA do personagem (frente: esquerda da tela; costas: direita da tela)
+            info.handL = back ? { x: -hxx * sx, y: (ly - LG) * sy } : { x: hxx * sx, y: (ry_ - LG) * sy };   // escudo na esquerda do personagem
         }
-        info.hand = { x: wa0.x * sx, y: wa0.y * sy, a: wa0.a };
+        info.hand = { x: wa0.x * sx, y: (wa0.y - LG) * sy, a: wa0.a };
 
         g.save(); if (sx !== 1 || sy !== 1) g.scale(sx, sy);
+        g.translate(0, -LG);
         // capa (NPC): atrás do tronco
         const cape = o.cape;
         if (cape && !back) {
@@ -1364,7 +1373,8 @@
             paint(g, cape, OUT, 1.1);
             g.save(); g.clip(); g.globalAlpha = 0.3; g.fillStyle = shade(cape, -0.6); g.fillRect(side ? -sd - 6 : -14, -12 - bob, 30, 14); g.restore(); g.globalAlpha = 1;
         }
-        // pernas
+        // pernas (desenhadas no referencial do chão)
+        g.save(); g.translate(0, LG);
         if (side) {
             limb2(g, 0, legY, sw * 3, -6, -sw * 5, -1, 5, pantsD); ell(g, -sw * 5 + 1.6, -1, 4.2, 2, shade(boots, -0.15), OUT, 0.9);
             limb2(g, 0, legY, -sw * 3, -6, sw * 5, -1, 5, pants); ell(g, sw * 5 + 1.6, -1, 4.2, 2.1, boots, OUT, 0.9); ell(g, sw * 5 + 2, -1.6, 2.4, 0.8, shade(boots, 0.25));
@@ -1374,12 +1384,13 @@
             limb(g, -lx, legY, -lx + sw * 0.5, fl, 5.4, pants); ell(g, -lx + sw * 0.5, fl, 3.7, 2.1, boots, OUT, 0.9); ell(g, -lx + sw * 0.5 - 0.6, fl - 0.6, 1.8, 0.7, shade(boots, 0.25));
             limb(g, lx, legY, lx - sw * 0.5, fr, 5.4, pantsD); ell(g, lx - sw * 0.5, fr, 3.7, 2.1, boots, OUT, 0.9); ell(g, lx - sw * 0.5 - 0.6, fr - 0.6, 1.8, 0.7, shade(boots, 0.25));
         }
+        g.restore();
         // braço de trás (lado)
         if (side) { limb2(g, 0, -29 - bob, -armSw * 3, -23, -armSw * 5, -17 - bob, 4, shade(shirt, -0.45)); ell(g, -armSw * 5, -16.4 - bob, 2.3, 2.3, skinD, OUT, 0.9); }
         // objetos atrás do corpo (arma de costas, escudo de lado): desenhados sem a escala do corpo
-        if (o.behind && (back || side)) { g.save(); g.scale(1 / sx, 1 / sy); o.behind(g, info); g.restore(); }
+        if (o.behind && (back || side)) { g.save(); g.scale(1 / sx, 1 / sy); g.translate(0, LG * sy); o.behind(g, info); g.restore(); }
         // cabelo atrás (frente/lado)
-        if (hasStyle && !back) hairBehind(g, st, view, hy, hr, hc);
+        if (hasStyle && !back) { g.save(); headXf(); hairBehind(g, st, view, hy, hr, hc); g.restore(); }
         // pescoço
         if (!back) { g.fillStyle = skinD; g.fillRect(side ? -1.8 : -2.3, -34 - bob + br, side ? 4.2 : 4.6, 5); }
         else { g.fillStyle = skinD; g.fillRect(-2.3, -34 - bob + br, 4.6, 5); }
@@ -1401,13 +1412,10 @@
         else { const cw2 = 2 * (WA + 0.6) - 0.5 * (HP + SH + 1.1); g.moveTo(1.6, ty0); g.lineTo(2.4, ty0); g.quadraticCurveTo(2.8, ty0 - 0.4, SH * 0.55, sy0 - 2.3); g.quadraticCurveTo(SH + 0.5, sy0 - 1.2, SH + 0.5, sy0 + 1.0); g.quadraticCurveTo(cw2, -19 - bob, HP + 0.6, -12 - bob); g.lineTo(1.6, -12 - bob); }
         g.closePath(); g.globalAlpha = 0.3; g.fillStyle = shirtD; g.fill(); g.globalAlpha = 1;
         if (!side && !back) { g.fillStyle = skin; g.beginPath(); g.moveTo(-2.6, ty0 - 0.2); g.lineTo(2.6, ty0 - 0.2); g.lineTo(0, ty0 + 3.4); g.closePath(); g.fill(); g.strokeStyle = shirtD; g.lineWidth = 0.8; g.beginPath(); g.moveTo(-2.6, ty0); g.lineTo(0, ty0 + 3.4); g.lineTo(2.6, ty0); g.stroke(); }
-        if (o.armor) {
-            g.strokeStyle = 'rgba(255,255,255,0.4)'; g.lineWidth = 1; g.beginPath();
-            if (side) { g.moveTo(-sd + 1, -26 - bob); g.lineTo(sd - 0.4, -26 - bob); } else { g.moveTo(-SH + 1.4, -25.6 - bob); g.lineTo(SH - 1.4, -25.6 - bob); g.moveTo(0, -29.5 - bob); g.lineTo(0, -14 - bob); }
-            g.stroke();
-        }
+        const AT = o.armorT != null ? o.armorT : 2, AC = o.armorCol || '#aab3bd';
+        if (o.armor) armorBody(g, view, AT, AC, SH, WA, HP, sd, bob);
         if (o.apron && !back) { const hw = side ? sd : WA + 0.6; g.beginPath(); g.moveTo(-hw + 0.5, -26 - bob); g.lineTo(hw - 0.5, -26 - bob); g.lineTo(hw + 0.4, -9 - bob); g.lineTo(-hw - 0.4, -9 - bob); g.closePath(); paint(g, o.apron, OUT, 0.9); }
-        if (o.robe) { const hw = side ? sd : HP; g.beginPath(); g.moveTo(-hw - 0.6, -14 - bob); g.lineTo(-hw - 3.6, -2); g.lineTo(hw + 3.6, -2); g.lineTo(hw + 0.6, -14 - bob); g.closePath(); paint(g, shirt, OUT, 1.1); g.save(); g.clip(); g.globalAlpha = 0.3; g.fillStyle = shirtD; g.fillRect(1.6, -16 - bob, 14, 16); g.restore(); g.globalAlpha = 1; }
+        if (o.robe) { const hw = side ? sd : HP; g.beginPath(); g.moveTo(-hw - 0.6, -14 - bob); g.lineTo(-hw - 3.6, 1.2); g.lineTo(hw + 3.6, 1.2); g.lineTo(hw + 0.6, -14 - bob); g.closePath(); paint(g, shirt, OUT, 1.1); g.save(); g.clip(); g.globalAlpha = 0.3; g.fillStyle = shirtD; g.fillRect(1.6, -16 - bob, 14, 16); g.restore(); g.globalAlpha = 1; }
         // cinto
         const bw = side ? sd + 0.5 : (WA * 0.5 + HP * 0.5 + 0.9);
         rrect(g, -bw, -15.4 - bob, bw * 2, 2.6, 1, o.belt || '#4a2f16', OUT, 0.7);
@@ -1417,19 +1425,20 @@
         // (costas) capa por cima, escudo nas costas, cabelo longo sobre as costas
         if (back) {
             if (cape) { g.beginPath(); g.moveTo(-SH + 0.2, -29.6 - bob); g.quadraticCurveTo(0, -31.4 - bob, SH - 0.2, -29.6 - bob); g.lineTo(SH + 3.2 + sw, -6 - bob); g.quadraticCurveTo(0, -3.6 - bob, -SH - 3.2 - sw, -6 - bob); g.closePath(); paint(g, cape, OUT, 1.1); g.save(); g.clip(); g.globalAlpha = 0.3; g.fillStyle = shade(cape, -0.6); g.fillRect(1.4, -30 - bob, 12, 30); g.restore(); g.globalAlpha = 1; }
-            if (hasStyle) hairBackOver(g, st, hy, hr, hc);
-            if (o.onBack) { g.save(); g.scale(1 / sx, 1 / sy); o.onBack(g, info); g.restore(); }
+            if (hasStyle) { g.save(); headXf(); hairBackOver(g, st, hy, hr, hc); g.restore(); }
+            if (o.onBack) { g.save(); g.scale(1 / sx, 1 / sy); g.translate(0, LG * sy); o.onBack(g, info); g.restore(); }
         }
         if (!side && !back && hasStyle) hairLocksFront(g, st, hy, hr, hc);
         // braços (frente/costas)
         if (!side) {
             const hxx = SH + 2.4, ly = -14.6 - bob - armSw * 1.6, ry_ = -14.6 - bob + armSw * 1.6;
-            const wl = back ? lift : 0, wr = back ? 0 : lift, wx = atk * 1.2;
-            limb2(g, -SH - 0.4, -27.4 - bob, -SH - 2.6, -21.6, -hxx - (back ? wx : 0), ly - wl, aw, shirt); ell(g, -hxx - (back ? wx : 0), ly + 0.6 - wl, 2.5, 2.5, skin, OUT, 0.9);
-            limb2(g, SH + 0.4, -27.4 - bob, SH + 2.6, -21.6, hxx + (back ? 0 : wx), ry_ - wr, aw, shirt); ell(g, hxx + (back ? 0 : wx), ry_ + 0.6 - wr, 2.5, 2.5, skin, OUT, 0.9);
-            if (o.armor) { ell(g, -SH - 0.6, -28.4 - bob, 3.1, 2.4, shade(shirt, 0.18), OUT, 0.9); ell(g, SH + 0.6, -28.4 - bob, 3.1, 2.4, shade(shirt, 0.18), OUT, 0.9); g.strokeStyle = 'rgba(255,255,255,0.45)'; g.lineWidth = 0.8; g.beginPath(); g.arc(-SH - 0.8, -28.8 - bob, 1.8, 3.6, 5.2); g.stroke(); g.beginPath(); g.arc(SH + 0.4, -28.8 - bob, 1.8, 3.6, 5.2); g.stroke(); }
+            const wl = back ? 0 : lift, wr = back ? lift : 0, wx = atk * 1.2;
+            limb2(g, -SH - 0.4, -27.4 - bob, -SH - 2.6, -21.6, -hxx - (back ? 0 : wx), ly - wl, aw, shirt); ell(g, -hxx - (back ? 0 : wx), ly + 0.6 - wl, 2.5, 2.5, skin, OUT, 0.9);
+            limb2(g, SH + 0.4, -27.4 - bob, SH + 2.6, -21.6, hxx + (back ? wx : 0), ry_ - wr, aw, shirt); ell(g, hxx + (back ? wx : 0), ry_ + 0.6 - wr, 2.5, 2.5, skin, OUT, 0.9);
+            if (o.armor) { armorPad(g, AT, AC, -SH - 0.6, -28.4 - bob, -1); armorPad(g, AT, AC, SH + 0.6, -28.4 - bob, 1); }
         }
         // cabeça (em frente/costas gira de leve para o lado do movimento ou do alvo: 3/4 suave)
+        g.save(); headXf();
         const hrr = side ? hr * 0.94 : hr, tn = side ? 0 : (o.turn || 0);
         if (tn) { g.save(); g.translate(tn * 0.9, 0); g.translate(0, hy + 6); g.rotate(tn * 0.05 * (back ? -1 : 1)); g.translate(0, -(hy + 6)); }
         if (back) {
@@ -1451,37 +1460,120 @@
             if (race === 'elf') earFront(g, race, hy, hr, skin, true);
         }
         if (o.beard && !back) beardShape(g, o.beard, view, hy, hr, race === 'dwarf');
-        hat(g, o.hat, hy, view, o.hatColor);
+        hat(g, o.hat, hy, view, o.hatColor, o.hatStyle);
         if (tn) g.restore();
+        g.restore();   // headXf
         // braço da frente (lado)
         if (side) {
             const a = wa0.a; g.save(); g.translate(1, -29 - bob); g.rotate(a); limb2(g, 0, 0, 1, 6, 2, 11, 4.4, shirt); ell(g, 2, 12, 2.6, 2.6, skin, OUT, 0.9); g.restore();
-            if (o.armor) ell(g, 1, -29.2 - bob, 3.0, 2.5, shade(shirt, 0.18), OUT, 0.9);
+            if (o.armor) armorPad(g, AT, AC, 1, -29.2 - bob, 1);
         }
         g.restore();
         return info;
     }
-    function helmet(g, hy, view, c) {
-        const base = c || '#b9c2cc', dk = shade(base, -0.35), lt = shade(base, 0.35);
+    /* ---------- armaduras: peitoral, ombreiras e elmos por tier ---------- */
+    function armorBody(g, view, T, c, SH, WA, HP, sd, bob) {
+        const y = (v) => v - bob, hi = shade(c, 0.42), dk = shade(c, -0.42), side = view === 'side', back = view === 'back';
+        const path = () => {
+            g.beginPath();
+            if (side) { g.moveTo(-sd + 0.2, y(-29.4)); g.quadraticCurveTo(0.6, y(-31.2), sd + 0.1, y(-29)); g.lineTo(sd + 0.55, y(-16.2)); g.lineTo(-sd - 0.55, y(-16.2)); }
+            else { g.moveTo(-SH + 0.2, y(-29)); g.quadraticCurveTo(0, y(-31.2), SH - 0.2, y(-29)); g.quadraticCurveTo(SH + 0.5, y(-22), WA + 1.3, y(-16.2)); g.lineTo(-WA - 1.3, y(-16.2)); g.quadraticCurveTo(-SH - 0.5, y(-22), -SH + 0.2, y(-29)); }
+            g.closePath();
+        };
+        const hw = side ? sd : SH;
+        path(); paint(g, T === 0 ? c : lg(g, -hw, y(-30), hw, y(-16), [[0, shade(c, 0.32)], [0.55, c], [1, shade(c, -0.32)]]), OUT, 1.1);
+        g.save(); path(); g.clip(); g.globalAlpha = 0.26; g.fillStyle = dk; g.fillRect(side ? 0.8 : hw * 0.3, y(-33), 20, 20); g.restore(); g.globalAlpha = 1;
+        g.lineCap = 'round';
+        const ridge = (col, a) => { g.save(); g.globalAlpha = a; g.strokeStyle = col; g.lineWidth = 0.9; g.beginPath(); g.moveTo(side ? 1.4 : 0, y(-29)); g.lineTo(side ? 1.4 : 0, y(-16.4)); g.stroke(); g.restore(); };
+        const rivet = (x, yy) => { ell(g, x, y(yy), 0.7, 0.7, hi, OUT, 0.4); };
+        if (T === 0) {   // couro: costura, cordões e tiras
+            g.strokeStyle = dk; g.lineWidth = 0.8; g.beginPath(); g.moveTo(side ? 1.4 : 0, y(-28)); g.lineTo(side ? 1.4 : 0, y(-17)); g.stroke();
+            if (!side && !back) { g.lineWidth = 0.7; g.beginPath(); for (let i = 0; i < 4; i++) { const yy = -26 + i * 3; g.moveTo(-1.8, y(yy)); g.lineTo(1.8, y(yy + 1.6)); g.moveTo(1.8, y(yy)); g.lineTo(-1.8, y(yy + 1.6)); } g.stroke(); }
+            g.save(); g.globalAlpha = 0.7; g.strokeStyle = shade(c, -0.55); g.lineWidth = 1.3; g.beginPath(); g.moveTo(-hw + 1.2, y(-28.4)); g.lineTo(hw - 1.2, y(-17)); g.stroke(); g.restore();
+        } else if (T <= 2) {
+            ridge(dk, 0.55); if (!side) { ridge(hi, 0); g.save(); g.globalAlpha = 0.5; g.strokeStyle = hi; g.lineWidth = 0.9; g.beginPath(); g.moveTo(-hw + 1.4, y(-27)); g.quadraticCurveTo(-hw * 0.5, y(-25.4), -hw * 0.18, y(-26.6)); g.stroke(); g.restore(); }
+            rivet(-hw + 1.7, -27.6); rivet(hw - 1.7, -27.6); rivet(-WA - 0.2, -17.6); rivet(WA + 0.2, -17.6);
+        } else if (T === 3) {
+            ridge(dk, 0.55); g.save(); g.globalAlpha = 0.55; g.strokeStyle = dk; g.lineWidth = 0.8; for (const yy of [-23, -19.6]) { g.beginPath(); g.moveTo(-hw + 0.9, y(yy)); g.lineTo(hw - 0.9, y(yy)); g.stroke(); } g.restore();
+            g.save(); g.globalAlpha = 0.6; g.strokeStyle = hi; g.lineWidth = 0.8; g.beginPath(); g.moveTo(-hw + 1.4, y(-27)); g.quadraticCurveTo(-hw * 0.5, y(-25.6), -hw * 0.18, y(-26.6)); g.stroke(); g.restore();
+            rivet(-hw + 1.7, -27.6); rivet(hw - 1.7, -27.6);
+        } else if (T === 4) {
+            g.save(); g.strokeStyle = '#fff0a0'; g.globalAlpha = 0.9; g.lineWidth = 1.3; path(); g.stroke(); g.restore();
+            if (!back) { ridge(dk, 0.35); ell(g, side ? 2 : 0, y(-23.5), 1.8, 2.2, '#d8342b', OUT, 0.8); ell(g, side ? 1.6 : -0.5, y(-24.2), 0.6, 0.6, '#ffb0a0'); }
+            else ridge('#fff0a0', 0.7);
+        } else if (T === 5) {
+            glow(g, 0, y(-23), 9, '#6ec8ff', 0.22);
+            g.save(); g.strokeStyle = '#d4f6ff'; g.globalAlpha = 0.9; g.lineWidth = 1; g.beginPath(); if (side) { g.moveTo(-sd + 1, y(-26)); g.lineTo(2, y(-22)); g.lineTo(sd - 0.4, y(-26)); } else { g.moveTo(-hw + 1.6, y(-27)); g.lineTo(0, y(-21.4)); g.lineTo(hw - 1.6, y(-27)); g.moveTo(-hw + 2.6, y(-23.4)); g.lineTo(0, y(-18.6)); g.lineTo(hw - 2.6, y(-23.4)); } g.stroke(); g.restore();
+        } else if (T === 6) {
+            g.strokeStyle = shade('#6b6450', 0.0); g.lineWidth = 0.9; g.beginPath();
+            if (!side) { g.moveTo(0, y(-29)); g.lineTo(0, y(-16.6)); for (let i = 0; i < 4; i++) { const yy = -27 + i * 3.1; g.moveTo(-0.8, y(yy)); g.quadraticCurveTo(-hw * 0.6, y(yy - 1.2), -hw + 1.6, y(yy + 1.8)); g.moveTo(0.8, y(yy)); g.quadraticCurveTo(hw * 0.6, y(yy - 1.2), hw - 1.6, y(yy + 1.8)); } }
+            else for (let i = 0; i < 4; i++) { const yy = -27 + i * 3.1; g.moveTo(-sd + 0.8, y(yy)); g.quadraticCurveTo(0, y(yy - 1.4), sd - 0.6, y(yy + 1.6)); }
+            g.stroke();
+        } else {   // dragão: escamas e debrum vermelho
+            g.save(); path(); g.clip(); g.strokeStyle = dk; g.globalAlpha = 0.65; g.lineWidth = 0.7; for (let r = 0; r < 6; r++) for (let q = -3; q <= 3; q++) { g.beginPath(); g.arc(q * 3.4 + (r & 1) * 1.7, y(-28 + r * 2.5), 1.7, 0, PI); g.stroke(); } g.restore();
+            g.save(); g.strokeStyle = '#c0392b'; g.lineWidth = 1.1; path(); g.stroke(); g.restore();
+        }
+        if (T >= 3) {   // gorjal (colar) e saiote de placas
+            if (!side) ell(g, 0, y(-30.4), 4.4, 1.7, T === 4 ? '#e6c24a' : c, OUT, 0.9); else ell(g, 0.4, y(-30.4), 3.4, 1.7, T === 4 ? '#e6c24a' : c, OUT, 0.9);
+            const tw = side ? sd : HP; g.save(); for (let i = -1; i <= 1; i++) { if (side && i) continue; const px = side ? 0.2 : i * (tw * 0.66); rrect(g, px - (side ? tw : tw * 0.34), y(-12.4), side ? tw * 2 : tw * 0.68, 5, 1.2, T === 4 ? '#e6c24a' : shade(c, -0.1), OUT, 0.8); } g.restore();
+        }
+    }
+    function armorPad(g, T, c, x, yy, dir) {
+        const hi = shade(c, 0.4), dk = shade(c, -0.4);
+        if (T === 0) { ell(g, x, yy + 0.4, 2.6, 2, shade(c, -0.1), OUT, 0.8); return; }
+        if (T === 5) { tri(g, x - dir * 2.2, yy + 1.8, x + dir * 5.2, yy - 5.4, x + dir * 3.4, yy + 2, '#8fd0ff', OUT, 0.8); tri(g, x - dir * 1.6, yy + 1.2, x + dir * 3.6, yy - 3.2, x + dir * 2.6, yy + 1.8, '#d4f6ff', null); }
+        if (T === 6) { tri(g, x - 1.4, yy - 1.4, x + dir * 0.6, yy - 6.4, x + 1.0, yy - 1.4, '#e6e0c8', OUT, 0.7); tri(g, x + dir * 1.4, yy - 1.2, x + dir * 4.4, yy - 4.4, x + dir * 3.6, yy - 0.4, '#e6e0c8', OUT, 0.7); }
+        if (T === 7) { tri(g, x - 1.2, yy - 1.4, x + dir * 0.4, yy - 7.4, x + 1.2, yy - 1.4, '#d8d0c0', OUT, 0.7); tri(g, x + dir * 1.6, yy - 1.0, x + dir * 5.6, yy - 4.2, x + dir * 4, yy, '#d8d0c0', OUT, 0.7); }
+        if (T === 3) ell(g, x, yy + 1.4, 3.5, 2.2, dk, OUT, 0.9);
+        ell(g, x, yy, 3.2, 2.4, T === 4 ? '#e6c24a' : c, OUT, 0.9); g.strokeStyle = hi; g.globalAlpha = 0.7; g.lineWidth = 0.8; g.beginPath(); g.arc(x - dir * 0.4, yy - 0.2, 1.9, 3.5, 5.2); g.stroke(); g.globalAlpha = 1;
+        if (T === 4) { g.strokeStyle = '#fff0a0'; g.lineWidth = 0.7; g.beginPath(); g.ellipse(x, yy, 3.2, 2.4, 0, 0, TAU); g.stroke(); }
+    }
+    function helmKind(it) {
+        const n = String((it && it.name) || '').toLowerCase(); if (/crown|tiara|circlet/.test(n)) return 'crown';
+        const t = gearTier(it); return t >= 7 ? 'horned' : t === 6 ? 'skull' : t === 5 ? 'winged' : t === 4 ? 'gold' : t === 3 ? 'visor' : 'open';
+    }
+    function crownHat(g, hy, view, c) {
+        const base = c && c !== '#b9c2cc' ? c : '#e6c24a', lt = shade(base, 0.4), w = view === 'side' ? 6.6 : 7.4, x0 = view === 'side' ? -0.4 : 0;
+        g.beginPath(); g.moveTo(x0 - w, hy - 3.8);
+        const n = 5; for (let i = 0; i < n; i++) { const xa = x0 - w + (2 * w) * (i / n), xb = x0 - w + (2 * w) * ((i + 0.5) / n), xc = x0 - w + (2 * w) * ((i + 1) / n); g.lineTo(xa + 0.4, hy - 6.4); g.lineTo(xb, hy - 11.6 + (i === 2 ? -2.4 : 0)); g.lineTo(xc - 0.4, hy - 6.4); }
+        g.lineTo(x0 + w, hy - 3.8); g.quadraticCurveTo(x0, hy - 2.4, x0 - w, hy - 3.8); g.closePath(); paint(g, base, OUT, 1.1);
+        g.strokeStyle = lt; g.globalAlpha = 0.8; g.lineWidth = 0.9; g.beginPath(); g.moveTo(x0 - w + 0.6, hy - 5); g.quadraticCurveTo(x0, hy - 3.6, x0 + w - 0.6, hy - 5); g.stroke(); g.globalAlpha = 1;
+        if (view !== 'back') { ell(g, x0, hy - 4.4, 1.3, 1.2, '#d8342b', OUT, 0.6); if (view === 'front') { ell(g, x0 - 4, hy - 4.6, 0.8, 0.8, '#3b9ee8', OUT, 0.5); ell(g, x0 + 4, hy - 4.6, 0.8, 0.8, '#3b9ee8', OUT, 0.5); } }
+    }
+    function helmet(g, hy, view, c, style) {
+        style = style || 'visor';
+        const base = style === 'gold' ? '#e6c24a' : style === 'skull' ? '#e6e0c8' : style === 'horned' ? '#6a2a2a' : style === 'winged' ? '#9fc4f0' : (c || '#b9c2cc'), dk = shade(base, -0.35), lt = shade(base, 0.35);
+        const open = style === 'open' || style === 'gold';
+        // asas / chifres ficam atrás da calota
+        if (style === 'winged') { for (let sgn = -1; sgn <= 1; sgn += 2) { if (view === 'side' && sgn > 0) continue; const X = view === 'side' ? -1 : sgn * 8; g.beginPath(); g.moveTo(X, hy - 3); g.quadraticCurveTo(X + sgn * 6, hy - 6, X + sgn * 10, hy - 15); g.quadraticCurveTo(X + sgn * 5, hy - 12, X + sgn * 4.4, hy - 11); g.quadraticCurveTo(X + sgn * 8, hy - 9.6, X + sgn * 5, hy - 7.6); g.quadraticCurveTo(X + sgn * 4, hy - 5, X, hy - 1); g.closePath(); paint(g, '#eaf6ff', OUT, 0.9); g.strokeStyle = 'rgba(80,120,170,.5)'; g.lineWidth = 0.6; g.beginPath(); g.moveTo(X + sgn * 2, hy - 4); g.lineTo(X + sgn * 8, hy - 12); g.stroke(); } }
+        if (style === 'horned') { for (let sgn = -1; sgn <= 1; sgn += 2) { if (view === 'side' && sgn > 0) continue; const X = view === 'side' ? -2 : sgn * 7.4; g.beginPath(); g.moveTo(X, hy - 4); g.quadraticCurveTo(X + sgn * 6.6, hy - 5, X + sgn * 6, hy - 15); g.quadraticCurveTo(X + sgn * 3.4, hy - 8.4, X - sgn * 1.4, hy - 7); g.closePath(); paint(g, '#efe6cc', OUT, 0.9); } }
         g.beginPath();
         if (view === 'side') { g.moveTo(-8.2, hy + 3.6); g.quadraticCurveTo(-9.6, hy - 9, -0.6, hy - 9.6); g.quadraticCurveTo(7.6, hy - 9, 7.4, hy - 1.6); g.lineTo(7.4, hy - 0.6); g.lineTo(1.8, hy - 0.6); g.lineTo(1.8, hy + 4); g.lineTo(-1.2, hy + 4); g.lineTo(-1.6, hy + 3.4); g.closePath(); }
         else if (view === 'back') { g.moveTo(-8, hy + 3.4); g.quadraticCurveTo(-9.4, hy - 10, 0, hy - 10); g.quadraticCurveTo(9.4, hy - 10, 8, hy + 3.4); g.quadraticCurveTo(0, hy + 5, -8, hy + 3.4); g.closePath(); }
+        else if (open) { g.moveTo(-8, hy + 3); g.quadraticCurveTo(-9.4, hy - 10, 0, hy - 10); g.quadraticCurveTo(9.4, hy - 10, 8, hy + 3); g.lineTo(6.2, hy + 3); g.lineTo(5.4, hy - 2.4); g.quadraticCurveTo(0, hy - 4.6, -5.4, hy - 2.4); g.lineTo(-6.2, hy + 3); g.closePath(); }
         else { g.moveTo(-8, hy + 3); g.quadraticCurveTo(-9.4, hy - 10, 0, hy - 10); g.quadraticCurveTo(9.4, hy - 10, 8, hy + 3); g.lineTo(6, hy + 3); g.lineTo(6, hy - 0.8); g.lineTo(-6, hy - 0.8); g.lineTo(-6, hy + 3); g.closePath(); }
         paint(g, base, OUT, 1.2);
         g.save(); g.clip(); g.globalAlpha = 0.4; g.fillStyle = dk; g.fillRect(view === 'side' ? -1 : 2, hy - 12, 12, 20); g.globalAlpha = 0.6; g.fillStyle = lt; g.beginPath(); g.ellipse(view === 'side' ? -2.4 : -3.4, hy - 6.2, 1.8, 2.8, -0.5, 0, TAU); g.fill(); g.restore(); g.globalAlpha = 1;
         // aro (faixa)
-        g.strokeStyle = dk; g.lineWidth = 1.6; g.lineCap = 'butt'; g.beginPath();
+        g.strokeStyle = style === 'gold' ? '#fff0a0' : dk; g.lineWidth = 1.6; g.lineCap = 'butt'; g.beginPath();
         if (view === 'side') { g.moveTo(-8.4, hy - 2.4); g.quadraticCurveTo(0, hy - 4.4, 7.5, hy - 2.6); } else { g.moveTo(-8.3, hy - 2.4); g.quadraticCurveTo(0, hy - 4.4, 8.3, hy - 2.4); } g.stroke();
-        if (view === 'front') { g.fillStyle = '#1c1c22'; g.fillRect(-4.6, hy - 0.2, 9.2, 1.7); rrect(g, -1.1, hy - 3.6, 2.2, 6.6, 0.8, base, OUT, 0.8); }
-        else if (view === 'side') { g.fillStyle = '#1c1c22'; g.fillRect(2.6, hy - 0.4, 4.6, 1.6); }
-        tri(g, -1.6, hy - 9.4, 0, hy - 14.6, 1.6, hy - 9.4, '#c0392b', OUT, 0.8);
+        if (view === 'front') {
+            if (!open) { g.fillStyle = '#1c1c22'; g.fillRect(-4.6, hy - 0.2, 9.2, 1.7); if (style === 'skull') { ell(g, -2.4, hy + 0.6, 1.3, 1.1, '#1c1c22'); ell(g, 2.4, hy + 0.6, 1.3, 1.1, '#1c1c22'); } }
+            rrect(g, -1.1, hy - 3.6, 2.2, open ? 7.2 : 6.6, 0.8, base, OUT, 0.8);   // protetor de nariz
+            if (style === 'gold') ell(g, 0, hy - 5.4, 1.5, 1.4, '#d8342b', OUT, 0.7);
+        } else if (view === 'side') { if (!open) { g.fillStyle = '#1c1c22'; g.fillRect(2.6, hy - 0.4, 4.6, 1.6); } else { rrect(g, 6.2, hy - 2.4, 1.6, 6, 0.8, base, OUT, 0.7); } }
+        if (style === 'visor') tri(g, -1.8, hy - 9.4, 0, hy - 17, 1.8, hy - 9.4, '#c0392b', OUT, 0.8);
+        else if (style === 'open') { g.strokeStyle = dk; g.lineWidth = 0.9; g.beginPath(); g.moveTo(0, hy - 9.8); g.lineTo(0, hy - 5); g.stroke(); }
+        else if (style === 'gold') tri(g, -1.4, hy - 9.4, 0, hy - 14, 1.4, hy - 9.4, '#fff0a0', OUT, 0.7);
+        else if (style === 'skull') { for (let i = -2; i <= 2; i++) tri(g, i * 3 - 1, hy - 9.4 + Math.abs(i) * 0.8, i * 3, hy - 13.4 + Math.abs(i) * 1.4, i * 3 + 1, hy - 9.4 + Math.abs(i) * 0.8, '#d8d0c0', OUT, 0.6); }
     }
-    function hat(g, kind, hy, view, col) {
+    function hat(g, kind, hy, view, col, style) {
         if (!kind) return;
         const c = col;
         if (kind === 'cap') { g.beginPath(); g.moveTo(-8, hy - 1); g.quadraticCurveTo(-8, hy - 11, 0, hy - 10); g.quadraticCurveTo(8, hy - 11, 8, hy - 1); g.closePath(); paint(g, c || '#8a3b2a', OUT, 1.1); if (view !== 'back') rrect(g, view === 'side' ? 1 : -8, hy - 2.4, view === 'side' ? 9 : 16, 2.4, 1, shade(c || '#8a3b2a', -0.2), OUT, 0.8); }
         else if (kind === 'wizard') { g.beginPath(); g.moveTo(-9, hy - 4); g.quadraticCurveTo(-4, hy - 10, -1, hy - 24); g.quadraticCurveTo(3, hy - 26, 5, hy - 32); g.quadraticCurveTo(8, hy - 20, 9, hy - 4); g.quadraticCurveTo(0, hy - 1, -9, hy - 4); g.closePath(); paint(g, lg(g, 0, hy - 30, 0, hy - 2, [[0, shade(c || '#2b56b8', 0.2)], [1, shade(c || '#2b56b8', -0.3)]]), OUT, 1.2); ell(g, 0, hy - 3.6, 12, 2.8, shade(c || '#2b56b8', -0.15), OUT, 1.1); g.fillStyle = '#ffe36a'; ell(g, 2, hy - 13, 1.4, 1.4, '#ffe36a'); ell(g, -2, hy - 8, 1, 1, '#ffe36a'); }
-        else if (kind === 'helmet') helmet(g, hy, view, c);
+        else if (kind === 'helmet') helmet(g, hy, view, c, style);
+        else if (kind === 'crown') crownHat(g, hy, view, c);
         else if (kind === 'straw') { ell(g, 0, hy - 4, 12, 3, '#e6c46a', OUT, 1); g.beginPath(); g.moveTo(-6, hy - 4); g.quadraticCurveTo(-6, hy - 12, 0, hy - 11.6); g.quadraticCurveTo(6, hy - 12, 6, hy - 4); g.closePath(); paint(g, '#efd27a', OUT, 1); g.fillStyle = '#b5482e'; g.fillRect(-6, hy - 6, 12, 1.6); }
         else if (kind === 'hood') { g.beginPath(); g.moveTo(-8, hy + 3); g.quadraticCurveTo(-10, hy - 10, 0, hy - 11); g.quadraticCurveTo(10, hy - 10, 8, hy + 3); g.lineTo(6, hy - 2); g.quadraticCurveTo(0, hy - 6, -6, hy - 2); g.closePath(); paint(g, c || '#2f78b5', OUT, 1.1); }
         else if (kind === 'fisher') { ell(g, 0, hy - 4, 10.6, 2.6, c || '#1f8f7f', OUT, 1); g.beginPath(); g.moveTo(-6.6, hy - 4); g.quadraticCurveTo(-6.6, hy - 11, 0, hy - 10.6); g.quadraticCurveTo(6.6, hy - 11, 6.6, hy - 4); g.closePath(); paint(g, c || '#1f8f7f', OUT, 1); tri(g, 4, hy - 8, 10, hy - 14, 6, hy - 6, '#f3f3f3', OUT, 0.7); }
@@ -1562,7 +1654,7 @@
         const lean = a.mv * (side ? 0.045 : 0) + sin(a.ph) * a.mv * (side ? 0 : 0.025);
         if (lean) { ctx.translate(0, -10); ctx.rotate(lean); ctx.translate(0, 10); }
         const info = human(ctx, { view: view, t: now, seed: a.seed, mv: a.mv, ph: a.ph, skin, shirt, pants, hair: look.hair, hairStyle: look.hs, hat: look.hat, hatColor: look.hatColor, beard: look.beard, apron: look.apron, robe: look.robe, armor: look.armor, cape: look.cape, pack: look.pack, atk: 0, turn: side ? 0 : a.lx, lookX: side ? 0 : a.lx });
-        if (look.prop) { const wob = sin(now * 1.6 + a.seed) * 0.6; if (view === 'back') { ctx.save(); ctx.scale(-1, 1); prop(ctx, look.prop, 13, -15 - info.bob + wob, now, 0, 'front'); ctx.restore(); } else prop(ctx, look.prop, side ? 7 : 13, -15 - info.bob + wob, now, 0, view); }
+        if (look.prop) { const wob = sin(now * 1.6 + a.seed) * 0.6; if (view === 'back') { ctx.save(); ctx.scale(-1, 1); prop(ctx, look.prop, 13, -18.2 - info.bob + wob, now, 0, 'front'); ctx.restore(); } else prop(ctx, look.prop, side ? 7 : 13, -18.2 - info.bob + wob, now, 0, view); }
         ctx.restore();
         // ícone de conversa
         const bounce = sin(now * 3 + a.seed) * 1.5; ctx.fillStyle = '#f1c40f'; ctx.font = 'bold 12px Arial'; ctx.textAlign = 'center'; ctx.strokeStyle = 'rgba(0,0,0,0.7)'; ctx.lineWidth = 3;
@@ -1578,34 +1670,101 @@
     }
     // estado do quadro atual (funções estáticas abaixo leem daqui: sem closures por quadro)
     const _W = { wp: null, sh: null, view: 'front', anim: 0, skin: '#f1c27d', D: null };
-    function drawShieldFace(g, cx, cy, rx, ry, col) {
-        const dk = shade(col, -0.35), lt = shade(col, 0.3);
+    /* ============ ESTILO DOS ITENS EQUIPADOS (cada tipo/tier tem forma própria, não só outra cor) ============ */
+    function gearTier(it) {
+        const n = String((it && it.name) || '').toLowerCase();
+        if (/dragon/.test(n)) return 7; if (/lich|bone/.test(n)) return 6; if (/mithril/.test(n)) return 5; if (/gold/.test(n)) return 4;
+        if (/steel/.test(n)) return 3; if (/iron/.test(n)) return 2; if (/bronze/.test(n)) return 1; if (/leather|wood|cloth|linen/.test(n)) return 0;
+        const v = Math.max((it && it.bonusDmg) | 0, (it && (it.bonusDef || it.def)) | 0);
+        return v >= 15 ? 6 : v >= 10 ? 5 : v >= 7 ? 3 : v >= 4 ? 2 : 1;
+    }
+    const HEXC = /^#[0-9a-fA-F]{6}$/;
+    function gearCol(it, fb) { const n = String((it && it.name) || '').toLowerCase(); if (!(it && HEXC.test(it.col || '')) && /wood/.test(n)) return '#a8743a'; return armorColor(it, fb); }
+    function swordKind(it) {
+        const n = String((it && it.name) || '').toLowerCase(), t = gearTier(it);
+        if (/dagger|knife|shiv|dirk/.test(n)) return 'dagger'; if (/mace|club|hammer|flail|maul/.test(n)) return 'mace';
+        if (/scimitar|sabre|saber|katana|cutlass|curved/.test(n)) return 'curved'; if (/great|claymore|2h|zweih|executioner/.test(n)) return 'great';
+        if (t >= 7) return 'dragon'; if (t === 6) return 'bone'; if (t === 5) return 'mithril'; if (t === 4) return 'gold'; if (t === 3) return 'long';
+        return t === 2 ? 'broad' : 'short';
+    }
+    function drawSwordShape(ctx, kind, mc) {
+        const ln = (x0, y0, x1, y1, w, c) => { ctx.strokeStyle = c; ctx.lineWidth = w; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); };
+        const grip = (len, c, wrap) => { rrect(ctx, -1.6, -4, 3.2, len, 1.2, c || '#6b3f1c', OUT, 0.9); if (wrap) { ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 0.7; for (let y = -2; y < len - 5; y += 2.4) { ctx.beginPath(); ctx.moveTo(-1.6, y); ctx.lineTo(1.6, y + 1.2); ctx.stroke(); } } };
+        const blade = (pts, hi) => { poly(ctx, pts, lg(ctx, -3.4, 0, 3.4, 0, [[0, shade(hi || mc, 0.55)], [0.5, shade(hi || mc, 0.12)], [1, shade(hi || mc, -0.4)]]), OUT, 1.1); };
+        const guard = (w, c, curve) => { ctx.beginPath(); ctx.moveTo(-w, -6.6 + (curve ? 1.6 : 0)); ctx.quadraticCurveTo(0, -8.4 - (curve ? 1 : 0), w, -6.6 + (curve ? 1.6 : 0)); ctx.lineTo(w - 0.6, -3.9); ctx.quadraticCurveTo(0, -5.6, -w + 0.6, -3.9); ctx.closePath(); paint(ctx, c, OUT, 0.9); };
+        const gold = '#d2a437', pommel = (c, r) => ell(ctx, 0, 8.6, r || 2.3, r || 2.3, c, OUT, 0.9);
+        if (kind === 'dagger') { blade([-1.7, -5, 1.7, -5, 1.4, -17, 0, -21, -1.4, -17], mc); ln(0, -7, 0, -17, 0.7, 'rgba(255,255,255,.5)'); guard(3.6, '#8a6a3a'); grip(8, '#5a3a1c', 1); pommel('#8a6a3a', 1.9); }
+        else if (kind === 'mace') { rrect(ctx, -1.3, -22, 2.6, 30, 1.2, '#6b3f1c', OUT, 0.9); ell(ctx, 0, -24, 5, 5, lg(ctx, -5, -29, 5, -19, [[0, shade(mc, 0.5)], [1, shade(mc, -0.4)]]), OUT, 1); for (let a = 0; a < 6; a++) { const r = a * 1.0472; tri(ctx, Math.cos(r - 0.3) * 4.6, -24 + Math.sin(r - 0.3) * 4.6, Math.cos(r) * 8, -24 + Math.sin(r) * 8, Math.cos(r + 0.3) * 4.6, -24 + Math.sin(r + 0.3) * 4.6, shade(mc, 0.1), OUT, 0.7); } ell(ctx, 0, 8.6, 2, 2, '#8a6a3a', OUT, 0.8); }
+        else if (kind === 'curved') { ctx.beginPath(); ctx.moveTo(-2.4, -5); ctx.quadraticCurveTo(-3.2, -20, 4.8, -29); ctx.quadraticCurveTo(3.2, -18, 2.6, -5); ctx.closePath(); paint(ctx, lg(ctx, -3, 0, 4, 0, [[0, shade(mc, 0.55)], [0.5, shade(mc, 0.1)], [1, shade(mc, -0.4)]]), OUT, 1.1); ell(ctx, 0, -5.4, 4.6, 1.5, '#d2a437', OUT, 0.9); grip(9, '#5a3a1c', 1); pommel('#d2a437', 2); }
+        else if (kind === 'great') { blade([-3.4, -6, 3.4, -6, 3, -36, 0, -42, -3, -36], mc); ln(0, -9, 0, -36, 1, 'rgba(255,255,255,.5)'); guard(8.6, '#7a7f88', 1); grip(13, '#4a2f16', 1); pommel('#7a7f88', 2.6); }
+        else if (kind === 'broad') { blade([-3.2, -5, 3.2, -5, 3.0, -23, 0, -29, -3.0, -23], mc); ln(0, -8, 0, -23, 0.9, 'rgba(255,255,255,.45)'); guard(6.6, '#8a6a3a'); grip(10, '#6b3f1c', 1); pommel('#8a6a3a'); }
+        else if (kind === 'long') { blade([-2.8, -5, 2.8, -5, 2.5, -29, 0, -35, -2.5, -29], mc); ln(0, -8, 0, -30, 1, 'rgba(255,255,255,.55)'); ln(-1, -9, -1, -28, 0.5, 'rgba(0,0,0,.18)'); guard(7.6, '#c9a234', 1); grip(11, '#2f3b52', 1); pommel('#c9a234', 2.5); }
+        else if (kind === 'gold') { blade([-2.8, -5, 2.8, -5, 2.5, -29, 0, -35, -2.5, -29], '#e6c24a'); ln(0, -8, 0, -30, 1, 'rgba(255,255,255,.6)'); guard(8, '#e6c24a', 1); ell(ctx, 0, -5.6, 1.5, 1.5, '#d8342b', OUT, 0.7); grip(11, '#7a1f1f', 1); pommel('#e6c24a', 2.6); ell(ctx, 0, 8.6, 1, 1, '#d8342b'); }
+        else if (kind === 'mithril') { glow(ctx, 0, -20, 15, '#6ec8ff', 0.28); blade([-2.6, -5, 2.6, -5, 2.3, -30, 0, -37, -2.3, -30], '#9fd2ff'); ln(0, -8, 0, -31, 1, 'rgba(255,255,255,.75)'); ctx.beginPath(); ctx.moveTo(-8.6, -9); ctx.quadraticCurveTo(-4, -10, 0, -6.4); ctx.quadraticCurveTo(4, -10, 8.6, -9); ctx.quadraticCurveTo(5, -4.4, 0, -3.4); ctx.quadraticCurveTo(-5, -4.4, -8.6, -9); ctx.closePath(); paint(ctx, '#3b6fc4', OUT, 0.9); ell(ctx, 0, -5.4, 1.6, 1.6, '#bff0ff', OUT, 0.6); grip(11, '#20304f', 1); pommel('#3b6fc4', 2.6); }
+        else if (kind === 'bone') { ctx.beginPath(); ctx.moveTo(-2.6, -5); ctx.lineTo(-3.6, -11); ctx.lineTo(-2.4, -13); ctx.lineTo(-3.4, -19); ctx.lineTo(-2.2, -21); ctx.lineTo(-2.6, -28); ctx.lineTo(0, -35); ctx.lineTo(2.6, -28); ctx.lineTo(2.2, -21); ctx.lineTo(3.4, -19); ctx.lineTo(2.4, -13); ctx.lineTo(3.6, -11); ctx.lineTo(2.6, -5); ctx.closePath(); paint(ctx, lg(ctx, -3, 0, 3, 0, [[0, '#f4efdc'], [1, '#b8b095']]), OUT, 1.1); ln(0, -8, 0, -30, 0.7, 'rgba(90,70,40,.4)'); ell(ctx, 0, -5.4, 4.6, 2, '#e6e0c8', OUT, 0.9); ell(ctx, -1, -5.6, 0.8, 0.8, '#2a2418'); ell(ctx, 1, -5.6, 0.8, 0.8, '#2a2418'); grip(10, '#4a4030', 0); ell(ctx, 0, 8.6, 2.4, 2.4, '#e6e0c8', OUT, 0.9); }
+        else if (kind === 'dragon') { glow(ctx, 0, -18, 15, '#ff5a1a', 0.32); ctx.beginPath(); ctx.moveTo(-2.8, -5); ctx.lineTo(-4.2, -9); ctx.lineTo(-2.6, -11); ctx.lineTo(-4.0, -16); ctx.lineTo(-2.4, -18); ctx.lineTo(-3.4, -24); ctx.lineTo(-2.2, -26); ctx.lineTo(0, -37); ctx.lineTo(2.2, -26); ctx.lineTo(2.6, -22); ctx.lineTo(2.6, -5); ctx.closePath(); paint(ctx, lg(ctx, -4, 0, 3, 0, [[0, '#ff7a3a'], [0.45, '#b62a22'], [1, '#4a0f12']]), OUT, 1.1); ln(0.4, -8, 0.4, -30, 0.8, 'rgba(255,200,120,.7)'); ctx.beginPath(); ctx.moveTo(-9, -4); ctx.lineTo(-5, -9.4); ctx.lineTo(-2, -6.4); ctx.lineTo(0, -8.4); ctx.lineTo(2, -6.4); ctx.lineTo(5, -9.4); ctx.lineTo(9, -4); ctx.lineTo(4, -4.6); ctx.lineTo(0, -3.2); ctx.lineTo(-4, -4.6); ctx.closePath(); paint(ctx, '#2a1416', OUT, 0.9); grip(10, '#2a1416', 1); tri(ctx, -2, 7.6, 0, 12.6, 2, 7.6, '#c0392b', OUT, 0.8); }
+        else { blade([-2.5, -5, 2.5, -5, 2.4, -24, 0, -30, -2.4, -24], mc); ln(0, -8, 0, -25, 0.8, 'rgba(255,255,255,.5)'); guard(5.6, '#c9a234'); grip(10, '#6b3f1c', 1); pommel('#c9a234'); }
+    }
+    function shieldKind(it) {
+        const n = String((it && it.name) || '').toLowerCase(), t = gearTier(it);
+        if (/wood|buckler/.test(n)) return 'wood'; if (t >= 7) return 'dragon'; if (t === 6) return 'bone'; if (t === 5) return 'mithril'; if (t === 4) return 'gold'; if (t >= 2) return 'heater'; return 'round';
+    }
+    function drawShieldFace(g, cx, cy, rx, ry, col, kind) {
+        kind = kind || 'round';
+        const dk = shade(col, -0.38), lt = shade(col, 0.32);
+        const shade2 = (clipDraw) => { g.save(); clipDraw(); g.clip(); g.globalAlpha = 0.3; g.fillStyle = dk; g.fillRect(cx + rx * 0.15, cy - ry - 3, rx * 2, ry * 2 + 6); g.restore(); g.globalAlpha = 1; };
+        if (kind === 'heater' || kind === 'gold' || kind === 'mithril') {
+            const path = (k) => { const x = rx * k, yt = cy - ry * k, yb = cy + ry * 1.12 * (k > 0.9 ? 1 : 0.9); g.beginPath(); g.moveTo(cx - x, yt + 0.8); g.quadraticCurveTo(cx, yt - 2.2, cx + x, yt + 0.8); g.lineTo(cx + x, cy + ry * 0.12); g.quadraticCurveTo(cx + x * 0.85, cy + ry * 0.8, cx, yb); g.quadraticCurveTo(cx - x * 0.85, cy + ry * 0.8, cx - x, cy + ry * 0.12); g.closePath(); };
+            path(1); paint(g, dk, OUT, 1.2); path(0.82); g.fillStyle = col; g.fill();
+            shade2(() => path(0.82));
+            g.strokeStyle = lt; g.globalAlpha = 0.6; g.lineWidth = 0.8; path(0.82); g.stroke(); g.globalAlpha = 1;
+            if (kind === 'heater') { g.fillStyle = shade(col, -0.2); g.fillRect(cx - 0.9, cy - ry * 0.8, 1.8, ry * 1.7); g.fillRect(cx - rx * 0.6, cy - ry * 0.28, rx * 1.2, 1.8); ell(g, cx, cy - ry * 0.2, 1.5, 1.5, lt, OUT, 0.6); }
+            else if (kind === 'gold') { ell(g, cx, cy - ry * 0.12, rx * 0.42, ry * 0.4, '#d8342b', OUT, 0.9); ell(g, cx - 0.5, cy - ry * 0.25, 0.9, 0.7, '#ff9a8a'); for (const [dx, dy] of [[-0.62, -0.7], [0.62, -0.7]]) ell(g, cx + rx * dx, cy + ry * dy, 1, 1, lt, OUT, 0.5); }
+            else { glow(g, cx, cy, rx * 1.6, '#6ec8ff', 0.28); tri(g, cx - rx * 0.7, cy - ry * 0.55, cx, cy - ry * 0.05, cx - rx * 0.1, cy + ry * 0.55, '#bff0ff', OUT, 0.7); tri(g, cx + rx * 0.7, cy - ry * 0.55, cx, cy - ry * 0.05, cx + rx * 0.1, cy + ry * 0.55, '#8fd0ff', OUT, 0.7); }
+            return;
+        }
+        if (kind === 'wood') {
+            ell(g, cx, cy, rx, ry, dk, OUT, 1.2); g.save(); g.beginPath(); g.ellipse(cx, cy, rx - 1, ry - 1, 0, 0, TAU); g.clip(); g.fillStyle = col; g.fillRect(cx - rx, cy - ry, rx * 2, ry * 2);
+            g.strokeStyle = shade(col, -0.35); g.lineWidth = 0.8; for (let i = -2; i <= 2; i++) { g.beginPath(); g.moveTo(cx + i * rx * 0.4, cy - ry); g.lineTo(cx + i * rx * 0.4, cy + ry); g.stroke(); }
+            g.fillStyle = shade(col, -0.3); g.fillRect(cx - rx, cy - 1.2, rx * 2, 2.4); g.restore(); ell(g, cx, cy, rx * 0.3, ry * 0.26, '#8a929c', OUT, 0.8); return;
+        }
+        if (kind === 'bone') {
+            ell(g, cx, cy, rx, ry, dk, OUT, 1.2); ell(g, cx, cy, rx - 1.1, ry - 1.1, '#e6e0c8', null);
+            ell(g, cx - rx * 0.28, cy - ry * 0.1, rx * 0.2, ry * 0.2, '#2a2418'); ell(g, cx + rx * 0.28, cy - ry * 0.1, rx * 0.2, ry * 0.2, '#2a2418');
+            g.strokeStyle = '#2a2418'; g.lineWidth = 0.9; g.beginPath(); g.moveTo(cx - rx * 0.4, cy + ry * 0.45); g.lineTo(cx + rx * 0.4, cy + ry * 0.45); for (let i = -1; i <= 1; i++) { g.moveTo(cx + i * rx * 0.2, cy + ry * 0.35); g.lineTo(cx + i * rx * 0.2, cy + ry * 0.55); } g.stroke(); return;
+        }
+        if (kind === 'dragon') {
+            for (let a = 0; a < 8; a++) { const r = a * 0.7854; tri(g, cx + Math.cos(r - 0.22) * rx, cy + Math.sin(r - 0.22) * ry, cx + Math.cos(r) * (rx + 3), cy + Math.sin(r) * (ry + 3), cx + Math.cos(r + 0.22) * rx, cy + Math.sin(r + 0.22) * ry, '#d8d0c0', OUT, 0.7); }
+            ell(g, cx, cy, rx, ry, dk, OUT, 1.2); ell(g, cx, cy, rx - 1.2, ry - 1.2, col, null);
+            g.save(); g.beginPath(); g.ellipse(cx, cy, rx - 1.2, ry - 1.2, 0, 0, TAU); g.clip(); g.strokeStyle = shade(col, -0.45); g.lineWidth = 0.8; for (let r = -2; r <= 2; r++) for (let c = -2; c <= 2; c++) { g.beginPath(); g.arc(cx + c * 3.2 + (r & 1) * 1.6, cy + r * 3, 1.7, 0, PI); g.stroke(); } g.restore();
+            ell(g, cx, cy, rx * 0.34, ry * 0.3, '#e8c04a', OUT, 0.8); return;
+        }
+        // round (bronze / padrão): aro, bossa, rebites
         ell(g, cx, cy, rx, ry, dk, OUT, 1.2); ell(g, cx, cy, rx - 1.3, ry - 1.3, col, null); ell(g, cx - 0.8, cy - 1.2, rx - 2.6, ry - 2.8, shade(col, 0.12), null);
         g.strokeStyle = lt; g.globalAlpha = 0.7; g.lineWidth = 0.9; g.beginPath(); g.ellipse(cx, cy, rx - 0.9, ry - 0.9, 0, 3.5, 5.0); g.stroke(); g.globalAlpha = 1;
+        for (let a = 0; a < 6; a++) { const r = a * 1.0472 + 0.5; ell(g, cx + Math.cos(r) * (rx - 1.9), cy + Math.sin(r) * (ry - 1.9), 0.55, 0.55, lt); }
         ell(g, cx, cy, rx * 0.36, ry * 0.3, lt, OUT, 0.8);
     }
-    function behindFn(g, info) {   // arma de costas / escudo de lado: ficam ATRÁS do tronco
+    function behindFn(g, info) {   // arma de costas / escudo de lado e de costas: ficam ATRÁS do tronco (o escudo é carregado no braço, não nas costas)
         const W = _W;
-        if (W.view === 'back' && W.wp) drawWeapon(g, W.wp, info.hand, 'back', W.anim, W.skin);
-        else if (W.view === 'side' && W.sh) {
-            const sdd = 2.6 + W.D.sh * 0.25, c = armorColor(W.sh, '#9aa3ad'), cx = (sdd + 3.2) * W.D.sx, cy = -19.5 * W.D.sy - info.bob;
+        if (W.view === 'back') {
+            if (W.sh) { const c = gearCol(W.sh, '#9aa3ad'), H = info.handL, k = shieldKind(W.sh); ell(g, H.x - 2.6, H.y - 3.6, 2.5, 8.4, shade(c, -0.32), OUT, 1.1); ell(g, H.x - 2.2, H.y - 3.6, 1.2, 6.6, shade(c, 0.02), null); if (k === 'dragon') for (let i = -2; i <= 2; i++) tri(g, H.x - 4.6, H.y - 3.6 + i * 3, H.x - 7.2, H.y - 3.6 + i * 3.4, H.x - 4.6, H.y - 2.2 + i * 3, '#d8d0c0', OUT, 0.5); }
+            if (W.wp) drawWeapon(g, W.wp, info.hand, 'back', W.anim, W.skin);
+        } else if (W.view === 'side' && W.sh) {
+            const sdd = 2.6 + W.D.sh * 0.25, c = gearCol(W.sh, '#9aa3ad'), cx = (sdd + 3.2) * W.D.sx, cy = -19.5 * W.D.sy - info.bob;
             ell(g, cx, cy, 2.6, 8.2, shade(c, -0.3), OUT, 1.1); ell(g, cx + 0.2, cy, 1.4, 6.6, shade(c, 0.05), null); ell(g, cx, cy, 0.9, 1.6, shade(c, 0.35), null);
         }
     }
-    function onBackFn(g, info) {   // de costas: escudo preso nas costas (por cima do tronco, nunca na frente do personagem)
-        const W = _W; if (!W.sh) return;
-        const c = armorColor(W.sh, '#9aa3ad'), cy = -21.6 * W.D.sy - info.bob;
-        g.strokeStyle = shade('#6b4a2a', -0.2); g.lineWidth = 1.6; g.beginPath(); g.moveTo(-6 * W.D.sx, -29 * W.D.sy - info.bob); g.lineTo(6 * W.D.sx, -14 * W.D.sy - info.bob); g.stroke();
-        drawShieldFace(g, 0, cy, 5.4, 6.4, c);
-    }
+    function onBackFn() { }
     function drawWeapon(ctx, wp, H, view, anim, skin) {
         const prg = anim > 0 ? anim / 15 : 0, swing = sin(prg * PI);
         const light = wp.tool === 'magic' || wp.tool === 'ranged';
         ctx.save(); ctx.translate(H.x, H.y);
         let rot;
-        if (view === 'back') { ctx.scale(-1, 1); rot = 0.34 + swing * (light ? 0.15 : 0.5); }
+        if (view === 'front') { ctx.scale(-1, 1); rot = 0.3 + swing * (light ? 0.5 : 1.7); }
+        else if (view === 'back') rot = 0.34 + swing * (light ? 0.15 : 0.5);
         else if (view === 'side') rot = 0.72 + H.a * 0.45 + swing * (light ? 0.3 : 0.7);
-        else rot = 0.3 + swing * (light ? 0.5 : 1.7);
+        else rot = 0.3;
         ctx.rotate(rot);
         const wood = '#8b5a2b', woodL = '#b07a3f', mc = armorColor(wp, '#c9d1d8'), steel = wp.tool ? '#b9c2cc' : mc;
         const handle = (y0, y1, w) => { limb(ctx, 0, y0, 0, y1, w + 1.4, OUT); limb(ctx, 0, y0, 0, y1, w, wood); ctx.fillStyle = woodL; ctx.fillRect(-w / 2 + 0.3, y1, 0.9, y0 - y1); };
@@ -1624,11 +1783,7 @@
         }
         else if (wp.tool === 'net') { handle(13, -13, 2.2); ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, -20, 8, 0, TAU); ctx.stroke(); ctx.strokeStyle = 'rgba(240,240,240,0.9)'; ctx.lineWidth = 1; ctx.stroke(); for (let i = -1; i <= 1; i++) { ctx.beginPath(); ctx.moveTo(-8, -20 + i * 4); ctx.lineTo(8, -20 + i * 4); ctx.moveTo(i * 4, -28); ctx.lineTo(i * 4, -12); ctx.stroke(); } }
         else if (wp.tool === 'rod') { handle(14, -34, 1.9); ctx.strokeStyle = 'rgba(245,245,245,0.9)'; ctx.lineWidth = 0.8; if (!root.__rodOut) { ctx.beginPath(); ctx.moveTo(0, -34); ctx.quadraticCurveTo(9, -28, 7, -16); ctx.stroke(); ell(ctx, 7, -14.6, 1.6, 1.6, '#e8483a', OUT, 0.6); } ell(ctx, -2.4, -7, 2.4, 2.4, '#8a929c', OUT, 0.7); }
-        else {   // espada: lâmina, guarda, cabo e pomo
-            poly(ctx, [-2.6, -5, 2.6, -5, 2.4, -26, 0, -32, -2.4, -26], lg(ctx, -3, 0, 3, 0, [[0, shade(mc, 0.55)], [0.5, shade(mc, 0.1)], [1, shade(mc, -0.35)]]), OUT, 1.1);
-            ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(0, -8); ctx.lineTo(0, -27); ctx.stroke();
-            rrect(ctx, -6.4, -6.8, 12.8, 3.2, 1.4, '#d2a437', OUT, 0.9); rrect(ctx, -1.7, -4, 3.4, 11, 1.2, '#6b3f1c', OUT, 0.9); ell(ctx, 0, 8, 2.4, 2.4, '#d2a437', OUT, 0.9);
-        }
+        else drawSwordShape(ctx, swordKind(wp), mc);   // espada (formas por tipo/tier)
         ell(ctx, 0, 1, 3.1, 3.3, skin, OUT, 0.9);   // punho por cima do cabo
         ctx.restore();
     }
@@ -1638,11 +1793,11 @@
         const wp = equip ? equip.weapon : null, sh = equip ? equip.shield : null, body = equip ? equip.body : null, hd = equip ? equip.head : null;
         const D = dimsOf(L.sex, L.race), atk = anim > 0 ? sin((anim / 15) * PI) : 0;
         _W.wp = wp; _W.sh = sh; _W.view = view; _W.anim = anim; _W.skin = L.skin || '#f1c27d'; _W.D = D;
-        const o = _baseO; o.view = view; o.t = now; o.seed = 3; o.turn = turn || 0; o.lookX = turn || 0; o.mv = mv; o.ph = ph; o.atk = atk; o.sex = L.sex; o.race = L.race; o.hairStyle = L.hairStyle | 0; o.hair = L.hair; o.skin = L.skin; o.shirt = body ? armorColor(body, L.shirt) : L.shirt; o.pants = L.pants;
-        o.armor = !!body && !body.robe; o.hat = hd ? (hd.hat === 'wizard' || hd.hat === 'hood' ? hd.hat : 'helmet') : null; o.hatColor = armorColor(hd, '#b9c2cc'); o.beard = (L.sex !== 'f' && (L.beard === 1 || (L.beard === undefined && L.race === 'dwarf'))) ? shade(L.hair || '#5a3a1e', -0.08) : null;
+        const o = _baseO; o.view = view; o.t = now; o.seed = 3; o.turn = turn || 0; o.lookX = turn || 0; o.mv = mv; o.ph = ph; o.atk = atk; o.sex = L.sex; o.race = L.race; o.hairStyle = L.hairStyle | 0; o.hair = L.hair; o.skin = L.skin; o.shirt = (body && body.robe) ? armorColor(body, L.shirt) : L.shirt; o.armorT = body ? gearTier(body) : null; o.armorCol = body ? armorColor(body, '#aab3bd') : null; o.pants = L.pants;
+        o.armor = !!body && !body.robe; o.hat = hd ? (hd.hat === 'wizard' || hd.hat === 'hood' ? hd.hat : (helmKind(hd) === 'crown' ? 'crown' : 'helmet')) : null; o.hatStyle = hd ? helmKind(hd) : null; o.hatColor = armorColor(hd, '#b9c2cc'); o.beard = (L.sex !== 'f' && (L.beard === 1 || (L.beard === undefined && L.race === 'dwarf'))) ? shade(L.hair || '#5a3a1e', -0.08) : null;
         o.behind = (wp || sh) ? behindFn : null; o.onBack = sh ? onBackFn : null; o.cape = null; o.apron = null; o.robe = !!(body && body.robe); o.pack = null; o.belt = null; o.boots = null; o.hatColor = o.hatColor;
         const info = human(ctx, o);
-        if (view === 'front' && sh) { const H = info.handL; drawShieldFace(ctx, H.x - 1, H.y - 4.4, 6.6, 7.8, armorColor(sh, '#9aa3ad')); }
+        if (view === 'front' && sh) { const H = info.handL; drawShieldFace(ctx, H.x + 1.2, H.y - 4.4, 6.6, 7.8, gearCol(sh, '#9aa3ad'), shieldKind(sh)); }
         if (wp && view !== 'back') drawWeapon(ctx, wp, info.hand, view, anim, _W.skin);
         if (equip && root.Mimic && ((hd && hd.mimic) || (body && body.mimic) || (wp && wp.mimic) || (sh && sh.mimic))) { try { root.Mimic.overlay(ctx, view, equip, info, now); } catch (e) { } }   // itens Mímicos (mimic.js)
         return info;
