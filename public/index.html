@@ -1274,7 +1274,7 @@
         // se o mundo mudou e o jogador ficou "dentro" de uma construção, tira ele de lá (procura o ponto livre mais próximo)
         function ensurePlayerFree() {
             const m = gameMaps[currentMap]; if (!m || !m.entities) return; const W = m.width || 800, H = m.height || 600;
-            const solid = m.entities.filter(o => o && o.active && !['ground_item','fishing_spot','farm_plot','rift_gate','rift_next','portal','fire','paint','enemy','npc'].includes(o.type));
+            const solid = m.entities.filter(o => o && o.active && !['ground_item','fishing_spot','farm_plot','rift_gate','rift_next','portal','fire','paint','enemy','npc'].includes(o.type) && !flyOver(o));
             const hits = (x, y) => solid.some(o => { const h = getHitbox(o); return h && x - 10 < h.x + h.w && x + 10 > h.x && y - 10 < h.y + h.h && y + 10 > h.y; });
             if (!hits(player.x, player.y)) return;
             for (let r = 20; r < 600; r += 20) for (let a = 0; a < 16; a++) { const x = player.x + Math.cos(a / 16 * 6.283) * r, y = player.y + Math.sin(a / 16 * 6.283) * r; if (x > 20 && y > 20 && x < W - 20 && y < H - 20 && !(currentMap === 'casa' && window.World2 && World2.inRoom && !World2.inRoom(x, y)) && !hits(x, y)) { player.x = x; player.y = y; player.destX = x; player.destY = y; return; } }
@@ -1966,12 +1966,13 @@
                 });
                 
                 // === Y-SORTING ===
-                let renderQueue = [];
+                let renderQueue = []; const _flyNow = !!(window.Pets && Pets.flying && Pets.flying());
                 cur.forEach(o => {
                     if (!o || !o.type || o.type === 'ground_item' || o.type === 'paint') return;
                     if (!inView(o, (o.type === 'enemy' || o.type === 'npc') ? 120 : 60)) return;
                     if (!o.active && !(o.type === 'tree' || (typeof o.type === 'string' && o.type.startsWith('rock')))) return;   // árvore/rocha esgotada ficam como toco/pedra vazia
                     let sy = o.y + (o.h || 30); if (o.type === 'decor' && (o.kind === 'flowers' || o.kind === 'bones' || o.kind === 'lily' || o.kind === 'mushrooms')) sy -= 1000;
+                    if (_flyNow && flyOver(o)) sy -= 1000;   // sobrevoando: o dragão passa por cima da cerca, não por baixo
                     if (o.type === 'farm_plot' || o.type === 'rift_next') sy -= 1000;   // canteiro e fissura são chão: quem anda por cima aparece na frente   // decoração rasteira fica sempre atrás
                     renderQueue.push({ type: 'entity', obj: o, sortY: sy });
                 });
