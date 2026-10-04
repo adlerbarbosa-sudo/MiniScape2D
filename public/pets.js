@@ -424,13 +424,28 @@
         // regeneração em % (vida e mana)
         { const b = bonus(); if (b.regen > 0 && player.stats.hp > 0 && player.stats.hp < player.stats.maxHp) { const base = (1 + Math.floor((player.stats.skills.hp.level || 1) / 10)) * Balance.HEAL_MULT; P.regenAcc += (b.regen / 100) * base / 60 * 1.5; if (P.regenAcc >= 1) { P.regenAcc -= 1; player.stats.hp = Math.min(player.stats.maxHp, player.stats.hp + 1); try { updateUI(); } catch (e) { } } }
             if (b.mregen > 0 && player.stats.mp < player.stats.maxMp) { P.mregenAcc += (player.stats.maxMp * b.mregen / 100) / 3600 * 4; if (P.mregenAcc >= 1) { P.mregenAcc -= 1; player.stats.mp = Math.min(player.stats.maxMp, player.stats.mp + 1); try { updateUI(); } catch (e) { } } } }
-        const pet = player.pet; if (!pet || !PETS[pet.id] || P.pm) { delete P.fol.me; return; }
+        const pet = player.pet; if (!pet || !PETS[pet.id] || P.pm) {
+            delete P.fol.me;
+            // montado NO pet: ele mesmo recolhe o que estiver perto, seguindo o modo escolhido (itens / ouro / tudo)
+            if (pet && PETS[pet.id] && P.pm && (pet.mode === 'items' || pet.mode === 'coins' || pet.mode === 'all')) {
+                if (P.cd > 0) P.cd--;
+                if (P.cd <= 0 && ++P.scanT >= 12) {
+                    P.scanT = 0; const m = gameMaps[currentMap], now = performance.now();
+                    if (m) for (const o of (m.entities || [])) {
+                        if (!eligible(o, pet.mode) || (o.id != null && P.skip[o.id] && P.skip[o.id] > now) || !itemDB[o.item]) continue;
+                        if (hyp(player.x - (o.x + 10), player.y - (o.y + 10)) > 70) continue;
+                        if (petCollect(o)) { P.cd = COLLECT_CD; sfx('pickup'); try { Art.burst(o.x + 10, o.y + 8, '#ffe27a', 6, 1); } catch (e) { } break; }
+                    }
+                }
+            }
+            return;
+        }
         solids();
         let F = P.fol.me; if (!F) { F = P.fol.me = newFol(player.x, player.y); teleport(F, player.x, player.y, PETS[pet.id][3]); F.tp = 0; }
         const fly = !!PETS[pet.id][3], ownerSpd = hyp(player.x - (F.lox || player.x), player.y - (F.loy || player.y));
         if (P.cd > 0) P.cd--; if (P.atkCd > 0) P.atkCd--; if (F.atk > 0) F.atk--;
         let goal = null; const mode = pet.mode;
-        if (!P.mounted && (mode === 'items' || mode === 'coins' || mode === 'all')) {
+        if (mode === 'items' || mode === 'coins' || mode === 'all') {
             if (P.tgt && (!P.tgt.active || hyp(player.x - (P.tgt.x + 10), player.y - (P.tgt.y + 10)) > COLLECT_R + 40)) P.tgt = null;
             if (!P.tgt && ++P.scanT >= 20) { P.scanT = 0; P.tgt = scanGround(F, mode); }
             if (P.tgt) {
