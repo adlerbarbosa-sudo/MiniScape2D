@@ -1149,8 +1149,8 @@
         }
 
         // --- SISTEMAS DE DEV E IMPORTAÇÃO BLINDADA ---
-        function openModal(htmlContent) { const overlay = document.getElementById('custom-modal-overlay'); const box = document.getElementById('custom-modal-box'); box.innerHTML = htmlContent; overlay.style.display = 'flex'; }
-        function closeModal() { document.getElementById('custom-modal-overlay').style.display = 'none'; }
+        function openModal(htmlContent) { const overlay = document.getElementById('custom-modal-overlay'); const box = document.getElementById('custom-modal-box'); box.innerHTML = htmlContent; box.dataset.social = ''; box.dataset.trade = ''; overlay.style.display = 'flex'; }
+        function closeModal() { document.getElementById('custom-modal-overlay').style.display = 'none'; const _b = document.getElementById('custom-modal-box'); if (_b) { _b.dataset.social = ''; _b.dataset.trade = ''; } }
         function openDevSub(tabId, btn) { document.querySelectorAll('.dev-sub-content').forEach(e=>e.classList.remove('active')); document.querySelectorAll('.dev-sub-btn').forEach(e=>e.classList.remove('active')); const t = document.getElementById(tabId); if(t) t.classList.add('active'); if(btn) btn.classList.add('active'); if(tabId==='dev-map') buildDevEntityList(); if(tabId==='dev-items') populateDevItems(); if(tabId==='dev-npcs') populateDevNPCs(); if(tabId==='dev-map-manager') loadDevMapManager(); if(tabId==='dev-import') document.getElementById('dev-import-code').value = ''; if(tabId==='dev-players') loadDevPlayers(); }
 
         async function loadDevPlayers() {

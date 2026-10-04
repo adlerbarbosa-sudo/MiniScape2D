@@ -61,7 +61,7 @@
         if (!s.invite) invSeen = {};
         if (s.ginvite && !invSeen['g:' + s.ginvite.from]) { invSeen['g:' + s.ginvite.from] = Date.now(); showGuildInvite(s.ginvite); }
         renderTradeUI();
-        const m = $('custom-modal-box'); if (m && m.dataset.social === '1' && !s.trade) renderSocialModal();
+        const m = $('custom-modal-box'), ov = $('custom-modal-overlay'); if (m && ov && ov.style.display !== 'none' && m.dataset.social === '1' && !s.trade && m.querySelector('#soc-leave, [data-inv], #soc-gnew, #soc-gleave')) renderSocialModal();
     }
     let invSeen = {}, trQty = '1'; const N = (n) => (window.fmtNum ? fmtNum(n) : n);
 
