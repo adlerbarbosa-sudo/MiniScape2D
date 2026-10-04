@@ -13,6 +13,7 @@ Leia o README.md antes de começar. Regras de trabalho: testar com Playwright em
 
 - Casa: novo editor com inventário/estoque, preview que segue o mouse, girar (R) e móveis de treino automáticos com XP fixa editável no Dev (`public/world2.js`).
 - Fendas (`public/fendas.js`, `engagesrv.js`): masmorra de 6 andares, níveis 1-30, modificador semanal, placar semanal, pódio e meta comunitária. Reforja com afixos (`public/reforja.js`).
+- Terreno orgânico em grade (`public/terrain.js`), objetos com altura/base (estante encosta na parede, construções com pés mais rasos), celeiro e placa da taverna corrigidos. Se não gostar do terreno novo, basta remover a linha do script `terrain.js` no `index.html`: o desenho antigo volta sozinho.
 
 ## Falta
 - Falta o evento Invasão no cliente (spawn dos invasores; precisa de teste multiplayer no servidor real).

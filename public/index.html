@@ -200,6 +200,7 @@
     <script src="sfx.js"></script>
     <script src="quests.js"></script>
     <script src="artworld.js"></script>
+    <script src="terrain.js"></script>
     <script src="petart.js"></script>
     <script src="pets.js"></script>
     <script src="mimic.js"></script>
@@ -366,11 +367,30 @@
         let mouseX = 0, mouseY = 0;
         let lastWorldX = 0, lastWorldY = 0;
 
+        /* --- pintura do chão em GRADE: peças presas a uma grade de 40 px, tamanhos em múltiplos de 40 (1x1, 2x1, 2x2...). Arrastar o mouse pinta várias de uma vez. --- */
+        const PAINT_GRID = 40, PAINT_COLOR = { paint_dirt: '#5c4033', paint_stone: '#7f8c8d', paint_grass: '#27ae60', paint_water: '#3498db' };
+        let _dragPaint = null, _dragKey = '', _dragDirty = false;
+        function paintRectAt(cW, cH, wx, wy, m) {
+            const G = PAINT_GRID, gw = Math.max(1, Math.round((cW || G) / G)), gh = Math.max(1, Math.round((cH || G) / G)), w = gw * G, h = gh * G, mw = (m && m.width) || 800, mh = (m && m.height) || 600;
+            let x = Math.round((wx - w / 2) / G) * G, y = Math.round((wy - h / 2) / G) * G;
+            x = Math.max(0, Math.min(Math.floor((mw - w) / G) * G, x)); y = Math.max(0, Math.min(Math.floor((mh - h) / G) * G, y)); return { x, y, w, h };
+        }
+        function devPlacePaint(val, pos) {
+            const m = gameMaps[currentMap]; if (!m || !PAINT_COLOR[val]) return;
+            const r = paintRectAt(parseInt(document.getElementById('spawn-w').value) || PAINT_GRID, parseInt(document.getElementById('spawn-h').value) || PAINT_GRID, pos.x, pos.y, m), col = PAINT_COLOR[val], key = val + r.x + ',' + r.y + ',' + r.w + ',' + r.h;
+            if (key === _dragKey) return; _dragKey = key;
+            const cur = m.entities || (m.entities = []);
+            if (cur.some(o => o && o.type === 'paint' && o.color === col && o.x <= r.x && o.y <= r.y && o.x + (o.w || 40) >= r.x + r.w && o.y + (o.h || 40) >= r.y + r.h)) return;   // já tem essa mancha aí
+            cur.push({ id: newEntId(), type: 'paint', name: 'Chão', color: col, x: r.x, y: r.y, w: r.w, h: r.h, active: true }); _dragDirty = true;
+        }
+        function endPaintDrag() { if (_dragDirty) { _dragDirty = false; try { saveDataLogic(false, true); } catch (e) { } } _dragPaint = null; _dragKey = ''; }
+        document.addEventListener('mouseup', endPaintDrag); document.addEventListener('touchend', endPaintDrag);
         document.addEventListener('mousemove', (e) => { 
             mouseX = e.pageX; mouseY = e.pageY;
             if(document.getElementById('login-overlay').style.display === 'none') {
                 const pos = getCoords(e);
                 lastWorldX = pos.x; lastWorldY = pos.y;
+                if (_dragPaint && isDevBuildMode && (e.buttons & 1)) devPlacePaint(_dragPaint, pos);
             }
             if (tooltip.style.display === 'block') placeTip(); 
         });
@@ -1194,7 +1214,7 @@
             else if (val.startsWith('paint_')) { w = 40; h = 40; } else if (val === 'portal') { w = 60; h = 60; }
             return w ? { w, h } : null;
         }
-        function setDevObj(val, el) { selectedDevEntity = val; { const d = devDefaultSize(val); if (d) { const a = document.getElementById('spawn-w'), b = document.getElementById('spawn-h'); if (a) a.value = d.w; if (b) b.value = d.h; } } document.querySelectorAll('.dev-ent-item').forEach(e => e.classList.remove('selected')); el.classList.add('selected'); }
+        function setDevObj(val, el) { selectedDevEntity = val; { const _pw = document.getElementById('spawn-w'), _ph = document.getElementById('spawn-h'), _gr = String(val).startsWith('paint_'); if (_pw && _ph) { _pw.step = _ph.step = _gr ? 40 : 1; _pw.min = _ph.min = _gr ? 40 : 0; _pw.title = _ph.title = _gr ? 'Chão: múltiplos de 40 (grade). Arraste o mouse para pintar várias.' : ''; } } { const d = devDefaultSize(val); if (d) { const a = document.getElementById('spawn-w'), b = document.getElementById('spawn-h'); if (a) a.value = d.w; if (b) b.value = d.h; } } document.querySelectorAll('.dev-ent-item').forEach(e => e.classList.remove('selected')); el.classList.add('selected'); }
         function toggleDevView() { devViewMode = devViewMode === 'list' ? 'grid' : 'list'; buildDevEntityList(); let search = document.getElementById('dev-search'); if(search) filterDevEntities(search.value); }
         
         function buildDevEntityList() { 
@@ -1262,7 +1282,10 @@
             let hw = o.w || 30; let hh = o.h || 30; let hx = o.x; let hy = o.y;
             if (o.type === 'decor') return window.Art ? Art.hitboxFor(o) : null;   // decoração não sólida = sem colisão
             if (o.type === 'house' && window.Art) return Art.hitboxFor(o);
+            if (o.bf && o.type === 'furniture') { const bh = hh * o.bf; return { x: hx, y: hy + hh - bh, w: hw, h: bh }; }   // móvel alto: só a base ocupa o chão
             if(o.type === 'tree') { const tw = Math.max(16, hw * 0.24), th = Math.max(12, hh * 0.17); hy += hh - th; hh = th; hx += hw/2 - tw/2; hw = tw; }
+            else if(typeof o.type === 'string' && o.type.startsWith('rock')) { const bh = hh * 0.62; hy += hh - bh; hh = bh; hx += hw * 0.08; hw *= 0.84; }   // minério: só a base da pedra ocupa o chão
+            else if(o.type === 'anvil') { const bh = hh * 0.64; hy += hh - bh; hh = bh; hx += hw * 0.06; hw *= 0.88; }
             else if(o.type === 'house') { hy += hh - 30; hh = 30; }
             else if(o.type === 'furnace' || o.type === 'bank') { hy += hh - 20; hh = 20; }
             else if(o.type === 'cauldron' || o.type === 'enchant_table') { hy += hh * 0.45; hh = hh * 0.55; }
@@ -1504,6 +1527,7 @@
             if (e.button === 0 || e.button === undefined) { 
                 if (isDevBuildMode) { 
                     const val = selectedDevEntity; if(!val) return;
+                    if (PAINT_COLOR[val]) { _dragPaint = val; _dragKey = ''; devPlacePaint(val, pos); return; }   // chão: grade + arrastar
                     let cW = parseInt(document.getElementById('spawn-w').value) || 40;
                     let cH = parseInt(document.getElementById('spawn-h').value) || 40;
                     let cI = document.getElementById('spawn-img').value;
@@ -1985,7 +2009,12 @@
                         let fakeObj = { x: lastWorldX - cW/2, y: lastWorldY - cH/2, w: cW, h: cH, type: baseType, name: val, color: 'rgba(241, 196, 15, 0.5)', dbKey: val.substring(2), active: true, id: 7 };
                         if (baseType === 'house') fakeObj.style = val.substring(2); if (baseType === 'decor') fakeObj.kind = val.substring(2);
                         if (baseType === 'enemy' || baseType === 'npc') { fakeObj.hp = (npcDB[fakeObj.dbKey] || {}).hp; fakeObj.maxHp = fakeObj.hp; }
-                        if(baseType === 'paint') { ctx.fillStyle = val.startsWith('paint_dirt') ? '#5c4033' : val.startsWith('paint_stone') ? '#7f8c8d' : val.startsWith('paint_grass') ? '#27ae60' : '#3498db'; ctx.fillRect(fakeObj.x, fakeObj.y, cW, cH); } 
+                        if(baseType === 'paint') {
+                            const G = PAINT_GRID, pr = paintRectAt(cW, cH, lastWorldX, lastWorldY, mapObj); ctx.globalAlpha = 0.16; ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.beginPath();
+                            for (let gx = Math.max(0, Math.floor(VW.x / G) * G); gx <= Math.min(mapW, VW.x + VW.w); gx += G) { ctx.moveTo(gx, Math.max(0, VW.y)); ctx.lineTo(gx, Math.min(mapH, VW.y + VW.h)); }
+                            for (let gy = Math.max(0, Math.floor(VW.y / G) * G); gy <= Math.min(mapH, VW.y + VW.h); gy += G) { ctx.moveTo(Math.max(0, VW.x), gy); ctx.lineTo(Math.min(mapW, VW.x + VW.w), gy); } ctx.stroke();
+                            ctx.globalAlpha = 0.5; ctx.fillStyle = PAINT_COLOR[val] || '#888'; ctx.fillRect(pr.x, pr.y, pr.w, pr.h); fakeObj.x = pr.x; fakeObj.y = pr.y; cW = pr.w; cH = pr.h; fakeObj.w = pr.w; fakeObj.h = pr.h;
+                        } 
                         else if(baseType === 'ground_item') { ctx.fillStyle = '#f1c40f'; ctx.fillRect(fakeObj.x, fakeObj.y, cW, cH); } 
                         else if(baseType === 'fire' || baseType === 'portal' || baseType === 'furnace' || baseType === 'anvil' || baseType === 'bank' || baseType === 'fishing_spot' || baseType === 'tree' || baseType.startsWith('rock') || baseType === 'house' || baseType === 'decor' || baseType === 'enemy' || baseType === 'npc') { renderEntity(ctx, fakeObj, true); }
                         else { renderEntity(ctx, fakeObj, true); }

@@ -41,28 +41,28 @@
         bed: { n: 'Cama', c: 120, w: 58, h: 84, t: 'furniture', cat: 'Móveis', rot: 1, use: 'Descansar (recupera vida e mana)' },
         table: { n: 'Mesa', c: 60, w: 70, h: 46, t: 'furniture', cat: 'Móveis', rot: 1 },
         chair: { n: 'Cadeira', c: 25, w: 28, h: 32, t: 'furniture', cat: 'Móveis', rot: 1 },
-        shelf: { n: 'Estante', c: 90, w: 76, h: 40, t: 'furniture', cat: 'Móveis', rot: 1 },
+        shelf: { n: 'Estante', c: 90, w: 76, h: 40, bf: 0.5, t: 'furniture', cat: 'Móveis', rot: 1 },
         rug_red: { n: 'Tapete vermelho', c: 40, w: 110, h: 70, t: 'paint', col: '#8a2b2b', cat: 'Decoração', rot: 1 },
         rug_blue: { n: 'Tapete azul', c: 40, w: 110, h: 70, t: 'paint', col: '#2b4a8a', cat: 'Decoração', rot: 1 },
-        lamp: { n: 'Lampião', c: 35, w: 26, h: 40, t: 'decor', kind: 'lamp', cat: 'Decoração' },
-        banner: { n: 'Estandarte', c: 50, w: 40, h: 60, t: 'decor', kind: 'banner', cat: 'Decoração' },
-        statue: { n: 'Estátua', c: 150, w: 50, h: 70, t: 'decor', kind: 'statue', cat: 'Decoração' },
+        lamp: { n: 'Lampião', c: 35, w: 26, h: 40, bf: 0.3, t: 'decor', kind: 'lamp', cat: 'Decoração' },
+        banner: { n: 'Estandarte', c: 50, w: 40, h: 60, bf: 0.32, t: 'decor', kind: 'banner', cat: 'Decoração' },
+        statue: { n: 'Estátua', c: 150, w: 50, h: 70, bf: 0.38, t: 'decor', kind: 'statue', cat: 'Decoração' },
         flowers: { n: 'Flores', c: 20, w: 34, h: 30, t: 'decor', kind: 'flowers', cat: 'Decoração' },
         bush: { n: 'Arbusto', c: 20, w: 40, h: 36, t: 'decor', kind: 'bush', cat: 'Decoração' },
         barrel: { n: 'Barril', c: 30, w: 30, h: 36, t: 'decor', kind: 'barrel', cat: 'Decoração' },
-        crystal: { n: 'Cristal', c: 200, w: 34, h: 44, t: 'decor', kind: 'crystal', cat: 'Decoração' },
+        crystal: { n: 'Cristal', c: 200, w: 34, h: 44, bf: 0.5, t: 'decor', kind: 'crystal', cat: 'Decoração' },
         bank: { n: 'Baú do Banco', c: 800, w: 80, h: 48, t: 'bank', cat: 'Estações', use: 'Guarda itens como no banco' },
         furnace: { n: 'Fornalha', c: 300, w: 48, h: 72, t: 'furnace', cat: 'Estações' },
         anvil: { n: 'Bigorna', c: 200, w: 46, h: 39, t: 'anvil', cat: 'Estações' },
         cauldron: { n: 'Caldeirão', c: 400, w: 44, h: 44, t: 'cauldron', cat: 'Estações' },
         enchant_table: { n: 'Mesa de Encantamento', c: 600, w: 54, h: 46, t: 'enchant_table', cat: 'Estações' },
-        dummy: { n: 'Manequim de treino', c: 900, w: 44, h: 72, t: 'furniture', cat: 'Treino', rot: 1, sym: 1, use: 'Treina Combate' },
-        archery: { n: 'Alvo de arco', c: 900, w: 56, h: 72, t: 'furniture', cat: 'Treino', rot: 1, sym: 1, use: 'Treina Arco' },
-        punchbag: { n: 'Saco de pancada', c: 1100, w: 40, h: 74, t: 'furniture', cat: 'Treino', rot: 1, sym: 1, use: 'Treina Defesa' },
-        library: { n: 'Biblioteca de estudos', c: 1600, w: 104, h: 54, t: 'furniture', cat: 'Treino', rot: 1, use: 'Medita e estuda: Magia' },
+        dummy: { n: 'Manequim de treino', c: 900, w: 44, h: 72, bf: 0.34, t: 'furniture', cat: 'Treino', rot: 1, sym: 1, use: 'Treina Combate' },
+        archery: { n: 'Alvo de arco', c: 900, w: 56, h: 72, bf: 0.32, t: 'furniture', cat: 'Treino', rot: 1, sym: 1, use: 'Treina Arco' },
+        punchbag: { n: 'Saco de pancada', c: 1100, w: 40, h: 74, bf: 0.3, t: 'furniture', cat: 'Treino', rot: 1, sym: 1, use: 'Treina Defesa' },
+        library: { n: 'Biblioteca de estudos', c: 1600, w: 104, h: 54, bf: 0.55, t: 'furniture', cat: 'Treino', rot: 1, use: 'Medita e estuda: Magia' },
         hottub: { n: 'Banheira quente', c: 1800, w: 86, h: 66, t: 'furniture', cat: 'Treino', rot: 1, sym: 1, use: 'Relaxa: Vitalidade' },
-        trophy_dragon: { n: 'Troféu de Dragão', c: 0, w: 60, h: 50, t: 'furniture', cat: 'Troféus', rot: 1, sym: 1, need: 'dragon_boss', needTxt: 'Derrote o Dragão Ancestral' },
-        trophy_lich: { n: 'Troféu do Lich', c: 0, w: 50, h: 56, t: 'furniture', cat: 'Troféus', rot: 1, sym: 1, need: 'lich_boss', needTxt: 'Derrote o Lich Rei' }
+        trophy_dragon: { n: 'Troféu de Dragão', c: 0, w: 60, h: 50, bf: 0.55, t: 'furniture', cat: 'Troféus', rot: 1, sym: 1, need: 'dragon_boss', needTxt: 'Derrote o Dragão Ancestral' },
+        trophy_lich: { n: 'Troféu do Lich', c: 0, w: 50, h: 56, bf: 0.55, t: 'furniture', cat: 'Troféus', rot: 1, sym: 1, need: 'lich_boss', needTxt: 'Derrote o Lich Rei' }
     };
     /* móveis de treino: sessões curtas, poucas por dia, XP pequena (bônus de rotina, não um lugar para viver) */
     const TRAIN = {
@@ -91,7 +91,15 @@
         if (f.t === 'paint') o.color = f.col;
         else if (f.t === 'decor') { o.kind = f.kind; o.name = f.n; }
         if (f.t === 'furniture') o.fk = it.k;
+        if (f.bf && (!(r & 1) || f.sym)) o.bf = f.bf;   // peça ALTA: só a base (parte de baixo) ocupa o chão; o resto sobe e pode encostar/sobrepor a parede
         return o;
+    }
+    /* área que a peça realmente ocupa no chão (a base). Móveis altos têm base menor que o desenho. */
+    function fpOf(o) { let hb = null; if (o.type !== 'paint') { try { hb = getHitbox(o); } catch (e) { } } return hb ? { x: hb.x, y: hb.y, w: hb.w, h: hb.h } : { x: o.x, y: o.y, w: o.w || 30, h: o.h || 30 }; }
+    function footOf(it) { const e = furnEntity(it, 0); return e ? fpOf(e) : null; }
+    function clampItem(it) {   // põe a BASE da peça dentro do piso (o desenho pode passar sobre a parede)
+        const f = footOf(it); if (!f) return; const ox = f.x - it.x, oy = f.y - it.y;
+        it.x = Math.round(Math.max(HB.x0 - ox, Math.min(HB.x1 - f.w - ox, it.x))); it.y = Math.round(Math.max(HB.y0 - oy, Math.min(HB.y1 - f.h - oy, it.y)));
     }
     // reconstrói as peças da casa (só as do jogador local) dentro do mapa 'casa'
     /* ---- a sala: paredes de verdade (sólidas), janelas, lareira, piso de tábuas. Montada aqui (nunca salva): vale para todas as casas ---- */
@@ -107,15 +115,15 @@
         m.entities = (m.entities || []).filter((o) => o && !o.hf);
         roomEntities().forEach((e) => m.entities.push(e));
         const items = (hctx && hctx.owner !== me()) ? hctx.items : houseData().items;
-        if (!(hctx && hctx.owner !== me())) items.forEach((it) => { const f = FURN[it.k]; if (!f) return; const sz = sizeOf(it.k, it.r | 0); it.x = Math.max(HB.x0, Math.min(HB.x1 - sz[0], it.x)); it.y = Math.max(HB.y0, Math.min(HB.y1 - sz[1], it.y)); });   // casas antigas (sem parede) são ajustadas para dentro da sala nova
+        if (!(hctx && hctx.owner !== me())) items.forEach((it) => { if (FURN[it.k]) clampItem(it); });   // casas antigas (sem parede) são ajustadas para dentro da sala nova
         items.forEach((it, i) => { const e = furnEntity(it, i); if (e) m.entities.push(e); });
     }
     function inHouseBounds(m, x, y, w, h) { return x >= HB.x0 && y >= HB.y0 && x + w <= HB.x1 && y + h <= HB.y1 && !(x < 500 && x + w > 400 && y + h > 500); }   // a faixa da porta fica livre
     function canPlace(k, r, x, y) {
-        const m = gameMaps.casa, f = FURN[k]; if (!m || !f) return false; const sz = sizeOf(k, r);
-        if (!inHouseBounds(m, x, y, sz[0], sz[1])) return false;
+        const m = gameMaps.casa, f = FURN[k]; if (!m || !f) return false; const fp = footOf({ k, x, y, r });
+        if (!fp || !inHouseBounds(m, fp.x, fp.y, fp.w, fp.h)) return false;
         if (f.t === 'paint') return true;
-        return !m.entities.some((o) => o && o.active !== false && o.hf && o.type !== 'paint' && x - 2 < o.x + (o.w || 30) && x + sz[0] + 2 > o.x && y - 2 < o.y + (o.h || 30) && y + sz[1] + 2 > o.y);
+        return !m.entities.some((o) => { if (!o || o.active === false || !o.hf || o.type === 'paint') return false; const b = fpOf(o); return fp.x - 2 < b.x + b.w && fp.x + fp.w + 2 > b.x && fp.y - 2 < b.y + b.h && fp.y + fp.h + 2 > b.y; });
     }
 
     /* ---------- editor ---------- */
@@ -238,7 +246,7 @@
         if (ed.on && ed.held) {
             const k = ed.held.k, f = FURN[k], sz = sizeOf(k, ed.held.r), e = furnEntity({ k, x: ed.ghost.x, y: ed.ghost.y, r: ed.held.r }, 'g');
             ctx.save(); ctx.globalAlpha = 0.72; try { renderEntity(ctx, e, true); } catch (er) { } ctx.restore();
-            ctx.save(); ctx.lineWidth = 2; ctx.strokeStyle = ed.ok ? '#2ecc71' : '#e74c3c'; ctx.fillStyle = ed.ok ? 'rgba(46,204,113,.16)' : 'rgba(231,76,60,.22)'; ctx.fillRect(ed.ghost.x, ed.ghost.y, sz[0], sz[1]); ctx.setLineDash([6, 4]); ctx.strokeRect(ed.ghost.x, ed.ghost.y, sz[0], sz[1]); ctx.restore();
+            ctx.save(); ctx.lineWidth = 2; ctx.strokeStyle = ed.ok ? '#2ecc71' : '#e74c3c'; ctx.fillStyle = ed.ok ? 'rgba(46,204,113,.16)' : 'rgba(231,76,60,.22)'; const fp = footOf({ k, x: ed.ghost.x, y: ed.ghost.y, r: ed.held.r }) || { x: ed.ghost.x, y: ed.ghost.y, w: sz[0], h: sz[1] }; ctx.fillRect(fp.x, fp.y, fp.w, fp.h); ctx.setLineDash([6, 4]); ctx.strokeRect(fp.x, fp.y, fp.w, fp.h); if (fp.h < sz[1] - 1) { ctx.globalAlpha = 0.35; ctx.strokeStyle = '#f0e2bd'; ctx.setLineDash([2, 4]); ctx.strokeRect(ed.ghost.x, ed.ghost.y, sz[0], sz[1]); } ctx.restore();
         } else if (ed.on) {
             const m = gameMaps.casa; ctx.save(); ctx.strokeStyle = 'rgba(240,226,189,.35)'; ctx.setLineDash([3, 5]); (m.entities || []).forEach((o) => { if (o && o.hf) ctx.strokeRect(o.x - 1, o.y - 1, (o.w || 30) + 2, (o.h || 30) + 2); }); ctx.restore();
         }

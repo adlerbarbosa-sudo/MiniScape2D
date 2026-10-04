@@ -99,18 +99,18 @@
     /* ---------- CONSTRUÇÕES ----------
        w,h: tamanho padrão  |  foot: parte de baixo que bloqueia [x0,y0,x1,y1] em frações  */
     const BUILDINGS = {
-        cottage:  { name: 'Casinha de Sapê', w: 104, h: 96,  foot: [0.06, 0.52, 0.94, 1], desc: 'Casa simples de camponês, com telhado de palha e chaminé.' },
-        townhouse:{ name: 'Sobrado de Madeira', w: 116, h: 132, foot: [0.04, 0.55, 0.96, 1], desc: 'Casa de dois andares com estrutura de madeira e telhado de telhas.' },
-        tavern:   { name: 'Taverna', w: 160, h: 128, foot: [0.03, 0.5, 0.97, 1], desc: 'Ponto de encontro da vila: placa pendurada, chaminé fumegando e luz quente nas janelas.' },
-        smithy:   { name: 'Ferraria', w: 138, h: 108, foot: [0.04, 0.5, 0.96, 1], desc: 'Forja aberta com chaminé em brasa. Combina com fornalha e bigorna.' },
-        church:   { name: 'Igreja', w: 150, h: 178, foot: [0.05, 0.55, 0.95, 1], desc: 'Nave de pedra com torre do sino e vitral.' },
-        wizard_tower: { name: 'Torre do Mago', w: 86, h: 190, foot: [0.14, 0.7, 0.86, 1], desc: 'Torre torta de pedra azul com telhado pontudo e estrelas.' },
-        watchtower:   { name: 'Torre de Vigia', w: 76, h: 150, foot: [0.1, 0.62, 0.9, 1], desc: 'Torre de pedra com ameias e bandeira.' },
-        castle:   { name: 'Castelo', w: 260, h: 190, foot: [0.02, 0.55, 0.98, 1], desc: 'Fortaleza com duas torres, muralha, portão levadiço e estandartes.' },
-        windmill: { name: 'Moinho', w: 110, h: 158, foot: [0.16, 0.6, 0.84, 1], desc: 'Moinho de vento com pás giratórias.' },
-        barn:     { name: 'Celeiro', w: 148, h: 116, foot: [0.03, 0.5, 0.97, 1], desc: 'Celeiro vermelho com portas grandes e feno no sótão.' },
-        market:   { name: 'Barraca de Feira', w: 88, h: 70,  foot: [0.08, 0.6, 0.92, 1], desc: 'Barraca com toldo listrado e mercadorias.' },
-        tent:     { name: 'Tenda de Acampamento', w: 84, h: 66, foot: [0.1, 0.55, 0.9, 1], desc: 'Tenda de lona para acampamentos e goblins.' }
+        cottage:  { name: 'Casinha de Sapê', w: 104, h: 96,  foot: [0.06, 0.6, 0.94, 1], desc: 'Casa simples de camponês, com telhado de palha e chaminé.' },
+        townhouse:{ name: 'Sobrado de Madeira', w: 116, h: 132, foot: [0.04, 0.64, 0.96, 1], desc: 'Casa de dois andares com estrutura de madeira e telhado de telhas.' },
+        tavern:   { name: 'Taverna', w: 160, h: 128, foot: [0.03, 0.58, 0.97, 1], desc: 'Ponto de encontro da vila: placa pendurada, chaminé fumegando e luz quente nas janelas.' },
+        smithy:   { name: 'Ferraria', w: 138, h: 108, foot: [0.04, 0.55, 0.96, 1], desc: 'Forja aberta com chaminé em brasa. Combina com fornalha e bigorna.' },
+        church:   { name: 'Igreja', w: 150, h: 178, foot: [0.05, 0.62, 0.95, 1], desc: 'Nave de pedra com torre do sino e vitral.' },
+        wizard_tower: { name: 'Torre do Mago', w: 86, h: 190, foot: [0.14, 0.74, 0.86, 1], desc: 'Torre torta de pedra azul com telhado pontudo e estrelas.' },
+        watchtower:   { name: 'Torre de Vigia', w: 76, h: 150, foot: [0.1, 0.7, 0.9, 1], desc: 'Torre de pedra com ameias e bandeira.' },
+        castle:   { name: 'Castelo', w: 260, h: 190, foot: [0.02, 0.6, 0.98, 1], desc: 'Fortaleza com duas torres, muralha, portão levadiço e estandartes.' },
+        windmill: { name: 'Moinho', w: 110, h: 158, foot: [0.16, 0.68, 0.84, 1], desc: 'Moinho de vento com pás giratórias.' },
+        barn:     { name: 'Celeiro', w: 148, h: 116, foot: [0.03, 0.58, 0.97, 1], desc: 'Celeiro vermelho com portas grandes e feno no sótão.' },
+        market:   { name: 'Barraca de Feira', w: 88, h: 70,  foot: [0.08, 0.62, 0.92, 1], desc: 'Barraca com toldo listrado e mercadorias.' },
+        tent:     { name: 'Tenda de Acampamento', w: 84, h: 66, foot: [0.1, 0.6, 0.9, 1], desc: 'Tenda de lona para acampamentos e goblins.' }
     };
 
     /* ---------- DECORAÇÃO ---------- (solid = bloqueia; foot = área que bloqueia) */

@@ -59,10 +59,10 @@
     const OUT = 'rgba(18,10,8,0.85)';
     const BODY = {   // corpo sólido da entrada (portal fica à frente, na base); foot = parte sólida
         tomb: { name: 'Mausoléu Rachado', w: 132, h: 112, foot: [0.04, 0.12, 0.96, 0.96] },
-        minegate: { name: 'Boca de Mina', w: 164, h: 122, foot: [0.04, 0.14, 0.96, 0.96] },
-        cavemouth: { name: 'Boca de Caverna', w: 152, h: 114, foot: [0.04, 0.14, 0.96, 0.96] },
-        ruinarch: { name: 'Arco em Ruínas', w: 164, h: 122, foot: [0.04, 0.14, 0.96, 0.96] },
-        craterrim: { name: 'Cratera do Dragão', w: 184, h: 126, foot: [0.04, 0.14, 0.96, 0.96] }
+        minegate: { name: 'Boca de Mina', w: 164, h: 122, foot: [0.04, 0.5, 0.96, 0.96] },
+        cavemouth: { name: 'Boca de Caverna', w: 152, h: 114, foot: [0.04, 0.5, 0.96, 0.96] },
+        ruinarch: { name: 'Arco em Ruínas', w: 164, h: 122, foot: [0.04, 0.5, 0.96, 0.96] },
+        craterrim: { name: 'Cratera do Dragão', w: 184, h: 126, foot: [0.04, 0.5, 0.96, 0.96] }
     };
     const NEWDECOR = { torch: { name: 'Tocha de Parede', w: 22, h: 50, solid: false } };
     Object.keys(BODY).forEach((k) => { NEWDECOR[k] = { name: BODY[k].name, w: BODY[k].w, h: BODY[k].h, solid: true, foot: BODY[k].foot }; });
