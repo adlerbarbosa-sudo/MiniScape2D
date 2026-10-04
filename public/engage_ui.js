@@ -55,7 +55,11 @@
         .eng-days{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin:6px 0}.eng-day{padding:4px 2px;border-radius:6px;background:#ffffff0d;border:1px solid #e8c46933;text-align:center;font-size:.62rem}.eng-day.on{border-color:#7bd68f;background:#3f9a5833}.eng-day.past{opacity:.5}.eng-day b{display:block;font-size:.72rem}`;
         document.head.appendChild(s);
     }
-    function place() { const c = $('gameCanvas'); const r = c ? c.getBoundingClientRect() : { right: window.innerWidth - 20, top: 10 }; if (btn) { btn.style.left = Math.max(8, Math.min(window.innerWidth - 84, r.right - 128)) + 'px'; btn.style.top = Math.max(8, Math.min(window.innerHeight - 40, r.top + 66)) + 'px'; } }
+    function place() {   // abaixo do botão Diário (Diário, Social e a estrela da árvore ocupam a linha de cima)
+        if (!btn) return; const h = document.querySelector('.hub-btn'), hr = h && h.offsetWidth ? h.getBoundingClientRect() : null, c = $('gameCanvas'), r = c ? c.getBoundingClientRect() : { right: window.innerWidth - 20, top: 10 };
+        const left = hr ? hr.left : r.right - 208, top = hr ? hr.bottom + 6 : r.top + 100;
+        btn.style.left = Math.max(8, Math.min(window.innerWidth - 90, left)) + 'px'; btn.style.top = Math.max(8, Math.min(window.innerHeight - 40, top)) + 'px';
+    }
     function badge() {
         if (!S) return 0; let n = S.daily && !S.daily.claimed ? 1 : 0;
         for (const p of ['d', 'w']) { const Q = S.quests[p]; (Q.list || []).forEach((q) => { if (q.p >= q.need && !q.done) n++; }); if (Q.list.length && Q.list.every((q) => q.done) && !Q.bonus) n++; }

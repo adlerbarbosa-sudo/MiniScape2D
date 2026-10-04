@@ -19,7 +19,7 @@
         'Cooked Golden Koi': { name: 'Cooked Golden Koi', icon: '🍣', type: 'consumable', heal: 32, stackable: true, weight: 0.5, desc: 'Um banquete dourado.', value: 220 },
         'Colossus Core': { name: 'Colossus Core', icon: '💎', type: 'resource', stackable: true, weight: 1.5, desc: 'Coração do Colosso de Pedra. Vale uma fortuna.', value: 700 }
     };
-    const BOSS = { name: 'Colosso de Pedra', group: 'chefe', species: 'golem', behavior: 'neutral', range: 220, speed: 0.6, w: 100, h: 110, hp: 1800, maxHit: 18, xp: 0, c1: '#7b8794', c2: '#ff9d3a', lootStr: '', dialog: '', shopStr: '', desc: 'Um colosso ancestral que desperta a cada hora. Chame os amigos!' };
+    const BOSS = { name: 'Colosso de Pedra', group: 'chefe', species: 'golem', behavior: 'neutral', range: 220, speed: 0.6, w: 100, h: 110, hp: 1800, maxHit: 18, xp: 0, c1: '#a8643c', c2: '#ff9d3a', lootStr: '', dialog: '', shopStr: '', desc: 'Um colosso ancestral que desperta a cada hora. Chame os amigos!' };
     try { if (window.Balance) Balance.applyMob('wboss_golem', BOSS); } catch (e) { }   // balanceamento v2: Colosso (vida e dano por nível)
     try { if (window.CATALOG) { Object.assign(CATALOG.ITEMS, NEW_ITEMS); CATALOG.CREATURES.wboss_golem = BOSS; } } catch (e) { }
 
