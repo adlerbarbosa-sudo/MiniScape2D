@@ -20,7 +20,7 @@ Leia o README.md antes de começar. Regras de trabalho: testar com Playwright em
 - Móveis na casa de outro jogador: causa real não confirmada, testar em produção.
 - Falta o evento Invasão no cliente (spawn dos invasores; precisa de teste multiplayer no servidor real).
 - Teste em produção das Fendas/Reforja/Casa (o ambiente de desenvolvimento não tem `express`; a lógica de servidor foi testada em módulo e o cliente com o servidor simulado).
-- Prestígio: não implementado (a Maestria após o nível 99 já cumpre o papel). Guildas não existem; a meta coletiva vive nas Fendas.
+- Prestígio: não implementado (a Maestria após o nível 99 já cumpre o papel). Guildas: implementadas (04/10) em `social.js` (criar/convidar/expulsar/sair, chat `/gd`, XP da guilda e bônus de até +10% de XP de combate; UI no botão Social).
 
 ## Multiplayer / Eventos / Visuais (lote 15:43–15:49)
 - `drops.js`: drops, árvores/rochas esgotadas e fogueiras compartilhados via sync; coleta arbitrada em `POST /api/drop` (precisa de teste online em produção).
@@ -30,3 +30,8 @@ Leia o README.md antes de começar. Regras de trabalho: testar com Playwright em
 - Árvores por espécie no editor (níveis em econ.js); 4 novas casas (stone_house, longhouse, manor, cabin).
 - Terreno de cor livre orgânico (`c:#hex` em terrain.js).
 - Monstros humanoides: braços/armas reproporcionados, armas de perfil mais naturais.
+
+## Lote 04/10 tarde
+- Grupo: XP compartilhado (50% aos próximos), bônus +10% por companheiro próximo (até 3), HUD novo à esquerda do mapa.
+- Fx remotos: números de dano, impacto, cone, raio, auras de buff/barreira (`au` no sync).
+- Ainda falta: Invasão (cliente), prestígio, armadura draconiana no estilo das referências, pernas dos monstros de frente, validação de XP no servidor.

@@ -59,6 +59,7 @@
         renderHud();
         if (s.invite && !invSeen[s.invite.from]) { invSeen[s.invite.from] = Date.now(); showInvite(s.invite.from); }
         if (!s.invite) invSeen = {};
+        if (s.ginvite && !invSeen['g:' + s.ginvite.from]) { invSeen['g:' + s.ginvite.from] = Date.now(); showGuildInvite(s.ginvite); }
         renderTradeUI();
         const m = $('custom-modal-box'); if (m && m.dataset.social === '1' && !s.trade) renderSocialModal();
     }
@@ -146,11 +147,12 @@
     // XP de grupo: quem causa dano repassa o XP base; juntamos por 1,2 s e mandamos num pedido só
     let _px = {}, _pxT = 0;
     window.partyShareXp = function (sk, x) {
-        if (!S.party || S.party.members.length < 2 || !(x > 0)) return 0; _px[sk] = (_px[sk] || 0) + x;
+        if (!((S.party && S.party.members.length >= 2) || S.guild) || !(x > 0)) return 0; _px[sk] = (_px[sk] || 0) + x;
         if (_pxT) return groupNear(); _pxT = setTimeout(() => { const o = _px; _px = {}; _pxT = 0; Object.keys(o).forEach((k) => { socialCall('party_xp', { s: k, x: Math.round(o[k]) }, true).catch(() => { }); }); }, 1200);
         return groupNear();
     };
-    function groupNear() { let c = 0; try { S.party.members.forEach((m) => { const o = otherPlayers[m.u]; if (m.u !== window.currentUser && o && o.map === currentMap && Math.hypot((o.x || 0) - player.x, (o.y || 0) - player.y) < 1100) c++; }); } catch (e) { } return c; }
+    function groupNear() { let c = 0; try { if (!S.party) return 0; S.party.members.forEach((m) => { const o = otherPlayers[m.u]; if (m.u !== window.currentUser && o && o.map === currentMap && Math.hypot((o.x || 0) - player.x, (o.y || 0) - player.y) < 1100) c++; }); } catch (e) { } return c; }
+    window.guildBonus = () => (S.guild ? S.guild.bonus || 0 : 0);
     function place() {
         const c = document.getElementById('gameCanvas'); const r = c ? c.getBoundingClientRect() : { right: window.innerWidth - 20, top: 10 };
         if (btn) { btn.style.left = Math.max(8, r.right - 118) + 'px'; btn.style.top = (r.top + 66) + 'px'; }
@@ -171,6 +173,11 @@
         hud.style.display = 'block'; place();
         hud.innerHTML = `<div class="h"><span>GRUPO</span><span>${p.members.length}</span></div>` + p.members.map((m) => { const pc = m.maxHp ? Math.max(0, Math.min(100, Math.round(m.hp / m.maxHp * 100))) : 0; return `<div class="r" style="opacity:${m.on ? 1 : .45}">${m.u === p.leader ? '<span style="color:#f1c40f">★</span> ' : ''}${esc(m.u)}<small>${m.on ? m.hp + '/' + m.maxHp : 'off'}</small><div class="b"><i class="${pc < 30 ? 'l' : pc < 60 ? 'm' : ''}" style="width:${pc}%"></i></div></div>`; }).join('');
     }
+    function showGuildInvite(i) {
+        openModal(`<h3 style="margin:0 0 8px">Convite de guilda</h3><p><b>${esc(i.from)}</b> convidou você para a guilda <b>${esc(i.name)}</b>.</p><div style="text-align:right"><button class="soc-b" id="soc-gyes">Aceitar</button><button class="soc-b" id="soc-gno">Recusar</button></div>`);
+        const b = $('custom-modal-box'); if (b) b.dataset.social = '0';
+        $('soc-gyes').onclick = async () => { closeModal(); await socialCall('guild_accept'); }; $('soc-gno').onclick = async () => { closeModal(); await socialCall('guild_decline'); };
+    }
     function showInvite(from) {
         openModal(`<h3 style="margin:0 0 8px">Convite de grupo</h3><p><b>${esc(from)}</b> convidou você para um grupo.</p><div style="text-align:right"><button class="soc-b" id="soc-yes">Aceitar</button><button class="soc-b" id="soc-no">Recusar</button></div>`);
         const b = $('custom-modal-box'); if (b) b.dataset.social = '0';
@@ -186,8 +193,14 @@
         if (p) {
             h += p.members.map((m) => `<div style="margin:2px 0">${m.u === p.leader ? '★ ' : ''}<b>${esc(m.u)}</b> <small>${m.on ? 'HP ' + m.hp + '/' + m.maxHp : 'offline'}</small>${lead && m.u !== me ? ` <button class="soc-b" data-kick="${esc(m.u)}">Expulsar</button>` : ''}</div>`).join('') + `<button class="soc-b" id="soc-leave">Sair do grupo</button><div style="font-size:.74rem;opacity:.8">Converse só com o grupo: <b>/g mensagem</b></div>`;
         } else h += `<div style="font-size:.8rem;opacity:.85">Você não está em um grupo. Convide alguém abaixo.</div>`;
+        const gl = S.guild;
+        h += `<h4 style="margin:10px 0 2px">Guilda</h4>`;
+        if (gl) {
+            const pc = gl.next ? Math.max(0, Math.min(100, Math.round((gl.xp - gl.base) / (gl.next - gl.base) * 100))) : 100;
+            h += `<div style="color:#6ec6ff"><b>${esc(gl.name)}</b> <small>nível ${gl.lvl} · +${gl.bonus}% XP de combate</small></div><div class="soc-hud-bar" style="height:6px;background:#000a;border-radius:4px;overflow:hidden;margin:3px 0"><div style="width:${pc}%;height:100%;background:linear-gradient(#6ec6ff,#2f7fc0)"></div></div>` + gl.members.map((m) => `<div style="margin:2px 0;opacity:${m.on ? 1 : .5}">${m.u === gl.leader ? '★ ' : ''}${esc(m.u)} <small>${m.on ? 'online' : 'offline'}</small>${gl.leader === me && m.u !== me ? ` <button class="soc-b" data-gkick="${esc(m.u)}">Expulsar</button>` : ''}</div>`).join('') + `<button class="soc-b" id="soc-gleave">Sair da guilda</button><div style="font-size:.74rem;opacity:.8">Chat da guilda: <b>/gd mensagem</b>. Cada golpe seu rende XP à guilda.</div>`;
+        } else h += `<div style="font-size:.8rem;opacity:.85">Sem guilda.</div><input id="soc-gname" maxlength="16" placeholder="Nome da guilda" style="width:60%;font:inherit"> <button class="soc-b" id="soc-gnew">Criar</button>`;
         const list = nearby();
-        h += `<h4 style="margin:10px 0 2px">Jogadores por perto</h4>` + (list.length ? list.map((o) => `<div style="margin:2px 0"><b>${esc(o.u)}</b> <small>(${o.d}px)</small> <button class="soc-b" data-inv="${esc(o.u)}" ${p && !lead ? 'disabled' : ''}>Convidar</button><button class="soc-b" data-trade="${esc(o.u)}" ${o.d > 300 ? 'disabled' : ''}>Trocar</button></div>`).join('') : `<div style="font-size:.8rem;opacity:.8">Ninguém neste mapa agora.</div>`);
+        h += `<h4 style="margin:10px 0 2px">Jogadores por perto</h4>` + (list.length ? list.map((o) => `<div style="margin:2px 0"><b>${esc(o.u)}</b> <small>(${o.d}px)</small> <button class="soc-b" data-inv="${esc(o.u)}" ${p && !lead ? 'disabled' : ''}>Convidar</button>${gl && gl.leader === me ? `<button class="soc-b" data-ginv="${esc(o.u)}">Guilda</button>` : ''}<button class="soc-b" data-trade="${esc(o.u)}" ${o.d > 300 ? 'disabled' : ''}>Trocar</button></div>`).join('') : `<div style="font-size:.8rem;opacity:.8">Ninguém neste mapa agora.</div>`);
         h += `<div style="text-align:right;margin-top:8px"><button class="soc-b" onclick="closeModal()">Fechar</button></div>`;
         openModal(h); const b = $('custom-modal-box'); if (!b) return; b.dataset.social = '1';
         b.onclick = async (ev) => {
@@ -196,6 +209,10 @@
             else if (t.dataset.trade) { const r = await socialCall('trade_request', { to: t.dataset.trade }); if (r && r.ok) { closeModal(); note('Pedido de troca enviado.'); } }
             else if (t.dataset.kick) await socialCall('party_kick', { to: t.dataset.kick });
             else if (t.id === 'soc-leave') await socialCall('party_leave');
+            else if (t.dataset.ginv) { const r = await socialCall('guild_invite', { to: t.dataset.ginv }); if (r && r.ok) note('Convite de guilda enviado a ' + t.dataset.ginv + '.'); }
+            else if (t.dataset.gkick) await socialCall('guild_kick', { to: t.dataset.gkick });
+            else if (t.id === 'soc-gleave') await socialCall('guild_leave');
+            else if (t.id === 'soc-gnew') { const v = $('soc-gname'); await socialCall('guild_create', { name: v ? v.value : '' }); }
         };
     }
     function openSocial() { if (S.trade && (S.trade.st === 'open' || S.trade.st === 'invite')) { tradeKey = ''; renderTradeUI(); return; } renderSocialModal(); }

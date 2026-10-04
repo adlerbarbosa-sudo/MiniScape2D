@@ -381,7 +381,7 @@ const extras = createExtras({ db, activePlayers, markDirty, knownItem: (n) => se
 const sq = createSQ({ getDB: () => db, extras, sec, markDirty, giftLog: (o) => giftLog(o) });   // missões especiais do admin (specialquests.js)
 eng = createEngageSrv({ getDB: () => db, extras, sec, markDirty, activePlayers });
 try { const RI = require('./public/riftitems.js'); if (db.itemDB && typeof db.itemDB === 'object') { let ch = false; for (const k of Object.keys(RI)) if (!hasOwn(db.itemDB, k)) { db.itemDB[k] = RI[k]; ch = true; } if (ch) { dbStr = JSON.stringify([db.itemDB, db.npcDB]); markDirty(); } } } catch (e) { console.error('[rift-items]', e); }   // itens das Fendas entram no catálogo do servidor (o correio só entrega itens conhecidos)
-function chatFor(user) { return db.chat.filter(c => social.chatVisible(user, c)).map(c => { if (!c.party) return c; const { sender, msg, color } = c; return { sender, msg, color }; }); }
+function chatFor(user) { return db.chat.filter(c => social.chatVisible(user, c)).map(c => { if (!c.party && !c.guild) return c; const { sender, msg, color } = c; return { sender, msg, color }; }); }
 
 /* ---------- respawn autoritativo dos monstros e chefes ----------
    O servidor guarda o instante de cada morte (db.mobDeaths, persistido) e revive por relógio próprio: não depende de ter alguém no mapa, de ser o host nem de o admin estar online.
@@ -887,9 +887,11 @@ app.post('/api/chat', auth, (req, res) => {
         const role = req.role;
         const color = role === 'admin' ? '#e74c3c' : role === 'vip_full' ? '#f1c40f' : role === 'vip_light' ? '#3498db' : '#ecf0f1';
         const prefix = role === 'admin' ? '[ADM] ' : role.startsWith('vip') ? '[VIP] ' : '';
+        const gid = cb.guild ? social.guildOf(req.user) : null;
+        if (cb.guild && !gid) return res.json({ error: 'Você não está em uma guilda.', chat: chatFor(req.user), chatVer: db.chatVer });
         const pid = cb.party ? social.partyOf(req.user) : null;
         if (cb.party && !pid) return res.json({ error: 'Você não está em um grupo.', chat: chatFor(req.user), chatVer: db.chatVer });
-        db.chat.push(pid ? { sender: '[Grupo] ' + req.user, msg, color: '#7bd67b', party: pid } : { sender: prefix + req.user, msg, color }); if (db.chat.length > 50) db.chat.shift();
+        db.chat.push(gid ? { sender: '[Guilda] ' + req.user, msg, color: '#6ec6ff', guild: gid } : pid ? { sender: '[Grupo] ' + req.user, msg, color: '#7bd67b', party: pid } : { sender: prefix + req.user, msg, color }); if (db.chat.length > 50) db.chat.shift();
         db.chatVer++; markDirty();
     }
     res.json({ chat: chatFor(req.user), chatVer: db.chatVer });

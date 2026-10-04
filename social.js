@@ -13,6 +13,13 @@ const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 module.exports = function createSocial(ctx) {
     let db = ctx.db; const { activePlayers, markDirty } = ctx;
     if (!db.trades || typeof db.trades !== 'object') db.trades = Object.create(null);
+    if (!db.guilds || typeof db.guilds !== 'object') db.guilds = Object.create(null);
+    const guildOf = Object.create(null), ginv = Object.create(null); let gSave = 0;
+    const G_MAX = 20, gLvl = (g) => Math.min(11, Math.floor(Math.sqrt((g.xp || 0) / 3000)) + 1);
+    function rebuildGuilds() { for (const k of Object.keys(guildOf)) delete guildOf[k]; for (const id of Object.keys(db.guilds)) { const g = db.guilds[id]; if (!g || !Array.isArray(g.members) || !g.members.length) { delete db.guilds[id]; continue; } g.members.forEach((m) => { guildOf[m] = id; }); } }
+    rebuildGuilds();
+    function guildLeave(u) { const id = guildOf[u], g = id && db.guilds[id]; if (!g) return; delete guildOf[u]; g.members = g.members.filter((m) => m !== u); if (!g.members.length) delete db.guilds[id]; else if (g.leader === u) g.leader = g.members[0]; markDirty(); }
+    function guildView(u) { const id = guildOf[u], g = id && db.guilds[id]; if (!g) return null; const l = gLvl(g); return { name: g.name, leader: g.leader, lvl: l, xp: g.xp | 0, next: l >= 11 ? 0 : 3000 * l * l, base: 3000 * (l - 1) * (l - 1), bonus: l - 1, members: g.members.map((m) => ({ u: m, on: online(m) })) }; }
     const parties = Object.create(null), partyOf = Object.create(null), invites = Object.create(null), tradeOf = Object.create(null);
     let seq = 1;
     const now = () => Date.now();
@@ -75,7 +82,7 @@ module.exports = function createSocial(ctx) {
     const pend = Object.create(null), xpRate = Object.create(null);   // XP compartilhado do grupo, entregue uma vez a cada membro
     function view(u) {
         const inv = invites[u];
-        const out = { party: partyView(u), invite: inv && parties[inv.pid] ? { from: inv.from } : null, trade: tradeView(u) };
+        const gi = ginv[u]; const out = { guild: guildView(u), ginvite: gi && gi.exp > now() && db.guilds[gi.gid] ? { from: gi.from, name: db.guilds[gi.gid].name } : null, party: partyView(u), invite: inv && parties[inv.pid] ? { from: inv.from } : null, trade: tradeView(u) };
         if (pend[u] && pend[u].length) { out.xp = pend[u]; pend[u] = []; }
         return out;
     }
@@ -109,6 +116,8 @@ module.exports = function createSocial(ctx) {
             case 'party_kick': { const p = parties[partyOf[u]]; if (!p || p.leader !== u) return err('Só o líder expulsa.'); if (!to || to === u || partyOf[to] !== p.id) return err('Jogador não encontrado no grupo.'); dropFromParty(to); return { ok: true }; }
 
             case 'party_xp': {   // o XP de combate de quem lutou rende 50% (no cliente) aos companheiros próximos, no mesmo mapa
+                const gid = guildOf[u], gg = gid && db.guilds[gid];
+                if (gg) { const gx = Math.min(5000, Math.max(0, Math.floor(Number(b.x)) || 0)); if (gx > 0) { gg.xp = (gg.xp || 0) + gx; if (now() - gSave > 20000) { gSave = now(); markDirty(); } } }
                 const pid = partyOf[u], p = pid && parties[pid]; if (!p) return { ok: true };
                 const sk = String(b.s || ''); if (!/^(combat|ranged|magic)$/.test(sk)) return { ok: true };
                 let x = Math.floor(Number(b.x)); if (!(x > 0)) return { ok: true }; x = Math.min(x, 5000);
@@ -116,6 +125,21 @@ module.exports = function createSocial(ctx) {
                 for (const m of p.members) { if (m === u || !online(m)) continue; const a = activePlayers[m]; if (a.map !== me.map || Math.hypot(a.x - me.x, a.y - me.y) > 1100) continue; const q = pend[m] || (pend[m] = []); if (q.length < 40) q.push({ f: u, s: sk, x }); }
                 return { ok: true };
             }
+            case 'guild_create': {
+                if (guildOf[u]) return err('Você já está em uma guilda.'); const nm = String(b.name || '').trim().replace(/\s+/g, ' ');
+                if (!/^[\p{L}\p{N} ]{3,16}$/u.test(nm)) return err('Nome da guilda: 3 a 16 letras ou números.');
+                const id = nm.toLowerCase(); if (db.guilds[id]) return err('Já existe uma guilda com esse nome.');
+                db.guilds[id] = { name: nm, leader: u, members: [u], xp: 0, t: now() }; guildOf[u] = id; markDirty(); return { ok: true };
+            }
+            case 'guild_invite': {
+                const g = db.guilds[guildOf[u]]; if (!g) return err('Você não está em uma guilda.'); if (g.leader !== u) return err('Só o líder convida.');
+                if (!to || to === u || !online(to)) return err('Jogador indisponível.'); if (guildOf[to]) return err(to + ' já está em uma guilda.'); if (g.members.length >= G_MAX) return err('Guilda cheia.');
+                ginv[to] = { from: u, gid: guildOf[u], exp: now() + 60000 }; return { ok: true };
+            }
+            case 'guild_accept': { const iv = ginv[u]; const g = iv && iv.exp > now() && db.guilds[iv.gid]; if (!g) return err('Convite expirado.'); if (guildOf[u]) return err('Você já está em uma guilda.'); if (g.members.length >= G_MAX) return err('Guilda cheia.'); g.members.push(u); guildOf[u] = iv.gid; delete ginv[u]; markDirty(); return { ok: true }; }
+            case 'guild_decline': delete ginv[u]; return { ok: true };
+            case 'guild_leave': guildLeave(u); return { ok: true };
+            case 'guild_kick': { const g = db.guilds[guildOf[u]]; if (!g || g.leader !== u) return err('Só o líder expulsa.'); if (!to || to === u || guildOf[to] !== guildOf[u]) return err('Jogador não encontrado na guilda.'); guildLeave(to); return { ok: true }; }
             case 'trade_request': {
                 if (!to || to === u || !online(to)) return err('Jogador indisponível.');
                 if (tradeOf[u] || tradeOf[to]) return err('Um dos dois já está em uma troca.');
@@ -164,7 +188,7 @@ module.exports = function createSocial(ctx) {
         if (t && (t.st === 'invite' || t.st === 'open' || t.st === 'commit')) endTrade(t, why || 'jogador saiu');
         delete invites[u];
     }
-    function chatVisible(u, c) { return !c.party || c.party === partyOf[u]; }
+    function chatVisible(u, c) { if (c.guild) return c.guild === guildOf[u]; return !c.party || c.party === partyOf[u]; }
     function rebind(nd) { db = nd; if (!db.trades || typeof db.trades !== 'object') db.trades = Object.create(null); rebuildTrades(); }
-    return { act, view, dropUser, chatVisible, rebind, partyOf: (u) => partyOf[u] || null, tick, _t: { parties, invites, tradeOf } };
+    return { act, view, dropUser, chatVisible, rebind, partyOf: (u) => partyOf[u] || null, guildOf: (u) => guildOf[u] || null, guildName: (u) => { const g = db.guilds[guildOf[u]]; return g ? g.name : null; }, tick, _t: { parties, invites, tradeOf } };
 };
