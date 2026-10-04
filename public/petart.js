@@ -449,7 +449,7 @@
     /* ===== lobo gigante e pantera: predadores detalhados (pata digitígrada, trote, cauda, cabeça própria) ===== */
     const PRED = {
         lobo_gigante: { wolf: 1, c1: '#7b828d', c2: '#d9dde3', c3: '#474d57', len: 16.5, h: 8.6, by: -21.5, seatY: -31.5, eye: '#f0be3a', nose: '#1d1d22' },
-        pantera: { wolf: 0, c1: '#2e2544', c2: '#5a4688', c3: '#150f24', len: 17.5, h: 7.4, by: -18.2, seatY: -28.5, eye: '#ffe45a', nose: '#8a5ac4' }
+        pantera: { wolf: 0, c1: '#2a2140', c2: '#6a52a0', c3: '#120c20', len: 20, h: 6.4, by: -16, seatY: -25.2, eye: '#ffe45a', nose: '#8a5ac4' }
     };
     function predator(id, v, o, rider) {
         const P = PRED[id], W = P.wolf, t = o.t, mv = o.mv, ph = o.ph, c1 = P.c1, c2 = P.c2, c3 = P.c3, cd = sh(c1, -0.25);
@@ -475,34 +475,37 @@
             // cauda
             const tw = sin(t * 2.6 + ph * 0.4) * (0.2 + mv * 0.2) - (gal ? 0.35 : 0);
             if (W) { g.save(); g.translate(-16, by - 3); g.rotate(0.9 + tw + mv * 0.25); g.beginPath(); g.moveTo(0, -2.6); g.quadraticCurveTo(-8, -1, -15, 6); g.quadraticCurveTo(-8, 5.4, 0, 2.6); g.closePath(); g.fillStyle = c1; g.fill(); g.lineWidth = 1; g.strokeStyle = OUT; g.stroke(); g.beginPath(); g.moveTo(-9, 0.6); g.quadraticCurveTo(-12, 2.6, -15, 6); g.quadraticCurveTo(-11.4, 5.2, -9.6, 3.6); g.closePath(); g.fillStyle = c3; g.fill(); ell(-3.4, 0.8, 4.4, 1.2, c2, 0, 0); g.restore(); }
-            else { g.beginPath(); g.moveTo(-16.5, by - 2); const N = 8; const pts = []; for (let i = 0; i <= N; i++) { const k = i / N; pts.push([-17 - k * 12 + sin(t * 3 + k * 4 + ph * 0.3) * 1.6 * k, by - 2 - k * 4 + (k > 0.5 ? -(k - 0.5) * 22 : 0) + sin(t * 2.4 + k * 3) * 1.2 * k]); } for (let i = 0; i <= N; i++) { g.lineTo(pts[i][0], pts[i][1]); } g.lineCap = 'round'; g.lineJoin = 'round'; g.strokeStyle = OUT; g.lineWidth = 4.6; g.stroke(); g.strokeStyle = c1; g.lineWidth = 3.1; g.stroke(); ell(pts[N][0], pts[N][1], 2.2, 2.2, c2, 0, 0.6); glow(pts[N][0], pts[N][1], 5, 'rgba(160,110,255,A)', 0.5); }
+            else { const N = 14, pts = []; for (let i = 0; i <= N; i++) { const k = i / N; pts.push([-P.len + 1 - Math.sin(k * 2.3) * 14 - k * 4 + sin(t * 3 + k * 4 - ph * 0.5) * 1.8 * k, by - 1 + Math.sin(k * 3.1) * 9 - (k > 0.75 ? (k - 0.75) * 40 : 0) + (gal ? -k * 4 : 0)]); } g.lineCap = 'round'; g.lineJoin = 'round'; for (let pass = 0; pass < 2; pass++) { for (let i = 0; i < N; i++) { g.strokeStyle = pass ? c1 : OUT; g.lineWidth = (pass ? 3.4 : 5) * (1 - i / N * 0.45); g.beginPath(); g.moveTo(pts[i][0], pts[i][1]); g.lineTo(pts[i + 1][0], pts[i + 1][1]); g.stroke(); } } glow(pts[N][0], pts[N][1], 4, 'rgba(160,110,255,A)', 0.4); }
             // pernas do lado de lá
             leg('h', -10.5, ph + PI, cd, 0.95, 1, 0.1); leg('f', 9.5, ph, cd, 0.95, 1, 0.5);
             // corpo
             const L = P.len, H = P.h;
-            g.beginPath(); g.moveTo(-L, by - 1); g.quadraticCurveTo(-L - 0.8, by - H, -L + 6, by - H - 0.2); g.quadraticCurveTo(0, by - H + (W ? 0.6 : 1.6), L - 6, by - H - 0.8); g.quadraticCurveTo(L + 1.2, by - H, L, by + 1.5); g.quadraticCurveTo(L - 2, by + H + 1, L - 8, by + H - 0.6); g.quadraticCurveTo(0, by + H - 3.2, -L + 8, by + H - 0.4); g.quadraticCurveTo(-L - 0.8, by + H, -L, by - 1); g.closePath();
-            g.fillStyle = c1; g.fill(); g.lineWidth = 1; g.lineJoin = 'round'; g.strokeStyle = OUT; g.stroke();
+            if (W) { g.beginPath(); g.moveTo(-L, by - 1); g.quadraticCurveTo(-L - 0.8, by - H, -L + 6, by - H - 0.2); g.quadraticCurveTo(0, by - H + (W ? 0.6 : 1.6), L - 6, by - H - 0.8); g.quadraticCurveTo(L + 1.2, by - H, L, by + 1.5); g.quadraticCurveTo(L - 2, by + H + 1, L - 8, by + H - 0.6); g.quadraticCurveTo(0, by + H - 3.2, -L + 8, by + H - 0.4); g.quadraticCurveTo(-L - 0.8, by + H, -L, by - 1); g.closePath();
+            g.fillStyle = c1; g.fill(); g.lineWidth = 1; g.lineJoin = 'round'; g.strokeStyle = OUT; g.stroke(); } else {
+                const fxx = sin(ph - 0.3) * 2.6 * mv; blob([[-L * 0.5, by + 0.6 + fxx, L * 0.56, H * 1.02], [L * 0.5, by - 0.4 - fxx, L * 0.52, H * 1.14], [0, by + 1.2, L * 0.72, H * 0.8]], c1);
+                ell(L * 0.34, by - H + 1.6 - fxx, 4.8, 3, sh(c1, 0.1), -0.35, 0.8); ell(-L * 0.55, by - 0.5 + fxx, 6, H * 0.8, sh(c1, 0.06), 0, 0.8);
+                ell(0, by + H * 0.78, L * 0.7, 2, c3, 0, 0); g.strokeStyle = 'rgba(190,160,255,.5)'; g.lineWidth = 0.9; g.lineCap = 'round'; g.beginPath(); g.moveTo(-L * 0.9, by - H * 0.55 + fxx); g.quadraticCurveTo(0, by - H - 0.4, L * 0.8, by - H * 0.9 - fxx); g.stroke();
+            }
             if (W) { // dorso escuro, barriga clara, pelo em tufos
                 g.save(); g.clip(); ell(-1, by - H + 1, L - 1, 4.2, c3, 0, 0); ell(0, by + H - 1.2, L - 3, 3.6, c2, 0, 0); g.restore();
                 g.fillStyle = c3; g.beginPath(); g.moveTo(-L + 5, by - H - 0.2); for (let i = 0; i < 8; i++) { g.lineTo(-L + 8 + i * 4, by - H - 2.4 + (i % 2) * 0.8); g.lineTo(-L + 10 + i * 4, by - H - 0.4); } g.closePath(); g.fill();
                 g.strokeStyle = 'rgba(0,0,0,.28)'; g.lineWidth = 0.8; g.beginPath(); g.moveTo(-14, by - 4); g.quadraticCurveTo(-7, by - 3, -6, by + 5); g.stroke(); g.beginPath(); g.moveTo(5, by - 6); g.quadraticCurveTo(11, by - 1, 8, by + 6); g.stroke();
             } else {
-                g.save(); g.clip(); ell(0, by - H + 1, L, 3.8, c3, 0, 0); ell(0, by + H - 1, L - 3, 3, sh(c1, -0.2), 0, 0); g.restore();
                 g.strokeStyle = c2; g.lineWidth = 1.2; g.lineCap = 'round'; for (let i = 0; i < 4; i++) { g.globalAlpha = 0.55 + sin(t * 2 + i) * 0.25; g.beginPath(); g.moveTo(-10 + i * 6, by - 4.4); g.quadraticCurveTo(-8 + i * 6, by, -10 + i * 6, by + 3.4); g.stroke(); } g.globalAlpha = 1;
                 g.strokeStyle = 'rgba(0,0,0,.3)'; g.lineWidth = 0.8; g.beginPath(); g.moveTo(-14, by - 3); g.quadraticCurveTo(-7, by - 2, -7, by + 5); g.stroke();
             }
             // pescoço + cabeça
-            const nod = sin(t * 1.6) * 0.4 - (mv > 0.1 ? sin(ph * 2) * 0.5 : 0), hx = L - 0.5 + (W ? 4 : 4.5), hy = by - (W ? 7.5 : 3.6) + nod;
+            const nod = sin(t * 1.6) * 0.4 - (mv > 0.1 ? sin(ph * 2) * 0.5 : 0), hx = L - 0.5 + (W ? 4 : 4.5), hy = by - (W ? 7.5 : 0.6) + nod;
             g.beginPath(); g.moveTo(L - 9, by - H - 0.8); g.quadraticCurveTo(L - 2, by - H - (W ? 1.6 : 0), hx, hy - (W ? 3.4 : 4.6)); g.lineTo(hx + 1, hy + 5); g.quadraticCurveTo(L, by + 5, L - 8, by + H - 1); g.closePath(); g.fillStyle = c1; g.fill(); g.lineWidth = 1; g.strokeStyle = OUT; g.stroke();
             if (W) { ell(L - 2.4, by + 0.5, 6.6, 7.8, c2); poly([L - 8, by + 6, L - 6.2, by + 11, L - 3.6, by + 6.6], c2, 0.9); poly([L - 4, by + 6.8, L - 1.4, by + 11.6, L + 1.6, by + 5.4], c2, 0.9); poly([L - 1, by - 5, L + 3, by - 1, L + 1, by + 3], sh(c2, 0.1), 0); }
-            g.save(); g.translate(hx, hy); g.rotate(W ? 0.12 : 0.3);
+            g.save(); g.translate(hx, hy); g.rotate(W ? 0.12 : 0.35);
             if (W) {
                 ell(0, 0, 6.2, 5.2, c1); ell(8.2, 1.9, 6.6, 3, c1); ell(8.6, 3.4, 5.8, 1.6, c2, 0, 0); ell(13.6, 1.2, 1.7, 1.4, P.nose, 0, 0.6);
                 g.strokeStyle = '#1d1d22'; g.lineWidth = 0.8; g.beginPath(); g.moveTo(13, 3.6); g.quadraticCurveTo(8.6, 4.8, 5, 3.4); g.stroke(); poly([10.6, 3.8, 11.6, 3.8, 11.1, 5.6], '#f2f2f2', 0.6);
                 poly([-2.4, -3.8, -3.6, -10.6, 2, -4.6], c1, 0.9); poly([-2, -4.2, -2.8, -8.4, 0.8, -4.8], '#caa0a0', 0); poly([-4.6, -3, -7, -8.4, -1, -4.4], cd, 0.9);
                 ell(2.6, -1, 1.9, 1.3, P.eye, -0.3, 0.7); ell(2.9, -1, 0.5, 0.9, '#1d1d22', 0, 0); ell(3, 4.4, 4, 1.6, c2, 0, 0); g.strokeStyle = c3; g.lineWidth = 1; g.beginPath(); g.moveTo(5.4, -3.6); g.lineTo(9.6, -1.2); g.stroke();
             } else {
-                ell(0, 0, 5.8, 5, c1); ell(6.6, 2, 3.8, 3, sh(c1, 0.08)); ell(9.6, 1.2, 1.5, 1.2, P.nose, 0, 0.6); ell(6.6, 3.8, 3.2, 1.3, c3, 0, 0);
+                ell(0, 0, 5.2, 4.6, c1); ell(5.6, 2, 3.2, 2.6, sh(c1, 0.1)); ell(9.6, 1.2, 1.5, 1.2, P.nose, 0, 0.6); ell(6.6, 3.8, 3.2, 1.3, c3, 0, 0);
                 g.strokeStyle = '#0a0612'; g.lineWidth = 0.8; g.beginPath(); g.moveTo(9.4, 3.4); g.quadraticCurveTo(6.6, 4.4, 4.2, 3.2); g.stroke(); poly([7, 3.6, 8, 3.6, 7.5, 5.4], '#f6f2ff', 0.6);
                 ell(-2.4, -4.8, 2.4, 2.8, c1, 0.2); ell(-2.2, -4.6, 1.2, 1.6, P.nose, 0.2, 0); ell(-4.8, -3.8, 2.2, 2.6, cd, -0.2);
                 glow(2.4, -0.8, 6, 'rgba(255,230,90,A)', 0.55); ell(2.4, -0.8, 1.8, 1.2, P.eye, -0.25, 0.7); ell(2.7, -0.8, 0.4, 0.9, '#0a0612', 0, 0);
@@ -540,7 +543,7 @@
                 if (W) { g.beginPath(); for (let i = 0; i < 9; i++) { const a = PI + i / 8 * PI; g.lineTo(cos(a) * (i % 2 ? 9.4 : 7.6), hy + 4.4 + sin(a) * (i % 2 ? 10 : 8)); } g.closePath(); g.fillStyle = c2; g.fill(); g.lineWidth = 0.9; g.strokeStyle = OUT; g.stroke(); }
                 else ell(0, hy + 3, 6.4, 7.6, c1);
                 // orelhas
-                for (const s of [-1, 1]) { if (W) { poly([s * 2.6, hy - 2.4, s * 6.8, hy - 11.4, s * 0.8, hy - 4.2], c1, 0.9); poly([s * 2.8, hy - 3.6, s * 5.6, hy - 9, s * 1.4, hy - 4.8], '#caa0a0', 0); } else { ell(s * 4.6, hy - 3.6, 2.6, 3, c1); ell(s * 4.6, hy - 3.4, 1.3, 1.7, P.nose, 0, 0); } }
+                for (const s of [-1, 1]) { if (W) { poly([s * 2.6, hy - 2.4, s * 6.8, hy - 11.4, s * 0.8, hy - 4.2], c1, 0.9); poly([s * 2.8, hy - 3.6, s * 5.6, hy - 9, s * 1.4, hy - 4.8], '#caa0a0', 0); } else { poly([s * 2, hy - 2, s * 5.6, hy - 9, s * 0.4, hy - 3.8], c1, 0.9); poly([s * 2.4, hy - 3, s * 4.6, hy - 7, s * 1, hy - 3.8], P.nose, 0); } }
                 ell(0, hy + 2, W ? 5 : 5.6, W ? 5.4 : 5, c1);
                 if (W) { ell(0, hy + 7.4, 3, 3.8, c2); ell(0, hy + 9.8, 1.6, 1.1, P.nose, 0, 0.6); g.strokeStyle = c3; g.lineWidth = 1; g.beginPath(); g.moveTo(0, hy - 1); g.lineTo(0, hy + 4); g.stroke(); eye(-3, hy + 1, 1.2, false, P.eye); eye(3, hy + 1, 1.2, false, P.eye); poly([-1.8, hy + 10.6, -0.6, hy + 10.6, -1.2, hy + 12.2], '#f2f2f2', 0.5); poly([1.8, hy + 10.6, 0.6, hy + 10.6, 1.2, hy + 12.2], '#f2f2f2', 0.5); }
                 else { ell(0, hy + 6, 3.4, 2.7, c3, 0, 0); ell(0, hy + 5, 1.5, 1.1, P.nose, 0, 0.5); glow(-2.8, hy + 1.4, 5, 'rgba(255,230,90,A)', 0.55); glow(2.8, hy + 1.4, 5, 'rgba(255,230,90,A)', 0.55); ell(-2.8, hy + 1.4, 1.5, 1.1, P.eye, 0.3, 0.6); ell(2.8, hy + 1.4, 1.5, 1.1, P.eye, -0.3, 0.6); poly([-1.4, hy + 7, -0.4, hy + 7, -0.9, hy + 8.8], '#f6f2ff', 0.5); poly([1.4, hy + 7, 0.4, hy + 7, 0.9, hy + 8.8], '#f6f2ff', 0.5); }
