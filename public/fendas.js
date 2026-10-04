@@ -69,8 +69,8 @@
             if (!r || !r.ok) { setActionText((r && r.error) || 'Não foi possível abrir a Fenda agora.', '#e74c3c'); return; }
             run = { id: r.id, lvl: r.lvl, bl: r.bl, mod: r.mod, floor: 0, cleared: 0, t0: Date.now(), keys: [], seedBase: (Date.now() ^ (Math.random() * 1e9)) | 0, origin: { m: currentMap, x: Math.round(player.x), y: Math.round(player.y + 70) } };
             if (!run.origin.m || run.origin.m === 'fenda') run.origin = { m: 'lumbridge', x: 400, y: 300 };
-            player.rift = { o: run.origin, run: 1 }; closePanel(); pendingCombatLogs.length = 0;
-            if (!enter(1)) { run = null; delete player.rift; }
+            player.rift = Object.assign({}, player.rift || {}, { o: run.origin, run: 1 }); closePanel(); pendingCombatLogs.length = 0;
+            if (!enter(1)) { run = null; player.rift.run = 0; }
         } catch (e) { setActionText('Sem conexão com o servidor.', '#e74c3c'); } finally { busy = false; }
     }
     async function finish(cleared) {
@@ -78,7 +78,7 @@
         try { if (typeof pendingCombatLogs !== 'undefined') pendingCombatLogs.length = 0; } catch (e) { }
         const o = r.origin || { m: 'lumbridge', x: 400, y: 300 };
         if (currentMap === 'fenda') { try { switchMap(gameMaps[o.m] ? o.m : 'lumbridge', o.x, o.y); } catch (e) { } }
-        delete gameMaps.fenda; r.keys.forEach((k) => { delete npcDB[k]; }); player.rift = { o, run: 0 };
+        delete gameMaps.fenda; r.keys.forEach((k) => { delete npcDB[k]; }); player.rift = Object.assign({}, player.rift || {}, { o, run: 0 });
         try { player.stats.hp = Math.max(player.stats.hp, Math.round(player.stats.maxHp * 0.5)); } catch (e) { }
         let res = null; try { res = await api('/engage', { a: 'rend', id: r.id, fc: r.cleared, cl: !!cleared }); } catch (e) { }
         try { saveDataLogic(); } catch (e) { }
@@ -131,15 +131,18 @@
     function closePanel() { if (ui) ui.style.display = 'none'; }
     function render(msg) {
         if (!ui || ui.style.display === 'none') return;
-        if (!st) { ui.innerHTML = '<div class="rf"><div class="rh"><b>🔮 Fenda Instável</b><button class="sm" data-x="1">✕</button></div><div class="rb">Não foi possível falar com o servidor agora.</div></div>'; return; }
-        const tabs = [['enter', 'Entrar'], ['rank', 'Placar'], ['comm', 'Comunidade']]; let b = '';
-        if (tab === 'enter') {
+        const noSrv = !st && tab !== 'forge'; if (noSrv) tab = 'forge' === tab ? tab : tab;
+        const tabs = [['enter', 'Entrar'], ['rank', 'Placar'], ['comm', 'Comunidade'], ['forge', 'Reforja']]; let b = '';
+        if (noSrv) b = '<p>Não foi possível falar com o servidor agora. Tente de novo em instantes.</p>';
+        else if (tab === 'enter') {
             const left = Math.max(0, st.rewardCap - st.rewarded);
             b = '<p style="margin:0 0 6px">Seis andares: cinco de criaturas e um guardião. Quanto maior o nível, mais forte a Fenda — e maior a pontuação. Você começa no nível 1 e libera o próximo vencendo o atual.</p>' +
                 '<div><span class="pill">Esta semana: <b>' + esc(st.mod.n) + '</b></span><span class="pill">' + esc(st.mod.d) + '</span></div>' +
                 '<div style="display:flex;align-items:center;gap:8px;margin:10px 0"><button class="sm" data-lv="-1">−</button><b style="font-size:16px">Nível ' + selLvl + '</b><button class="sm" data-lv="1">+</button><span style="opacity:.8">liberado até o nível ' + st.maxLvl + '</span></div>' +
                 '<p style="margin:4px 0;opacity:.85">Recompensas (fragmentos e moedas, pelo correio): <b>' + left + '</b> de ' + st.rewardCap + ' corridas restantes hoje. Depois disso você ainda disputa o placar, só sem prêmio — sem pressa, sem grind.</p>' +
                 '<p style="text-align:center;margin:12px 0 4px"><button class="go" data-go="1"' + (busy ? ' disabled' : '') + '>Entrar na Fenda</button></p><p style="text-align:center;margin:0;opacity:.7;font-size:12px">Se você cair, a corrida termina e vale o que já venceu.</p>';
+        } else if (tab === 'forge') {
+            b = window.Reforja ? Reforja.html() : '<p>Reforja indisponível.</p>';
         } else if (tab === 'rank') {
             b = '<p style="margin:0 0 6px;opacity:.85">Placar desta semana (reinicia em ' + fmtLeft(st.left) + '). Pódio ganha prêmios na semana seguinte.</p>';
             if (st.prev) b += '<p style="margin:0 0 8px">🏆 Você ficou em <b>#' + st.prev.pos + '</b> na semana passada. ' + (st.prev.claimed ? '(prêmio resgatado)' : '<button class="sm" data-claim="prize">Resgatar prêmio</button>') + '</p>';
@@ -154,7 +157,9 @@
         ui.innerHTML = '<div class="rf"><div class="rh"><b>🔮 Fenda Instável</b><button class="sm" data-x="1">✕</button></div><div class="rt">' + tabs.map((t) => '<button data-tab="' + t[0] + '" class="' + (tab === t[0] ? 'on' : '') + '">' + t[1] + '</button>').join('') + '</div><div class="rb">' + (msg ? '<p style="color:#ffd27a;margin:0 0 6px">' + esc(msg) + '</p>' : '') + b + '</div></div>';
     }
     async function onClick(e) {
-        if (e.target === ui) { closePanel(); return; } const t = e.target.closest('button'); if (!t) return; const d = t.dataset;
+        if (e.target === ui) { closePanel(); return; }
+        if (tab === 'forge' && window.Reforja && Reforja.click(e)) { render(); return; }
+        const t = e.target.closest('button'); if (!t) return; const d = t.dataset;
         if (d.x) closePanel(); else if (d.tab) { tab = d.tab; await refresh(); render(); } else if (d.lv) { selLvl = Math.max(1, Math.min(st ? st.maxLvl : 1, selLvl + (+d.lv))); render(); } else if (d.go) begin(selLvl);
         else if (d.claim) { try { const r = await api('/engage', { a: 'rclaim', w: d.claim }); if (r && r.ok) { st = r.state || st; render('Prêmio enviado ao seu correio!'); } else render((r && r.error) || 'Não foi possível resgatar.'); } catch (er) { render('Sem conexão.'); } }
     }
@@ -163,7 +168,7 @@
         let b;
         if (!res || !res.ok) b = '<p>A corrida terminou, mas o servidor não confirmou o resultado' + (res && res.error ? ' (' + esc(res.error) + ')' : '') + '.</p>';
         else {
-            st = res.state || st;
+            st = res.state || st; try { const pr = (player.rift && typeof player.rift === 'object') ? player.rift : (player.rift = {}); if (res.cleared) pr.clr = (pr.clr | 0) + 1; if (st && st.best > (pr.bl | 0)) pr.bl = st.best; saveDataLogic(); } catch (e) { }
             b = '<p style="font-size:15px;margin:0 0 6px">' + (cleared ? '✨ <b>Fenda selada!</b>' : '💫 Corrida encerrada.') + '</p><p style="margin:2px 0">Andares vencidos: <b>' + res.fc + '/' + FLOORS + '</b> · Nível <b>' + res.lvl + '</b> · Tempo <b>' + Math.floor(res.secs / 60) + ':' + String(res.secs % 60).padStart(2, '0') + '</b></p><p style="margin:2px 0">Pontuação: <b>' + res.score + '</b>' + (res.newBest ? ' <span class="pill">novo recorde da semana!</span>' : '') + '</p>' +
                 (res.shards || res.coins ? '<p style="margin:6px 0">🎁 Recompensa enviada ao <b>correio</b>: ' + res.coins + ' moedas e ' + res.shards + ' Fragmento(s) de Fenda.</p>' : res.capped ? '<p style="margin:6px 0;opacity:.85">Você já recebeu as recompensas das ' + st.rewardCap + ' corridas de hoje. A pontuação continua valendo no placar.</p>' : '') + (res.err ? '<p style="color:#ffd27a">' + esc(res.err) + '</p>' : '') +
                 (cleared && st && st.best >= r.lvl && r.lvl < 30 ? '<p style="margin:6px 0">🔓 Nível ' + Math.min(30, r.lvl + 1) + ' liberado.</p>' : '');

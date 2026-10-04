@@ -64,6 +64,12 @@
     ach('a_streak', 'Constante', 'Constante', 'Complete todas as diárias por 7 dias seguidos.', () => (player.daily && player.daily.best) | 0, 7, 800);
     ach('a_sell', 'Comerciante', 'Comerciante', 'Venda 5 itens no mercado.', () => P().sold | 0, 5, 300);
     ach('a_rare', 'Sortudo', 'Sortudo', 'Pesque um peixe raro.', () => P().rarefish | 0, 1, 250);
+    const rf = () => (player.rift && typeof player.rift === 'object') ? player.rift : {};
+    const topRar = () => { let m = 0; try { (player.inventory || []).concat(Object.values(player.equipment || {})).forEach((it) => { if (it && (it.rar | 0) > m) m = it.rar | 0; }); } catch (e) { } return m; };
+    ach('a_rift1', 'Selador de Fendas', 'Selador de Fendas', 'Sele uma Fenda Instável (vença os 6 andares).', () => rf().clr | 0, 1, 300);
+    ach('a_rift10', 'Domador de Fendas', 'Domador de Fendas', 'Sele 10 Fendas Instáveis.', () => rf().clr | 0, 10, 1000);
+    ach('a_riftlv', 'Abismo Adentro', 'Abismo Adentro', 'Sele uma Fenda de nível 10 ou mais.', () => rf().bl | 0, 10, 2000);
+    ach('a_epic', 'Forjador de Lendas', 'Forjador de Lendas', 'Reforje uma peça até a raridade Lendária.', topRar, 4, 800);
     ach('a_dead', 'Teimoso', 'Teimoso', 'Seja derrotado 10 vezes. Ninguém disse que era fácil.', () => P().deaths | 0, 10, 100);
 
     function checkAch() {

@@ -232,6 +232,7 @@
         if (it.type === 'pet' || it.petId) return 'pet';
         if (it.type === 'mount' || it.mountId) return 'montaria';
         if (num(it.ench) > 0) return 'encantado';
+        if (num(it.rar) > 0) return 'reforjado';
         if (it.bait) return 'isca';
         if (it.name === 'Coins') return 'moeda';
         if (it.quest || it.type === 'quest' || it.giftOnly || it.untradeable || it.bound) return 'missao';
@@ -239,7 +240,7 @@
         if (own(it, 'sell') && (it.sell === 0 || it.sell === null || it.sell === false)) return 'marcado';
         return '';
     }
-    const BLOCK_TXT = { mimico: 'Itens Mímicos são ligados à conta.', pet: 'Pets não são vendidos.', montaria: 'Montarias não são vendidas.', encantado: 'Itens encantados não são vendidos a NPCs.', isca: 'Iscas não são vendidas.', moeda: '', missao: 'Itens de missão não são vendidos.', caixa: 'Caixas não são vendidas.', marcado: 'Este item não pode ser vendido.', invalido: '' };
+    const BLOCK_TXT = { mimico: 'Itens Mímicos são ligados à conta.', pet: 'Pets não são vendidos.', montaria: 'Montarias não são vendidas.', encantado: 'Itens encantados não são vendidos a NPCs.', reforjado: 'Itens reforjados não são vendidos a NPCs.', isca: 'Iscas não são vendidas.', moeda: '', missao: 'Itens de missão não são vendidos.', caixa: 'Caixas não são vendidas.', marcado: 'Este item não pode ser vendido.', invalido: '' };
     const blockText = (why) => own(BLOCK_TXT, why) ? BLOCK_TXT[why] : '';
 
     /* monta o avaliador. db = itemDB; npcDB (lojas: shopStr 'Item,preço|...'); extra = { proc: {saída: [[mat,qtd]...]} } (fundição e poções) */
