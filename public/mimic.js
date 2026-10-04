@@ -386,14 +386,20 @@
             }
         } else if (fb === 'b_dragon') {
             for (const sg of sgs) {
-                const rx = side ? -2.2 * sx : sg * 4 * sx, ry = cy - 5, dir = (a) => [sg > 0 || side ? Math.cos(a) * (side ? -1 : 1) : -Math.cos(a), Math.sin(a)];
-                const a1 = -0.95 + f * 0.55, d1 = dir(a1), E = [rx + 10 * scl * d1[0], ry + 10 * scl * d1[1]], a2 = a1 - 0.35 - f * 0.25, d2 = dir(a2), W = [E[0] + 12 * scl * d2[0], E[1] + 12 * scl * d2[1]];
-                const tips = [-0.1, 0.5, 1.05, 1.55].map((o, i) => { const a = a2 + o + Math.sin(now * 7.2 - i * 0.7) * 0.1, d = dir(a), L = [22, 24, 21, 16][i] * scl; return [W[0] + L * d[0], W[1] + L * d[1]]; });
-                ctx.beginPath(); ctx.moveTo(rx, ry); ctx.lineTo(E[0], E[1]); ctx.lineTo(W[0], W[1]); ctx.lineTo(tips[0][0], tips[0][1]);
-                for (let i = 1; i < 4; i++) { const m = [(tips[i - 1][0] + tips[i][0]) / 2, (tips[i - 1][1] + tips[i][1]) / 2], c = [m[0] + (W[0] - m[0]) * 0.35, m[1] + (W[1] - m[1]) * 0.35]; ctx.quadraticCurveTo(c[0], c[1], tips[i][0], tips[i][1]); }
-                ctx.lineTo(rx + (side ? -1 : -sg) * 2 * sx, cy + 6); ctx.closePath();
-                const gr = ctx.createLinearGradient(rx, ry, tips[3][0], tips[3][1]); gr.addColorStop(0, 'rgb(' + dark(cA, 0.5) + ')'); gr.addColorStop(1, 'rgb(' + dark(cA, 0.85) + ')'); ctx.fillStyle = gr; ctx.fill(); ctx.strokeStyle = OUTC; ctx.lineWidth = 0.8; ctx.stroke();
-                ctx.strokeStyle = 'rgb(' + dark(cB, 0.85) + ')'; ctx.lineWidth = 1.3; ctx.beginPath(); ctx.moveTo(rx, ry); ctx.lineTo(E[0], E[1]); ctx.lineTo(W[0], W[1]); tips.forEach((t) => { ctx.moveTo(W[0], W[1]); ctx.lineTo(t[0], t[1]); }); ctx.stroke();
+                const rx = side ? -2.4 * sx : sg * 4.6 * sx, ry = cy - 4.5, ph = now * 5.2, fl = -0.28 + Math.sin(ph) * 0.34, sc = (side ? 0.8 : 0.92) * scl, dir = side ? -1 : sg;
+                const lag = (k) => Math.sin(ph - 0.7 - k * 0.35) * 0.1;   // pontas atrasam um pouco: bater de asa de verdade
+                const P = (x, y, k) => { const a = fl + (k || 0), ca = Math.cos(a), sa = Math.sin(a); return [(x * ca - y * sa) * sc, (x * sa + y * ca) * sc]; };
+                const E = P(8, -10), Wr = P(19, -23), T = [P(37, -19, lag(0)), P(35, -4, lag(1)), P(26, 8, lag(2)), P(15, 12, lag(3))], B0 = P(1, 7);
+                ctx.save(); ctx.translate(rx, ry); ctx.scale(dir, 1);
+                ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(E[0], E[1]); ctx.lineTo(Wr[0], Wr[1]); ctx.lineTo(T[0][0], T[0][1]);
+                for (let k = 1; k < 4; k++) { const a = T[k - 1], b = T[k], mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2; ctx.quadraticCurveTo(mx + (Wr[0] - mx) * 0.32, my + (Wr[1] - my) * 0.32, b[0], b[1]); }
+                ctx.quadraticCurveTo((T[3][0] + B0[0]) / 2 - 1, (T[3][1] + B0[1]) / 2 - 3, B0[0], B0[1]); ctx.closePath();
+                const gr = ctx.createLinearGradient(0, 0, T[1][0], T[1][1]); gr.addColorStop(0, 'rgb(' + dark(cA, 0.55) + ')'); gr.addColorStop(0.6, 'rgb(' + dark(cA, 0.9) + ')'); gr.addColorStop(1, 'rgba(' + cB + ',0.92)');
+                ctx.fillStyle = gr; ctx.fill(); ctx.strokeStyle = OUTC; ctx.lineWidth = 0.9; ctx.stroke();
+                ctx.strokeStyle = 'rgb(' + dark(cA, 0.35) + ')'; ctx.lineWidth = 1.5; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(E[0], E[1]); ctx.lineTo(Wr[0], Wr[1]); T.forEach((t) => { ctx.moveTo(Wr[0], Wr[1]); ctx.lineTo(t[0], t[1]); }); ctx.stroke();
+                ctx.strokeStyle = 'rgba(' + cB + ',0.75)'; ctx.lineWidth = 0.7; ctx.stroke();
+                ctx.fillStyle = 'rgb(' + dark(cB, 0.9) + ')'; ctx.beginPath(); ctx.moveTo(Wr[0] - 1.4, Wr[1] + 0.4); ctx.lineTo(Wr[0] + 1, Wr[1] - 4.2); ctx.lineTo(Wr[0] + 2, Wr[1] + 0.6); ctx.closePath(); ctx.fill(); ctx.stroke();   // garra do pulso
+                ctx.restore();
             }
         } else if (fb === 'b_cape') {
             const w1 = 6.4 * sx, wv = (k) => Math.sin(now * 2.8 + k) * 2.2, bot = cy + 17 + Math.sin(now * 3) * 1.2, bw = side ? 5 : 10.5 * sx;
@@ -417,14 +423,23 @@
         if (fh === 'h_horns') {
             for (const sg of (side ? [-1] : [-1, 1])) { const x0 = side ? -1.5 : sg * 4.4, k = side ? -1 : sg; ctx.beginPath(); ctx.moveTo(x0, top + 3); ctx.quadraticCurveTo(x0 + k * 5, top - 0.5, x0 + k * 3.4, top - 8); ctx.quadraticCurveTo(x0 + k * 1.2, top - 2.6, x0 - k * 1.6, top + 2.4); ctx.closePath(); fill(col); ctx.fillStyle = acc; ctx.beginPath(); ctx.arc(x0 + k * 3.4, top - 7.4, 0.9, 0, 6.3); ctx.fill(); }
         } else if (fh === 'h_drac') {
-            for (const sg of (side ? [-1] : [-1, 1])) {
-                if (side) { ctx.beginPath(); ctx.moveTo(0.5, top + 3.2); ctx.quadraticCurveTo(-7, top - 3, -14, top - 5.5); ctx.quadraticCurveTo(-8, top + 0.5, -4.5, top + 4.4); ctx.closePath(); fill(col); ctx.fillStyle = acc; ctx.beginPath(); ctx.arc(-13.4, top - 5.2, 0.9, 0, 6.3); ctx.fill(); break; }
-                ctx.beginPath(); ctx.moveTo(sg * 5, top + 4); ctx.quadraticCurveTo(sg * 12.5, top + 1, sg * 10.6, top - 10); ctx.quadraticCurveTo(sg * 8.6, top - 1.4, sg * 3.2, top + 2.4); ctx.closePath(); fill(col);
-                ctx.fillStyle = acc; ctx.beginPath(); ctx.arc(sg * 10.5, top - 9.2, 0.9, 0, 6.3); ctx.fill();
-                ctx.beginPath(); ctx.moveTo(sg * 6.6, hy + 0.6); ctx.lineTo(sg * 11.4, hy + 5.2); ctx.lineTo(sg * 6.2, hy + 4.4); ctx.closePath(); fill(col);   // barbatana da bochecha
+            const metal = 'rgb(' + dark(cA, 0.62) + ')', hi = 'rgb(' + dark(cA, 0.95) + ')', gold = acc || '#e8c469';
+            if (side) {
+                ctx.beginPath(); ctx.moveTo(4.6, hy - 1.2); ctx.quadraticCurveTo(5.4, top - 0.4, 0.5, top - 1.4); ctx.quadraticCurveTo(-6.4, top - 0.6, -7.2, hy + 1.6); ctx.lineTo(-5.4, hy + 2.8); ctx.quadraticCurveTo(-4.4, hy - 0.4, 0, hy - 3.2); ctx.quadraticCurveTo(3.2, hy - 3.6, 4.6, hy - 1.2); ctx.closePath(); fill(metal);
+                ctx.beginPath(); ctx.moveTo(1, top - 0.8); ctx.quadraticCurveTo(-4, top - 1, -6, hy - 3); ctx.strokeStyle = hi; ctx.lineWidth = 1; ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(-1.5, top + 1.4); ctx.quadraticCurveTo(-9, top - 1.5, -15.5, top - 8.5); ctx.quadraticCurveTo(-10, top + 0.4, -4.2, top + 4.6); ctx.closePath(); fill(hi);   // chifre varrido para trás
+                for (let i = 0; i < 3; i++) { const x = 1.5 - i * 3; ctx.beginPath(); ctx.moveTo(x + 1.3, top - 0.6 + i * 0.4); ctx.lineTo(x - 1.2, top - 5 + i * 0.9); ctx.lineTo(x - 1.6, top - 0.4 + i * 0.4); ctx.closePath(); fill(gold); }
+                ctx.beginPath(); ctx.moveTo(1.5, hy - 2.6); ctx.lineTo(5.4, hy - 1.8); ctx.lineTo(5.4, hy - 0.2); ctx.lineTo(1.5, hy - 0.8); ctx.closePath(); fill(gold);
+            } else {
+                for (const sg of [-1, 1]) {   // chifres curvos saindo das têmporas
+                    ctx.beginPath(); ctx.moveTo(sg * 5.2, top + 4.2); ctx.quadraticCurveTo(sg * 13.5, top + 3.2, sg * 12.6, top - 5.5); ctx.quadraticCurveTo(sg * 12, top - 9.5, sg * 9.6, top - 11.2); ctx.quadraticCurveTo(sg * 10.6, top - 5, sg * 8.2, top + 0.4); ctx.quadraticCurveTo(sg * 6.8, top + 1.8, sg * 3.4, top + 2.8); ctx.closePath(); fill(hi);
+                    ctx.beginPath(); ctx.moveTo(sg * 6.4, hy + 0.2); ctx.lineTo(sg * 10.6, hy + 4.4); ctx.lineTo(sg * 6.4, hy + 3.8); ctx.closePath(); if (view !== 'back') fill(metal);   // aleta da bochecha
+                }
+                ctx.beginPath(); ctx.moveTo(-7, hy - 1.6); ctx.quadraticCurveTo(-7.6, top - 1.6, 0, top - 2.2); ctx.quadraticCurveTo(7.6, top - 1.6, 7, hy - 1.6); ctx.lineTo(5.2, hy - 3.4); ctx.quadraticCurveTo(0, hy - 5.4, -5.2, hy - 3.4); ctx.closePath(); fill(metal);   // calota
+                ctx.beginPath(); ctx.moveTo(-4.6, top + 0.2); ctx.quadraticCurveTo(0, top - 2.6, 4.6, top + 0.2); ctx.strokeStyle = hi; ctx.lineWidth = 1; ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(-1.8, top - 1.4); ctx.lineTo(0, top - 8.4); ctx.lineTo(1.8, top - 1.4); ctx.closePath(); fill(gold);   // crista
+                if (view !== 'back') { ctx.beginPath(); ctx.moveTo(-6.4, hy - 2.8); ctx.lineTo(6.4, hy - 2.8); ctx.lineTo(5.6, hy - 4); ctx.lineTo(-5.6, hy - 4); ctx.closePath(); fill(gold); ctx.fillStyle = '#ffdca0'; ctx.beginPath(); ctx.arc(0, hy - 3.4, 0.9, 0, 6.3); ctx.fill(); }
             }
-            const cr = (x, h) => { ctx.beginPath(); ctx.moveTo(x - 1.6, top + 2.2); ctx.lineTo(x, top + 2.2 - h); ctx.lineTo(x + 1.6, top + 2.2); ctx.closePath(); fill(acc); };
-            if (side) { cr(-1.2, 6); cr(-4.4, 5); cr(-7.4, 4); } else cr(0, 7);
         } else if (fh === 'h_ears') {
             for (const sg of (side ? [1] : [-1, 1])) { const x0 = side ? -1.6 : sg * 4.4; ctx.beginPath(); ctx.moveTo(x0 - sg * 3, top + 3); ctx.lineTo(x0 + sg * 1.6, top - 6.4); ctx.lineTo(x0 + sg * 3.2, top + 2.8); ctx.closePath(); fill(col); ctx.fillStyle = 'rgba(' + cB + ',0.85)'; ctx.beginPath(); ctx.moveTo(x0 - sg * 0.8, top + 2.2); ctx.lineTo(x0 + sg * 1.5, top - 3.6); ctx.lineTo(x0 + sg * 2.4, top + 2); ctx.fill(); }
         } else if (fh === 'h_wing') {
