@@ -550,8 +550,22 @@
         });
         return eq;
     }
+    /* personagem grande ao lado da janela: mostra você com as peças Mímicas da aba (formas/aparências na hora) por cima do que já veste */
+    function bigPreview(w, t, eq, look) {
+        let c0, el = $('mm-big'); const host = w.parentNode; const hw = host ? host.clientWidth : 0, bw = Math.min(300, Math.floor((hw - Math.min(460, hw - 24)) / 2) - 18), narrow = bw < 150;
+        if (!el) { el = document.createElement('div'); el.id = 'mm-big'; el.innerHTML = '<canvas width="300" height="420"></canvas><div class="mm-bv"></div>'; host.appendChild(el);
+            el.addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (b) { S.ui.bigView = b.dataset.v; el._v = null; } }); }
+        el.style.display = narrow ? 'none' : 'block'; if (narrow) return; el.style.width = bw + 'px'; el.style.left = Math.max(6, Math.floor(hw / 2 - Math.min(460, hw - 24) / 2 - bw - 22)) + 'px'; c0 = el.querySelector('canvas'); c0.style.width = bw + 'px'; c0.style.height = Math.round(bw * 1.4) + 'px';
+        const bv = S.ui.bigView || 'auto'; if (el._v !== bv) { el._v = bv; el.querySelector('.mm-bv').innerHTML = [['auto', 'Girar'], ['front', 'Frente'], ['side', 'Lado'], ['back', 'Costas']].map((x) => `<button class="mm-pb${bv === x[0] ? ' on' : ''}" data-v="${x[0]}">${x[1]}</button>`).join(''); }
+        const view = bv === 'auto' ? ['front', 'side', 'back', 'side'][Math.floor(t / 2.2) % 4] : bv, c = el.querySelector('canvas'), g = c.getContext('2d'); g.clearRect(0, 0, c.width, c.height);
+        const grd = g.createRadialGradient(150, 250, 10, 150, 250, 190); grd.addColorStop(0, 'rgba(140,90,210,.35)'); grd.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = grd; g.fillRect(0, 0, c.width, c.height);
+        g.fillStyle = 'rgba(0,0,0,.35)'; g.beginPath(); g.ellipse(150, 392, 62, 11, 0, 0, 6.3); g.fill();
+        const base = (gameOn() && player.equipment) || {}, E = {}; ['head', 'body', 'weapon', 'shield'].forEach((sl) => { E[sl] = eq[sl] || base[sl] || null; });
+        try { Art.drawLook(g, 150, 392, look, view, { scale: 6.4, t, equip: E, mv: 0 }); } catch (e) { }
+    }
     function drawPreviews() {
         const w = $('mimic-win'); if (!w || !S.ui.open || !window.Art || !Art.drawLook) return; const t = performance.now() / 1000;
+        try { bigPreview(w, t, previewEquip(S.ui.tab, S.ui.pvStage), (gameOn() && player.look) || (Art.defaultLook ? Art.defaultLook() : null)); } catch (e) { }
         const eq = previewEquip(S.ui.tab, S.ui.pvStage); const look = (gameOn() && player.look) || (Art.defaultLook ? Art.defaultLook() : null);
         ['front', 'side', 'back'].forEach((v) => {
             const c = $('mm-pv-' + v); if (!c) return; const g = c.getContext('2d'); g.clearRect(0, 0, c.width, c.height);
@@ -564,6 +578,7 @@
     const CSS = `
 #mimic-win{display:none;position:absolute;z-index:131;left:50%;top:12px;transform:translateX(-50%);width:min(460px,calc(100% - 24px));max-height:calc(100% - 28px);flex-direction:column;gap:7px;padding:10px;border-radius:14px;color:var(--text,#eadfc4);background:linear-gradient(#2a1a3a,#150d20);border:3px solid #6a3fa0;box-shadow:0 0 0 2px #000,0 14px 40px rgba(0,0,0,.7),0 0 24px rgba(160,100,255,.25);font-family:var(--sans,sans-serif)}
 #mimic-win.on{display:flex}
+#mm-big{display:none;position:absolute;z-index:130;top:12px;width:300px;padding:8px;border-radius:14px;background:linear-gradient(#2a1a3a,#150d20);border:3px solid #6a3fa0;box-shadow:0 0 0 2px #000,0 14px 40px rgba(0,0,0,.7)} #mm-big canvas{display:block} #mm-big .mm-bv{display:flex;flex-wrap:wrap;gap:3px;justify-content:center;margin-top:6px} #mm-big .mm-pb{min-height:28px;padding:0 6px;border-radius:8px;border:1px solid #000;background:#33204a;color:#eadfc4;font:700 .7rem var(--sans,sans-serif);cursor:pointer} #mm-big .mm-pb.on{background:#6a3fa0;color:#fff}
 #mimic-win .mm-h{display:flex;align-items:center;gap:6px;flex-wrap:wrap} #mimic-win .mm-t{font:700 1rem var(--serif,Georgia,serif);color:#e8c469;margin-right:auto}
 #mimic-win .mm-x{width:32px;height:32px;border-radius:50%;border:1px solid #000;background:#3a2150;color:#eadfc4;font-size:1.1rem;cursor:pointer}
 #mimic-win .mm-body{display:flex;flex-direction:column;gap:7px;overflow-y:auto;overflow-anchor:none;min-height:0;padding-right:2px}
@@ -677,7 +692,7 @@ body.mimic-open #qb{display:none!important}`;
         else if (a === 'pvs') { S.ui.pvStage = n === 'auto' ? null : Number(n); render(true); }
     }
     function open(tab) { if (!ensureDOM() || !ensure()) return; if (tab && CLS[tab]) S.ui.tab = tab; S.ui.open = true; $('mimic-win').classList.add('on'); document.body.classList.add('mimic-open'); try { window.Pets && Pets.close && Pets.close(); } catch (e) { } render(true); }
-    function close() { S.ui.open = false; const w = $('mimic-win'); if (w) w.classList.remove('on'); document.body.classList.remove('mimic-open'); }
+    function close() { S.ui.open = false; const w = $('mimic-win'); if (w) w.classList.remove('on'); const bg = $('mm-big'); if (bg) bg.style.display = 'none'; document.body.classList.remove('mimic-open'); }
     function toggle() { if (S.ui.open) close(); else open(); }
     function chip() {
         if (!ensureDOM() || !ensure()) return; const c = $('mimic-chip'); if (!c) return;
