@@ -254,6 +254,56 @@
         g.beginPath(); g.moveTo(2, 22); g.lineTo(44, 4); g.lineTo(86, 22); g.strokeStyle = OUT; g.lineWidth = 1.4; g.stroke();
         rrect(g, 26, 26, 36, 8, 2, '#f4ecd0', OUT, 0.9); g.fillStyle = '#5a3a1a'; g.font = 'bold 6px Arial'; g.textAlign = 'center'; g.fillText('FEIRA', 44, 32); g.textAlign = 'start';
     };
+    B.stone_house = (g, t, o) => {
+        shadowBase(g, 4, 102, 104, 5);
+        bricks(g, 8, 48, 96, 54, '#9a9da2', 12, 7);
+        g.fillStyle = 'rgba(0,0,0,0.16)'; g.fillRect(8, 92, 96, 10);
+        win(g, 20, 62, 14, 18, { lit: true, arch: true }); win(g, 78, 62, 14, 18, { lit: true, arch: true, shut: '#3f5f8a' });
+        door(g, 46, 66, 20, 36, '#6a4326');
+        bricks(g, 80, 6, 14, 36, '#8a8d92', 7, 5); rrect(g, 78, 4, 18, 5, 1, '#5a5d62', OUT, 1); smoke(g, 87, 4, t, hash(o.id || 5));
+        tilesRoof(g, (g) => { g.moveTo(-2, 54); g.lineTo(56, 12); g.lineTo(114, 54); g.lineTo(104, 54); g.lineTo(56, 22); g.lineTo(8, 54); g.closePath(); g.moveTo(-2, 54); g.lineTo(56, 10); g.lineTo(114, 54); g.quadraticCurveTo(56, 46, -2, 54); g.closePath(); }, [-2, 10, 116, 46], '#4e5a70', 5, 8);
+        glow(g, 56, 84, 50, '#ffb84a', 0.1);
+    };
+    B.longhouse = (g, t, o) => {
+        shadowBase(g, 4, 96, 144, 5);
+        g.save(); g.beginPath(); g.rect(10, 44, 132, 52); g.clip(); g.fillStyle = lg(g, 10, 44, 10, 96, [[0, '#b58a54'], [1, '#6a4a2a']]); g.fillRect(10, 44, 132, 52);
+        for (let i = 0; i < 17; i++) { g.strokeStyle = 'rgba(40,22,8,0.5)'; g.lineWidth = 1; g.beginPath(); g.moveTo(10 + i * 8, 44); g.lineTo(10 + i * 8, 96); g.stroke(); g.fillStyle = 'rgba(255,230,180,0.08)'; g.fillRect(11 + i * 8, 44, 2, 52); } g.restore();
+        g.strokeStyle = OUT; g.lineWidth = 1.2; g.strokeRect(10, 44, 132, 52); beam(g, 8, 92, 136, 5);
+        win(g, 24, 58, 14, 16, { lit: true, shut: '#7a3a1e' }); win(g, 100, 58, 14, 16, { lit: true, shut: '#7a3a1e' });
+        door(g, 62, 56, 26, 40, '#5a3a1e', { double: true });
+        [[62, 54], [88, 54]].forEach(([x, y]) => { rrect(g, x - 2, y - 2, 4, 8, 1, '#c8a050', OUT, 0.6); });
+        thatch(g, (g) => { g.moveTo(-4, 50); g.lineTo(76, 10); g.lineTo(156, 50); g.quadraticCurveTo(76, 40, -4, 50); g.closePath(); }, [-4, 10, 160, 42], '#c9a24c');
+        g.strokeStyle = '#4a2f18'; g.lineWidth = 3; g.lineCap = 'round'; g.beginPath(); g.moveTo(-2, 49); g.lineTo(-8, 38); g.moveTo(154, 49); g.lineTo(160, 38); g.moveTo(76, 11); g.lineTo(70, 2); g.moveTo(76, 11); g.lineTo(82, 2); g.stroke();
+        smoke(g, 76, 8, t, hash(o.id || 7)); glow(g, 76, 80, 60, '#ffb84a', 0.1);
+    };
+    B.manor = (g, t, o) => {
+        shadowBase(g, 4, 150, 176, 6);
+        // alas
+        [[6, 84, 66], [112, 84, 66]].forEach(([x, y, w]) => { bricks(g, x, y + 36, w, 28, '#8d8f94', 12, 6); plaster(g, x, y, w, 38, '#f0e4c8'); beam(g, x - 2, y - 1, w + 4, 4); beam(g, x - 2, y + 35, w + 4, 4); win(g, x + 12, y + 8, 14, 20, { lit: true, shut: '#3f5f4a' }); win(g, x + w - 26, y + 8, 14, 20, { lit: true, shut: '#3f5f4a' }); });
+        tilesRoof(g, (g) => { g.moveTo(0, 86); g.lineTo(38, 52); g.lineTo(78, 86); g.closePath(); }, [0, 52, 78, 34], '#6a4a3a', 5, 8);
+        tilesRoof(g, (g) => { g.moveTo(106, 86); g.lineTo(146, 52); g.lineTo(184, 86); g.closePath(); }, [106, 52, 78, 34], '#6a4a3a', 5, 8);
+        // corpo central com torre
+        bricks(g, 66, 100, 52, 50, '#9a9da2', 12, 6); plaster(g, 66, 54, 52, 48, '#f4e8cc'); beam(g, 64, 52, 56, 4); beam(g, 64, 98, 56, 4);
+        win(g, 74, 62, 12, 18, { lit: true, arch: true }); win(g, 98, 62, 12, 18, { lit: true, arch: true });
+        // colunas e porta
+        [72, 106].forEach(x => { rrect(g, x, 104, 6, 46, 2, lg(g, x, 0, x + 6, 0, [[0, '#f2eee4'], [1, '#aaa59a']]), OUT, 1); });
+        door(g, 80, 108, 24, 42, '#5a3a22', { double: true });
+        tilesRoof(g, (g) => { g.moveTo(58, 56); g.lineTo(92, 6); g.lineTo(126, 56); g.closePath(); }, [58, 6, 68, 50], '#4e3a5a', 6, 9);
+        win(g, 86, 26, 12, 14, { lit: true, arch: true });
+        bricks(g, 140, 30, 14, 30, '#9a6a52', 7, 5); rrect(g, 138, 28, 18, 5, 1, '#6a4a3a', OUT, 1); smoke(g, 147, 28, t, hash(o.id || 9));
+        flag(g, 92, 8, 16, 8, '#c0392b', t, 2); glow(g, 92, 120, 80, '#ffb84a', 0.1);
+    };
+    B.cabin = (g, t, o) => {
+        shadowBase(g, 4, 80, 80, 4);
+        g.save(); g.beginPath(); g.rect(10, 38, 68, 42); g.clip();
+        for (let i = 0; i < 7; i++) { const y = 38 + i * 6.2; g.fillStyle = lg(g, 0, y, 0, y + 6.2, [[0, '#a8743a'], [1, '#6a4524']]); g.fillRect(10, y, 68, 6.2); g.strokeStyle = 'rgba(30,16,6,0.6)'; g.lineWidth = 1; g.strokeRect(10, y, 68, 6.2); ell(g, 10, y + 3, 3.4, 3.1, '#8a5a2c', OUT, 0.6); ell(g, 78, y + 3, 3.4, 3.1, '#8a5a2c', OUT, 0.6); }
+        g.restore();
+        win(g, 54, 50, 14, 14, { lit: true, shut: '#3f7f5a', box: true }); door(g, 22, 50, 18, 30, '#5a3a1e');
+        // varanda
+        rrect(g, 4, 74, 40, 6, 1, '#7a5430', OUT, 1); [8, 40].forEach(x => rrect(g, x, 50, 4, 28, 1, '#6a4326', OUT, 0.8));
+        tilesRoof(g, (g) => { g.moveTo(-2, 42); g.lineTo(44, 8); g.lineTo(90, 42); g.lineTo(84, 42); g.lineTo(44, 16); g.lineTo(4, 42); g.closePath(); g.moveTo(-2, 42); g.lineTo(44, 7); g.lineTo(90, 42); g.quadraticCurveTo(44, 36, -2, 42); g.closePath(); }, [-2, 7, 92, 36], '#7a5a3a', 4, 10);
+        bricks(g, 62, 10, 11, 26, '#8a6a52', 6, 5); rrect(g, 60, 8, 15, 4, 1, '#5a4a3a', OUT, 1); smoke(g, 67, 8, t, hash(o.id || 11));
+    };
     B.tent = (g, t, o) => {
         shadowBase(g, 6, 65, 72, 3);
         g.beginPath(); g.moveTo(4, 64); g.lineTo(42, 4); g.lineTo(80, 64); g.closePath(); paint(g, lg(g, 4, 0, 80, 0, [[0, '#c9b487'], [0.5, '#e8d8ac'], [1, '#a8946a']]), OUT, 1.6);

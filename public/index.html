@@ -1215,7 +1215,7 @@
             if (val.startsWith('b_') && C.BUILDINGS && C.BUILDINGS[val.substring(2)]) { w = Math.round(C.BUILDINGS[val.substring(2)].w * SCALE_BUILD); h = Math.round(C.BUILDINGS[val.substring(2)].h * SCALE_BUILD); }
             else if (val.startsWith('d_') && C.DECOR && C.DECOR[val.substring(2)]) { w = Math.round(C.DECOR[val.substring(2)].w * SCALE_DECOR); h = Math.round(C.DECOR[val.substring(2)].h * SCALE_DECOR); }
             else if (val.startsWith('e_') && npcDB[val.substring(2)]) { const n = npcDB[val.substring(2)]; w = n.w || 30; h = n.h || 30; }
-            else if (val === 'tree') { w = TREE_W; h = TREE_H; } else if (val === 'house') { w = Math.round(104 * SCALE_BUILD); h = Math.round(96 * SCALE_BUILD); } else if (val.startsWith('rock_')) { w = 38; h = 38; } else if (val === 'farm_plot') { w = 56; h = 46; } else if (val === 'cauldron') { w = 44; h = 44; } else if (val === 'enchant_table') { w = 54; h = 46; }
+            else if (val === 'tree' || val.startsWith('tree_')) { w = TREE_W; h = TREE_H; } else if (val === 'house') { w = Math.round(104 * SCALE_BUILD); h = Math.round(96 * SCALE_BUILD); } else if (val.startsWith('rock_')) { w = 38; h = 38; } else if (val === 'farm_plot') { w = 56; h = 46; } else if (val === 'cauldron') { w = 44; h = 44; } else if (val === 'enchant_table') { w = 54; h = 46; }
             else if (val === 'furnace') { w = 48; h = 72; } else if (val === 'anvil') { w = 46; h = 39; } else if (val === 'bank') { w = 80; h = 48; } else if (val === 'fishing_spot') { w = 46; h = 46; }
             else if (val.startsWith('paint_')) { w = 40; h = 40; } else if (val === 'portal') { w = 60; h = 60; }
             return w ? { w, h } : null;
@@ -1226,7 +1226,7 @@
         function buildDevEntityList() { 
             let cont = document.getElementById('dev-entity-list'); if(!cont) return; let html = ''; 
             let list = [ 
-                { cat: '🌲 Ambiente', items: [ { v: 'tree', n: 'Árvore', ic: '🌲' }, { v: 'fishing_spot', n: 'Lagos', ic: '🐟' }, { v: 'rock_copper', n: 'Minério (Copper)', ic: '🪨' }, { v: 'rock_coal', n: 'Carvão', ic: '⚫' }, { v: 'rock_mithril', n: 'Mithril', ic: '🔷' }, { v: 'farm_plot', n: 'Canteiro', ic: '🌱' }, { v: 'cauldron', n: 'Caldeirão', ic: '🧪' }, { v: 'enchant_table', n: 'Mesa de Encantamento', ic: '✨' }, { v: 'rock_tin', n: 'Minério (Tin)', ic: '🪨' }, { v: 'rock_iron', n: 'Minério (Iron)', ic: '🪨' } ]}, 
+                { cat: '🌲 Ambiente', items: [ { v: 'tree', n: 'Árvore (sorteia pelo mapa)', ic: '🌲' }, { v: 'tree_normal', n: 'Árvore comum (nv 1)', ic: '🌳' }, { v: 'tree_oak', n: 'Carvalho (nv 15)', ic: '🌳' }, { v: 'tree_willow', n: 'Salgueiro (nv 30)', ic: '🌿' }, { v: 'tree_maple', n: 'Bordo (nv 45)', ic: '🍁' }, { v: 'tree_yew', n: 'Teixo (nv 60)', ic: '🌲' }, { v: 'tree_magic', n: 'Árvore Mágica (nv 75)', ic: '🔮' }, { v: 'tree_palm', n: 'Palmeira (nv 1)', ic: '🌴' }, { v: 'tree_dead', n: 'Árvore seca (nv 1)', ic: '🪵' }, { v: 'tree_cherry', n: 'Cerejeira (nv 15)', ic: '🌸' }, { v: 'fishing_spot', n: 'Lagos', ic: '🐟' }, { v: 'rock_copper', n: 'Minério (Copper)', ic: '🪨' }, { v: 'rock_coal', n: 'Carvão', ic: '⚫' }, { v: 'rock_mithril', n: 'Mithril', ic: '🔷' }, { v: 'farm_plot', n: 'Canteiro', ic: '🌱' }, { v: 'cauldron', n: 'Caldeirão', ic: '🧪' }, { v: 'enchant_table', n: 'Mesa de Encantamento', ic: '✨' }, { v: 'rock_tin', n: 'Minério (Tin)', ic: '🪨' }, { v: 'rock_iron', n: 'Minério (Iron)', ic: '🪨' } ]}, 
                 { cat: '🏠 Estações', items: [ { v: 'furnace', n: 'Fornalha', ic: '♨️' }, { v: 'anvil', n: 'Bigorna', ic: '🔨' }, { v: 'bank', n: 'Bank', ic: '🏦' }, { v: 'house_door', n: 'Porta de Casa (dono)', ic: '🚪' }, { v: 'portal', n: 'Portal', ic: '🚪' }, { v: 'house', n: 'Casa (Sapê)', ic: '🏠' } ]}, 
                 { cat: '🏰 Construções Medievais', items: Object.keys((window.CATALOG && CATALOG.BUILDINGS) || {}).map(k => ({ v: 'b_'+k, n: CATALOG.BUILDINGS[k].name, ic: '🏰' })) }, 
                 { cat: '🪑 Decoração', items: Object.keys((window.CATALOG && CATALOG.DECOR) || {}).map(k => ({ v: 'd_'+k, n: CATALOG.DECOR[k].name, ic: '🪑' })) }, 
@@ -1551,7 +1551,7 @@
                         if(!curM.entities) curM.entities = []; curM.entities.push(n); saveDataLogic(false, true);
                         if (window.World2) World2.editDoor(n); else closeModal();
                         return; }
-                    else if (val === 'tree') { n.type = 'tree'; n.name = 'Tree'; n.hp = 3; n.maxHp = 3; n.h = cH||50; }
+                    else if (val === 'tree' || val.startsWith('tree_')) { n.type = 'tree'; n.name = 'Tree'; n.hp = 3; n.maxHp = 3; n.h = cH||50; if (val !== 'tree') n.tk = val.slice(5); }
                     else if (val === 'fishing_spot') { n.type = 'fishing_spot'; n.name = 'Ponto de Pesca'; }
                     else if (val === 'house') { n.type = 'house'; n.name = 'House'; n.w=cW||100; n.h=cH||100; }
                     else if (val.startsWith('paint_')) { n.type = 'paint'; n.name = 'Chão'; n.color = val==='paint_dirt'?'#5c4033':val==='paint_stone'?'#7f8c8d':val==='paint_grass'?'#27ae60':'#3498db'; n.w=cW||40; n.h=cH||40; }

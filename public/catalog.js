@@ -110,6 +110,10 @@
         windmill: { name: 'Moinho', w: 110, h: 158, foot: [0.16, 0.68, 0.84, 1], desc: 'Moinho de vento com pás giratórias.' },
         barn:     { name: 'Celeiro', w: 148, h: 116, foot: [0.03, 0.58, 0.97, 1], desc: 'Celeiro vermelho com portas grandes e feno no sótão.' },
         market:   { name: 'Barraca de Feira', w: 88, h: 70,  foot: [0.08, 0.62, 0.92, 1], desc: 'Barraca com toldo listrado e mercadorias.' },
+        stone_house: { name: 'Casa de Pedra', w: 112, h: 104, foot: [0.05, 0.58, 0.95, 1], desc: 'Casa robusta de pedra com telhado de ardósia, porta em arco e chaminé.' },
+        longhouse: { name: 'Casa Comprida', w: 152, h: 98, foot: [0.03, 0.56, 0.97, 1], desc: 'Casa nórdica de tábuas, telhado de palha comprido e empenas entalhadas.' },
+        manor:    { name: 'Mansão', w: 184, h: 152, foot: [0.03, 0.62, 0.97, 1], desc: 'Residência nobre com duas alas, torre central, colunas e janelas iluminadas.' },
+        cabin:    { name: 'Cabana de Toras', w: 88, h: 82, foot: [0.06, 0.58, 0.94, 1], desc: 'Cabana de toras com varanda e telhado de tábuas, ideal para a floresta.' },
         tent:     { name: 'Tenda de Acampamento', w: 84, h: 66, foot: [0.1, 0.6, 0.9, 1], desc: 'Tenda de lona para acampamentos e goblins.' }
     };
 
