@@ -25,7 +25,9 @@
     const fnum = (v) => String(Math.round(v * 10) / 10).replace('.', ',');
     const say = (t, c) => { try { setActionText(t, c || '#9ad3ff'); } catch (e) { } };
     const sr = (v) => { const f = Math.floor(v); return f + (rnd() < v - f ? 1 : 0); };
-    const at = (arr, r) => arr[Math.max(0, Math.min(arr.length, r) - 1)];
+    // Prestígio da habilidade: dobra os efeitos de poder e reduz a mana (S.prcur = 1 enquanto uma habilidade com Prestígio é lançada/atua)
+    const ARRK = new Map(), PRS = { mult: 2, dmgp: 2, drp: 2, asp: 2, ls: 2, pct: 2, dur: 1.5, st: 1.5, slow: 1.5, n: 1.5, rad: 1.25, len: 1.25, inv: 1.5, spd: 1.5, mp: 0.6, cd: 0.85 };
+    const at = (arr, r) => { const v = arr[Math.max(0, Math.min(arr.length, r) - 1)]; if (S.prcur) { const k = ARRK.get(arr), f = k && PRS[k]; if (f) return k === 'n' ? Math.ceil(v * f) : v * f; } return v; };
     const gameOn = () => typeof player !== 'undefined' && player && player.stats && player.equipment && player.stats.skills && typeof currentUser !== 'undefined' && currentUser && $('game-wrapper') && $('game-wrapper').style.display !== 'none';
     const lv = (k) => { const s = player.stats.skills[k]; return s ? Math.max(1, Math.floor(s.level) || 1) : 1; };
     const ex = (o) => o.x + (o.w || 30) / 2, ey = (o) => o.y + (o.h || 30) / 2, er = (o) => Math.max(10, Math.min(o.w || 30, o.h || 30) * 0.5);
@@ -249,8 +251,8 @@
     }
 
     /* ---------- zonas com efeito repetido (chuva de flechas, tempestade...) ---------- */
-    function zone(o) { if (S.zn.length >= 6) S.zn.shift(); o.next = S.frame + (o.first || 0); S.zn.push(o); return o; }
-    function stepZones() { for (let i = S.zn.length - 1; i >= 0; i--) { const z = S.zn[i]; if (S.frame >= z.next) { z.next += z.every; z.fn(z); if (--z.left <= 0) S.zn.splice(i, 1); } } }
+    function zone(o) { o.pr = S.prcur; if (S.zn.length >= 6) S.zn.shift(); o.next = S.frame + (o.first || 0); S.zn.push(o); return o; }
+    function stepZones() { for (let i = S.zn.length - 1; i >= 0; i--) { const z = S.zn[i]; if (S.frame >= z.next) { z.next += z.every; const _p = S.prcur; S.prcur = z.pr; try { z.fn(z); } finally { S.prcur = _p; } if (--z.left <= 0) S.zn.splice(i, 1); } } }
 
     /* ---------- investida / esquiva ---------- */
     const SKIPC = { ground_item: 1, fishing_spot: 1, farm_plot: 1, portal: 1, fire: 1, paint: 1, enemy: 1, npc: 1 };
@@ -283,7 +285,7 @@
         return true;
     }
     const ACT = {};
-    const def = (id, o) => { ACT[id] = Object.assign({ id, ic: NODES[id].ic, cost: null }, o); };
+    const def = (id, o) => { ACT[id] = Object.assign({ id, ic: NODES[id].ic, cost: null }, o); for (const k of Object.keys(PRS)) if (Array.isArray(ACT[id][k])) ARRK.set(ACT[id][k], k); };
     const dirToward = (o) => { const dx = ex(o) - player.x, dy = ey(o) - (player.y - 8), d = Math.hypot(dx, dy) || 1; return [dx / d, dy / d]; };
     const facingVec = () => { const fx = player.facing || { x: 0, y: 1 }; const d = Math.hypot(fx.x, fx.y) || 1; return [fx.x / d, fx.y / d]; };
 
@@ -439,21 +441,24 @@
 
     /* ============================ LANÇAR ============================ */
     /* ---- Aljava Mágica / Fonte Arcana / Vigor Inabalável: custos e ganchos ---- */
+    const prOn = (id) => !!(player && player.skillTree && SN.prOn(player.skillTree, id));
     const capOn = (id) => { const st = player && player.skillTree; return !!(st && st.tg && st.tg[id] === true && rankOf(id) > 0); };
     function weaponTier(w) {   // 1..5 pelo nível mínimo e pelo dano do arco/cajado (arco de bronze = 1 ... arco de mithril/dragão = 5)
         const rq = window.Stats && Stats.reqOf ? Stats.reqOf(w) : null, L = rq ? rq.lvl : 1, d = (w && w.bonusDmg) || 0;
         const a = L >= 40 ? 5 : L >= 30 ? 4 : L >= 20 ? 3 : L >= 10 ? 2 : 1, b = d >= 14 ? 5 : d >= 10 ? 4 : d >= 7 ? 3 : d >= 4 ? 2 : 1; return Math.max(a, b);
     }
-    const shotMp = (w) => Math.min(6, 1 + weaponTier(w));                  // mana por disparo da Aljava Mágica: 2 a 6 conforme o arco
-    const quiverBonus = (w) => Math.min(11, 1 + 2 * (weaponTier(w) - 1)); // dano das "flechas de mana" (equivale a uma boa flecha do mesmo nível)
-    const spellMp = (sp) => Math.max(4, Math.round(3 + 1.5 * Object.keys(sp.req || {}).length + (sp.lvl || 1) / 5));   // mana por magia básica da Fonte Arcana
-    const VIGOR_MP = 3, VIGOR_HEAL = 1.5;
-    function costOf(a, r, live) {   // live = checagem na hora de lançar (cai para flechas se a mana não der); sem live = custo "de vitrine" (barra e dicas)
+    const shotMp = (w) => { const v = Math.min(6, 1 + weaponTier(w)); return prOn('a_aljava_cap') ? Math.max(1, Math.round(v * 0.5)) : v; };                  // mana por disparo da Aljava Mágica: 2 a 6 conforme o arco
+    const quiverBonus = (w) => { const v = Math.min(11, 1 + 2 * (weaponTier(w) - 1)); return prOn('a_aljava_cap') ? v * 2 : v; }; // dano das "flechas de mana" (equivale a uma boa flecha do mesmo nível)
+    const spellMp = (sp) => { const v = Math.max(4, Math.round(3 + 1.5 * Object.keys(sp.req || {}).length + (sp.lvl || 1) / 5)); return prOn('m_fonte_cap') ? Math.max(2, Math.round(v * 0.6)) : v; };   // mana por magia básica da Fonte Arcana
+    const VIGOR_BASE_MP = 3, VIGOR_BASE_HEAL = 1.5;
+    const vigorMp = () => (prOn('w_vigor_cap') ? 1.5 : VIGOR_BASE_MP), vigorHeal = () => (prOn('w_vigor_cap') ? VIGOR_BASE_HEAL * 2 : VIGOR_BASE_HEAL);
+    function costOf(a, r, live) { const _p = S.prcur; S.prcur = prOn(a.id) ? 1 : 0; try { return costOf0(a, r, live); } finally { S.prcur = _p; } }
+    function costOf0(a, r, live) {   // live = checagem na hora de lançar (cai para flechas se a mana não der); sem live = custo "de vitrine" (barra e dicas)
         const c = a.cost || {}, o = {}; if (a.mp) o.mp = at(a.mp, r); if (c.ammo) o.ammo = c.ammo;
         if (c.ammo && capOn('a_aljava_cap') && wpn() && wpn().tool === 'ranged') { const mp = (o.mp || 0) + c.ammo * shotMp(wpn()); if (!live || player.stats.mp >= mp) { o.mp = mp; o.ammo = 0; o.q = 1; } }
         return o;
     }
-    const cdOf = (a, r) => cdTime(at(a.cd, r));
+    const cdOf = (a, r) => { S.prcur = prOn(a.id) ? 1 : 0; try { return cdTime(at(a.cd, r)); } finally { S.prcur = 0; } };
     function reason(a, r) {   // '' = pode usar agora
         if (!gameOn()) return 'Entre no jogo.'; if (player.stats.hp <= 0) return 'Você está caído.';
         if (cdMs(a.id) > 0) return 'Em recarga (' + Math.ceil(cdMs(a.id) / 1000) + ' s).';
@@ -466,10 +471,13 @@
     function say1(t, c) { const n = performance.now(); if (n - S.lastMsg < 700) return; S.lastMsg = n; say(t, c || '#e67e22'); sfx('error'); }
     function castId(id) {
         const a = ACT[id], r = rankOf(id); if (!a || r < 1) return false;
-        const why = reason(a, r); if (why) { say1(why); return false; }
-        const out = a.run(r); if (out !== true) { say1(out); return false; }
-        const c = costOf(a, r, true); if (c.mp) mana(-c.mp); if (c.ammo) spendAmmo(c.ammo);
-        setCd(id, at(a.cd, r)); player.actionAnim = 15; try { player.attackCooldown = Math.max(player.attackCooldown || 0, 12); } catch (e) { } S.barSig = ''; return true;
+        S.prcur = prOn(id) ? 1 : 0;
+        try {
+            const why = reason(a, r); if (why) { say1(why); return false; }
+            const out = a.run(r); if (out !== true) { say1(out); return false; }
+            const c = costOf(a, r, true); if (c.mp) mana(-Math.max(1, Math.round(c.mp))); if (c.ammo) spendAmmo(c.ammo);
+            setCd(id, at(a.cd, r)); player.actionAnim = 15; try { player.attackCooldown = Math.max(player.attackCooldown || 0, 12); } catch (e) { } S.barSig = ''; if (S.prcur) { try { ring(player.x, player.y + 4, 8, 46, '#ffd24a', 16, 3); burst(player.x, player.y - 16, '#ffe27a', 8, 1.4); } catch (e) { } } return true;
+        } finally { S.prcur = 0; }
     }
     function cast(slot) {
         if (!ensure() || !canCastKeys()) return false; const id = player.skillTree.bar[slot];
@@ -535,7 +543,7 @@
             noteOnce('fa', 'Sem mana: usando as runas.'); return undefined;
         }
         if ((!w || (w.tool !== 'ranged' && w.tool !== 'magic')) && capOn('w_vigor_cap')) {   // Vigor Inabalável
-            if (st.mp >= VIGOR_MP) return () => { if (player.attackCooldown > 0 && player.stats.mp >= VIGOR_MP) { mana(-VIGOR_MP); heal(Math.max(1, Math.round(st.maxHp * VIGOR_HEAL / 100)), '#ff8a7a'); } };
+            if (st.mp >= vigorMp()) return () => { if (player.attackCooldown > 0 && player.stats.mp >= vigorMp()) { mana(-vigorMp()); heal(Math.max(1, Math.round(st.maxHp * vigorHeal() / 100)), '#ff8a7a'); } };
             noteOnce('vi', 'Sem mana: o Vigor Inabalável descansa.'); return undefined;
         }
         return undefined;
@@ -544,7 +552,7 @@
         const out = [], on = capOn(n.id);
         if (n.id === 'a_aljava_cap') { const w = wpn(), tw = w && w.tool === 'ranged' ? w : null; out.push('Ligado: seus disparos de arco (comuns e das habilidades) não gastam flechas.'); out.push('Custo: ' + (tw ? shotMp(tw) + ' de mana por disparo (seu arco atual)' : '2 a 6 de mana por disparo (conforme o arco: arcos melhores custam mais)') + '.'); out.push('Sem mana, volta a usar flechas; sem nenhuma das duas, avisa "Sem mana".'); }
         else if (n.id === 'm_fonte_cap') { out.push('Ligado: suas magias básicas não gastam runas.'); out.push('Custo: um pouco mais de mana por magia (6 a 12, conforme a magia).'); out.push('Sem mana, volta a usar runas; sem nenhuma das duas, avisa "Sem mana".'); }
-        else { out.push('Ligado: cada golpe corpo a corpo cura ' + String(VIGOR_HEAL).replace('.', ',') + '% da sua vida máxima.'); out.push('Custo: ' + VIGOR_MP + ' de mana por golpe. Sem mana, o vigor descansa e você luta normalmente.'); }
+        else { out.push('Ligado: cada golpe corpo a corpo cura ' + String(vigorHeal()).replace('.', ',') + '% da sua vida máxima.'); out.push('Custo: ' + vigorMp() + ' de mana por golpe. Sem mana, o vigor descansa e você luta normalmente.'); }
         out.push('Alternável: tecla X, botão na barra de habilidades ou aqui no painel.'); out.push('Estado: ' + (rankOf(n.id) > 0 ? (on ? 'LIGADO' : 'desligado') : 'ainda não aprendido')); return out;
     }
 
@@ -620,6 +628,7 @@
         let h = '<div class="sk-ih"><img class="sk-big" src="' + Icons.skillUrl(n.ic) + '" alt=""><div><b class="sk-nm">' + esc(n.name) + '</b><div class="sk-tg ' + n.kind + '">' + tag + ' · ' + esc(TREES[n.tree].branches[n.branch]) + '</div></div></div>';
         h += '<div class="sk-rk" title="Rank">' + Array.from({ length: n.max }, (_, i) => '<i class="' + (i < rank ? 'on' : '') + '"></i>').join('') + '<span>Rank ' + rank + '/' + n.max + '</span></div>';
         if (n.d) h += '<p class="sk-d">' + esc(n.d) + '</p>';
+        if (rank >= n.max) h += '<div class="sk-ef"><span class="a" style="color:#ffd24a">✦ Prestígio' + (SN.prOn(st, n.id) ? ' ativo' : '') + ':</span> ' + (n.kind === 'p' ? 'todos os bônus desta passiva em dobro.' : n.kind === 'a' ? 'dano, cura, escudo e bônus em dobro; duração e área maiores; −40% de mana e −15% de recarga.' : 'custo de mana pela metade e efeito ampliado.') + '</div>';
         if (n.kind === 'p') {
             effLines(n, rank, true).forEach((l) => { h += '<div class="sk-ef">' + (l.cur ? '<span class="a">Agora:</span> ' + esc(l.cur) : '<span class="m">Rank 1:</span> ' + esc(SN.EFF_LABEL[l.k](fnum(n.eff[l.k])))) + '</div>'; if (l.cur && l.nxt) h += '<div class="sk-ef nx"><span>Próximo:</span> ' + esc(l.nxt) + '</div>'; });
         } else if (n.kind === 'c') {
@@ -697,7 +706,7 @@
             const n = NODES[id], p = nodeXY(n), st = nodeState(n), r = rankOf(id), isA = n.kind === 'a', isC = n.kind === 'c', sel = S.ui.sel === id;
             const shape = isC ? '<circle class="rg" r="36"/><circle class="rg2" r="31"/><circle class="core" r="27" fill="url(#skg-' + (st === 'on' || st === 'max' ? tree : st === 'avail' || st === 'soft' ? 'av' : 'off') + ')"/>' : isA ? '<polygon class="rg" points="0,-31 27,-15.5 27,15.5 0,31 -27,15.5 -27,-15.5"/><polygon class="core" points="0,-26 22.5,-13 22.5,13 0,26 -22.5,13 -22.5,-13" fill="url(#skg-' + (st === 'on' || st === 'max' ? tree : st === 'avail' || st === 'soft' ? 'av' : 'off') + ')"/>' : '<circle class="rg" r="27"/><circle class="core" r="22.5" fill="url(#skg-' + (st === 'on' || st === 'max' ? tree : st === 'avail' || st === 'soft' ? 'av' : 'off') + ')"/>';
             h += '<g class="sk-n st-' + st + (isA ? ' act' : '') + (isC ? ' cap' + (capOn(id) ? ' tgon' : '') : '') + (sel ? ' sel' : '') + '" data-id="' + id + '" transform="translate(' + p[0] + ',' + p[1] + ')" style="--c:' + T.color + ';--c2:' + T.color2 + '">' + shape + '<image href="' + Icons.skillUrl(n.ic) + '" x="' + (isC ? -21 : -17) + '" y="' + (isC ? -21 : -17) + '" width="' + (isC ? 42 : 34) + '" height="' + (isC ? 42 : 34) + '"/>' +
-                '<g class="bd" transform="translate(19,19)"><circle r="9.5"/><text y="3.6" text-anchor="middle">' + r + '/' + n.max + '</text></g>' + (st === 'max' ? '<text class="mx" y="-34" text-anchor="middle">★</text>' : '') + '<text class="nm" y="' + (isC ? 52 : isA ? 47 : 43) + '" text-anchor="middle">' + esc(n.name) + '</text></g>';
+                '<g class="bd" transform="translate(19,19)"><circle r="9.5"/><text y="3.6" text-anchor="middle">' + r + '/' + n.max + '</text></g>' + (st === 'max' ? '<text class="mx" y="-34" text-anchor="middle" style="' + (prOn(id) ? 'fill:#ffd24a;font-size:19px' : '') + '">' + (prOn(id) ? '✦' : '★') + '</text>' : '') + '<text class="nm" y="' + (isC ? 52 : isA ? 47 : 43) + '" text-anchor="middle">' + esc(n.name) + '</text></g>';
         });
         world.innerHTML = h; if (!keepView) fitView(); else applyView();
     }
@@ -722,7 +731,7 @@
         const s = $('sk-side'); if (!s) return; const id = S.ui.sel; if (!id || !NODES[id] || NODES[id].tree !== S.ui.tab) { const T = TREES[S.ui.tab]; s.innerHTML = '<div class="sk-ih"><img class="sk-big" src="' + Icons.skillUrl(S.ui.tab === 'warrior' ? 'sword' : S.ui.tab === 'archer' ? 'bow' : 'wand') + '" alt=""><div><b class="sk-nm">' + esc(T.name) + '</b><div class="sk-tg">' + esc(T.blurb) + '</div></div></div><p class="sk-d">Toque num nó para ver os detalhes e gastar pontos. <b>Hexágonos</b> são habilidades <b>ativas</b> (vão para a barra); <b>círculos</b> são <b>passivas</b>; o <b>grande círculo dourado</b> no fim da árvore é o <b>poder final</b>, que você liga e desliga.</p><p class="sk-d">Os pontos desta árvore vêm do nível de <b>' + esc(T.skillName) + '</b>: 1 ponto a cada 2 níveis.</p>' + (player.cls === S.ui.tab || (!player.cls && S.ui.tab === 'warrior') ? '<p class="sk-d rec">★ Árvore recomendada para a sua classe.</p>' : ''); return; }
         const n = NODES[id], r = rankOf(id), pt = points(n.tree), why = SN.canLearn(player.skillTree.pts[n.tree], id, pt.free);
         let h = nodeHtml(n, false); h += '<div class="sk-act">';
-        if (r >= n.max) h += '<button type="button" class="sk-b go" disabled>Rank máximo</button>';
+        if (r >= n.max) h += SN.prOn(player.skillTree, id) ? '<button type="button" class="sk-b go" disabled style="color:#ffd24a">✦ Prestígio ativo</button>' : '<button type="button" class="sk-b go" data-a="prest" style="color:#ffd24a;border-color:#ffd24a">✦ Prestigiar (dobra os efeitos)</button>';
         else h += '<button type="button" class="sk-b go" data-a="learn" ' + (why ? 'disabled' : '') + '>' + (r ? 'Melhorar para o rank ' + (r + 1) : 'Aprender') + ' <small>(' + n.cost + (n.cost > 1 ? ' pontos' : ' ponto') + ')</small></button>' + (why ? '<div class="sk-why">' + esc(why) + '</div>' : '');
         if (n.kind === 'c' && r > 0) { const on = capOn(id); h += '<button type="button" class="sk-b tgl' + (on ? ' on' : '') + '" data-a="togcap" data-id="' + id + '">' + (on ? 'Ligado · tocar para desligar (X)' : 'Desligado · tocar para ligar (X)') + '</button>'; }
         h += '</div>'; if (n.kind === 'a' && r > 0) h += barSlotsHtml(id);
@@ -739,6 +748,7 @@
         if (a === 'close') closeUI(); else if (a === 'tab') { S.ui.tab = b.dataset.t; S.ui.sel = null; try { localStorage.setItem('ms_sk_tab', S.ui.tab); } catch (er) { } renderAll(); fitView(); }
         else if (a === 'zin') zoomAt(V.cw / 2, V.ch / 2, 1.25); else if (a === 'zout') zoomAt(V.cw / 2, V.ch / 2, 1 / 1.25); else if (a === 'fit') fitView();
         else if (a === 'learn') { const r = learn(S.ui.sel); if (!r.ok) say(r.msg, '#e67e22'); }
+        else if (a === 'prest') { const r = prestigeNode(S.ui.sel); say(r.msg, r.ok ? '#ffd24a' : '#e67e22'); renderAll(); }
         else if (a === 'togcap') toggleCap(b.dataset.id || S.ui.sel); else if (a === 'slot') setSlot(S.ui.sel, +b.dataset.i); else if (a === 'unslot') clearSlot(S.ui.sel);
         else if (a === 'reset') { const tr = S.ui.tab, pt = points(tr); if (pt.spent > 0) { S.ui.confirm = { tree: tr, spent: pt.spent, cost: resetCost(tr), have: getInvCount('Coins') }; renderConfirm(); } }
         else if (a === 'cfno') { S.ui.confirm = null; renderConfirm(); } else if (a === 'cfok') { const q = S.ui.confirm; S.ui.confirm = null; const r = reset(q.tree); say(r.msg, r.ok ? '#6fe08a' : '#e67e22'); renderAll(); }
@@ -760,6 +770,18 @@
         if (n.kind === 'c' && first) { if (!st.tg) st.tg = {}; st.tg[id] = true; say(n.name + ' aprendido e LIGADO! Tecla X (ou botão na barra) liga e desliga.', '#8affd8'); }
         S.barSig = ''; sfx('accept'); try { Art.burst(player.x, player.y - 14, TREES[n.tree].color2, 10, 1.2); } catch (e) { }
         try { saveDataLogic(); } catch (e) { } renderAll(); return { ok: true, msg: n.name + ' → rank ' + ranks[id] };
+    }
+    function prestigeNode(id) {
+        const st = ensure(), n = NODES[id]; if (!st || !n) return { ok: false, msg: 'Habilidade inexistente.' };
+        if (rankOf(id) < n.max) return { ok: false, msg: 'Chegue ao rank máximo para prestigiar.' }; if (SN.prOn(st, id)) return { ok: false, msg: 'Já tem Prestígio.' };
+        if (!st.pr) st.pr = {}; st.pr[id] = 1; recompute(); S.barSig = '';
+        try { Art.burst(player.x, player.y - 16, '#ffd24a', 16, 1.6); ring(player.x, player.y + 4, 8, 70, '#ffd24a', 22, 4); sfx('accept'); saveDataLogic(true); } catch (e) { }
+        return { ok: true, msg: '✦ ' + n.name + ' alcançou o Prestígio!' };
+    }
+    function prestigeReset(tree) {   // chamado pelo Prestígio da perícia: zera os pontos da árvore (os Prestígios de habilidade já conquistados ficam)
+        const st = ensure(); if (!st || !TREES[tree]) return; st.pts[tree] = {}; if (st.tg) CAPS.forEach((c) => { if (NODES[c].tree === tree) delete st.tg[c]; });
+        for (let i = 0; i < BAR_N; i++) if (st.bar[i] && NODES[st.bar[i]] && NODES[st.bar[i]].tree === tree) st.bar[i] = null; st.rs[tree] = 0;
+        recompute(); S.barSig = ''; S.free = freeAll();
     }
     function reset(tree) {
         const st = ensure(), pt = points(tree); if (!st || !TREES[tree]) return { ok: false, msg: 'Árvore inexistente.' }; if (pt.spent < 1) return { ok: false, msg: 'Nada a redistribuir.' };
@@ -979,7 +1001,7 @@
     }
     window.addEventListener('load', () => setTimeout(wire, 50));
     window.SkillTree = {
-        open: openUI, close: closeUI, toggle: toggleUI, learn, reset, cast, castId, points, toggleCap, capOn, capCost: () => ({ shot: wpn() && wpn().tool === 'ranged' ? shotMp(wpn()) : 0, vigor: VIGOR_MP }), costOf, cdOf, cdTime, primaryCap, learnedCaps, totalFree, ensure, adopt, recompute, validate, rankOf, learnedActives, ACT, resetCost,
+        open: openUI, close: closeUI, toggle: toggleUI, learn, reset, prestigeNode, prestigeReset, prOn, cast, castId, points, toggleCap, capOn, capCost: () => ({ shot: wpn() && wpn().tool === 'ranged' ? shotMp(wpn()) : 0, vigor: vigorMp() }), costOf, cdOf, cdTime, primaryCap, learnedCaps, totalFree, ensure, adopt, recompute, validate, rankOf, learnedActives, ACT, resetCost,
         setSlot, clearSlot, removeAt, setCollapsed, isCollapsed: barCollapsed, resetBarPos, barRect: () => (bar ? bar.getBoundingClientRect() : null), swapSlots, openPicker: (i) => { const el = bar && bar.querySelector('.sk-s[data-i="' + i + '"]'); if (el) openPick(i, el); }, setEdit, isEdit: () => !!S.edit, bar: () => (ensure() ? player.skillTree.bar.slice() : []), isOpen: () => S.ui.open,
         aura: () => { try { if (S.pl !== player) return null; let f = null; for (const b of S.buffs) if (b.until > S.frame) { f = (b.id === 'grito' || b.id === 'furor' || b.id === 'fury') ? '#ff6a2a' : (f || '#f1c40f'); } const br = S.barrier && S.barrier.hp > 0 && S.barrier.until > S.frame ? S.barrier.col : null; const ok = (v) => /^#[0-9a-fA-F]{6}$/.test(v || '') ? v : null; return (ok(br) || f) ? { b: ok(br), f } : null; } catch (e) { return null; } },
         state: () => ({ tree: ensure() ? JSON.parse(JSON.stringify(player.skillTree)) : null, frame: S.frame, buffs: S.buffs.map((b) => ({ id: b.id, left: b.until - S.frame })), barrier: S.barrier && { hp: S.barrier.hp, max: S.barrier.max }, invuln: S.invuln - S.frame, queue: S.Q.length, pj: S.pj.length, zones: S.zn.length, fx: S.fx.length, bonus: S.bonus, dmgPct: S.dmgPct, skd: S.skd, cdr: cdrNow(), tok: S.tok, caps: Object.assign({}, (player.skillTree && player.skillTree.tg) || {}) }),

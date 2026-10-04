@@ -211,6 +211,11 @@ module.exports = function createSecurity(opts) {
         const r = SN.clean(pd.skillTree, lv, Date.now());
         if (r.forged > 0) { if (role !== 'admin') strike(user, ip, 'skilltree', 1, 'skillTree forjada: ' + r.forged + ' entrada(s) inválida(s) (nó inexistente, rank impossível ou tipo errado)'); else slog('SKILLTREE', user, ip, 'admin: ' + r.forged + ' entrada(s) inválida(s) descartada(s)'); }
         else if (r.trimmed > 0) slog('SKILLTREE', user, ip, 'árvore ajustada: ' + r.trimmed + ' rank(s) removido(s) (pré-requisito ou pontos acima do permitido pelas perícias)');
+        try {   // Prestígio de habilidade: só se já estava no save anterior ou se o rank máximo foi atingido (neste save ou no anterior)
+            const old = getDB().users && hasOwn(getDB().users, user) ? getDB().users[user].playerData : null, ot = old && old.skillTree && typeof old.skillTree === 'object' ? old.skillTree : {}, opr = ot.pr && typeof ot.pr === 'object' ? ot.pr : {}, opts = ot.pts && typeof ot.pts === 'object' ? ot.pts : {};
+            for (const id of Object.keys(r.tree.pr || {})) { const n = SN.NODES[id]; if (opr[id] === 1) continue; if (SN.rankOf(r.tree.pts[n.tree], id) >= n.max || SN.rankOf(opts[n.tree], id) >= n.max) continue; delete r.tree.pr[id]; slog('SKILLTREE', user, ip, 'prestígio de habilidade removido (rank máximo não atingido): ' + id); }
+        } catch (e) { }
+        { const bb = SN.bonusAll(r.tree); r.tree.ap = { hp: Math.round(bb.maxHp || 0), mp: Math.round(bb.maxMp || 0) }; }
         pd.skillTree = r.tree; return r.tree.ap;
     }
 
@@ -278,6 +283,12 @@ module.exports = function createSecurity(opts) {
                     }
                 }
                 st.skills = sk;
+                try {   // Prestígio de perícia: 0..5 estrelas; só sobe 1 por vez e só se a perícia estava no nível 99 no save anterior
+                    const pp = prev && prev.prestige && typeof prev.prestige === 'object' ? prev.prestige : {}, np = pd.prestige && typeof pd.prestige === 'object' && !Array.isArray(pd.prestige) ? pd.prestige : {}, outp = {};
+                    for (const key of Object.keys(np)) { if (!hasOwn(SK, key) || key === 'hp') continue; const want = int(np[key], 0, 5, 0), had = int(pp[key], 0, 5, 0); let v = want; if (want > had) { const pl = psk[key] && psk[key].xp !== undefined ? BAL.levelForXp(int(psk[key].xp, 0, BAL.MAX_XP, 0)) : 1; v = (pl >= 99 && want === had + 1) ? want : had; } else if (want < had) v = had; if (v > 0) outp[key] = v; }
+                    for (const key of Object.keys(pp)) if (!outp[key] && hasOwn(SK, key)) outp[key] = int(pp[key], 0, 5, 0);
+                    pd.prestige = outp;
+                } catch (e) { }
                 const tb = cleanTree(user, ip, pd, role, sk);   // a árvore de habilidades pode somar vida/mana máx. (já embutidas no maxHp/maxMp salvos)
                 const hpL = sk.hp ? sk.hp.level : 1, mgL = sk.magic ? sk.magic.level : 1, hpLim = BAL.maxHpAllowed(hpL, tb.hp), mpLim = BAL.maxMpAllowed(mgL, tb.mp);   // 100 + 10 por nível de Vitalidade + classe/raça/árvore (com folga)
                 const maxHp = num(st.maxHp, 1, hpLim, prev && prev.stats ? num(prev.stats.maxHp, 1, hpLim, BAL.maxHpForLevel(hpL)) : BAL.maxHpForLevel(hpL));

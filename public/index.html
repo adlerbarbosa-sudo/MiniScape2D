@@ -192,6 +192,7 @@
     <script src="engage.js"></script>
     <script src="engage_ui.js"></script>
     <script src="invasao.js"></script>
+    <script src="prestige.js"></script>
     <script src="mobile.js"></script>
     <script src="qol.js"></script>
     <script src="bank.js"></script>
@@ -1100,6 +1101,7 @@
             const sk = player.stats.skills[sK]; if (!sk || !(a > 0)) return;
             let mult = raw ? 1 : Balance.roleXpMul(userRole) * Balance.earlyMul(sk.level);   // VIP modesto (+10%/+15%) e impulso de iniciante (balance.js)
             try { if (!raw && window.Engage && Engage.xpMul) mult *= Engage.xpMul(sK); } catch (e) { }   // evento Lua Cheia (+10%, deterministico pelo relogio do servidor), engage.js
+            try { if (!raw && window.Prestige) mult *= Prestige.xpMul(sK); } catch (e) { }
             let f = raw ? a : a * Balance.XP_RATE * mult; if (!raw && !Balance.isCombatSkill(sK)) f *= Balance.tierScale(sk.level); if (!raw && player.race === 'human') f *= 1.05;
             const fl = Math.floor(f), finalXP = fl + (Math.random() < f - fl ? 1 : 0); if (!(finalXP > 0)) return;
             // parte do XP que vai para a montaria equipada (0..40%, depois dos Mímicos; pets.js). O jogador fica com o resto: soma exata.

@@ -35,4 +35,5 @@ Leia o README.md antes de começar. Regras de trabalho: testar com Playwright em
 - Grupo: XP compartilhado (50% aos próximos), bônus +10% por companheiro próximo (até 3), HUD novo à esquerda do mapa.
 - Fx remotos: números de dano, impacto, cone, raio, auras de buff/barreira (`au` no sync).
 - Feito depois: Invasão no cliente (`public/invasao.js`), armadura draconiana (Mímico `b_dracarm`), pernas dos monstros de frente (`legF`), fx remotos de explosão/chuva de flechas. Validação de XP no servidor já existia (`security.js`, orçamentos de XP).
-- Falta: Prestígio (só proposta, sem implementação); testar Invasão com servidor real.
+- Prestígio implementado (04/10): perícia 99 → ✦ estrela (+10% XP, máx. 5; zera pontos da árvore); habilidade no rank máximo → ✦ Prestigiar (efeitos ×2, −40% mana; passivas ×2; capstones com mana pela metade). `public/prestige.js`, `skilltree.js` (`prOn`, `PRS`), `skillnodes.js` (`pr`), validação em `security.js`.
+- Falta: testar Invasão e Prestígio com o servidor real.

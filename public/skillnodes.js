@@ -146,14 +146,15 @@
     const reqOk = (n, ranks) => n.req.every((r) => rankOf(ranks, r[0]) >= r[1]);
     const costOf = (n, rank) => n.cost * rank;
     function spentOf(ranks) { let s = 0; for (const id of Object.keys(ranks || {})) { const n = NODES[id]; if (n) s += costOf(n, ranks[id] | 0); } return s; }
-    function bonusOf(ranks) {   // soma dos efeitos de passiva de UMA árvore (ranks = {id: rank})
+    const prOn = (st, id) => { const n = NODES[id]; return !!(n && st && st.pr && st.pr[id] === 1 && rankOf(st.pts && st.pts[n.tree], id) >= n.max); };   // Prestígio da habilidade: só vale com o rank máximo
+    function bonusOf(ranks, pr) {   // soma dos efeitos de passiva de UMA árvore (ranks = {id: rank}); pr = {id:1} habilidades com Prestígio (efeito em dobro)
         const o = {}; if (!ranks) return o;
-        for (const id of Object.keys(ranks)) { const n = NODES[id]; if (!n || !n.eff) continue; const r = ranks[id] | 0; for (const k of Object.keys(n.eff)) o[k] = r1((o[k] || 0) + n.eff[k] * r); }
+        for (const id of Object.keys(ranks)) { const n = NODES[id]; if (!n || !n.eff) continue; const r = ranks[id] | 0, m = (pr && pr[id] === 1 && r >= n.max) ? 2 : 1; for (const k of Object.keys(n.eff)) o[k] = r1((o[k] || 0) + n.eff[k] * r * m); }
         return o;
     }
     function bonusAll(st) {   // soma das três árvores (st = skillTree)
         const o = {}; const out = { warrior: {}, archer: {}, mage: {} };
-        for (const t of TREE_IDS) { out[t] = bonusOf(st && st.pts && st.pts[t]); for (const k of Object.keys(out[t])) o[k] = r1((o[k] || 0) + out[t][k]); }
+        for (const t of TREE_IDS) { out[t] = bonusOf(st && st.pts && st.pts[t], st && st.pr); for (const k of Object.keys(out[t])) o[k] = r1((o[k] || 0) + out[t][k]); }
         o.byTree = out; return o;
     }
     function canLearn(ranks, id, free) {   // free = pontos livres da árvore; devolve '' (pode) ou o motivo
@@ -167,7 +168,7 @@
        Devolve { tree, forged, trimmed } — forged = nós inexistentes / ranks impossíveis / tipos errados (indício de edição manual); trimmed = ranks removidos por pré-requisito ou excesso de pontos. */
     function clean(raw, lv, now) {
         now = now || Date.now(); let forged = 0, trimmed = 0;
-        const out = { pts: { warrior: {}, archer: {}, mage: {} }, bar: [], hint: false, rs: { warrior: 0, archer: 0, mage: 0 }, cd: {}, ap: { hp: 0, mp: 0 }, tg: {} };
+        const out = { pts: { warrior: {}, archer: {}, mage: {} }, pr: {}, bar: [], hint: false, rs: { warrior: 0, archer: 0, mage: 0 }, cd: {}, ap: { hp: 0, mp: 0 }, tg: {} };
         const isObj = (v) => v && typeof v === 'object' && !Array.isArray(v);
         if (!isObj(raw)) return { tree: out, forged: raw === undefined || raw === null ? 0 : 1, trimmed };
         const rp = isObj(raw.pts) ? raw.pts : {};
@@ -199,8 +200,9 @@
         if (isObj(raw.rs)) for (const t of TREE_IDS) { const v = raw.rs[t]; if (typeof v === 'number' && Number.isFinite(v)) out.rs[t] = Math.max(0, Math.min(9999, Math.floor(v))); }
         if (isObj(raw.cd)) { let n = 0; for (const id of Object.keys(raw.cd)) { if (n >= 40) break; if (!(Object.prototype.hasOwnProperty.call(NODES, id) ? NODES[id].kind === 'a' : SET_IDS.indexOf(id) >= 0)) continue; const v = raw.cd[id]; if (typeof v === 'number' && Number.isFinite(v) && v > now - 1000 && v <= now + 900000) { out.cd[id] = Math.floor(v); n++; } } }
         if (isObj(raw.tg)) for (const id of CAP_IDS) if (raw.tg[id] === true && rankOf(out.pts[NODES[id].tree], id) > 0) out.tg[id] = true;   // capstone ligado (só se aprendido)
+        out.pr = {}; if (isObj(raw.pr)) for (const id of Object.keys(raw.pr)) { const n = Object.prototype.hasOwnProperty.call(NODES, id) ? NODES[id] : null; if (n && raw.pr[id] === 1) out.pr[id] = 1; }   // Prestígio: o servidor confere se foi conquistado (security.js)
         const b = bonusAll(out); out.ap = { hp: Math.round(b.maxHp || 0), mp: Math.round(b.maxMp || 0) };
         return { tree: out, forged, trimmed };
     }
-    return { TREE_IDS, TREES, NODES, ORDER, EFF_LABEL, EFF_KEYS, SET_IDS, ACTIVE_IDS, CAP_IDS, BAR_SLOTS, pointsFor, rankOf, reqOk, costOf, spentOf, bonusOf, bonusAll, canLearn, clean };
+    return { prOn, TREE_IDS, TREES, NODES, ORDER, EFF_LABEL, EFF_KEYS, SET_IDS, ACTIVE_IDS, CAP_IDS, BAR_SLOTS, pointsFor, rankOf, reqOk, costOf, spentOf, bonusOf, bonusAll, canLearn, clean };
 });
