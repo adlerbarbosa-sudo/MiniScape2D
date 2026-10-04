@@ -189,6 +189,6 @@ module.exports = function createSocial(ctx) {
         delete invites[u];
     }
     function chatVisible(u, c) { if (c.guild) return c.guild === guildOf[u]; return !c.party || c.party === partyOf[u]; }
-    function rebind(nd) { db = nd; if (!db.trades || typeof db.trades !== 'object') db.trades = Object.create(null); rebuildTrades(); }
+    function rebind(nd) { db = nd; if (!db.trades || typeof db.trades !== 'object') db.trades = Object.create(null); if (!db.guilds || typeof db.guilds !== 'object') db.guilds = Object.create(null); rebuildTrades(); rebuildGuilds(); }
     return { act, view, dropUser, chatVisible, rebind, partyOf: (u) => partyOf[u] || null, guildOf: (u) => guildOf[u] || null, guildName: (u) => { const g = db.guilds[guildOf[u]]; return g ? g.name : null; }, tick, _t: { parties, invites, tradeOf } };
 };

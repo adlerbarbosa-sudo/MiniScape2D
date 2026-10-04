@@ -61,7 +61,7 @@
         if (!s.invite) invSeen = {};
         if (s.ginvite && !invSeen['g:' + s.ginvite.from]) { invSeen['g:' + s.ginvite.from] = Date.now(); showGuildInvite(s.ginvite); }
         renderTradeUI();
-        const m = $('custom-modal-box'), ov = $('custom-modal-overlay'); if (m && ov && ov.style.display !== 'none' && m.dataset.social === '1' && !s.trade && m.querySelector('#soc-leave, [data-inv], #soc-gnew, #soc-gleave')) renderSocialModal();
+        const m = $('custom-modal-box'), ov = $('custom-modal-overlay'); if (m && ov && ov.style.display !== 'none' && m.dataset.social === '1' && !s.trade && m.querySelector('#soc-leave, [data-inv], #soc-gnew, #soc-gleave') && !(document.activeElement && /^soc-g(name|inv-name)$/.test(document.activeElement.id))) renderSocialModal();
     }
     let invSeen = {}, trQty = '1'; const N = (n) => (window.fmtNum ? fmtNum(n) : n);
 
@@ -197,7 +197,7 @@
         h += `<h4 style="margin:10px 0 2px">Guilda</h4>`;
         if (gl) {
             const pc = gl.next ? Math.max(0, Math.min(100, Math.round((gl.xp - gl.base) / (gl.next - gl.base) * 100))) : 100;
-            h += `<div style="color:#6ec6ff"><b>${esc(gl.name)}</b> <small>nível ${gl.lvl} · +${gl.bonus}% XP de combate</small></div><div class="soc-hud-bar" style="height:6px;background:#000a;border-radius:4px;overflow:hidden;margin:3px 0"><div style="width:${pc}%;height:100%;background:linear-gradient(#6ec6ff,#2f7fc0)"></div></div>` + gl.members.map((m) => `<div style="margin:2px 0;opacity:${m.on ? 1 : .5}">${m.u === gl.leader ? '★ ' : ''}${esc(m.u)} <small>${m.on ? 'online' : 'offline'}</small>${gl.leader === me && m.u !== me ? ` <button class="soc-b" data-gkick="${esc(m.u)}">Expulsar</button>` : ''}</div>`).join('') + `<button class="soc-b" id="soc-gleave">Sair da guilda</button><div style="font-size:.74rem;opacity:.8">Chat da guilda: <b>/gd mensagem</b>. Cada golpe seu rende XP à guilda.</div>`;
+            h += `<div style="color:#6ec6ff"><b>${esc(gl.name)}</b> <small>nível ${gl.lvl} · +${gl.bonus}% XP de combate</small></div><div class="soc-hud-bar" style="height:6px;background:#000a;border-radius:4px;overflow:hidden;margin:3px 0"><div style="width:${pc}%;height:100%;background:linear-gradient(#6ec6ff,#2f7fc0)"></div></div>` + gl.members.map((m) => `<div style="margin:2px 0;opacity:${m.on ? 1 : .5}">${m.u === gl.leader ? '★ ' : ''}${esc(m.u)} <small>${m.on ? 'online' : 'offline'}</small>${gl.leader === me && m.u !== me ? ` <button class="soc-b" data-gkick="${esc(m.u)}">Expulsar</button>` : ''}</div>`).join('') + `${gl.leader === me ? `<div style="margin:6px 0"><input id="soc-ginv-name" maxlength="20" placeholder="Nome do jogador (online)" style="width:55%;font:inherit"> <button class="soc-b" id="soc-ginv-btn">Convidar para a guilda</button></div>` : ''}<button class="soc-b" id="soc-gleave">Sair da guilda</button><div style="font-size:.74rem;opacity:.8">Chat da guilda: <b>/gd mensagem</b>. Cada golpe seu rende XP à guilda.</div>`;
         } else h += `<div style="font-size:.8rem;opacity:.85">Sem guilda.</div><input id="soc-gname" maxlength="16" placeholder="Nome da guilda" style="width:60%;font:inherit"> <button class="soc-b" id="soc-gnew">Criar</button>`;
         const list = nearby();
         h += `<h4 style="margin:10px 0 2px">Jogadores por perto</h4>` + (list.length ? list.map((o) => `<div style="margin:2px 0"><b>${esc(o.u)}</b> <small>(${o.d}px)</small> <button class="soc-b" data-inv="${esc(o.u)}" ${p && !lead ? 'disabled' : ''}>Convidar</button>${gl && gl.leader === me ? `<button class="soc-b" data-ginv="${esc(o.u)}">Guilda</button>` : ''}<button class="soc-b" data-trade="${esc(o.u)}" ${o.d > 300 ? 'disabled' : ''}>Trocar</button></div>`).join('') : `<div style="font-size:.8rem;opacity:.8">Ninguém neste mapa agora.</div>`);
@@ -211,7 +211,8 @@
             else if (t.id === 'soc-leave') await socialCall('party_leave');
             else if (t.dataset.ginv) { const r = await socialCall('guild_invite', { to: t.dataset.ginv }); if (r && r.ok) note('Convite de guilda enviado a ' + t.dataset.ginv + '.'); }
             else if (t.dataset.gkick) await socialCall('guild_kick', { to: t.dataset.gkick });
-            else if (t.id === 'soc-gleave') await socialCall('guild_leave');
+            else if (t.id === 'soc-ginv-btn') { const v = $('soc-ginv-name'), nm = v ? v.value.trim() : ''; if (nm) { const r = await socialCall('guild_invite', { to: nm }); if (r && r.ok) { note('Convite de guilda enviado a ' + nm + '.'); if (v) v.value = ''; } } }
+            else if (t.id === 'soc-gleave') { if (confirm('Sair da guilda?')) await socialCall('guild_leave'); }
             else if (t.id === 'soc-gnew') { const v = $('soc-gname'); await socialCall('guild_create', { name: v ? v.value : '' }); }
         };
     }
