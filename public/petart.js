@@ -498,7 +498,7 @@
             const nod = sin(t * 1.6) * 0.4 - (mv > 0.1 ? sin(ph * 2) * 0.5 : 0), hx = L - 0.5 + (W ? 4 : 4.5), hy = by - (W ? 7.5 : 0.6) + nod;
             g.beginPath(); g.moveTo(L - 9, by - H - 0.8); g.quadraticCurveTo(L - 2, by - H - (W ? 1.6 : 0), hx, hy - (W ? 3.4 : 4.6)); g.lineTo(hx + 1, hy + 5); g.quadraticCurveTo(L, by + 5, L - 8, by + H - 1); g.closePath(); g.fillStyle = c1; g.fill(); g.lineWidth = 1; g.strokeStyle = OUT; g.stroke();
             if (W) { ell(L - 2.4, by + 0.5, 6.6, 7.8, c2); poly([L - 8, by + 6, L - 6.2, by + 11, L - 3.6, by + 6.6], c2, 0.9); poly([L - 4, by + 6.8, L - 1.4, by + 11.6, L + 1.6, by + 5.4], c2, 0.9); poly([L - 1, by - 5, L + 3, by - 1, L + 1, by + 3], sh(c2, 0.1), 0); }
-            g.save(); g.translate(hx, hy); g.rotate(W ? 0.12 : 0.12); if (!W) g.scale(1.22, 1.22);
+            g.save(); g.translate(hx, hy); g.rotate(W ? 0.12 : 0.12); if (!W) g.scale(0.95, 0.95);
             if (W) {
                 ell(0, 0, 6.2, 5.2, c1); ell(8.2, 1.9, 6.6, 3, c1); ell(8.6, 3.4, 5.8, 1.6, c2, 0, 0); ell(13.6, 1.2, 1.7, 1.4, P.nose, 0, 0.6);
                 g.strokeStyle = '#1d1d22'; g.lineWidth = 0.8; g.beginPath(); g.moveTo(13, 3.6); g.quadraticCurveTo(8.6, 4.8, 5, 3.4); g.stroke(); poly([10.6, 3.8, 11.6, 3.8, 11.1, 5.6], '#f2f2f2', 0.6);
