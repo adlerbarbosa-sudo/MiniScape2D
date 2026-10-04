@@ -170,8 +170,8 @@ K.vulc = npc('vulcanologo_pyra', 'Vulcanóloga Pyra', 'wizard', '#c8501a', 'Se o
 
 /* ============ MAPAS ============ */
 const SEA = '#17405f', SEA2 = '#1d5078', WOOD = '#7a5a3a', WOOD2 = '#5c4028', ASH = '#3a3532', OBS = '#2a2a38', BLK = '#2b2630';
-const GX = 8, GY = 0;
-const porto = makeMap('porto_aurora', 'Porto de Aurora', 2000, 1400, '#7a7468', null, null);
+const GX = -6, GY = 3;   // mapa-múndi: sudoeste, do outro lado do mar a partir do Porto dos Mares (-1,2)
+const porto = makeMap('porto_aurora', 'Estaleiro de Porto dos Mares', 2000, 1400, '#7a7468', -1, 3);
 const navio = makeMap('navio_sombrio', 'Navio para as Terras Sombrias', 1400, 800, SEA, null, null, 'dim');
 const costa = makeMap('costa_ossos', 'Costa de Ossos', 2000, 1400, '#5a574a', GX, GY, 'dim');
 const pantano = makeMap('pantano_negro', 'Pântano Negro', 2000, 1400, '#2c3a2c', GX + 1, GY, 'dim');
@@ -181,6 +181,10 @@ const cemiterio = makeMap('cemiterio_reis', 'Cemitério dos Reis', 2000, 1400, '
 const cratera = makeMap('cratera_cinzas', 'Cratera de Cinzas', 2000, 1400, '#4a2e24', GX + 2, GY + 1, 'dim');
 const cripta = makeMap('cripta_abissal', 'Cripta Abissal', 1600, 1200, '#10121c', null, null, 'dark');
 
+/* o estaleiro fica ao sul do Porto dos Mares (borda sul, c=900, como a norte dele) */
+const EXT = [];
+function extLink(M, d, c, w, other, od, oc, id, col) { openSide(M, d, c, w, col, other, od, oc, w, id); EXT.push({ map: other, e: { id: id + '_r', d: od, a: R(oc - w / 2 + 12), b: R(oc + w / 2 - 12), to: M.m.id, td: d, ta: R(c - w / 2 + 12), tb: R(c + w / 2 - 12), w, col } }); }
+extLink(porto, 'n', 900, 110, 'porto_mares', 's', 900, 'som_porto_mares', STONE);
 link(costa, 'e', 700, pantano, 'w', 700, DIRT, 'som_costa_pantano');
 link(pantano, 'e', 700, fortaleza, 'w', 700, STONE, 'som_pantano_fortaleza');
 link(costa, 's', 1000, floresta, 'n', 1000, DIRT, 'som_costa_floresta');
@@ -209,10 +213,9 @@ const station = (M, type, name, x, y, w, h) => M.add({ type, name, x, y, w, h })
     station(M, 'bank', 'Banco', 880, 410, 80, 48);
     for (const [x, y] of [[1560, 300], [1700, 480], [1600, 980], [1760, 1120]]) M.add({ type: 'fishing_spot', name: 'Ponto de Pesca', x, y, w: 46, h: 46 }, false);
     M.npc(K.cap, 1390, 640); M.npc(K.estivador, 1330, 680);
-    M.decor('sign', 1130, 600, { name: 'Placa: Embarque para as Terras Sombrias → Recomendado: vit/def 30+' });
+    M.decor('sign', 1130, 600, { name: 'Placa: Embarque para as Terras Sombrias — recomendado vit/def 30+' });
     M.decor('banner', 380, 130); M.decor('banner', 820, 130); M.decor('statue', 760, 700);
     // a estrada do portão da Vila chega por cima
-    M.reserve(900, 80, 220, 260);
     sprinkle(M, [['flowers', 18], ['bush', 12], ['crates', 5], ['barrel', 7], ['haystack', 3]], 0, [120, 120, 1280, 1160]);
     M.scatter((x, y) => M.tree(x, y), 22, [120, 120, 1280, 1160]);
     M.flush();
@@ -359,17 +362,11 @@ const station = (M, type, name, x, y, w, h) => M.add({ type, name, x, y, w, h })
     M.flush();
 })();
 
-/* ---------- portal da Vila para o porto ---------- */
-const gate = { name: 'Estrada para o Porto de Aurora', x: 980, y: 180 };
-const GATE_DECOR = [{ type: 'decor', kind: 'sign', name: 'Placa: Porto de Aurora — navios para as Terras Sombrias', x: 925, y: 182, w: R(30 * 1.3), h: R(40 * 1.3), pk: 'Terras Sombrias' }];
-const gatePortal = { type: 'portal', name: gate.name, x: gate.x, y: gate.y, w: 64, h: 64, destMap: 'porto_aurora', destX: 1000, destY: 260, look: 'door', pk: 'Terras Sombrias', id: 'som_portal_vila' };
-portal(porto, 'Voltar à Vila de Aldeburgo', 940, 130, 'lumbridge', gate.x + 32, gate.y + 110, 'door');
-
 /* ---------- saída ---------- */
 const MAPS = { porto_aurora: porto, navio_sombrio: navio, costa_ossos: costa, pantano_negro: pantano, floresta_murcha: floresta, cemiterio_reis: cemiterio, fortaleza_obsidiana: fortaleza, cratera_cinzas: cratera, cripta_abissal: cripta };
 const maps = {}; let nEnt = 0;
 for (const k of Object.keys(MAPS)) { const m = MAPS[k].m; for (const o of m.entities) o.pk = 'Terras Sombrias'; nEnt += m.entities.length; maps[k] = m; }
-const pack = { name: 'Terras Sombrias', replace: true, items: ITEMS, npcs: NPC, maps, entities: { lumbridge: GATE_DECOR.concat([gatePortal]) } };
+const pack = { name: 'Terras Sombrias', replace: true, items: ITEMS, npcs: NPC, maps, entities: {}, edges: EXT.reduce((a, x) => { (a[x.map] = a[x.map] || []).push(x.e); return a; }, {}) };
 const out = path.join(__dirname, '..', 'docs', 'packs', 'terras-sombrias.json');
 fs.mkdirSync(path.dirname(out), { recursive: true }); fs.writeFileSync(out, JSON.stringify(pack));
 const sizes = Object.keys(maps).map((k) => k + ':' + maps[k].entities.length + ' (mobs ' + maps[k].entities.filter((o) => o.type === 'enemy').length + ')');

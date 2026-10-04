@@ -38,7 +38,7 @@
         for (const [k, v] of [['items', items], ['npcs', npcs], ['maps', maps], ['entities', ents]]) if (!isObj(v)) errors.push('"' + k + '" precisa ser um objeto.');
         if (errors.length) return { errors, warns, lines };
         try { if (JSON.stringify(p).length > LIM.bytes) errors.push('Pacote maior que ' + Math.round(LIM.bytes / 1000) + ' KB.'); } catch (e) { errors.push('JSON inválido.'); }
-        const ik = Object.keys(items), nk = Object.keys(npcs), mk = Object.keys(maps), ek = Object.keys(ents);
+        const ik = Object.keys(items), nk = Object.keys(npcs), mk = Object.keys(maps), ek = Object.keys(ents), edg = isObj(p.edges) ? p.edges : {};
         if (ik.length > LIM.items) errors.push('Itens demais (máx. ' + LIM.items + ').'); if (nk.length > LIM.npcs) errors.push('Monstros/NPCs demais (máx. ' + LIM.npcs + ').'); if (mk.length > LIM.maps) errors.push('Mapas demais (máx. ' + LIM.maps + ').');
         const newItems = new Set(ik), newNpcs = new Set(nk), newMaps = new Set(mk);
         let ov = 0;
@@ -79,11 +79,25 @@
             if (!has(ctx.maps, id) && !newMaps.has(id)) { errors.push('"entities": o mapa "' + id + '" não existe.'); continue; }
             if (!Array.isArray(ents[id])) { errors.push('"entities.' + id + '" deve ser uma lista.'); continue; } ents[id].forEach((o) => checkEnt(o, 'Mapa "' + id + '"'));
         }
+        for (const id of Object.keys(edg)) {   // ligações pela borda acrescentadas a mapas que já existem (estrada + abertura)
+            if (!has(ctx.maps, id) && !newMaps.has(id)) { warns.push('Ligação ignorada: o mapa "' + id + '" não existe neste mundo (use "Auditar conexões" depois).'); continue; }
+            if (!Array.isArray(edg[id])) { errors.push('"edges.' + id + '" deve ser uma lista.'); continue; }
+            edg[id].forEach((e) => { if (!isObj(e) || !['n', 's', 'e', 'w'].includes(e.d) || !Number.isFinite(e.a) || !Number.isFinite(e.b) || typeof e.to !== 'string') errors.push('Mapa "' + id + '": ligação inválida (precisa de d, a, b, to).'); else if (!has(ctx.maps, e.to) && !newMaps.has(e.to)) warns.push('Mapa "' + id + '": a ligação aponta para "' + e.to + '", que não existe.'); });
+        }
         if (nEnt > LIM.ents) errors.push('Entidades demais (máx. ' + LIM.ents + ').');
         lines.push(ik.length + ' item(ns), ' + nk.length + ' monstro(s)/NPC(s), ' + mk.length + ' mapa(s), ' + nEnt + ' entidade(s)' + (ov ? ', ' + ov + ' substituição(ões)' : '') + '.');
         return { errors, warns, lines };
     }
     const tag = (o, pk) => { const c = clone(o); c.pk = pk; if (c.type === 'ground_item') c.wi = true; return c; };   // item de chão só persiste no mundo com wi (colocado pelo Dev)
+    function applyEdge(m, e, pk) {   // põe a abertura numa borda do mapa: registra a ligação, abre o corredor (árvores, pedras, enfeites, bichos) e pinta a estrada
+        const W = m.width || 2000, H = m.height || 1400, D = 300; if (!Array.isArray(m.edges)) m.edges = [];
+        m.edges = m.edges.filter((q) => !(q && q.id === e.id)); const q = clone(e); q.pk = pk; delete q.w; delete q.col; m.edges.push(q);
+        const w = e.w || Math.max(80, e.b - e.a + 24), c = (e.a + e.b) / 2, hz = e.d === 'e' || e.d === 'w';
+        const rect = hz ? [e.d === 'w' ? 0 : W - D, c - w / 2 - 20, D, w + 40] : [c - w / 2 - 20, e.d === 'n' ? 0 : H - D, w + 40, D];
+        const ov = (o) => { const r = o.type === 'tree' ? [o.x - 12, o.y - 30, 100, 126] : [o.x, o.y, o.w || 30, o.h || 30]; return r[0] < rect[0] + rect[2] && r[0] + r[2] > rect[0] && r[1] < rect[1] + rect[3] && r[1] + r[3] > rect[1]; };
+        m.entities = (m.entities || []).filter((o) => !(o && (o.type === 'tree' || o.type === 'decor' || o.type === 'ground_item' || o.type === 'enemy' || (typeof o.type === 'string' && o.type.indexOf('rock') === 0)) && ov(o)));
+        m.entities.push(tag({ id: 'pk_road_' + e.id, type: 'paint', name: 'Chão', color: e.col || '#5c4033', x: Math.round(hz ? rect[0] : c - w / 2), y: Math.round(hz ? c - w / 2 : rect[1]), w: Math.round(hz ? D : w), h: Math.round(hz ? w : D), active: true }, pk));
+    }
     /* aplica no estado do jogo (itemDB, npcDB, gameMaps) e devolve o instantâneo para desfazer */
     function apply(p, ctx) {
         const snap = { name: p.name, at: Date.now(), items: {}, npcs: {}, maps: {} };
@@ -96,7 +110,14 @@
             if (has(ctx.maps, id) && !p.replace) add(id, p.maps[id].entities);
             else { const m = clone(p.maps[id]); m.id = id; if (!m.name) m.name = id; m.entities = []; ctx.maps[id] = m; add(id, p.maps[id].entities); }
         }
+        // reaplicar o mesmo pacote: tira o que ele deixou em mapas que ele não lista mais (ex.: portal antigo numa vila) e as bordas antigas dele
+        for (const id of Object.keys(ctx.maps)) { if (has(p.maps || {}, id) && p.replace) continue; const m = ctx.maps[id]; if (!m) continue; const had = (m.entities || []).some((o) => o && o.pk === p.name) || (Array.isArray(m.edges) && m.edges.some((e) => e && e.pk === p.name)); if (!had) continue; keepMap(id); if (!has(p.entities || {}, id)) m.entities = (m.entities || []).filter((o) => !(o && o.pk === p.name)); if (Array.isArray(m.edges)) m.edges = m.edges.filter((e) => !(e && e.pk === p.name)); }
         for (const id of Object.keys(p.entities || {})) { keepMap(id); add(id, p.entities[id]); }
+        for (const id of Object.keys(p.edges || {})) {
+            const m = ctx.maps[id]; if (!m || !Array.isArray(p.edges[id])) continue; keepMap(id); if (!Array.isArray(m.edges)) m.edges = [];
+            const W = m.width || 2000, H = m.height || 1400, D = 300;
+            p.edges[id].forEach((e) => applyEdge(m, e, p.name));
+        }
         return snap;
     }
     function restore(snap, ctx) {
@@ -133,6 +154,16 @@
         const nm = (id) => (maps[id] && maps[id].name) || id; let n = 0;
         const connect = (from, to, label) => {   // portal em "from" levando a "to" (+ portal de volta em "to" se pedido)
             const A = maps[from], Bm = maps[to], ga = grid(A), gb = grid(Bm);
+            if (ga && gb && Math.abs(ga[0] - gb[0]) + Math.abs(ga[1] - gb[1]) === 1 && A.env !== 'dark' && Bm.env !== 'dark' && (A.width || 0) >= 1000 && (Bm.width || 0) >= 1000) {   // vizinhos na grade: ligação pela borda (estrada), como o resto do mundo
+                const d1 = gb[0] > ga[0] ? 'e' : gb[0] < ga[0] ? 'w' : gb[1] > ga[1] ? 's' : 'n', d2 = { e: 'w', w: 'e', s: 'n', n: 's' }[d1], used = (m, d) => (Array.isArray(m.edges) ? m.edges : []).some((q) => q && q.d === d);
+                if (!used(A, d1) && !used(Bm, d2)) {
+                    const cA = d1 === 'e' || d1 === 'w' ? (A.height || 1400) / 2 : (A.width || 2000) / 2, cB = d2 === 'e' || d2 === 'w' ? (Bm.height || 1400) / 2 : (Bm.width || 2000) / 2, w = 120, id = 'auto_' + from + '_' + to;
+                    keep(from); keep(to);
+                    applyEdge(A, { id, d: d1, a: Math.round(cA - w / 2 + 12), b: Math.round(cA + w / 2 - 12), to, td: d2, ta: Math.round(cB - w / 2 + 12), tb: Math.round(cB + w / 2 - 12), w }, 'Ligação automática');
+                    applyEdge(Bm, { id: id + '_r', d: d2, a: Math.round(cB - w / 2 + 12), b: Math.round(cB + w / 2 - 12), to: from, td: d1, ta: Math.round(cA - w / 2 + 12), tb: Math.round(cA + w / 2 - 12), w }, 'Ligação automática');
+                    lines.push('✔ ' + nm(from) + ' ⇄ ' + nm(to) + ' (estrada pela borda' + (label ? ', ' + label : '') + ')'); n++; return true;
+                }
+            }
             const dir = ga && gb ? [Math.sign(gb[0] - ga[0]), Math.sign(gb[1] - ga[1])] : [0, 1];
             const pa = freeSpot(A, [(A.width || 2000) / 2 + dir[0] * 700, (A.height || 1400) / 2 + dir[1] * 400]), pb = freeSpot(Bm, [(Bm.width || 2000) / 2 - dir[0] * 700, (Bm.height || 1400) / 2 - dir[1] * 400]);
             if (!pa || !pb) { lines.push('Sem espaço livre para ligar ' + nm(from) + ' → ' + nm(to) + '. Abra espaço no mapa e rode de novo.'); return false; }

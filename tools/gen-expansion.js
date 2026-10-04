@@ -146,21 +146,25 @@ const portal = (M, name, x, y, dest, dx, dy, look, extra) => M.add(Object.assign
 const cx = 1000, cy = 700;
 
 /* ============ 1. COLINAS VENTOSAS ============ */
-const GX = 5, GY = 0;
+const GX = 2, GY = 0;   // mapa-múndi: leste da Mina de Pedra (1,0); a fileira do lago/ruínas/cidadela fica ao NORTE (y-1)
 const colinas = makeMap('colinas_ventosas', 'Colinas Ventosas', 2000, 1400, '#6f9a3a', GX, GY);
 const cogumelos = makeMap('floresta_cogumelos', 'Floresta dos Cogumelos', 2000, 1400, '#38503e', GX + 1, GY);
 const montanha = makeMap('montanha_trovao', 'Montanha do Trovão', 2000, 1400, '#6a6f78', GX + 2, GY);
-const lago = makeMap('lago_cristalino', 'Lago Cristalino', 2000, 1400, '#4f8a4a', GX, GY + 1);
-const ruinas = makeMap('ruinas_solares', 'Ruínas Solares', 2000, 1400, '#c9a25a', GX + 1, GY + 1);
-const cidadela = makeMap('cidadela_tempestade', 'Cidadela da Tempestade', 2000, 1400, '#4a4f5c', GX + 2, GY + 1);
+const lago = makeMap('lago_cristalino', 'Lago Cristalino', 2000, 1400, '#4f8a4a', GX, GY - 1);
+const ruinas = makeMap('ruinas_solares', 'Ruínas Solares', 2000, 1400, '#c9a25a', GX + 1, GY - 1);
+const cidadela = makeMap('cidadela_tempestade', 'Cidadela da Tempestade', 2000, 1400, '#4a4f5c', GX + 2, GY - 1);
 const caverna = makeMap('caverna_cristais', 'Caverna dos Cristais', 1600, 1200, '#1c2438', null, null, 'dark');
 
+/* ligação com o mundo: a estrada leste da Mina de Pedra (borda leste, c=700, como a oeste da Vila) leva às Colinas Ventosas */
+const EXT = [];
+function extLink(M, d, c, w, other, od, oc, id, col) { openSide(M, d, c, w, col, other, od, oc, w, id); EXT.push({ map: other, e: { id: id + '_r', d: od, a: R(oc - w / 2 + 12), b: R(oc + w / 2 - 12), to: M.m.id, td: d, ta: R(c - w / 2 + 12), tb: R(c + w / 2 - 12), w, col } }); }
+extLink(colinas, 'w', 700, 120, 'mina', 'e', 700, 'sol_mina_colinas', DIRT);
 /* ligações (grade 3x2 + a caverna acima da montanha, por portal) */
 link(colinas, 'e', 700, cogumelos, 'w', 700, DIRT, 'sol_colinas_cogumelos');
 link(cogumelos, 'e', 700, montanha, 'w', 700, DIRT, 'sol_cogumelos_montanha');
-link(colinas, 's', 1000, lago, 'n', 1000, DIRT, 'sol_colinas_lago');
-link(cogumelos, 's', 1000, ruinas, 'n', 1000, DIRT, 'sol_cogumelos_ruinas');
-link(montanha, 's', 1000, cidadela, 'n', 1000, STONE, 'sol_montanha_cidadela');
+link(colinas, 'n', 1000, lago, 's', 1000, DIRT, 'sol_colinas_lago');
+link(cogumelos, 'n', 1000, ruinas, 's', 1000, DIRT, 'sol_cogumelos_ruinas');
+link(montanha, 'n', 1000, cidadela, 's', 1000, STONE, 'sol_montanha_cidadela');
 link(lago, 'e', 700, ruinas, 'w', 700, SAND, 'sol_lago_ruinas');
 link(ruinas, 'e', 700, cidadela, 'w', 700, SAND, 'sol_ruinas_cidadela');
 
@@ -220,7 +224,7 @@ link(ruinas, 'e', 700, cidadela, 'w', 700, SAND, 'sol_ruinas_cidadela');
     M.scatter((x, y) => M.tree(x, y), 46, [120, 120, 1760, 1160], 3000);
     M.scatter((x, y) => M.decor('flowers', x, y), 30, [100, 100, 1800, 1200]);
     M.pack(K.sapo, 4, 400, 540, 120); M.pack(K.sapo, 3, 1560, 560, 120); M.pack(K.serp, 4, 480, 1100, 130); M.pack(K.serp, 4, 1500, 1100, 130); M.pack('drowned', 3, 780, 1150, 120); M.pack('swamp_snake', 3, 1220, 1150, 120);
-    M.boss(K.hidra, 980, 1180);
+    M.boss(K.hidra, 700, 1140);
     M.flush();
 })();
 /* --- Ruínas Solares --- */
@@ -261,7 +265,7 @@ link(ruinas, 'e', 700, cidadela, 'w', 700, SAND, 'sol_ruinas_cidadela');
     for (const [c, x, y, w, h] of [['#3f4452', 200, 160, 700, 420], ['#555b6a', 1100, 160, 700, 420], ['#3f4452', 160, 820, 760, 400], ['#555b6a', 1100, 840, 760, 400]]) M.paint(c, x, y, w, h);
     M.reserve(cx - 340, 380, 680, 560); M.paint('#6b7080', cx - 340, 380, 680, 560); M.paint('#4f5565', cx - 250, 470, 500, 380);
     M.build('castle', cx - 150, 400);
-    for (let i = 0; i < 7; i++) { M.decor('wall_h', cx - 340 + i * 96, 900); }
+    for (let i = 0; i < 8; i++) { const wx = cx - 340 + i * 96; if (wx + 125 > cx - 100 && wx < cx + 100) continue; M.decor('wall_h', wx, 900); }   // vão do portão (entrada pelo sul)
     for (let i = 0; i < 5; i++) { M.decor('wall_v', cx - 360, 400 + i * 98); M.decor('wall_v', cx + 340, 400 + i * 98); }
     M.decor('banner', cx - 300, 430); M.decor('banner', cx + 280, 430); M.decor('statue', cx - 250, 720); M.decor('statue', cx + 210, 720); M.decor('lamp', cx - 200, 800); M.decor('lamp', cx + 180, 800);
     M.build('watchtower', 260, 240); M.build('watchtower', 1580, 240); M.build('watchtower', 260, 960); M.build('watchtower', 1580, 960);
@@ -291,10 +295,7 @@ link(ruinas, 'e', 700, cidadela, 'w', 700, SAND, 'sol_ruinas_cidadela');
 })();
 
 /* ---------- portal do mundo para o reino (Vila) ---------- */
-const gate = { name: 'Estrada para as Colinas Ventosas', x: 1640, y: 610 };
-const GATE_DECOR = [{ type: 'decor', kind: 'sign', name: 'Placa: Colinas Ventosas ->', x: 1585, y: 612, w: R(30 * 1.3), h: R(40 * 1.3), pk: 'Reinos de Solaris' }];
-const gatePortal = { type: 'portal', name: gate.name, x: gate.x, y: gate.y, w: 64, h: 64, destMap: 'colinas_ventosas', destX: 932, destY: 620, look: 'door', pk: 'Reinos de Solaris', id: 'sol_portal_vila' };
-portal(colinas, 'Voltar à Vila de Aldeburgo', 900, 480, 'lumbridge', gate.x + 32, gate.y + 110, 'door');
+
 
 /* ---------- saída ---------- */
 const MAPS = { colinas_ventosas: colinas, floresta_cogumelos: cogumelos, montanha_trovao: montanha, lago_cristalino: lago, ruinas_solares: ruinas, cidadela_tempestade: cidadela, caverna_cristais: caverna };
@@ -303,7 +304,8 @@ for (const k of Object.keys(MAPS)) { const m = MAPS[k].m; for (const o of m.enti
 const pack = {
     name: 'Reinos de Solaris', replace: true,
     items: ITEMS, npcs: NPC, maps,
-    entities: { lumbridge: GATE_DECOR.concat([gatePortal]) }
+    entities: {},
+    edges: EXT.reduce((a, x) => { (a[x.map] = a[x.map] || []).push(x.e); return a; }, {})
 };
 const out = path.join(__dirname, '..', 'docs', 'packs', 'reinos-de-solaris.json');
 fs.mkdirSync(path.dirname(out), { recursive: true }); fs.writeFileSync(out, JSON.stringify(pack));
