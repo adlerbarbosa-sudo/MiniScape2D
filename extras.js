@@ -157,7 +157,7 @@ module.exports = function createExtras(ctx) {
     function house(user, b) {
         b = b || {};
         if (b.a === 'enter') {
-            const owner = findUser(b.owner); if (!owner) return { ok: false, error: 'Esta casa ainda não tem morador.' };
+            const owner = findUser(b.owner); if (!owner) return { ok: false, error: (typeof b.owner === 'string' && b.owner.trim()) ? 'Não existe jogador chamado "' + b.owner.trim().slice(0, 30) + '". O Dev precisa informar o nome exato do usuário.' : 'Esta casa ainda não tem morador.' };
             const h = houseOf(owner); if (!h) return owner === user ? { ok: true, owner, items: [], guests: [] } : { ok: false, error: 'O morador ainda não arrumou a casa.' };
             const me = user.toLowerCase();
             const isAdmin = db.users[user] && db.users[user].role === 'admin';

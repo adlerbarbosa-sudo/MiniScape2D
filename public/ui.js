@@ -265,6 +265,8 @@
         el.classList.toggle('done', qAllDone); el.classList.toggle('min', qMin);
         const pct = Math.round((qStep / STEPS.length) * 100);
         const nq = (qAllDone && window.Quests) ? window.Quests.summary() : [];
+        if (qAllDone && !nq.length) { el.style.display = 'none'; return; }   // tutorial concluído e sem missões de NPC: o painel some de vez
+        el.style.display = '';
         el.innerHTML = qAllDone && nq.length
             ? `<h4>${IC('flag')} Missões de NPC (${nq.length}) <span class="q-x">${qMin ? 'expandir' : 'minimizar'}</span></h4><div class="q-title">${esc(nq[0].title)}</div><div class="q-hint">${nq[0].ready ? 'Pronta! Volte ao ' + esc(nq[0].giverName) + ' para entregar.' : esc(nq[0].text) + ' <b>(' + nq[0].cur + '/' + nq[0].need + ')</b>'}</div><div class="q-bar"><i style="width:${Math.round(nq[0].cur / nq[0].need * 100)}%"></i></div>`
             : qAllDone

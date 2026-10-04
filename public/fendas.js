@@ -98,6 +98,16 @@
             setActionText('Andar limpo! Entre na fissura para descer. (+25% de vida)', '#2ecc71');
         }
     }
+    let btn = null, btnT = 0;
+    function tickBtn() {   // atalho sempre à mão na Vila (o portal também fica no mundo, perto do ponto de partida)
+        if (!btn) {
+            btn = document.createElement('button'); btn.id = 'rift-btn'; btn.textContent = '🔮 Fenda Instável'; btn.className = 'dev-btn';
+            btn.style.cssText = 'position:absolute;left:50%;top:54px;transform:translateX(-50%);z-index:60;display:none;padding:6px 14px;font-weight:700;background:linear-gradient(#4a2f7a,#2a1850);color:#e6d8ff;border:2px solid #8a5ad8;border-radius:8px;cursor:pointer';
+            btn.onclick = openPanel; (document.getElementById('game-container') || document.body).appendChild(btn);
+        }
+        let show = false; try { show = !run && currentMap === 'lumbridge' && !!currentUser && document.getElementById('login-overlay').style.display === 'none'; } catch (e) { }
+        btn.style.display = show ? '' : 'none';
+    }
     function interact(t) {
         if (!t || t.active === false) return false;
         if (t.type === 'rift_gate') { openPanel(); return true; }
@@ -198,6 +208,7 @@
         merge();
         try { if (player.rift && player.rift.run) { const o = player.rift.o; player.rift.run = 0; if (currentMap === 'fenda' || !gameMaps[currentMap]) switchMap(gameMaps[o && o.m] ? o.m : 'lumbridge', (o && o.x) || 400, (o && o.y) || 300); setTimeout(() => setActionText('A Fenda se fechou enquanto você estava fora.', '#b07aff'), 1500); } } catch (e) { }
         if (!tickT) tickT = setInterval(onTick, 400);
+        if (!btnT) btnT = setInterval(tickBtn, 500);
     }
     function wire() {
         const oi = window.tryInteract; if (typeof oi === 'function') window.tryInteract = function (t) { if (interact(t)) { player.actionAnim = 15; return; } return oi.apply(this, arguments); };

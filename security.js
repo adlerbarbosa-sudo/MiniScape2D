@@ -227,7 +227,7 @@ module.exports = function createSecurity(opts) {
         /* 1) envelope: listas de itens, equipamento, posição, stats */
         if (admin) { /* admin: mantém o conteúdo, só passou pela varredura profunda */ }
         else {
-            pd.inventory = cleanList(pd.inventory, 40, ctx); pd.bank = cleanList(pd.bank, 130, ctx); pd.equipment = cleanEquip(pd.equipment, ctx);
+            pd.inventory = cleanList(pd.inventory, 120, ctx); pd.bank = cleanList(pd.bank, 130, ctx); pd.equipment = cleanEquip(pd.equipment, ctx);
             if (pd.escrow !== undefined && pd.escrow !== null) {
                 const e = pd.escrow; if (!e || typeof e !== 'object' || !Array.isArray(e.items) || typeof e.id !== 'string') pd.escrow = null;
                 else pd.escrow = { id: e.id.slice(0, 60), items: e.items.slice(0, 8).filter(x => Array.isArray(x) && typeof x[0] === 'string' && ITEM_RE.test(x[0]) && Number.isInteger(x[1]) && x[1] >= 1 && x[1] <= MAXQ).map(x => [x[0], x[1]]) };

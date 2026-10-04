@@ -264,6 +264,14 @@
         } catch (e) { setActionText('Sem conexão. Tente novamente em instantes.', '#e74c3c'); }
         renderPanel();
     }
+    function editDoor(o) {   // Dev: define/troca o dono de uma porta de casa (salva ao digitar, ao teclar Enter ou ao clicar em Salvar)
+        const cur = esc(o.owner || '');
+        openModal('<h3 style="margin-top:0">Porta de Casa</h3><p style="font-size:.8rem;opacity:.85;margin:0 0 6px">Informe o nome do usuário que mora aqui (o mesmo do login; maiúsculas não importam). Só o dono decora e convida.</p><label>Dono (nome do usuário):</label><input type="text" id="hd-owner" class="dev-input" maxlength="40" value="' + cur + '" style="margin-bottom:8px"><div id="hd-msg" style="font-size:.75rem;min-height:1em;color:#f1c40f"></div><div style="text-align:right"><button class="dev-btn" id="hd-ok" style="background:#2a5a3a;color:#fff;border-radius:6px;padding:4px 14px">Salvar</button></div>');
+        const inp = $('hd-owner'), ok = $('hd-ok'), msg = $('hd-msg');
+        const apply = () => { o.owner = (inp.value || '').trim().slice(0, 40); o.name = o.owner ? 'Casa de ' + o.owner : 'Casa'; try { saveDataLogic(false, true); } catch (e) { } if (msg) msg.textContent = o.owner ? 'Dono: ' + o.owner : ''; };
+        inp.addEventListener('input', apply); inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { apply(); closeModal(); } });
+        ok.onclick = () => { apply(); closeModal(); }; setTimeout(() => { try { inp.focus(); } catch (e) { } }, 50);
+    }
     async function enterHouse(door) {
         if (!gameMaps.casa) { setActionText('Esta casa ainda não está pronta. Tente novamente mais tarde.', '#e74c3c'); return; }
         if (!door || !door.owner) { setActionText('Esta casa ainda não tem morador.', '#f1c40f'); return; }
@@ -441,8 +449,8 @@
     function tickBtn() {
         if (!btn) {
             btn = document.createElement('button'); btn.id = 'house-btn'; btn.textContent = 'Decorar casa'; btn.className = 'dev-btn';
-            btn.style.cssText = 'position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:60;display:none;padding:6px 14px;font-weight:700;background:linear-gradient(#5a3d1e,#3a2410);color:#f0e2bd;border:2px solid #c9a24a;border-radius:8px;cursor:pointer';
-            btn.onclick = openDecor; document.body.appendChild(btn);
+            btn.style.cssText = 'position:absolute;left:50%;top:54px;transform:translateX(-50%);z-index:60;display:none;padding:6px 14px;font-weight:700;background:linear-gradient(#5a3d1e,#3a2410);color:#f0e2bd;border:2px solid #c9a24a;border-radius:8px;cursor:pointer';
+            btn.onclick = openDecor; (document.getElementById('game-container') || document.body).appendChild(btn);
         }
         btn.style.display = (typeof currentMap !== 'undefined' && currentMap === 'casa' && isMine()) ? '' : 'none';
     }
@@ -453,5 +461,5 @@
         setInterval(tickBtn, 400); setInterval(trainTick, 250);
     }
     window.addEventListener('load', wire);
-    window.World2 = { houseKey: () => (hctx && hctx.owner ? 'casa_' + String(hctx.owner).toLowerCase().replace(/[^\w\-]/g, '_').slice(0, 34) : null), ITEMS, CREATURES, FURN, HOUSE_MAX, record, kills, beastList, beastProgress, placeInWorld, merge, drawEntity, enterHouse, openDecor, buy, refreshHouse, drawOverlay, onLogin, TRAIN, buildCatacombs, buildHouseShell };
+    window.World2 = { houseKey: () => (hctx && hctx.owner ? 'casa_' + String(hctx.owner).toLowerCase().replace(/[^\w\-]/g, '_').slice(0, 34) : null), ITEMS, CREATURES, FURN, HOUSE_MAX, record, kills, beastList, beastProgress, placeInWorld, merge, drawEntity, enterHouse, editDoor, openDecor, buy, refreshHouse, drawOverlay, onLogin, TRAIN, buildCatacombs, buildHouseShell };
 })();
