@@ -1948,7 +1948,7 @@
                     } else {
                         let myWp = (item.isMain && player.isPerformingAction && player.actionToolItem) ? player.actionToolItem : (item.op.equipment ? item.op.equipment.weapon : null); 
                         let myEquip = { weapon: myWp, shield: item.op.equipment ? item.op.equipment.shield : null, body: item.op.equipment ? item.op.equipment.body : null, head: item.op.equipment ? item.op.equipment.head : null };
-                        const _pf = () => drawCharacter(ctx, item.px, item.py, item.op.facing || {x:0, y:1}, item.op.actionAnim || 0, myEquip, item.name, item.isMain, { title: item.op.title || '', emote: item.op._em || null, look: item.op.look || null });
+                        const _pf = () => { const tp = item.isMain && window.World2 && World2.trainPose ? World2.trainPose(item.op, myEquip) : null; if (tp && tp.skip) return; drawCharacter(ctx, item.px, item.py, (tp && tp.facing) || item.op.facing || {x:0, y:1}, tp && tp.anim != null ? tp.anim : (item.op.actionAnim || 0), (tp && tp.equip) || myEquip, item.name, item.isMain, { title: item.op.title || '', emote: item.op._em || null, look: item.op.look || null }); };
                         const _mt = window.Pets && Pets.mountOf(item);   // montado: o cavaleiro senta sobre a montaria (pets.js)
                         if (_mt) Pets.drawMounted(ctx, item, _mt, myEquip, { title: item.op.title || '', emote: item.op._em || null, look: item.op.look || null }, T, mapObj);
                         else if (Art.isWater(mapObj, item.px, item.py)) Art.drawSubmerged(ctx, item.px, item.py, 26, 50, 0.4, T, _pf); else _pf();

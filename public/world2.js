@@ -232,6 +232,7 @@
         } else if (ed.on) {
             const m = gameMaps.casa; ctx.save(); ctx.strokeStyle = 'rgba(240,226,189,.35)'; ctx.setLineDash([3, 5]); (m.entities || []).forEach((o) => { if (o && o.hf) ctx.strokeRect(o.x - 1, o.y - 1, (o.w || 30) + 2, (o.h || 30) + 2); }); ctx.restore();
         }
+        try { trainOverlay(ctx, T); } catch (e) { }
         if (tr && tr.on) {   // barra de progresso do treino
             const p = Math.min(1, (performance.now() - tr.t0) / (trainSecs() * 1000)), x = player.x - 24, y = player.y - 48;
             ctx.save(); ctx.fillStyle = 'rgba(20,12,6,.8)'; ctx.fillRect(x - 1, y - 1, 50, 9); ctx.fillStyle = '#e0b84a'; ctx.fillRect(x, y, 48 * p, 7); ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#f0e2bd'; ctx.fillText(TRAIN[tr.fk].icon + ' ' + TRAIN[tr.fk].verb + '...', player.x, y - 4); ctx.restore();
@@ -241,21 +242,106 @@
     /* ---------- treino em casa ---------- */
     let tr = null;
     const today = () => new Date().toISOString().slice(0, 10);
+    /* ---- poses de treino: o personagem vai para o lugar certo de cada móvel ---- */
+    function poseSpot(t) {
+        const mw = (gameMaps.casa && gameMaps.casa.width) || 900, mh = (gameMaps.casa && gameMaps.casa.height) || 640, cx = t.x + t.w / 2; let px = player.x, py = player.y;
+        tr.back = { x: player.x, y: player.y };
+        if (t.fk === 'hottub') { px = cx; py = t.y + t.h / 2 + 12; tr.back = { x: cx, y: t.y + t.h + 30 }; }
+        else if (t.fk === 'library') { px = cx; py = t.y + t.h + 40; }
+        else if (t.fk === 'archery') { px = cx; py = Math.min(mh - 80, t.y + t.h + 150); tr.tx = cx; tr.ty = t.y + t.h * 0.36; tr.R = Math.min(t.w, t.h) * 0.42; }
+        else if (t.fk === 'punchbag') { tr.dir = cx > mw / 2 ? 1 : -1; px = cx - tr.dir * (t.w / 2 + 26); py = t.y + t.h - 12; }
+        else if (t.fk === 'dummy') { px = cx; py = t.y + t.h + 8; }
+        player.x = px; player.y = py; player.destX = px; player.destY = py; tr.x = px; tr.y = py;
+    }
+    const BEAT = { dummy: [900, 330], punchbag: [480, 240], archery: [1700, 320] };
+    function trainAnim() { const b = tr && BEAT[tr.fk]; if (!b || !tr.cycT) return 0; const el = performance.now() - tr.cycT; return el < b[1] ? 15 * (1 - el / b[1]) : 0; }
+    const BOW = { tool: 'ranged', name: 'Shortbow' };
+    /* chamado pelo desenho do personagem principal: devolve null (normal), {skip:true} (desenhado no overlay) ou ajustes de pose */
+    function trainPose(op, eq) {
+        if (!tr || !tr.on || currentMap !== 'casa') return null; const k = tr.fk;
+        if (k === 'hottub' || k === 'library') return { skip: true };
+        const body = eq && eq.body, head = eq && eq.head;
+        if (k === 'archery') return { facing: { x: 0, y: -1 }, anim: trainAnim(), equip: { weapon: BOW, shield: null, body, head } };
+        if (k === 'punchbag') return { facing: { x: tr.dir, y: 0 }, anim: trainAnim(), equip: { weapon: null, shield: null, body, head } };
+        if (k === 'dummy') return { facing: { x: 0, y: -1 }, anim: trainAnim() };
+        return null;
+    }
+    function swayAngle(o, k) {
+        if (!tr || !tr.on || tr.fk !== k || tr.id !== o.id) return 0; const now = performance.now();
+        if (k === 'punchbag') { const dt = (now - (tr.swingT || 1e12)) / 1000; if (dt < 0 || dt > 3) return 0; return -tr.dir * 0.4 * Math.exp(-2 * dt) * Math.cos(dt * 7.5); }
+        if (k === 'dummy') { const dt = (now - (tr.shakeT || 1e12)) / 1000; if (dt < 0 || dt > 1) return 0; return 0.09 * Math.exp(-5 * dt) * Math.sin(dt * 38); }
+        return 0;
+    }
+    function lookNaked() { const L = Object.assign({}, (window.Art && Art.defaultLook()) || {}, player.look || {}); L.shirt = L.skin || '#f1c27d'; L.pants = '#2b6cb0'; return L; }
+    function drawBook(c, x, y, T) {
+        c.save(); c.lineWidth = 1.2; c.strokeStyle = '#1c120a';
+        c.fillStyle = '#5a2a1a'; c.beginPath(); c.moveTo(x - 11, y + 2); c.lineTo(x + 11, y + 2); c.lineTo(x + 10, y - 8); c.lineTo(x - 10, y - 8); c.closePath(); c.fill(); c.stroke();
+        c.fillStyle = '#f4ecd2'; c.beginPath(); c.moveTo(x - 0.8, y + 1); c.lineTo(x - 10, y + 0.4); c.lineTo(x - 9.4, y - 7); c.lineTo(x - 0.8, y - 6.2); c.closePath(); c.fill(); c.stroke();
+        const flip = ((performance.now() / 1000) % 2.6) / 0.5;   // vira a página de tempos em tempos
+        if (flip < 1) { const a = flip; c.fillStyle = '#fffaf0'; c.beginPath(); c.moveTo(x + 0.8, y + 1); c.lineTo(x + 0.8 - a * 8, y - 6 - Math.sin(a * 3.14) * 5); c.lineTo(x + 9.4 - a * 18, y - 7 - Math.sin(a * 3.14) * 4); c.lineTo(x + 9.4 - a * 18 + 0.4, y + 0.4); c.closePath(); c.fill(); c.stroke(); }
+        else { c.fillStyle = '#f4ecd2'; c.beginPath(); c.moveTo(x + 0.8, y + 1); c.lineTo(x + 10, y + 0.4); c.lineTo(x + 9.4, y - 7); c.lineTo(x + 0.8, y - 6.2); c.closePath(); c.fill(); c.stroke(); }
+        c.strokeStyle = 'rgba(70,50,30,.5)'; c.lineWidth = 0.7; c.beginPath(); for (let i = 0; i < 4; i++) { c.moveTo(x - 8.4, y - 5.4 + i * 1.7); c.lineTo(x - 2, y - 5 + i * 1.7); if (flip >= 1) { c.moveTo(x + 2, y - 5 + i * 1.7); c.lineTo(x + 8.4, y - 5.4 + i * 1.7); } } c.stroke();
+        c.restore();
+    }
+    function trainOverlay(ctx, T) {
+        if (!tr || !tr.on || currentMap !== 'casa') return; const now = performance.now(), k = tr.fk, b = BEAT[k];
+        if (b) { const c = Math.floor((now - tr.t0b) / b[0]); if (c !== tr.cyc) { tr.cyc = c; tr.cycT = now; if (k === 'punchbag') tr.swingT = now + 110; else if (k === 'dummy') tr.shakeT = now + 130; else if (k === 'archery') tr.arrows.push({ t0: now + 160, x0: player.x + 9, y0: player.y - 14, hx: tr.tx + (Math.random() - 0.5) * tr.R * 1.3, hy: tr.ty + (Math.random() - 0.5) * tr.R * 1.3 }); } }
+        const ent = tr.ent, px = player.x, py = player.y;
+        if (k === 'archery') {
+            for (let i = tr.arrows.length - 1; i >= 0; i--) {
+                const a = tr.arrows[i], u = (now - a.t0) / 480; if (u < 0) continue;
+                if (u >= 1) { tr.stuck.push({ x: a.hx, y: a.hy }); if (tr.stuck.length > 7) tr.stuck.shift(); tr.arrows.splice(i, 1); tr.hitT = now; tr.hitX = a.hx; tr.hitY = a.hy; continue; }
+                const x = a.x0 + (a.hx - a.x0) * u, y = a.y0 + (a.hy - a.y0) * u - Math.sin(u * Math.PI) * 18;
+                const vy = (a.hy - a.y0) - Math.cos(u * Math.PI) * 18 * Math.PI, vx = a.hx - a.x0, an = Math.atan2(vy, vx);
+                ctx.save(); ctx.translate(x, y); ctx.rotate(an); ctx.lineCap = 'round'; ctx.strokeStyle = '#1c120a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-11, 0); ctx.lineTo(5, 0); ctx.stroke(); ctx.strokeStyle = '#d8c090'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(-11, 0); ctx.lineTo(5, 0); ctx.stroke(); ctx.fillStyle = '#dfe6ea'; ctx.beginPath(); ctx.moveTo(5, -2.2); ctx.lineTo(9, 0); ctx.lineTo(5, 2.2); ctx.fill(); ctx.fillStyle = '#c0392b'; ctx.beginPath(); ctx.moveTo(-11, 0); ctx.lineTo(-14, -2.4); ctx.lineTo(-9, -0.4); ctx.moveTo(-11, 0); ctx.lineTo(-14, 2.4); ctx.lineTo(-9, 0.4); ctx.fill(); ctx.restore();
+            }
+            tr.stuck.forEach((s) => { ctx.save(); ctx.lineCap = 'round'; ctx.strokeStyle = '#1c120a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(s.x - 1.5, s.y + 9); ctx.stroke(); ctx.strokeStyle = '#d8c090'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(s.x - 1.5, s.y + 9); ctx.stroke(); ctx.fillStyle = '#c0392b'; ctx.fillRect(s.x - 3, s.y + 8, 3, 2); ctx.fillRect(s.x, s.y + 8, 3, 2); ctx.restore(); });
+            if (tr.hitT && now - tr.hitT < 220) { const q = (now - tr.hitT) / 220; ctx.save(); ctx.strokeStyle = 'rgba(255,240,160,' + (1 - q) + ')'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(tr.hitX, tr.hitY, 4 + q * 9, 0, 6.3); ctx.stroke(); ctx.restore(); }
+        } else if (k === 'punchbag' && tr.swingT && now - tr.swingT < 140 && now > tr.swingT) {
+            const q = (now - tr.swingT) / 140, bx = ent.x + ent.w / 2 - tr.dir * ent.w * 0.3, by = ent.y + ent.h * 0.58; ctx.save(); ctx.strokeStyle = 'rgba(255,240,170,' + (1 - q) + ')'; ctx.lineWidth = 2; for (let i = 0; i < 6; i++) { const a = i * 1.05 + 0.3; ctx.beginPath(); ctx.moveTo(bx + Math.cos(a) * (4 + q * 4), by + Math.sin(a) * (4 + q * 4)); ctx.lineTo(bx + Math.cos(a) * (9 + q * 9), by + Math.sin(a) * (9 + q * 9)); ctx.stroke(); } ctx.restore();
+        } else if (k === 'hottub') {
+            const L = lookNaked(), cx = ent.x + ent.w / 2, cy = ent.y + ent.h / 2, wy = py + 8 - 27;
+            ctx.save(); ctx.beginPath(); ctx.rect(cx - 60, cy - 90, 120, wy - (cy - 90)); ctx.clip();
+            try { Art.drawPlayer(ctx, px, py, { x: 0, y: 1 }, 0, null, currentUser, true, { look: L, title: player.title || '' }); } catch (e) { }
+            ctx.restore();
+            ctx.save(); ctx.beginPath(); ctx.ellipse(cx, cy, ent.w / 2 - 6, ent.h / 2 - 6, 0, 0, 6.3); ctx.clip();
+            const g = ctx.createLinearGradient(0, wy, 0, wy + 30); g.addColorStop(0, 'rgba(120,210,245,.55)'); g.addColorStop(1, 'rgba(60,150,210,.15)'); ctx.fillStyle = g; ctx.fillRect(cx - 60, wy, 120, 36);
+            ctx.strokeStyle = 'rgba(220,245,255,.85)'; ctx.lineWidth = 1.6; ctx.beginPath(); for (let i = -20; i <= 20; i += 2) { const yy = wy + Math.sin(T * 3 + i * 0.5) * 1.2; if (i === -20) ctx.moveTo(px + i, yy); else ctx.lineTo(px + i, yy); } ctx.stroke();
+            for (let r = 0; r < 2; r++) { const q = ((T * 0.5 + r * 0.5) % 1); ctx.strokeStyle = 'rgba(230,248,255,' + (0.5 * (1 - q)) + ')'; ctx.lineWidth = 1.3; ctx.beginPath(); ctx.ellipse(px, wy + 3, 16 + q * 14, 4 + q * 5, 0, 0, 6.3); ctx.stroke(); }
+            ctx.fillStyle = 'rgba(255,255,255,.85)'; for (let i = 0; i < 7; i++) { const a = i * 1.7 + T * 0.4; ctx.beginPath(); ctx.arc(px + Math.cos(a) * (13 + (i % 3) * 4), wy + 1 + Math.sin(a * 1.3) * 2, 2 + (i % 2), 0, 6.3); ctx.fill(); }
+            ctx.restore();
+            for (let i = 0; i < 6; i++) { const q = ((T * 0.35 + i / 6) % 1), a = 0.28 * (1 - q); ctx.fillStyle = 'rgba(255,255,255,' + a + ')'; ctx.beginPath(); ctx.arc(cx + Math.sin(i * 2 + T) * 18, ent.y + 4 - q * 46, 6 + q * 10, 0, 6.3); ctx.fill(); }
+        } else if (k === 'library') {
+            const L = Object.assign({}, (window.Art && Art.defaultLook()) || {}, player.look || {}), eq = player.equipment || {}, E = { weapon: null, shield: null, body: eq.body, head: eq.head };
+            const wood = '#5a3a1a', pc = L.pants || '#4a3a2a';
+            ctx.save(); ctx.lineWidth = 1.5; ctx.strokeStyle = '#1c120a';
+            ctx.fillStyle = wood; ctx.fillRect(px - 12, py - 28, 24, 30); ctx.strokeRect(px - 12, py - 28, 24, 30);
+            ctx.fillStyle = '#7a5430'; ctx.fillRect(px - 14, py + 1, 28, 6); ctx.strokeRect(px - 14, py + 1, 28, 6);
+            ctx.save(); ctx.beginPath(); ctx.rect(px - 40, py - 120, 80, 120 + 2); ctx.clip();
+            try { Art.drawPlayer(ctx, px, py + 5, { x: 0, y: 1 }, 0, E, currentUser, true, { look: L, title: player.title || '' }); } catch (e) { }
+            ctx.restore();
+            ctx.fillStyle = pc; for (const sx of [-1, 1]) { ctx.beginPath(); ctx.roundRect ? ctx.roundRect(px + sx * 4.2 - 3.6, py + 1, 7.2, 9, 3) : ctx.rect(px + sx * 4.2 - 3.6, py + 1, 7.2, 9); ctx.fill(); ctx.stroke(); ctx.fillRect(px + sx * 4.2 - 3, py + 8, 6, 8); ctx.strokeRect(px + sx * 4.2 - 3, py + 8, 6, 8); ctx.fillStyle = '#2a1c12'; ctx.beginPath(); ctx.ellipse(px + sx * 4.2, py + 17, 4.4, 2.4, 0, 0, 6.3); ctx.fill(); ctx.stroke(); ctx.fillStyle = pc; }
+            drawBook(ctx, px, py - 10, T);
+            ctx.fillStyle = L.skin || '#f1c27d'; ctx.beginPath(); ctx.arc(px - 9.6, py - 6, 2.4, 0, 6.3); ctx.arc(px + 9.6, py - 6, 2.4, 0, 6.3); ctx.fill(); ctx.stroke();
+            for (let i = 0; i < 4; i++) { const q = ((T * 0.45 + i / 4) % 1); ctx.fillStyle = 'rgba(190,150,255,' + (0.7 * (1 - q)) + ')'; ctx.beginPath(); ctx.arc(px + Math.sin(i * 2.3 + T) * 9, py - 18 - q * 22, 1.6, 0, 6.3); ctx.fill(); }
+            ctx.restore();
+        }
+    }
     function stopTrain(msg, col) {
-        if (!tr) return; const t = tr; tr = null;
+        if (!tr) return; const t = tr; tr = null; if (t.fk === 'hottub' && t.back) { player.x = t.back.x; player.y = t.back.y; player.destX = player.x; player.destY = player.y; }
         setActionText(msg || (t.n ? 'Treino encerrado: +' + t.xp + ' XP em ' + t.n + ' sessão(ões).' : 'Treino interrompido.'), col || '#bdc3c7');
     }
     function startTrain(t) {
         const T = TRAIN[t.fk]; if (!T) return false; if (!isMine()) { setActionText('Só o morador treina aqui.', '#f1c40f'); return true; }
         if (tr && tr.on) { stopTrain(); return true; }   // clicar de novo no móvel para
-        tr = { on: true, fk: t.fk, t0: performance.now(), x: player.x, y: player.y, hp: player.stats.hp, n: 0, xp: 0 };
+        tr = { on: true, fk: t.fk, id: t.id, t0: performance.now(), t0b: performance.now(), cyc: -1, cycT: 0, x: player.x, y: player.y, hp: player.stats.hp, n: 0, xp: 0, arrows: [], stuck: [], dir: 1, ent: t };
+        poseSpot(t);
         setActionText(T.verb + '... (repete sozinho; ande ou clique de novo para parar)', '#e0b84a'); return true;
     }
     function trainTick() {
         if (!tr || !tr.on) return; const T = TRAIN[tr.fk];
         if (currentMap !== 'casa') { stopTrain(); return; }
         if (Math.hypot(player.x - tr.x, player.y - tr.y) > 30 || player.stats.hp < tr.hp || ed.on) { stopTrain(); return; }
-        if (T.skill && Math.random() < 0.15) { try { player.actionAnim = 15; } catch (e) { } }
         if (performance.now() - tr.t0 < trainSecs() * 1000) return;
         const fk = tr.fk, sk = player.stats.skills[T.skill]; if (!sk) { stopTrain(); return; }
         const xp = trainXpOf(fk); tr.t0 = performance.now(); tr.n++; tr.xp += xp;   // já começa a próxima sessão
@@ -466,6 +552,7 @@
         const k = o.fk;
         if (o.rot && FURN[k]) { drawTurned(ctx, o, T, k, o.rot & 3); return; }
         shadow();
+        const swy = swayAngle(o, k); if (swy) { const pvx = x + w / 2, pvy = k === 'punchbag' ? y + h * 0.06 : y + h * 0.95; ctx.save(); ctx.translate(pvx, pvy); ctx.rotate(swy); ctx.translate(-pvx, -pvy); }
         if (k === 'dummy') {
             ctx.fillStyle = '#6b4a2b'; ctx.fillRect(x + w * .44, y + h * .3, w * .12, h * .7); ctx.fillRect(x + w * .2, y + h * .92, w * .6, h * .08);
             ctx.fillStyle = '#c9a86a'; ctx.fillRect(x + w * .2, y + h * .3, w * .6, h * .3); ctx.strokeRect(x + w * .2, y + h * .3, w * .6, h * .3);
@@ -513,6 +600,7 @@
             ctx.fillStyle = '#e0b84a'; ctx.beginPath(); ctx.moveTo(x + w * .2, y + h * .2); ctx.lineTo(x + w * .3, y + h * .02); ctx.lineTo(x + w * .5, y + h * .16); ctx.lineTo(x + w * .7, y + h * .02); ctx.lineTo(x + w * .8, y + h * .2); ctx.closePath(); ctx.fill(); ctx.stroke();
             ctx.fillStyle = 'rgba(93,255,176,' + (0.35 + 0.25 * Math.sin(T * 3)).toFixed(2) + ')'; ctx.beginPath(); ctx.arc(x + w / 2, y + h * .38, w * .4, 0, 6.3); ctx.fill();
         } else { ctx.fillStyle = 'rgba(200,200,200,.5)'; ctx.fillRect(x, y, w, h); }
+        if (swy) ctx.restore();
     }
 
     /* ============================ LIGAÇÕES COM O JOGO ============================ */
@@ -538,5 +626,5 @@
         setInterval(tickBtn, 400); setInterval(trainTick, 250); setInterval(ensureDevTab, 2000);
     }
     window.addEventListener('load', wire);
-    window.World2 = { houseKey: () => (hctx && hctx.owner ? 'casa_' + String(hctx.owner).toLowerCase().replace(/[^\w\-]/g, '_').slice(0, 34) : null), ITEMS, CREATURES, FURN, HOUSE_MAX, record, kills, beastList, beastProgress, placeInWorld, merge, drawEntity, enterHouse, editDoor, openDecor, buy, refreshHouse, drawOverlay, onLogin, TRAIN, buildCatacombs, buildHouseShell };
+    window.World2 = { houseKey: () => (hctx && hctx.owner ? 'casa_' + String(hctx.owner).toLowerCase().replace(/[^\w\-]/g, '_').slice(0, 34) : null), ITEMS, CREATURES, FURN, HOUSE_MAX, record, kills, beastList, beastProgress, placeInWorld, merge, drawEntity, enterHouse, editDoor, openDecor, buy, refreshHouse, drawOverlay, onLogin, TRAIN, trainPose, buildCatacombs, buildHouseShell };
 })();
