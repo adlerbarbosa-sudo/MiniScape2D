@@ -117,11 +117,11 @@ module.exports = function createSocial(ctx) {
 
             case 'party_xp': {   // o XP de combate de quem lutou rende 50% (no cliente) aos companheiros próximos, no mesmo mapa
                 const gid = guildOf[u], gg = gid && db.guilds[gid];
-                if (gg) { const gx = Math.min(5000, Math.max(0, Math.floor(Number(b.x)) || 0)); if (gx > 0) { gg.xp = (gg.xp || 0) + gx; if (now() - gSave > 20000) { gSave = now(); markDirty(); } } }
+                if (gg) { const gx = Math.min(5000, Math.max(0, (Math.floor(Number(b.x)) || 0) / 100)); if (gx > 0) { gg.xp = Math.round(((gg.xp || 0) + gx) * 100) / 100; if (now() - gSave > 20000) { gSave = now(); markDirty(); } } }
                 const pid = partyOf[u], p = pid && parties[pid]; if (!p) return { ok: true };
                 const sk = String(b.s || ''); if (!/^(combat|ranged|magic)$/.test(sk)) return { ok: true };
-                let x = Math.floor(Number(b.x)); if (!(x > 0)) return { ok: true }; x = Math.min(x, 5000);
-                const n = now(), r = xpRate[u] || (xpRate[u] = { t: n, a: 0 }); if (n - r.t > 10000) { r.t = n; r.a = 0; } r.a += x; if (r.a > 20000) return { ok: true };
+                let x = Math.floor(Number(b.x)); if (!(x > 0)) return { ok: true }; x = Math.min(x, 500000);   // x em centésimos de XP base (as pancadas de monstros fracos valem frações)
+                const n = now(), r = xpRate[u] || (xpRate[u] = { t: n, a: 0 }); if (n - r.t > 10000) { r.t = n; r.a = 0; } r.a += x; if (r.a > 2000000) return { ok: true };
                 for (const m of p.members) { if (m === u || !online(m)) continue; const a = activePlayers[m]; if (a.map !== me.map || Math.hypot(a.x - me.x, a.y - me.y) > 1100) continue; const q = pend[m] || (pend[m] = []); if (q.length < 40) q.push({ f: u, s: sk, x }); }
                 return { ok: true };
             }

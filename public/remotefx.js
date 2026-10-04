@@ -3,7 +3,21 @@
     'use strict';
     let on = true; try { if (localStorage.getItem('ms_remote_fx') === '0') on = false; } catch (e) { }
     const out = [], live = [], seen = Object.create(null), known = Object.create(null); let lastMap = null;
+    function drawArrow(ctx, x, y, a) {   // mesmo desenho para a flecha própria e a dos outros jogadores
+        ctx.save(); ctx.translate(x, y); ctx.rotate(a || 0); ctx.fillStyle = '#8d6e4a'; ctx.fillRect(-8, -0.9, 13, 1.8); ctx.fillStyle = '#eceff1'; ctx.beginPath(); ctx.moveTo(8, 0); ctx.lineTo(4, -2.4); ctx.lineTo(4, 2.4); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#e8d8b8'; ctx.beginPath(); ctx.moveTo(-8, 0); ctx.lineTo(-11, -2.4); ctx.lineTo(-7, 0); ctx.lineTo(-11, 2.4); ctx.closePath(); ctx.fill(); ctx.restore();
+    }
+    function drawOrb(ctx, x, y, c, trail) {
+        for (let i = 0; i < trail.length; i += 2) { ctx.globalAlpha = (i / trail.length) * 0.4; ctx.fillStyle = c; ctx.beginPath(); ctx.arc(trail[i], trail[i + 1], 2 + i / 6, 0, 6.3); ctx.fill(); }
+        ctx.globalAlpha = 1; ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x, y, 6, 0, 6.3); ctx.fill(); ctx.fillStyle = '#ecf0f1'; ctx.beginPath(); ctx.arc(x, y, 3, 0, 6.3); ctx.fill();
+    }
     const RemoteFx = {
+        /* projéteis do PRÓPRIO jogador (index.html): flecha e orbe com o mesmo visual que os outros jogadores veem */
+        drawLocal(ctx, p) {
+            if (p.type === 'ranged') { drawArrow(ctx, p.x, p.y, Math.atan2((p.ty || p.y) - p.y, (p.tx || p.x) - p.x)); return; }
+            const tr = p._tr || (p._tr = []); if (p._trf !== p.x + ',' + p.y) { p._trf = p.x + ',' + p.y; tr.push(p.x, p.y); if (tr.length > 12) tr.splice(0, 2); }
+            drawOrb(ctx, p.x, p.y, p.color || '#1abc9c', (typeof Quality !== 'undefined' && Quality.level > 0) ? tr : []);
+        },
         get on() { return on; },
         set(v) { on = !!v; try { localStorage.setItem('ms_remote_fx', on ? '1' : '0'); } catch (e) { } if (!on) live.length = 0; },
         /* chamado quando o jogador lança: vai no próximo sync */
@@ -61,7 +75,7 @@
                     else if (p.k === 'cone') { const an = Math.atan2(p.ty - p.y, p.tx - p.x); ctx.globalAlpha = a * 0.5; ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.arc(p.x, p.y, p.r * (0.55 + u * 0.45), an - 0.6, an + 0.6); ctx.closePath(); ctx.fill(); }
                     else { ctx.globalCompositeOperation = 'lighter'; ctx.lineWidth = 5 * a + 1; ctx.beginPath(); ctx.moveTo(p.x, p.y); const mx = (p.x + p.tx) / 2 + Math.sin(p.age) * 8, my = (p.y + p.ty) / 2 + Math.cos(p.age * 2) * 8; ctx.lineTo(mx, my); ctx.lineTo(p.tx, p.ty); ctx.stroke(); }
                     ctx.restore(); continue; }
-                if (p.k === 'ranged') { ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.a || 0); ctx.fillStyle = '#795548'; ctx.fillRect(-7, -1, 12, 2); ctx.fillStyle = '#cfd8dc'; ctx.fillRect(5, -2, 3, 4); ctx.restore(); continue; }
+                if (p.k === 'ranged') { drawArrow(ctx, p.x, p.y, p.a); continue; }
                 for (let i = 0; i < p.trail.length; i += 2) { ctx.globalAlpha = (i / p.trail.length) * 0.4; ctx.fillStyle = p.c; ctx.beginPath(); ctx.arc(p.trail[i], p.trail[i + 1], 2 + i / 6, 0, 6.3); ctx.fill(); }
                 ctx.globalAlpha = 1; ctx.fillStyle = p.c; ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, 6.3); ctx.fill(); ctx.fillStyle = '#ecf0f1'; ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, 6.3); ctx.fill();
             }

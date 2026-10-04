@@ -51,7 +51,7 @@
     const busy = {};   // ids de troca que já estão sendo processados neste cliente
     function onSync(data) { if (data && data.social) onState(data.social); try { if (window.Life) Life.onSync(data); } catch (e) { } }
     function onState(s) {
-        try { if (s.xp && s.xp.length) { s.xp.forEach((e) => { try { if (window.partyXpGain) window.partyXpGain(e.s, e.x, e.f); } catch (x) { } }); } } catch (e) { }
+        try { if (s.xp && s.xp.length) { s.xp.forEach((e) => { try { if (window.partyXpGain) window.partyXpGain(e.s, e.x / 100, e.f); } catch (x) { } }); } } catch (e) { }
         S = s;
         const key = JSON.stringify(s);
         try { handleTrade(s.trade).catch((e) => console.error('[troca]', e)); } catch (e) { console.error('[troca]', e); }
@@ -148,7 +148,7 @@
     let _px = {}, _pxT = 0;
     window.partyShareXp = function (sk, x) {
         if (!((S.party && S.party.members.length >= 2) || S.guild) || !(x > 0)) return 0; _px[sk] = (_px[sk] || 0) + x;
-        if (_pxT) return groupNear(); _pxT = setTimeout(() => { const o = _px; _px = {}; _pxT = 0; Object.keys(o).forEach((k) => { socialCall('party_xp', { s: k, x: Math.round(o[k]) }, true).catch(() => { }); }); }, 1200);
+        if (_pxT) return groupNear(); _pxT = setTimeout(() => { const o = _px; _px = {}; _pxT = 0; Object.keys(o).forEach((k) => { socialCall('party_xp', { s: k, x: Math.round(o[k] * 100) }, true).catch(() => { }); }); }, 1200);
         return groupNear();
     };
     function groupNear() { let c = 0; try { if (!S.party) return 0; S.party.members.forEach((m) => { const o = otherPlayers[m.u]; if (m.u !== window.currentUser && o && o.map === currentMap && Math.hypot((o.x || 0) - player.x, (o.y || 0) - player.y) < 1100) c++; }); } catch (e) { } return c; }
