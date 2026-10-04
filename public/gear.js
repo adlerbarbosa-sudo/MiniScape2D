@@ -103,6 +103,8 @@
     def('Amulet of Haste', '📿', 'amulet', 'Amuleto de asa de morcego: ataques mais rápidos.', { atkSpd: 8 }, 'Gold Bar,2|Bat Wing,3', 0.2);
     def('Amulet of Warding', '📿', 'amulet', 'Amuleto com núcleo de golem: reduz o dano sofrido.', { dr: 5 }, 'Gold Bar,2|Stone Core,1', 0.3);
     def('Soul Pendant', '📿', 'amulet', 'Pingente com uma gema de alma do Lich Rei.', { crit: 6, critDmg: 25, lifesteal: 2 }, 'Soul Gem,1|Gold Bar,2', 0.3);
+    def('Ring of Focus', '💍', 'ring', 'Anel de ectoplasma: as técnicas voltam mais depressa.', { cdr: 4 }, 'Gold Bar,1|Ectoplasm,3', 0.1);
+    def('Amulet of Time', '📿', 'amulet', 'Amuleto com uma ampulheta presa: o tempo corre a seu favor.', { cdr: 6 }, 'Gold Bar,2|Dark Tome,1', 0.3);
 
     /* ===== OURO: minério e barra (vem de monstros; funde na fornalha) ===== */
     ITEMS['Gold Ore'] = { name: 'Gold Ore', icon: '🟡', type: 'resource', stackable: true, weight: 2.4, desc: 'Pepita de ouro. Duas viram uma barra na fornalha (Ferraria 12).' };

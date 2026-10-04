@@ -9,7 +9,7 @@
       Tempo por ação diminui com o nível (`gatherFrames`), chance de sucesso e de dobrar o recurso sobem com o nível.
    3) VENDA A NPC (`makeValuer`): preço de venda por unidade. Campo do item `sell` (moedas por unidade): número > 0 = preço escolhido;
       0, null ou `nosell: true` = NÃO vendível; ausente = preço automático (pré-set). Itens exclusivos (Mímicos, pets, montarias, encantados, iscas, caixas, missão) nunca são vendidos.
-      Regras anti-exploit: venda < compra na loja (sempre), venda de um item fabricado <= 1,2 x soma da venda dos materiais, e a conta fecha para fundição e culinária.
+      Regras anti-exploit: venda < compra na loja (sempre, mesmo no preço escolhido pelo admin); no preço automático, venda de um item fabricado <= 1,2 x soma da venda dos materiais, e a conta fecha para fundição e culinária.
    Valores de venda: ~15% do preço de loja para equipamento/ferramenta, ~30% para recursos/comida/poções; sem preço de loja: tabela moderada (PRIM) ou força do item (gearPrice). */
 (function (root, factory) {
     const m = factory(root);
@@ -291,10 +291,11 @@
             else base = 1;
             // teto 1: fabricado vale no máximo 1,2 x soma da venda dos materiais (por unidade produzida)
             const rec = recipeList(it);
-            if (rec && cus <= 0 || rec && cus > 0) { const per = Math.max(1, parseInt(it.craftQty) || 1); base = Math.min(base, Math.floor(CRAFT_MUL * matSum(rec) / per)); }
-            if (proc[name]) base = Math.min(base, Math.floor(CRAFT_MUL * matSum(proc[name])));
+            // (o preço que o ADMIN escolhe no item vale como digitado: só o teto 3, de loja, continua valendo sempre)
+            if (rec && cus <= 0) { const per = Math.max(1, parseInt(it.craftQty) || 1); base = Math.min(base, Math.floor(CRAFT_MUL * matSum(rec) / per)); }
+            if (proc[name] && cus <= 0) base = Math.min(base, Math.floor(CRAFT_MUL * matSum(proc[name])));
             // teto 2: o prato cozido vale no máximo 1,2 x o cru
-            if (own(cooksFrom, name)) base = Math.min(base, Math.floor(CRAFT_MUL * sell(cooksFrom[name])));
+            if (own(cooksFrom, name) && cus <= 0) base = Math.min(base, Math.floor(CRAFT_MUL * sell(cooksFrom[name])));
             // teto 3: nunca vende por mais (nem igual) do que custa na loja
             if (shopP > 0) base = Math.min(base, Math.ceil(shopP) - 1);
             base = Math.floor(base); if (!(base >= 1)) return 0;

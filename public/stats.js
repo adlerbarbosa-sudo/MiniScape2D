@@ -76,11 +76,25 @@
     const saves = () => Math.random() * 100 < get().save;   // true = não gasta a munição/runa desta vez
 
     /* ---------- nível mínimo para equipar ---------- */
-    function reqOf(it) { const r = it && (it.req || ((typeof itemDB !== 'undefined' && itemDB[it.name]) || {}).req); return r && r.skill && r.lvl > 1 ? r : null; }
+    /* requisito de nível de QUALQUER equipamento: econ.js (tabela por tier + derivação pela força do item + edição do admin). Mímicos não têm requisito (evoluem com o jogador). */
+    function reqOf(it) {
+        if (!it) return null;
+        const db = typeof itemDB !== 'undefined' ? itemDB : null, def = (db && db[it.name]) || {};
+        if (it.mimic || def.mimic) return null;
+        if (window.Econ) { const r = Econ.reqOf(it, db); return r && r.skill && r.lvl > 1 ? r : null; }
+        const r = it.req || def.req; return r && r.skill && r.lvl > 1 ? r : null;
+    }
+    const SKN_FULL = { cmb: 'Nível de Combate', defence: 'Defesa', woodcutting: 'Lenhador', mining: 'Mineração', crafting: 'Artesanato', smithing: 'Ferraria', cooking: 'Culinária' };
+    const skillLabel = (k) => SKNAME[k] || SKN_FULL[k] || k;
+    const levelFor = (k) => {
+        const sks = player.stats && player.stats.skills; if (!sks) return 1;
+        if (k === 'cmb') return window.Balance && Balance.combatLevel ? Balance.combatLevel(sks) : 1;
+        return sks[k] ? sks[k].level : 1;
+    };
     function canEquip(it) {
         const r = reqOf(it); if (!r || !gameReady()) return { ok: true };
-        const sk = player.stats && player.stats.skills && player.stats.skills[r.skill], lv = sk ? sk.level : 1;
-        return lv >= r.lvl ? { ok: true } : { ok: false, msg: 'Requer ' + (SKNAME[r.skill] || r.skill) + ' nível ' + r.lvl + ' (você tem ' + lv + ').' };
+        const lv = levelFor(r.skill);
+        return lv >= r.lvl ? { ok: true } : { ok: false, msg: 'Requer ' + skillLabel(r.skill) + ' nível ' + r.lvl + ' (você tem ' + lv + ').' };
     }
 
     /* ---------- tooltip ---------- */
@@ -88,7 +102,7 @@
         if (!it) return ''; let h = '';
         const col = '#7fd0ff';
         KEYS.forEach((k) => { const v = Number(it[k]); if (v > 0) h += `<div class="tt-stat" style="color:${col}">${esc(LABEL[k])}: ${FMT[k](v)}</div>`; });
-        const r = reqOf(it); if (r) { const ok = canEquip(it).ok; h += `<div class="tt-stat" style="color:${ok ? '#9ad39a' : '#ff8a7a'}">Requer ${esc(SKNAME[r.skill] || r.skill)} ${r.lvl}</div>`; }
+        const r = reqOf(it); if (r) { const ok = canEquip(it).ok; h += `<div class="tt-stat" style="color:${ok ? '#9ad39a' : '#ff8a7a'}">Requer ${esc(skillLabel(r.skill))} ${r.lvl}</div>`; }
         const s = setOf(it), S = s && window.Gear && Gear.SETS[s];
         if (S) {
             let n = 0; if (gameReady()) ['head', 'body', 'weapon', 'shield'].forEach((sl) => { if (player.equipment[sl] && setOf(player.equipment[sl]) === s) n++; });

@@ -67,7 +67,7 @@
         const lvl = player.stats.skills.smithing.level; let blocked = null, rec = null;
         for (const r of SMELT) { if (!hasNeeds(r)) continue; if (lvl < r.lvl) { blocked = blocked || r; continue; } rec = r; break; }
         if (!rec) { setActionText(blocked ? `Requer Ferraria nível ${blocked.lvl} para ${blocked.out}.` : 'Sem minérios para fundir. (Aço: Iron Ore + 2 Coal)', '#e74c3c'); return; }
-        smeltRec = rec; player.isPerformingAction = true; player.actionTarget = furnace; player.actionType = 'smelt'; player.actionTimer = player.actionDelay = Math.max(30, 100 - lvl * 2);
+        smeltRec = rec; player.isPerformingAction = true; player.actionTarget = furnace; player.actionType = 'smelt'; player.actionTimer = player.actionDelay = (window.Econ ? Econ.gatherFrames(100, lvl, 1, 24) : Math.max(30, 100 - lvl * 2));
     }
     function finishSmelt() {
         const r = smeltRec; player.isPerformingAction = false; smeltRec = null; if (!r || !hasNeeds(r)) return;

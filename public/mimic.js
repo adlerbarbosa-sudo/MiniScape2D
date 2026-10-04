@@ -36,22 +36,22 @@
     // st: atributo -> [no nível 1, no nível 50]
     const P = (cls, n, slot, icon, desc, st, extra) => Object.assign({ cls, n, slot, icon, desc, st }, extra || {});
     const LIST = [
-        P('guerreiro', 'Elmo Mímico do Guerreiro', 'head', '⛑️', 'Um elmo que pisca quando ninguém olha.', { defBonus: [2, 16], dr: [0.5, 3] }, { hat: 'helmet', w: 2.0 }),
+        P('guerreiro', 'Elmo Mímico do Guerreiro', 'head', '⛑️', 'Um elmo que pisca quando ninguém olha.', { defBonus: [2, 16], dr: [0.5, 3], cdr: [0.5, 4] }, { hat: 'helmet', w: 2.0 }),
         P('guerreiro', 'Peitoral Mímico do Guerreiro', 'body', '🦺', 'Armadura viva: range os dentes a cada golpe que você recebe.', { defBonus: [4, 30], dr: [1, 5] }, { w: 6.0 }),
         P('guerreiro', 'Espada Mímica do Guerreiro', 'weapon', '🗡️', 'Lâmina faminta: quanto mais você luta, mais afiada ela fica.', { bonusDmg: [5, 26], crit: [1, 5], critDmg: [0, 25] }, { w: 2.4 }),
         P('guerreiro', 'Escudo Mímico do Guerreiro', 'shield', '🛡️', 'Um escudo com um olho no meio que vigia o seu flanco.', { defBonus: [3, 22], dr: [0.5, 4] }, { w: 3.2 }),
-        P('guerreiro', 'Anel Mímico do Guerreiro', 'ring', '💍', 'Anel de dentes miúdos: morde o inimigo e cura o dono.', { crit: [1, 4], lifesteal: [0.5, 3] }, { w: 0.1 }),
-        P('guerreiro', 'Amuleto Mímico do Guerreiro', 'amulet', '📿', 'Amuleto que ronrona quando você está em perigo.', { dr: [1, 5], atkSpd: [1, 6] }, { w: 0.2 }),
-        P('arqueiro', 'Capuz Mímico do Arqueiro', 'head', '🧢', 'Capuz de sombras com dois olhinhos dourados lá no fundo.', { defBonus: [2, 12], crit: [1, 5] }, { hat: 'hood', w: 0.8 }),
+        P('guerreiro', 'Anel Mímico do Guerreiro', 'ring', '💍', 'Anel de dentes miúdos: morde o inimigo e cura o dono.', { crit: [1, 4], lifesteal: [0.5, 3], cdr: [1, 5] }, { w: 0.1 }),
+        P('guerreiro', 'Amuleto Mímico do Guerreiro', 'amulet', '📿', 'Amuleto que ronrona quando você está em perigo.', { dr: [1, 5], atkSpd: [1, 6], cdr: [1, 6] }, { w: 0.2 }),
+        P('arqueiro', 'Capuz Mímico do Arqueiro', 'head', '🧢', 'Capuz de sombras com dois olhinhos dourados lá no fundo.', { defBonus: [2, 12], crit: [1, 5], cdr: [0.5, 4] }, { hat: 'hood', w: 0.8 }),
         P('arqueiro', 'Gibão Mímico do Arqueiro', 'body', '🥋', 'Gibão que se ajusta ao corpo e deixa o passo leve.', { defBonus: [3, 22], moveSpd: [1, 6] }, { w: 3.0 }),
         P('arqueiro', 'Arco Mímico do Arqueiro', 'weapon', '🏹', 'Arco que sussurra o alvo certo antes de você soltar a corda.', { bonusDmg: [4, 24], atkSpd: [1, 8], crit: [1, 5] }, { tool: 'ranged', w: 1.3 }),
-        P('arqueiro', 'Anel Mímico do Arqueiro', 'ring', '💍', 'Anel guloso: às vezes come a flecha antes de ela sair da aljava.', { crit: [1, 4], save: [2, 10] }, { w: 0.1 }),
-        P('arqueiro', 'Amuleto Mímico do Arqueiro', 'amulet', '📿', 'Amuleto de olho vivo para tesouros e golpes certeiros.', { luck: [2, 10], critDmg: [5, 30] }, { w: 0.2 }),
-        P('mago', 'Chapéu Mímico do Mago', 'head', '🎩', 'Chapéu pontudo que murmura feitiços (e pede biscoitos).', { defBonus: [1, 8], save: [2, 8] }, { hat: 'wizard', w: 0.5 }),
+        P('arqueiro', 'Anel Mímico do Arqueiro', 'ring', '💍', 'Anel guloso: às vezes come a flecha antes de ela sair da aljava.', { crit: [1, 4], save: [2, 10], cdr: [1, 5] }, { w: 0.1 }),
+        P('arqueiro', 'Amuleto Mímico do Arqueiro', 'amulet', '📿', 'Amuleto de olho vivo para tesouros e golpes certeiros.', { luck: [2, 10], critDmg: [5, 30], cdr: [1, 6] }, { w: 0.2 }),
+        P('mago', 'Chapéu Mímico do Mago', 'head', '🎩', 'Chapéu pontudo que murmura feitiços (e pede biscoitos).', { defBonus: [1, 8], save: [2, 8], cdr: [0.5, 4] }, { hat: 'wizard', w: 0.5 }),
         P('mago', 'Manto Mímico do Mago', 'body', '👘', 'Manto que abre uma boca discreta no forro quando há magia por perto.', { defBonus: [2, 14], spellDmg: [1, 6], dr: [0.5, 3] }, { robe: true, w: 1.3 }),
         P('mago', 'Cajado Mímico do Mago', 'weapon', '🦯', 'Cajado com uma gema que pisca como um olho curioso.', { bonusDmg: [4, 24], spellDmg: [1, 5], atkSpd: [1, 6] }, { tool: 'magic', gem: '#ffd34a', w: 1.7 }),
-        P('mago', 'Anel Mímico do Mago', 'ring', '💍', 'Anel que guarda runas na boca e as devolve quando você precisa.', { save: [2, 10], spellDmg: [0, 2] }, { w: 0.1 }),
-        P('mago', 'Amuleto Mímico do Mago', 'amulet', '📿', 'Amuleto de sorte com um sorriso de dentes pequenos.', { luck: [2, 10], crit: [1, 4] }, { w: 0.2 })
+        P('mago', 'Anel Mímico do Mago', 'ring', '💍', 'Anel que guarda runas na boca e as devolve quando você precisa.', { save: [2, 10], spellDmg: [0, 2], cdr: [1, 5] }, { w: 0.1 }),
+        P('mago', 'Amuleto Mímico do Mago', 'amulet', '📿', 'Amuleto de sorte com um sorriso de dentes pequenos.', { luck: [2, 10], crit: [1, 4], cdr: [1, 6] }, { w: 0.2 })
     ];
     const PIECES = Object.create(null); LIST.forEach((p) => { PIECES[p.n] = p; });
     const BOX_OLD = 'Caixa Mímica';   // descontinuada
@@ -74,7 +74,7 @@
     const STAGE_DESC = ['aura sutil, olhos e dentes', '+ brilho forte, olhos extras e runas no corpo', '+ runas orbitando, terceiro olho, dentes maiores e partículas do tema', '+ halo, asas etéreas e aura intensa'];
     const STAGE_LVL = [1, 10, 25, 50];
     const SET_N = {}; CLS_IDS.forEach((c) => { SET_N[c] = LIST.filter((p) => p.cls === c).length; });
-    const SKEYS = ['crit', 'critDmg', 'moveSpd', 'atkSpd', 'lifesteal', 'luck', 'dr', 'spellDmg', 'save'];   // chaves do Stats
+    const SKEYS = ['crit', 'critDmg', 'moveSpd', 'atkSpd', 'lifesteal', 'luck', 'dr', 'spellDmg', 'save', 'cdr'];   // chaves do Stats
     const LBL = { defBonus: 'Defesa', bonusDmg: 'Dano', crit: 'Crítico', critDmg: 'Dano crítico', moveSpd: 'Vel. de movimento', atkSpd: 'Vel. de ataque', lifesteal: 'Roubo de vida', luck: 'Sorte', dr: 'Redução de dano', spellDmg: 'Dano mágico', save: 'Poupar munição/runas', dmgPct: 'Dano', mregen: 'Regen. de mana' };
     const FMT = { defBonus: (v) => '+' + Math.round(v * (window.Balance ? Balance.ARMOR_W : 1)), bonusDmg: (v) => '+' + Math.round(v * (window.Balance ? Balance.RATING_W * 100 : 1)) + '%', crit: (v) => fnum(v) + '%', critDmg: (v) => '+' + fnum(v) + '%', moveSpd: (v) => '+' + fnum(v) + '%', atkSpd: (v) => '+' + fnum(v) + '%', lifesteal: (v) => fnum(v) + '%', luck: (v) => '+' + fnum(v) + '%', dr: (v) => fnum(v) + '%', spellDmg: (v) => '+' + fnum(v), save: (v) => fnum(v) + '%', dmgPct: (v) => '+' + fnum(v) + '%', mregen: (v) => '+' + fnum(v) + '%' };
     const ORDER = ['defBonus', 'bonusDmg', 'dmgPct', 'crit', 'critDmg', 'moveSpd', 'atkSpd', 'lifesteal', 'luck', 'dr', 'spellDmg', 'save', 'mregen'];
