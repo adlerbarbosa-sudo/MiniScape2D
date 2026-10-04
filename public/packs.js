@@ -12,7 +12,7 @@
      "replace": false }                                // true = mapas do pacote substituem os de mesmo id (padrão: mapa existente só recebe as entidades) */
 (function () {
     'use strict';
-    const LIM = { items: 400, npcs: 200, maps: 40, ents: 1500, bytes: 1500000 };
+    const LIM = { items: 400, npcs: 200, maps: 40, ents: 4000, bytes: 4000000 };
     const BAD = /^(__proto__|constructor|prototype)$/;
     const NAME_RE = /^[\p{L}\p{N}_ \-]{1,40}$/u, KEY_RE = /^[\p{L}\p{N}_ .'’()+%!:\-]{1,60}$/u, MAP_RE = /^[A-Za-z0-9_\-]{1,40}$/;
     const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
@@ -57,7 +57,7 @@
             const n = npcs[k]; if (BAD.test(k) || !/^[A-Za-z0-9_\-]{1,40}$/.test(k)) { errors.push('Monstro/NPC com chave inválida: "' + k + '" (use letras, números, _ ou -).'); continue; } if (!isObj(n)) { errors.push('Monstro "' + k + '" precisa ser um objeto.'); continue; }
             if (has(ctx.npcDB, k)) { ov++; warns.push('Monstro/NPC "' + k + '" já existe e será SUBSTITUÍDO.'); }
             if (typeof n.name !== 'string' || !n.name) errors.push('Monstro/NPC "' + k + '": falta "name".');
-            if (!n.shopStr && !(Number.isFinite(n.hp) && n.hp > 0)) warns.push('Monstro "' + k + '": sem "hp" válido.');
+            if (n.behavior !== 'npc' && n.group !== 'npc' && !n.shopStr && !(Number.isFinite(n.hp) && n.hp > 0)) warns.push('Monstro "' + k + '": sem "hp" válido.');
             if (typeof n.lootStr === 'string') n.lootStr.split('|').forEach((e) => { const nm = e.split(',')[0].trim(); if (nm && nm !== 'Coins' && !has(ctx.itemDB, nm) && !newItems.has(nm)) warns.push('Monstro "' + k + '": drop "' + nm + '" não existe.'); });
         }
         let nEnt = 0;
@@ -109,6 +109,10 @@
         pushUndo(s) { undoStack.push(s); undoStack = undoStack.slice(-3); persist(); },
         popUndo() { const s = undoStack.pop(); persist(); return s || null; },
         undoInfo() { const s = undoStack[undoStack.length - 1]; return s ? s.name + ' (' + new Date(s.at).toLocaleString('pt-BR') + ')' : ''; },
+        readFile(inp) {   // botão "Abrir arquivo": carrega o pacote do disco no campo de texto (arquivos grandes não precisam de copiar e colar)
+            const f = inp.files && inp.files[0]; if (!f) return; if (f.size > 6e6) { alert('Arquivo grande demais.'); inp.value = ''; return; }
+            const r = new FileReader(); r.onload = () => { const box = document.getElementById('dev-import-code'); if (box) box.value = String(r.result || ''); const o = document.getElementById('dev-import-report'); if (o) { o.style.color = '#bdc3c7'; o.textContent = 'Arquivo "' + f.name + '" carregado. Clique em Pré-visualizar.'; } inp.value = ''; }; r.readAsText(f, 'utf-8');
+        },
         sample() {
             return JSON.stringify({
                 name: 'Exemplo Cavernas', replace: false,

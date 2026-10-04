@@ -8,6 +8,7 @@ Leia o README.md antes de começar. Regras de trabalho: testar com Playwright em
 
 - Frente 3 (engajamento): interface Jornada (`public/engage_ui.js`, tecla N): diária, missões, Códice, Maestria, Colosso; progresso enviado por `Engage.prog`.
 - Pacotes de Conteúdo: Injetor de Expansão do Dev com pré-visualização, validação, desfazer e anti-duplicação (`public/packs.js`).
+- Pacote de exemplo "Reinos de Solaris" (7 mapas, chefes, itens) em `docs/packs/`, gerado por `tools/gen-expansion.js`.
 
 ## Falta
 - Falta o evento Invasão no cliente (spawn dos invasores; precisa de teste multiplayer no servidor real).
