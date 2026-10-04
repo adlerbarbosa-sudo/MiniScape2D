@@ -146,7 +146,10 @@
         willow: { n: 'Salgueiro', lvl: 30, xp: 68, log: 'Willow Logs', t: 1.2, col: '#5fcfa0' },
         maple: { n: 'Bordo', lvl: 45, xp: 100, log: 'Maple Logs', t: 1.3, col: '#e0703a' },
         yew: { n: 'Teixo', lvl: 60, xp: 175, log: 'Yew Logs', t: 1.45, col: '#4a8a5a' },
-        magic: { n: 'Árvore Mágica', lvl: 75, xp: 250, log: 'Magic Logs', t: 1.6, col: '#c58bff' }
+        magic: { n: 'Árvore Mágica', lvl: 75, xp: 250, log: 'Magic Logs', t: 1.6, col: '#c58bff' },
+        palm: { n: 'Palmeira', lvl: 1, xp: 25, log: 'Logs', t: 1, col: '#58c85a' },
+        dead: { n: 'Árvore seca', lvl: 1, xp: 25, log: 'Logs', t: 0.9, col: '#8c7866' },
+        cherry: { n: 'Cerejeira', lvl: 15, xp: 38, log: 'Oak Logs', t: 1.1, col: '#f08cb8' }
     };
     const LOG_ITEMS = { 'Oak Logs': { n: 'Oak Logs', icon: '🪵', desc: 'Tronco de carvalho. Queima melhor e vale mais.', fm: 1.5 }, 'Willow Logs': { n: 'Willow Logs', icon: '🪵', desc: 'Tronco de salgueiro. Flexível e valioso.', fm: 2 }, 'Maple Logs': { n: 'Maple Logs', icon: '🪵', desc: 'Tronco de bordo, de veios avermelhados.', fm: 2.6 }, 'Yew Logs': { n: 'Yew Logs', icon: '🪵', desc: 'Tronco de teixo, madeira nobre.', fm: 3.4 }, 'Magic Logs': { n: 'Magic Logs', icon: '🪵', desc: 'Madeira mágica: brilha sozinha.', fm: 4.5 } };
     // mistura de árvores por mapa (peso); o tipo de cada árvore é sorteado de forma estável pelo id (igual para todo mundo); `tk` na árvore força o tipo

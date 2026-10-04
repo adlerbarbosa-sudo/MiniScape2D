@@ -370,7 +370,7 @@
         setActionText(msg || (t.n ? 'Treino encerrado: +' + t.xp + ' XP em ' + t.n + ' sessão(ões).' : 'Treino interrompido.'), col || '#bdc3c7');
     }
     function startTrain(t) {
-        const T = TRAIN[t.fk]; if (!T) return false; if (!isMine()) { setActionText('Só o morador treina aqui.', '#f1c40f'); return true; }
+        const T = TRAIN[t.fk]; if (!T) return false;
         if (tr && tr.on) { stopTrain(); return true; }   // clicar de novo no móvel para
         tr = { on: true, fk: t.fk, id: t.id, t0: performance.now(), t0b: performance.now(), cyc: -1, cycT: 0, x: player.x, y: player.y, hp: player.stats.hp, n: 0, xp: 0, arrows: [], stuck: [], dir: 1, ent: t };
         poseSpot(t);

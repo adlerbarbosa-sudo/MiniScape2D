@@ -264,7 +264,7 @@
             return list;
         }
         let _errN = 0; function logErr(e) { if (_errN++ < 5) console.error('[MiniScape]', e); }
-        let lastLookStr = '', lookTick = 0; let lastEqStr = ''; let authToken = null; let worldDirty = false; let lastChatVer = 0; let mobPosFromHost = {};
+        let lastLookStr = '', lookTick = 0; let lastEqStr = ''; let eqTick = 0; let authToken = null; let worldDirty = false; let lastChatVer = 0; let mobPosFromHost = {};
         function esc(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
         /* SESSÃO ÚNICA: outro login na mesma conta derrubou esta sessão. Para tudo (sync, loop, save, reconexão), NÃO salva de volta e mostra o aviso. */
         let _sessionDead = false; const SESSION_DEAD_MSG = 'Sua conta foi conectada em outro lugar. Você foi desconectado.';
@@ -784,8 +784,10 @@
             isSyncing = true;
             try {
                 let payload = { x: player.x, y: player.y, map: (currentMap === 'casa' && window.World2 && World2.houseKey && World2.houseKey()) || currentMap, facing: player.facing, actionAnim: player.actionAnim, combatLogs: pendingCombatLogs, chatVer: lastChatVer, title: player.title || '' }; if (window.Life) { const _em = Life.pendingEmote(); if (_em) payload.emote = _em; }
+                if (window.DropSync) { const dc = DropSync.collect(); if (dc.drops.length) payload.drops = dc.drops; if (dc.drel.length) payload.drel = dc.drel; if (dc.dep.length) payload.dep = dc.dep; }
                 if (window.RemoteFx) { const fxo = RemoteFx.take(); if (fxo.length) payload.fx = fxo; }
-                const eqStr = JSON.stringify(player.equipment); if (eqStr !== lastEqStr) { payload.equipment = player.equipment; lastEqStr = eqStr; }
+                const _slim = {}; ['weapon','shield','body','head','legs','feet','hands','cape','ring','amulet','ammo'].concat(Object.keys(player.equipment || {})).forEach(sl => { const it = player.equipment && player.equipment[sl]; if (_slim[sl] !== undefined) return; if (!it) { _slim[sl] = null; return; } const o = { name: it.name }; ['tool','hat','slot','type','set','col','gem','robe','mimic','stackable','mst','msk','ench','qty','icon'].forEach(k => { if (it[k] !== undefined && it[k] !== null && it[k] !== false) o[k] = it[k]; }); _slim[sl] = o; });
+                const eqStr = JSON.stringify(_slim); if (eqStr !== lastEqStr || ++eqTick >= 40) { payload.equipment = _slim; lastEqStr = eqStr; eqTick = 0; }   // enxuto (o servidor ignora pedidos grandes) e reenviado de tempos em tempos (reinício do servidor perde o estado)
                 if (player.look) { const lkStr = JSON.stringify(player.look); if (lkStr !== lastLookStr || ++lookTick >= 100) { payload.look = player.look; lastLookStr = lkStr; lookTick = 0; } }
                 const sentLogs = pendingCombatLogs; pendingCombatLogs = [];
                 if (window._tpPending) { payload.tp = 1; window._tpPending = false; }   // teleporte legítimo do jogo (portal, renascer): o servidor não conta como excesso de velocidade
@@ -805,6 +807,8 @@
                 if (data.lock) noteSaveLock(data.lock); else if (_saveLockUntil && _saveWhy === 'LOCKED') { _saveLockUntil = 0; _saveWhy = ''; }
                 try { if (window.Net) Net.onSync(data); } catch (e) { console.error(e); }
 
+                if (window.DropSync && data.drops) { DropSync.onSync(data.drops, data.dmine); DropSync.onDep(data.dep); }
+                if (data.toggles && typeof data.toggles === 'object') window.EventToggles = data.toggles;   // eventos ligados pelo admin (Fenda, Missões Especiais)
                 if(data.players) {
                     try { if (window.RemoteFx) RemoteFx.onSync(data.players); } catch (e) { }
                     Object.keys(data.players).forEach(u => {
@@ -1393,7 +1397,10 @@
             const wp = player.equipment ? player.equipment.weapon : null; 
             if (!tObj || !tObj.type || !tObj.active) return;
 
-            if (tObj.type === 'ground_item') { if (Math.hypot(player.x - (tObj.x + 10), player.y - (tObj.y + 10)) < 60) { if (addInvItem(tObj.item, tObj.qty)) { tObj.active = false; onGroundTaken(tObj); addPickupText(tObj.item, tObj.qty); updateUI(); saveDataLogic(); } else setActionText('Mochila cheia!', '#e74c3c'); } return; }
+            if (tObj.type === 'ground_item') { if (Math.hypot(player.x - (tObj.x + 10), player.y - (tObj.y + 10)) < 60) {
+                const _pick = () => { if (addInvItem(tObj.item, tObj.qty)) { tObj.active = false; onGroundTaken(tObj); addPickupText(tObj.item, tObj.qty); updateUI(); saveDataLogic(); } else setActionText('Mochila cheia!', '#e74c3c'); };
+                if (tObj.sid && window.DropSync && !isOfflineMode) { if (tObj._taking) return; if (!invSpaceFor(tObj.item, tObj.qty)) { setActionText('Mochila cheia!', '#e74c3c'); return; } tObj._taking = true; DropSync.take(tObj).then((ok) => { tObj._taking = false; if (ok) _pick(); else setActionText('Alguém pegou antes de você.', '#bdc3c7'); }); }
+                else _pick(); } return; }
             if (tObj.type === 'npc') { openShop(npcDB[tObj.dbKey]); return; }
             if (tObj.type === 'bank') { if (window.Bank) Bank.open(); return; }
             if (tObj.type === 'portal') { switchMap(tObj.destMap, tObj.destX, tObj.destY); return; }
@@ -1941,7 +1948,7 @@
                     });
                 }
 
-                if (currentMap === 'casa') { for (let i = 0; i < cur.length; i++) { const o = cur[i]; if (o && o.room) renderEntity(ctx, o, false); } }   // a sala da casa é desenhada ao vivo (fogo, luz) por cima do cache do chão
+                if (currentMap === 'casa') { for (let i = 0; i < cur.length; i++) { const o = cur[i]; if (o && o.room) renderEntity(ctx, o, false); } for (let i = 0; i < cur.length; i++) { const o = cur[i]; if (o && o.hf && o.type === 'paint' && !o.room) renderEntity(ctx, o, false); } }   // a sala da casa é desenhada ao vivo (fogo, luz) por cima do cache do chão
 
                 // DESENHA ITENS NO CHÃO
                 cur.forEach(o => { 
@@ -2072,6 +2079,7 @@
         }
     </script>
     <script src="remotefx.js"></script>
+    <script src="drops.js"></script>
     <script src="music.js"></script>
     <script src="ui.js"></script>
 </body>

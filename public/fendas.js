@@ -112,6 +112,7 @@
             setActionText('Andar limpo! Entre na fissura para descer. (+25% de vida)', '#2ecc71');
         }
     }
+    const evOn = () => !!(window.EventToggles && window.EventToggles.fenda === true) || (typeof isOfflineMode !== 'undefined' && isOfflineMode);   // evento ligado pelo admin (Dev > Eventos)
     let btn = null, btnT = 0;
     function tickBtn() {   // atalho sempre à mão na Vila (o portal também fica no mundo, perto do ponto de partida)
         if (!btn) {
@@ -119,12 +120,12 @@
             btn.style.cssText = 'position:absolute;left:50%;top:54px;transform:translateX(-50%);z-index:60;display:none;padding:6px 14px;font-weight:700;background:linear-gradient(#4a2f7a,#2a1850);color:#e6d8ff;border:2px solid #8a5ad8;border-radius:8px;cursor:pointer';
             btn.onclick = openPanel; (document.getElementById('game-container') || document.body).appendChild(btn);
         }
-        let show = false; try { show = !run && currentMap === 'lumbridge' && !!currentUser && document.getElementById('login-overlay').style.display === 'none'; } catch (e) { }
+        let show = false; try { show = evOn() && !run && currentMap === 'lumbridge' && !!currentUser && document.getElementById('login-overlay').style.display === 'none'; } catch (e) { }
         btn.style.display = show ? '' : 'none';
     }
     function interact(t) {
         if (!t || t.active === false) return false;
-        if (t.type === 'rift_gate') { openPanel(); return true; }
+        if (t.type === 'rift_gate') { if (!evOn()) { setActionText('A Fenda está fechada no momento (evento).', '#b07aff'); return true; } openPanel(); return true; }
         if (t.type === 'rift_next') { if (run && currentMap === 'fenda') enter(run.floor + 1); return true; }
         return false;
     }
@@ -202,6 +203,7 @@
 
     /* ---------- desenho e mundo ---------- */
     function drawEntity(ctx, o, T) {
+        if (o.type === 'rift_gate' && !evOn()) return;   // evento desligado: o portal some
         const x = o.x, y = o.y, w = o.w || 60, h = o.h || 80, cx = x + w / 2, cy = y + h / 2, pul = 0.5 + 0.5 * Math.sin(T * 2.2);
         ctx.save();
         const g = ctx.createRadialGradient(cx, cy, 4, cx, cy, Math.max(w, h) * 0.9); g.addColorStop(0, 'rgba(200,160,255,' + (0.55 + 0.25 * pul).toFixed(2) + ')'); g.addColorStop(1, 'rgba(90,40,170,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, Math.max(w, h) * 0.9, 0, 6.3); ctx.fill();

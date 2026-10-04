@@ -329,6 +329,7 @@
         if (name === 'dirt') { for (let i = 0; i < 90; i++) { g.fillStyle = rnd(i) > 0.5 ? 'rgba(255,220,170,0.10)' : 'rgba(0,0,0,0.12)'; g.beginPath(); g.ellipse(rnd(i + 200) * S, rnd(i + 400) * S, 1 + rnd(i + 9) * 3, 0.8 + rnd(i + 7) * 1.6, rnd(i) * 3, 0, TAU); g.fill(); } for (let i = 0; i < 9; i++) { g.fillStyle = 'rgba(150,120,90,0.65)'; g.beginPath(); g.ellipse(rnd(i + 900) * S, rnd(i + 950) * S, 1.6, 1.1, 0, 0, TAU); g.fill(); g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(rnd(i + 900) * S - 1, rnd(i + 950) * S + 0.6, 3, 1); } }
         else if (name === 'stone') { const cw = 16; for (let r = 0; r < 4; r++) for (let cc = 0; cc < 4; cc++) { const x = cc * cw + (r % 2) * 8, y = r * cw; const v = rnd(r * 9 + cc) * 0.2 - 0.1; g.fillStyle = v > 0 ? 'rgba(255,255,255,' + v + ')' : 'rgba(0,0,0,' + (-v) + ')'; g.beginPath(); g.roundRect ? g.roundRect(x + 1, y + 1, cw - 2, cw - 2, 4) : g.rect(x + 1, y + 1, cw - 2, cw - 2); g.fill(); g.strokeStyle = 'rgba(0,0,0,0.32)'; g.lineWidth = 1; g.stroke(); g.fillStyle = 'rgba(255,255,255,0.10)'; g.fillRect(x + 2.5, y + 2.5, cw - 7, 1.4); } for (let i = 0; i < 4; i++) { g.strokeStyle = 'rgba(0,0,0,0.25)'; g.beginPath(); g.moveTo(rnd(i) * S, rnd(i + 5) * S); g.lineTo(rnd(i) * S + 5, rnd(i + 5) * S + 3); g.stroke(); } }
         else if (name === 'water') { g.fillStyle = '#3489c8'; g.fillRect(0, 0, S, S); for (let i = 0; i < 9; i++) { const bx = rnd(i + 40) * S, by = rnd(i + 60) * S, br = 9 + rnd(i + 80) * 14, lt = rnd(i + 20) > 0.5; for (const ox of [-S, 0, S]) for (const oy of [-S, 0, S]) { const rg2 = g.createRadialGradient(bx + ox, by + oy, 0, bx + ox, by + oy, br); rg2.addColorStop(0, lt ? 'rgba(120,190,240,0.20)' : 'rgba(10,60,130,0.20)'); rg2.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = rg2; g.fillRect(bx + ox - br, by + oy - br, br * 2, br * 2); } } for (let i = 0; i < 26; i++) { g.strokeStyle = rnd(i) > 0.5 ? 'rgba(255,255,255,0.13)' : 'rgba(0,30,80,0.14)'; g.lineWidth = 1.4; g.beginPath(); const x = rnd(i + 3) * S, y = rnd(i + 11) * S; g.moveTo(x, y); g.quadraticCurveTo(x + 5, y - 2, x + 10, y); g.stroke(); } }
+        else if (name === 'ground') { for (let i = 0; i < 70; i++) { g.fillStyle = rnd(i) > 0.5 ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.09)'; g.beginPath(); g.ellipse(rnd(i + 200) * S, rnd(i + 400) * S, 1.5 + rnd(i + 9) * 4, 1 + rnd(i + 7) * 2.4, rnd(i + 3) * 3, 0, 6.3); g.fill(); } for (let i = 0; i < 14; i++) { g.fillStyle = rnd(i + 50) > 0.5 ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.16)'; g.fillRect(rnd(i + 600) * S, rnd(i + 700) * S, 1.6, 1.2); } }
         else if (name === 'grass') { for (let i = 0; i < 160; i++) { const x = rnd(i) * S, y = rnd(i + 3) * S, l = 3 + rnd(i + 5) * 5; g.strokeStyle = rnd(i + 8) > 0.5 ? 'rgba(160,255,140,0.22)' : 'rgba(0,50,10,0.24)'; g.lineWidth = 1.1; g.beginPath(); g.moveTo(x, y); g.lineTo(x + (rnd(i + 2) - 0.5) * 3, y - l); g.stroke(); } for (let i = 0; i < 40; i++) { g.fillStyle = 'rgba(0,0,0,0.05)'; g.beginPath(); g.arc(rnd(i + 70) * S, rnd(i + 80) * S, 3 + rnd(i) * 4, 0, TAU); g.fill(); } }
         return (_pat[key] = ctx.createPattern(c, 'repeat'));
     }
@@ -447,8 +448,8 @@
     function buildCompTile(e, m, cur, W, H, tx, ty, baseTile) {   // chão + pintura de um bloco
         const ox = tx * TS, oy = ty * TS, c = document.createElement('canvas'); c.width = baseTile.width; c.height = baseTile.height; const g = c.getContext('2d');
         g.drawImage(baseTile, 0, 0); g.translate(-ox, -oy);
-        for (const o of cur) { if (!o || o.type !== 'paint' || PAINT_KIND[o.color]) continue; const ow = o.w || 40, oh = o.h || 40; if (o.x > ox + c.width + 30 || o.x + ow < ox - 30 || o.y > oy + c.height + 30 || o.y + oh < oy - 30) continue; try { drawPaint(g, o, 0, true); } catch (er) { } }   // pinturas sem espécie (ex.: o piso da casa)
-        if (A.terrainTile) { try { A.terrainTile(g, cur, ox, oy, c.width, c.height, (cx, kind) => patternOf(cx, kind, PAINT_BASE[kind])); } catch (er) { console.error('[terreno]', er); } }
+        for (const o of cur) { if (!o || o.type !== 'paint' || PAINT_KIND[o.color] || A.terrainTile) continue; const ow = o.w || 40, oh = o.h || 40; if (o.x > ox + c.width + 30 || o.x + ow < ox - 30 || o.y > oy + c.height + 30 || o.y + oh < oy - 30) continue; try { drawPaint(g, o, 0, true); } catch (er) { } }   // pinturas sem espécie (ex.: o piso da casa)
+        if (A.terrainTile) { try { A.terrainTile(g, cur, ox, oy, c.width, c.height, (cx, kind) => kind.charAt(1) === ':' ? patternOf(cx, 'ground', kind.slice(2)) : patternOf(cx, kind, PAINT_BASE[kind]), W, H); } catch (er) { console.error('[terreno]', er); } }
         else for (const o of cur) { if (!o || o.type !== 'paint' || !PAINT_KIND[o.color]) continue; try { drawPaint(g, o, 0, true); } catch (er) { } }
         edgeShade(g, W, H); return c;
     }
@@ -512,19 +513,38 @@
         ctx.restore();
         ctx.restore();
     }
+    function treeKindOf(o) { if (o && typeof o.tk === 'string') return o.tk; try { return window.Econ ? Econ.treeKind(o, typeof currentMap !== 'undefined' ? currentMap : '') : 'normal'; } catch (e) { return 'normal'; } }
+    const TPAL = { oak: ['#6fcf5a', '#2f9a3c', '#165a28'], maple: ['#ffb04a', '#e0602a', '#8a2a14'], cherry: ['#ffd6e8', '#f08cb8', '#b84a86'] };
     function drawTree(ctx, o, t) {
-        const ow = o.w || 40, oh = o.h || 50, cx = o.x + ow / 2, by = o.y + oh, v = Math.floor(hash((o.id || 1) * 1.37) * 3), sw = sin(t * 1.1 + cx * 0.04) * 1.6, s = ow / 40;
+        const tk = treeKindOf(o);
+        const ow = o.w || 40, oh = o.h || 50, cx = o.x + ow / 2, by = o.y + oh, v = tk === 'yew' ? 1 : (tk === 'oak' || tk === 'maple' || tk === 'cherry') ? 0 : Math.floor(hash((o.id || 1) * 1.37) * 3), sw = sin(t * 1.1 + cx * 0.04) * 1.6, s = ow / 40;
         if (!o._ns) { ctx.fillStyle = 'rgba(0,0,0,0.26)'; ctx.beginPath(); ctx.ellipse(cx + 6 * s, by - 1, 18 * s, 5 * s, 0, 0, TAU); ctx.fill(); }
         ctx.save(); ctx.translate(cx, by); ctx.scale(s, oh / 50);
         const trunk = (w, col) => { ctx.beginPath(); ctx.moveTo(-w, 0); ctx.quadraticCurveTo(-w + 1, -12, -w * 0.7, -26); ctx.lineTo(w * 0.7, -26); ctx.quadraticCurveTo(w - 1, -12, w, 0); ctx.quadraticCurveTo(0, 3, -w, 0); ctx.closePath(); paint(ctx, lg(ctx, -w, 0, w, 0, [[0, shade(col, 0.15)], [1, shade(col, -0.35)]]), OUT, 1.2); ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 0.8; for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.moveTo(-w * 0.5 + i * w * 0.35, -2); ctx.lineTo(-w * 0.4 + i * w * 0.3, -20); ctx.stroke(); } };
-        if (v === 1) {   // pinheiro
+        if (tk === 'willow') {   // salgueiro: copa baixa e cortinas de folhas caídas
+            trunk(5.4, '#5e4630'); ctx.strokeStyle = OUT; ctx.lineWidth = 5.6; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(0, -20); ctx.lineTo(-12, -38); ctx.moveTo(0, -22); ctx.lineTo(13, -40); ctx.stroke(); ctx.strokeStyle = '#5e4630'; ctx.lineWidth = 3.4; ctx.beginPath(); ctx.moveTo(0, -20); ctx.lineTo(-12, -38); ctx.moveTo(0, -22); ctx.lineTo(13, -40); ctx.stroke();
+            foliage(ctx, o, [[0, -52, 25, 12], [-18, -44, 16, 10], [18, -45, 16, 10]], sw * 0.5, ['#a6f0c0', '#4fbf86', '#1f7a56', 'rgba(220,255,225,0.34)', 'rgba(0,50,35,0.34)', 'rgba(220,255,225,0.5)'], (o.id || 1) * 1.9, 0);
+            for (let i = 0; i < 11; i++) { const x = -26 + i * 5.2, len = 20 + hash((o.id || 1) * 3.1 + i) * 14, sway = sin(t * 1.3 + i * 0.7) * 1.8 + sw * 0.4, y0 = -46 + Math.abs(x) * 0.12; ctx.strokeStyle = OUT; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x, y0); ctx.quadraticCurveTo(x + sway * 0.5, y0 + len * 0.5, x + sway, y0 + len); ctx.stroke(); ctx.strokeStyle = i % 2 ? '#5fcf9a' : '#8fe6b4'; ctx.lineWidth = 1.7; ctx.stroke(); }
+        } else if (tk === 'magic') {   // árvore mágica: tronco torto roxo, copa violeta e luzes
+            ctx.strokeStyle = OUT; ctx.lineWidth = 11; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(-1, 0); ctx.bezierCurveTo(-9, -14, 8, -24, -2, -38); ctx.stroke(); ctx.strokeStyle = '#4a2f6a'; ctx.lineWidth = 8; ctx.stroke(); ctx.strokeStyle = '#7a52a8'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-3, -2); ctx.bezierCurveTo(-11, -14, 6, -24, -4, -37); ctx.stroke();
+            glow(ctx, 0, -48, 34, '#b98cff', 0.28 + 0.1 * sin(t * 2));
+            foliage(ctx, o, [[0, -50, 25, 18], [-17, -42, 16, 12], [17, -43, 16, 12], [-5, -62, 16, 11], [9, -60, 14, 10]], sw * 0.6, ['#e0c4ff', '#9a64e0', '#4a2a90', 'rgba(240,225,255,0.4)', 'rgba(20,0,60,0.36)', 'rgba(240,225,255,0.6)'], (o.id || 1) * 2.7, 0);
+            for (let i = 0; i < 6; i++) { const a = t * 1.2 + i * 1.05, r = 20 + (i % 3) * 5; ctx.fillStyle = 'rgba(255,250,200,' + (0.55 + 0.4 * sin(t * 3 + i)).toFixed(2) + ')'; ctx.beginPath(); ctx.arc(cos(a) * r, -48 + sin(a * 1.3) * 14, 1.4, 0, TAU); ctx.fill(); }
+        } else if (tk === 'palm') {   // palmeira
+            ctx.strokeStyle = OUT; ctx.lineWidth = 8.4; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(7, -20, 3 + sw * 0.3, -46); ctx.stroke(); ctx.strokeStyle = '#a8793f'; ctx.lineWidth = 6; ctx.stroke(); ctx.strokeStyle = 'rgba(70,40,15,0.5)'; ctx.lineWidth = 0.9; for (let i = 0; i < 7; i++) { const y = -4 - i * 6, x = 1.4 + (i / 7) * 5; ctx.beginPath(); ctx.moveTo(x - 3, y); ctx.lineTo(x + 3, y - 1); ctx.stroke(); }
+            const hx = 3 + sw * 0.3, hy2 = -46; for (let i = 0; i < 7; i++) { const a = -Math.PI + (i / 6) * Math.PI + sin(t * 1.4 + i) * 0.06, L = 24; const ex = hx + cos(a) * L, ey = hy2 + sin(a) * L * 0.5 + 12; ctx.beginPath(); ctx.moveTo(hx, hy2); ctx.quadraticCurveTo(hx + cos(a) * L * 0.55, hy2 + sin(a) * L * 0.8 - 6, ex, ey); ctx.strokeStyle = OUT; ctx.lineWidth = 5; ctx.stroke(); ctx.strokeStyle = i % 2 ? '#3fae4a' : '#58c85a'; ctx.lineWidth = 3; ctx.stroke(); }
+            ell(ctx, hx - 3, hy2 + 3, 3.2, 3.2, '#6b4a24', OUT, 0.8); ell(ctx, hx + 3, hy2 + 4, 3.2, 3.2, '#6b4a24', OUT, 0.8);
+        } else if (tk === 'dead') {   // árvore seca
+            ctx.strokeStyle = OUT; ctx.lineWidth = 9; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; const br = [[0, 0, -2, -24], [-2, -24, -12, -40], [-2, -24, 8, -44], [-8, -34, -17, -36], [5, -36, 14, -34], [8, -44, 6, -56]]; ctx.beginPath(); br.forEach((b, i) => { if (i === 0) { ctx.moveTo(b[0], b[1]); ctx.lineTo(b[2], b[3]); } else { ctx.moveTo(b[0], b[1]); ctx.lineTo(b[2], b[3]); } }); ctx.stroke();
+            ctx.strokeStyle = '#6d5a4a'; ctx.lineWidth = 5.4; ctx.stroke(); ctx.strokeStyle = '#8c7866'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(-1, -2); ctx.lineTo(-3, -22); ctx.stroke();
+        } else if (v === 1) {   // pinheiro (teixo: mais escuro, com frutinhas)
             trunk(4.6, '#6a4326');
             const tiers = [[-10, 22, 24], [-22, 19, 22], [-34, 16, 20], [-46, 12, 18], [-57, 8, 16]];   // [base y, meia largura, altura]: do maior (embaixo) ao menor (topo)
             tiers.forEach((r, i) => {
                 const sx = sin(t * 1.2 + i) * 0.5 + sw * (0.15 + i * 0.12), by0 = r[0], hw = r[1], hh = r[2];
                 ctx.beginPath(); ctx.moveTo(-hw, by0); ctx.lineTo(sx, by0 - hh); ctx.lineTo(hw, by0);
                 for (let k = 4; k >= 0; k--) { const x = -hw + (2 * hw) * (k / 4) * 1; const px = hw - (2 * hw) * ((4 - k) / 4); ctx.quadraticCurveTo(px + hw / 8, by0 + 4, px - hw / 4, by0 + (k % 2 ? 1 : 3.4)); }
-                ctx.closePath(); paint(ctx, lg(ctx, -hw, by0 - hh, hw, by0, [[0, '#4fb56a'], [0.5, '#2a8a4a'], [1, '#155f33']]), OUT, 1.3);
+                ctx.closePath(); paint(ctx, lg(ctx, -hw, by0 - hh, hw, by0, tk === 'yew' ? [[0, '#3f8f6e'], [0.5, '#1f5f4a'], [1, '#0d3a2c']] : [[0, '#4fb56a'], [0.5, '#2a8a4a'], [1, '#155f33']]), OUT, 1.3);
                 ctx.fillStyle = 'rgba(210,255,200,0.16)'; ctx.beginPath(); ctx.moveTo(sx, by0 - hh + 1); ctx.lineTo(-hw * 0.5, by0 - 3); ctx.lineTo(-hw * 0.1, by0 - 2); ctx.closePath(); ctx.fill();
                 ctx.fillStyle = 'rgba(0,30,10,0.22)'; ctx.beginPath(); ctx.moveTo(sx, by0 - hh + 1); ctx.lineTo(hw * 0.95, by0 - 1); ctx.lineTo(hw * 0.35, by0 - 2); ctx.closePath(); ctx.fill();
             });
@@ -535,8 +555,8 @@
             trunk(6, '#6f4526'); ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.moveTo(-6, 0); ctx.lineTo(-11, 2); ctx.lineTo(-4, -3); ctx.fill(); ctx.beginPath(); ctx.moveTo(6, 0); ctx.lineTo(11, 2); ctx.lineTo(4, -3); ctx.fill();
             ctx.strokeStyle = OUT; ctx.lineWidth = 6.4; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(0, -20); ctx.lineTo(-9, -34); ctx.moveTo(0, -22); ctx.lineTo(10, -36); ctx.stroke();
             ctx.strokeStyle = '#6f4526'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(0, -20); ctx.lineTo(-9, -34); ctx.moveTo(0, -22); ctx.lineTo(10, -36); ctx.stroke();
-            foliage(ctx, o, [[0, -45, 26, 19], [-17, -37, 17, 13], [17, -38, 17, 13], [-6, -57, 17, 12], [9, -56, 15, 11]], sw * 0.6, ['#7ddb6a', '#3fa544', '#1c6a2d', 'rgba(200,255,150,0.34)', 'rgba(0,45,15,0.36)', 'rgba(210,255,160,0.55)'], (o.id || 1) * 2.3, 0);
-            if (hash((o.id || 1) * 9.1) > 0.7) { [[-8, -38], [6, -46], [14, -34]].forEach(p => ell(ctx, p[0] + sw, p[1], 2.2, 2.2, '#e0384a', OUT, 0.6)); }
+            foliage(ctx, o, [[0, -45, 26, 19], [-17, -37, 17, 13], [17, -38, 17, 13], [-6, -57, 17, 12], [9, -56, 15, 11]], sw * 0.6, (TPAL[tk] || ['#7ddb6a', '#3fa544', '#1c6a2d']).concat(['rgba(200,255,150,0.34)', 'rgba(0,45,15,0.36)', 'rgba(210,255,160,0.55)']), (o.id || 1) * 2.3, 0);
+            if (tk === 'normal' && hash((o.id || 1) * 9.1) > 0.7) { [[-8, -38], [6, -46], [14, -34]].forEach(p => ell(ctx, p[0] + sw, p[1], 2.2, 2.2, '#e0384a', OUT, 0.6)); }
         }
         ctx.restore();
     }
@@ -637,12 +657,12 @@
 
     /* ---- árvore: sprite único por árvore (sem balanço); o balanço ao vivo vira um deslocamento de 1px só na copa ---- */
     function drawTreeC(ctx, o, t) {
-        const ow = o.w || 40, oh = o.h || 50, s = ow / 40, vs = oh / 50, key = 'T|' + (o.id || 1) + '|' + ow + '|' + oh;
+        const ow = o.w || 40, oh = o.h || 50, s = ow / 40, vs = oh / 50, tk = treeKindOf(o), key = 'T|' + (o.id || 1) + '|' + ow + '|' + oh + '|' + tk;
         let sp = sprTouch(key);
         if (!sp) {
             if (_built >= BUILD_PER_FRAME) return drawTree(ctx, o, t);
             _built++; const W = Math.ceil(92 * s) + 4, top = Math.ceil(80 * vs) + 2, H = top + Math.ceil(10 * s) + 4, [c, g] = mkCanvas(W, H);
-            const fo = { x: W / 2 - ow / 2, y: top - oh, w: ow, h: oh, id: o.id, type: 'tree', _ns: true }; drawTree(g, fo, -(W / 2) * 0.04 / 1.1);   // t escolhido para o balanço ser zero
+            const fo = { x: W / 2 - ow / 2, y: top - oh, w: ow, h: oh, id: o.id, type: 'tree', tk, _ns: true }; drawTree(g, fo, -(W / 2) * 0.04 / 1.1);   // t escolhido para o balanço ser zero
             sp = { c, W, H, top, px: W * H, cut: Math.max(1, Math.round(top - 27 * vs)) }; sprPut(key, sp);
         }
         const cx = o.x + ow / 2, by = o.y + oh, X = snapX(cx - sp.W / 2), Y = snapY(by - sp.top), sw = Math.round(sin(t * 1.1 + cx * 0.04) * 1.6 * 0.6);

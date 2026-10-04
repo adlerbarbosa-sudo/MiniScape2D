@@ -21,6 +21,7 @@
         dirt: { R: 5, amp: 0.30 },
         stone: { R: 4, amp: 0.22 }
     };
+    const STYLE_C = { R: 8, amp: 0.3, soft: 0.1 };
     const PAINT_KIND = { '#5c4033': 'dirt', '#7f8c8d': 'stone', '#27ae60': 'grass', '#3498db': 'water' };
 
     const h2 = (x, y) => { const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return n - Math.floor(n); };
@@ -63,14 +64,15 @@
 
     /* ---------- a mancha de uma espécie dentro de um bloco ---------- */
     function layer(g, kind, rects, x0, y0, W, H, patFn) {
-        const st = STYLE[kind], nx = Math.ceil(W / S), ny = Math.ceil(H / S), n = nx * ny, R = st.R;
+        const cust = kind.charAt(0) === 'c' && kind.charAt(1) === ':';   // cor livre (mapas de pacotes): mancha de chão com borda suave
+        const st = cust ? STYLE_C : STYLE[kind], nx = Math.ceil(W / S), ny = Math.ceil(H / S), n = nx * ny, R = st.R;
         const a = new Float32Array(n), b = new Float32Array(n);
         for (const r of rects) {   // cobertura (com fração nas bordas)
             const i0 = Math.max(0, Math.floor((r.x - x0) / S) - 1), i1 = Math.min(nx - 1, Math.ceil((r.x + r.w - x0) / S) + 1), j0 = Math.max(0, Math.floor((r.y - y0) / S) - 1), j1 = Math.min(ny - 1, Math.ceil((r.y + r.h - y0) / S) + 1);
             for (let j = j0; j <= j1; j++) { const sy = y0 + j * S, cy = Math.max(0, Math.min(sy + S, r.y + r.h) - Math.max(sy, r.y)) / S; if (cy <= 0) continue; for (let i = i0; i <= i1; i++) { const sx = x0 + i * S, cx = Math.max(0, Math.min(sx + S, r.x + r.w) - Math.max(sx, r.x)) / S; const v = cx * cy; if (v > a[j * nx + i]) a[j * nx + i] = v; } }
         }
         boxBlur(a, b, nx, ny, R); boxBlur(a, b, nx, ny, R);   // dois passes ≈ borrão suave
-        const soft = st.soft || 0, amp = st.amp, seed = kind.length * 17.3;
+        const soft = st.soft || 0, amp = st.amp, seed = cust ? hash(kind.length * 3 + kind.charCodeAt(3) * 7.7 + kind.charCodeAt(5)) * 40 : kind.length * 17.3;
         for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {   // ruído só onde há borda
             const k = j * nx + i, v = a[k]; if (v < 0.04 || v > 0.97) continue;
             const wx = x0 + i * S, wy = y0 + j * S;
@@ -85,6 +87,7 @@
             bodyA[k] = bd * 255 | 0;
             if (kind === 'grass') continue;
             rimA[k] = (bd * (1 - smooth(T0 + 0.02, T0 + (kind === 'stone' ? 0.12 : kind === 'water' ? 0.16 : 0.24), v))) * 255 | 0;
+            if (cust) continue;
             haloA[k] = ((1 - bd) * smooth(T0 - (kind === 'stone' ? 0.2 : 0.3), T0 - 0.02, v)) * 255 | 0;
             if (kind === 'water') deepA[k] = (bd * smooth(T0 + 0.22, T0 + 0.7, v)) * 255 | 0;
             if (kind === 'stone') hiA[k] = (bd * smooth(T0 + 0.1, T0 + 0.14, v) * (1 - smooth(T0 + 0.18, T0 + 0.24, v))) * 255 | 0;
@@ -92,7 +95,7 @@
         if (!any) return;
         const up = (c, dx, dy) => { g.drawImage(c, 0, 0, nx, ny, x0 + (dx || 0), y0 + (dy || 0), nx * S, ny * S); };
         const sm = g.imageSmoothingEnabled; g.imageSmoothingEnabled = true;
-        if (kind !== 'grass') {   // halo (sombra / terra gasta / lama úmida) por baixo do corpo
+        if (kind !== 'grass' && !cust) {   // halo (sombra / terra gasta / lama úmida) por baixo do corpo
             const col = kind === 'dirt' ? [96, 72, 40, 0.5] : kind === 'stone' ? [0, 0, 0, 0.5] : [58, 44, 26, 0.7];
             up(maskCanvas(nx, ny, (i) => [col[0], col[1], col[2], haloA[i] * col[3] | 0]), kind === 'stone' ? 1.5 : 0, kind === 'stone' ? 2 : 0);
         }
@@ -101,13 +104,14 @@
         sg.translate(-x0, -y0); sg.fillStyle = patFn(sg, kind); sg.fillRect(x0, y0, nx * S, ny * S); sg.setTransform(1, 0, 0, 1, 0, 0);
         sg.globalCompositeOperation = 'destination-in'; sg.imageSmoothingEnabled = true; sg.drawImage(maskCanvas(nx, ny, (i) => [255, 255, 255, bodyA[i]]), 0, 0, nx, ny, 0, 0, nx * S, ny * S); sg.globalCompositeOperation = 'source-over';
         g.drawImage(sc, 0, 0, sc.width, sc.height, x0, y0, sc.width, sc.height);
+        if (cust) up(maskCanvas(nx, ny, (i) => [20, 14, 8, rimA[i] * 0.3 | 0]));
         if (kind === 'water') up(maskCanvas(nx, ny, (i) => [8, 44, 104, deepA[i] * 0.34 | 0]));
         if (kind === 'dirt') up(maskCanvas(nx, ny, (i) => [48, 26, 10, rimA[i] * 0.42 | 0]));
         else if (kind === 'stone') { up(maskCanvas(nx, ny, (i) => [0, 0, 0, rimA[i] * 0.62 | 0])); up(maskCanvas(nx, ny, (i) => [255, 255, 255, hiA[i] * 0.18 | 0])); }
         else if (kind === 'water') up(maskCanvas(nx, ny, (i) => [220, 244, 255, rimA[i] * 0.7 | 0]));
         g.imageSmoothingEnabled = sm;
         // enfeites ao longo do contorno (posição pelo mundo → iguais em blocos vizinhos)
-        const dens = DENS[kind] || 0.12;
+        const dens = cust ? 0 : (DENS[kind] || 0.12); if (!dens) return;
         for (let j = 2; j < ny - 2; j++) for (let i = 2; i < nx - 2; i++) {
             const k = j * nx + i, v = a[k]; if (Math.abs(v - T0) > 0.035) continue;
             const wi = Math.round((x0 + i * S) / S), wj = Math.round((y0 + j * S) / S), p = hash(wi * 12.9898 + wj * 78.233); if (p > dens) continue;
@@ -118,15 +122,19 @@
     }
 
     /* desenha todas as manchas que tocam o bloco [ox,oy,w,h] (g já está com translate(-ox,-oy)) */
-    function terrainTile(g, cur, ox, oy, w, h, patFn) {
-        const x0 = ox - PAD, y0 = oy - PAD, W = w + PAD * 2, H = h + PAD * 2, by = {};
+    function terrainTile(g, cur, ox, oy, w, h, patFn, MW, MH) {
+        const x0 = ox - PAD, y0 = oy - PAD, W = w + PAD * 2, H = h + PAD * 2, by = {}, customs = [];
         const m = 2 * Math.max(STYLE.water.R, STYLE.dirt.R) * S + 6;
         for (const o of cur) {
-            if (!o || o.type !== 'paint') continue; const kind = PAINT_KIND[o.color]; if (!kind) continue;
-            const rw = o.w || 40, rh = o.h || 40; if (o.x > x0 + W + m || o.x + rw < x0 - m || o.y > y0 + H + m || o.y + rh < y0 - m) continue;
-            (by[kind] = by[kind] || []).push({ x: o.x, y: o.y, w: rw, h: rh });
+            if (!o || o.type !== 'paint') continue; let kind = PAINT_KIND[o.color];
+            if (!kind) { if (typeof o.color !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(o.color)) continue; kind = 'c:' + o.color.toLowerCase(); if (customs.indexOf(kind) < 0) customs.push(kind); }
+            let rx = o.x, ry = o.y, rw = o.w || 40, rh = o.h || 40;
+            if (MW && MH) { const E = 240; if (rx <= 2) { rw += E + rx; rx = -E; } if (ry <= 2) { rh += E + ry; ry = -E; } if (rx + rw >= MW - 2) rw = MW + E - rx; if (ry + rh >= MH - 2) rh = MH + E - ry; }   // pintura que chega à borda do mapa segue para fora (sem faixa vazia na beirada)
+            if (rx > x0 + W + m || rx + rw < x0 - m || ry > y0 + H + m || ry + rh < y0 - m) continue;
+            (by[kind] = by[kind] || []).push({ x: rx, y: ry, w: rw, h: rh });
         }
-        for (const kind of ORDER) if (by[kind]) layer(g, kind, by[kind], x0, y0, W, H, patFn);
+        const order = ['grass'].concat(customs, ['water', 'dirt', 'stone']);
+        for (const kind of order) if (by[kind]) layer(g, kind, by[kind], x0, y0, W, H, patFn);
     }
     A.terrainTile = terrainTile; A.terrainKind = PAINT_KIND;
 })(typeof window !== 'undefined' ? window : globalThis);

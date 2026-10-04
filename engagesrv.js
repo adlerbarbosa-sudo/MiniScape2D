@@ -309,6 +309,7 @@ module.exports = function createEngageSrv(ctx) {
             board: { week, top: board, me: { dmg: me, rank }, prev: { week: pw, top: topOf(pw, 3), mine: pm, claimed: !!(db0().bclaim[pw] && db0().bclaim[pw][user]), legend: lg }, msLeft: E.msToNextWeek(t) }
         };
     }
+    const rOff = () => { const t = getDB().toggles; return !(t && t.fenda === true); };
     function act(user, b, ip) {
         b = b && typeof b === 'object' ? b : {};
         switch (b.a) {
@@ -319,8 +320,8 @@ module.exports = function createEngageSrv(ctx) {
             case 'qbonus': return qBonus(user, b, ip);
             case 'mclaim': return mClaim(user, b, ip);
             case 'lclaim': return legendClaim(user, ip);
-            case 'rstate': return riftState(user);
-            case 'rstart': return riftStart(user, b);
+            case 'rstate': if (rOff()) return fail('A Fenda está fechada no momento.', 'OFF'); return riftState(user);
+            case 'rstart': if (rOff()) return fail('A Fenda está fechada no momento.', 'OFF'); return riftStart(user, b);
             case 'rend': return riftEnd(user, b);
             case 'rclaim': return riftClaim(user, b);
         }

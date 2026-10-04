@@ -175,6 +175,7 @@
             }
             const px = (player.renderX != null ? player.renderX : player.x) + offset.x, py = (player.renderY != null ? player.renderY : player.y) + offset.y;
             glowAt(ctx, px, py - 14, 72, TORCH, 0.24 * lightK);    // o herói carrega uma tocha
+            if (window.Mimic && Mimic.lights) Mimic.lights(ctx, offset, lightK);   // peças Mímicas brilham no escuro (também as de outros jogadores)
             ctx.restore();
         }
         ctx.globalAlpha = 1;

@@ -10,17 +10,26 @@
 
     function init(tab, bar) {
         if (built || !tab || !bar) return; built = true;
-        const btn = document.createElement('button'); btn.className = 'dev-sub-btn'; btn.id = 'btn-dev-sq'; btn.textContent = 'Missões Especiais'; btn.style.color = '#c58bff'; btn.style.fontWeight = 'bold';
+        const btn = document.createElement('button'); btn.className = 'dev-sub-btn'; btn.id = 'btn-dev-sq'; btn.textContent = 'Eventos'; btn.style.color = '#c58bff'; btn.style.fontWeight = 'bold';
         btn.onclick = function () { openDevSub('dev-sq', btn); load(); }; bar.appendChild(btn);
         const box = document.createElement('div'); box.id = 'dev-sq'; box.className = 'dev-sub-content';
-        box.innerHTML = `<h3 style="color:#c58bff;margin-top:0;border-bottom:1px solid #333;padding-bottom:5px">Missões Especiais</h3>
+        box.innerHTML = `<h3 style="color:#c58bff;margin-top:0;border-bottom:1px solid #333;padding-bottom:5px">Eventos</h3>
+<p style="font-size:.72rem;color:#bdc3c7;margin:4px 0">Ligue ou desligue os eventos do jogo. Desligado, o evento some para os jogadores (o servidor também recusa). Novos eventos entram aqui.</p>
+<div id="ev-list" style="font-size:.78rem;margin-bottom:8px"></div>
+<h4 style="color:#c58bff;margin:10px 0 2px">Missões Especiais</h4>
 <p style="font-size:.72rem;color:#bdc3c7;margin:4px 0">Crie missões com recompensa exclusiva (inclusive peças e aparências Mímicas). Os jogadores veem as ativas no Diário (tecla J, aba Especiais) e resgatam 1 vez; o prêmio vai pelo correio. Objetivo e resgate são conferidos no servidor.</p>
 <button id="sq-new" class="dev-save-btn" style="background:#8e44ad">+ Nova missão especial</button>
 <div id="sq-status" style="font-size:.75rem;margin:4px 0"></div><div id="sq-list" style="font-size:.74rem"></div>`;
         tab.appendChild(box);
         $('sq-new').onclick = () => form(null);
+        loadEv(); $('ev-list').addEventListener('click', (e) => { const b = e.target.closest('[data-ev]'); if (b) setEv(b.dataset.ev, b.dataset.on === '1'); });
         $('sq-list').addEventListener('click', onList);
     }
+    const EVENTS = [['fenda', '🔮 Fenda Instável', 'Masmorra infinita em andares, com placar semanal e meta comunitária. Desligada: portal e botão somem.'], ['especiais', '🎁 Missões Especiais', 'Missões criadas por você (lista abaixo), no Diário > Especiais. Desligado: a aba some e os resgates são recusados.']];
+    let tog = {};
+    async function loadEv() { try { const r = await api('/admin/events'); if (r && r.ok) { tog = r.toggles || {}; window.EventToggles = tog; renderEv(); } } catch (e) { } }
+    function renderEv() { const b = $('ev-list'); if (!b) return; b.innerHTML = EVENTS.map((e) => { const on = e[0] === 'fenda' ? tog.fenda === true : tog.especiais !== false; return `<div class="dev-ent-item" style="display:block;border-left:3px solid ${on ? '#2ecc71' : '#7f8c8d'};margin:4px 0;padding:6px"><b>${e[1]}</b> ${on ? '<span style="color:#2ecc71">ATIVO</span>' : '<span style="color:#95a5a6">desligado</span>'}<br><small style="opacity:.75">${e[2]}</small><br><button class="dev-save-btn" data-ev="${e[0]}" data-on="${on ? 0 : 1}" style="margin:4px 0 0;padding:3px 10px;width:auto;background:${on ? '#7f8c8d' : '#27ae60'}">${on ? 'Desligar' : 'Ligar'}</button></div>`; }).join(''); }
+    async function setEv(k, on) { const r = await api('/admin/events', { k, on }); if (r && r.ok) { tog = r.toggles; window.EventToggles = tog; renderEv(); status((on ? 'Evento ligado.' : 'Evento desligado.'), '#2ecc71'); } else status((r && r.error) || 'Erro.', '#e74c3c'); }
     const status = (t, c) => { const s = $('sq-status'); if (s) { s.textContent = t; s.style.color = c || '#bdc3c7'; } };
     async function load() {
         try { const r = await api('/admin/specialquest'); quests = (r && r.quests) || []; render(); } catch (e) { status('Falha de conexão.', '#e74c3c'); }

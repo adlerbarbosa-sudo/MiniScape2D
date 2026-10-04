@@ -1361,6 +1361,7 @@
         }
         info.hand = { x: wa0.x * sx, y: (wa0.y - LG) * sy, a: wa0.a };
 
+        if (o.under) o.under(g, info);   // asas/capa de peças especiais: atrás de todo o corpo
         g.save(); if (sx !== 1 || sy !== 1) g.scale(sx, sy);
         g.translate(0, -LG);
         // capa (NPC): atrás do tronco
@@ -1745,6 +1746,7 @@
         for (let a = 0; a < 6; a++) { const r = a * 1.0472 + 0.5; ell(g, cx + Math.cos(r) * (rx - 1.9), cy + Math.sin(r) * (ry - 1.9), 0.55, 0.55, lt); }
         ell(g, cx, cy, rx * 0.36, ry * 0.3, lt, OUT, 0.8);
     }
+    function underFn(g, info) { try { root.Mimic.under(g, _W.view, _W.eq, info, _W.now); } catch (e) { } }
     function behindFn(g, info) {   // arma de costas / escudo de lado e de costas: ficam ATRÁS do tronco (o escudo é carregado no braço, não nas costas)
         const W = _W;
         if (W.view === 'back') {
@@ -1796,6 +1798,7 @@
         const o = _baseO; o.view = view; o.t = now; o.seed = 3; o.turn = turn || 0; o.lookX = turn || 0; o.mv = mv; o.ph = ph; o.atk = atk; o.sex = L.sex; o.race = L.race; o.hairStyle = L.hairStyle | 0; o.hair = L.hair; o.skin = L.skin; o.shirt = (body && body.robe) ? armorColor(body, L.shirt) : L.shirt; o.armorT = body ? gearTier(body) : null; o.armorCol = body ? armorColor(body, '#aab3bd') : null; o.pants = L.pants;
         o.armor = !!body && !body.robe; o.hat = hd ? (hd.hat === 'wizard' || hd.hat === 'hood' ? hd.hat : (helmKind(hd) === 'crown' ? 'crown' : 'helmet')) : null; o.hatStyle = hd ? helmKind(hd) : null; o.hatColor = armorColor(hd, '#b9c2cc'); o.beard = (L.sex !== 'f' && (L.beard === 1 || (L.beard === undefined && L.race === 'dwarf'))) ? shade(L.hair || '#5a3a1e', -0.08) : null;
         o.behind = (wp || sh) ? behindFn : null; o.onBack = sh ? onBackFn : null; o.cape = null; o.apron = null; o.robe = !!(body && body.robe); o.pack = null; o.belt = null; o.boots = null; o.hatColor = o.hatColor;
+        _W.eq = equip; _W.now = now; o.under = (body && body.mimic && root.Mimic && root.Mimic.under && view !== 'back') ? underFn : null;
         const info = human(ctx, o);
         if (view === 'front' && sh) { const H = info.handL; drawShieldFace(ctx, H.x + 1.2, H.y - 4.4, 6.6, 7.8, gearCol(sh, '#9aa3ad'), shieldKind(sh)); }
         if (wp && view !== 'back') drawWeapon(ctx, wp, info.hand, view, anim, _W.skin);

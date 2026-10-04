@@ -81,7 +81,7 @@ function emptyDB() {
         users: Object.create(null), worldData: null, itemDB: null, npcDB: null,
         chat: [{ sender: 'Sistema', msg: 'O reino está aberto. Boa aventura!', color: '#2ecc71' }], chatVer: 1,
         mapVersion: Date.now(), sessions: Object.create(null),
-        mobDeaths: Object.create(null), specialQuests: Object.create(null), specialClaims: Object.create(null), specialProg: Object.create(null), engage: createEngageSrv.cleanDB(null)
+        mobDeaths: Object.create(null), specialQuests: Object.create(null), specialClaims: Object.create(null), specialProg: Object.create(null), engage: createEngageSrv.cleanDB(null), toggles: { fenda: false, especiais: true }
     };
 }
 function normalizeDB(d) {
@@ -115,6 +115,7 @@ function normalizeDB(d) {
     if (d.specialQuests && typeof d.specialQuests === 'object') for (const id of Object.keys(d.specialQuests)) { const q = cleanSQ(d.specialQuests[id], id); if (q) out.specialQuests[id] = q; }
     if (d.specialClaims && typeof d.specialClaims === 'object') for (const id of Object.keys(d.specialClaims)) { const c = d.specialClaims[id]; if (out.specialQuests[id] && c && typeof c === 'object' && !Array.isArray(c)) { const o = Object.create(null); for (const u of Object.keys(c)) if (Number.isFinite(c[u])) o[u] = c[u]; out.specialClaims[id] = o; } }
     if (d.specialProg && typeof d.specialProg === 'object') for (const id of Object.keys(d.specialProg)) { const c = d.specialProg[id]; if (out.specialQuests[id] && c && typeof c === 'object' && !Array.isArray(c)) { const o = Object.create(null); for (const u of Object.keys(c)) if (Number.isFinite(c[u]) && c[u] >= 0) o[u] = Math.min(1e6, Math.floor(c[u])); out.specialProg[id] = o; } }
+    out.toggles = { fenda: !!(d.toggles && d.toggles.fenda === true), especiais: !(d.toggles && d.toggles.especiais === false) };   // eventos ligados/desligados pelo admin (painel Dev > Eventos)
     out.engage = createEngageSrv.cleanDB(d.engage);   // estado de engajamento por conta (diária, missões, Códice, placar)
     if (out.worldData) healWorld(out.worldData);
     if (Number.isFinite(d.mapVersion)) out.mapVersion = d.mapVersion;
@@ -725,6 +726,39 @@ function houseMapAllowed(user, map) {
         return !!(h && Array.isArray(h.guests) && h.guests.some(g => String(g).toLowerCase() === me));
     } catch (e) { return false; }   // na dúvida, NÃO entra (antes falhava aberto)
 }
+/* itens no chão compartilhados: o cliente que gera o drop o publica (sync.drops) e todos no mesmo mapa o veem; quem pega confirma em /api/drop (primeiro a chegar leva). Só memória (somem com o tempo). */
+const groundDrops = Object.create(null);   // mapa -> sid -> { item, qty, x, y, by, exp }
+function dropsOf(map) { return groundDrops[map] || (groundDrops[map] = Object.create(null)); }
+function takeDrop(user, s) {
+    const a = activePlayers[user]; if (!a || typeof s !== 'string' || !/^[a-z0-9]{6,14}$/.test(s)) return { ok: false };
+    const d = groundDrops[a.map] && groundDrops[a.map][s]; if (!d || d.exp < Date.now()) return { ok: false };
+    if (Math.hypot(d.x - a.x, d.y - a.y) > 420) return { ok: false };   // longe demais do item
+    delete groundDrops[a.map][s]; return { ok: true };
+}
+function pubDrops(user, map, list) {
+    if (!Array.isArray(list) || /^casa_/.test(map)) return; const m = dropsOf(map), now = Date.now();
+    let mine = 0; for (const k in m) if (m[k].by === user) mine++;
+    for (const d of list.slice(0, 6)) {
+        if (!d || typeof d.s !== 'string' || !/^[a-z0-9]{6,14}$/.test(d.s) || m[d.s] || mine >= 40) continue;
+        if (d.k === 'fire') { m[d.s] = { k: 'fire', item: 'fire', qty: 1, x: coord(d.x, 0), y: coord(d.y, 0), by: user, exp: now + Math.max(5, Math.min(300, num(d.ttl, 60))) * 1000 }; mine++; continue; }
+        if (typeof d.item !== 'string' || !(sec.knownItem(d.item) || (db.itemDB && hasOwn(db.itemDB, d.item)))) continue;
+        const q = Math.floor(num(d.qty, 1)); if (!(q >= 1)) continue;
+        m[d.s] = { item: d.item, qty: Math.min(q, 100000), x: coord(d.x, 0), y: coord(d.y, 0), by: user, exp: now + Math.max(5, Math.min(300, num(d.ttl, 60))) * 1000 }; mine++;
+        if (Object.keys(m).length > 400) break;
+    }
+}
+function dropsView(user, map) {
+    const m = groundDrops[map]; if (!m) return []; const now = Date.now(), out = [];
+    for (const k of Object.keys(m)) { const d = m[k]; if (d.exp < now) { delete m[k]; continue; } if (d.by !== user) out.push({ s: k, k: d.k, item: d.item, qty: d.qty, x: d.x, y: d.y, ttl: Math.round((d.exp - now) / 1000) }); }
+    return out.slice(0, 120);
+}
+const depleted = Object.create(null);   // mapa -> id -> { exp, by }  (árvores/rochas esgotadas: todos veem o toco)
+function pubDep(user, map, list) {
+    if (!Array.isArray(list) || /^casa_/.test(map)) return; const m = depleted[map] || (depleted[map] = Object.create(null)), now = Date.now();
+    for (const d of list.slice(0, 8)) { if (!d || typeof d.i !== 'string' || !/^[A-Za-z0-9_\-]{1,30}$/.test(d.i)) continue; if (Object.keys(m).length >= 300) break; m[d.i] = { exp: now + Math.max(4, Math.min(120, num(d.s, 10))) * 1000, by: user }; }
+}
+function depView(user, map) { const m = depleted[map]; if (!m) return []; const now = Date.now(), out = []; for (const k of Object.keys(m)) { const d = m[k]; if (d.exp < now) { delete m[k]; continue; } if (d.by !== user) out.push({ i: k, s: Math.round((d.exp - now) / 1000) }); } return out.slice(0, 150); }
+function dropsMine(user, map) { const m = groundDrops[map]; if (!m) return []; const now = Date.now(); return Object.keys(m).filter(k => m[k].by === user && m[k].exp >= now).slice(0, 60); }
 let lastTick = 0;
 function doSync(user, b, ip) {
     b = b || {}; const now = Date.now(); ip = ip || '-';
@@ -732,7 +766,7 @@ function doSync(user, b, ip) {
     if (!/^casa_/.test(map) && db.worldData && !hasOwn(db.worldData, map)) map = hasOwn(db.worldData, 'lumbridge') ? 'lumbridge' : (Object.keys(db.worldData)[0] || map);   // mapa inexistente nunca cria estado novo
     if (/^casa_/.test(map) && sec.STRICT() && !houseMapAllowed(user, map)) { sec.slog('HOUSE-DENY', user, ip, 'sync em ' + map + ' sem convite'); map = 'lumbridge'; }
     const prev = activePlayers[user];
-    const eq = (b.equipment !== undefined && b.equipment && typeof b.equipment === 'object' && JSON.stringify(b.equipment).length < 6000) ? sec.cleanSyncEquip(b.equipment) : (prev ? prev.equipment : null);
+    const eq = (b.equipment !== undefined && b.equipment && typeof b.equipment === 'object' && JSON.stringify(b.equipment).length < 6000) ? sec.cleanSyncEquip(b.equipment) : (prev ? prev.equipment : ((hasOwn(db.users, user) && db.users[user].playerData && db.users[user].playerData.equipment && typeof db.users[user].playerData.equipment === 'object') ? sec.cleanSyncEquip(db.users[user].playerData.equipment) : null));   // sem estado (servidor reiniciou): usa o equipamento salvo
     try { if (eq) require('./mimicnames').syncVisual(eq, hasOwn(db.users, user) ? db.users[user].playerData : null); } catch (e) { }   // estágio/aparência dos Mímicos vistos pelos outros vêm do estado salvo
     const fc = (b.facing && typeof b.facing === 'object') ? { x: Math.max(-1, Math.min(1, num(b.facing.x) | 0)), y: Math.max(-1, Math.min(1, num(b.facing.y) | 0)) } : { x: 0, y: 1 };
     const role = hasOwn(db.users, user) ? db.users[user].role : 'player';
@@ -759,6 +793,7 @@ function doSync(user, b, ip) {
     } catch (e) { }
     try { if (!/^casa_/.test(map)) { sq.onVisit(user, map); eng.onVisit(user, map); } } catch (e) { }
     try { if (eng.isLegend(user) && !activePlayers[user].title) activePlayers[user].title = 'Lenda da Semana'; } catch (e) { }
+    try { if (Array.isArray(b.drel)) for (const s of b.drel.slice(0, 20)) if (typeof s === 'string' && groundDrops[map] && groundDrops[map][s] && groundDrops[map][s].by === user) delete groundDrops[map][s]; pubDrops(user, map, b.drops); pubDep(user, map, b.dep); } catch (e) { }
     const host = electHost(map); const isHost = host === user;
 
     if (!serverMobs[map]) serverMobs[map] = Object.create(null);
@@ -809,7 +844,7 @@ function doSync(user, b, ip) {
 
     const players = {};
     for (const u of Object.keys(activePlayers)) if (u !== user && activePlayers[u].map === map) players[u] = activePlayers[u];
-    const out = { t: now, boss: extras.bossInfo(), players, mapVersion: db.mapVersion, serverMobs: serverMobs[map], isHost, chatVer: db.chatVer, social: social.view(user) };
+    const out = { t: now, drops: dropsView(user, map), dmine: dropsMine(user, map), dep: depView(user, map), toggles: db.toggles, boss: extras.bossInfo(), players, mapVersion: db.mapVersion, serverMobs: serverMobs[map], isHost, chatVer: db.chatVer, social: social.view(user) };
     if (b.chatVer !== db.chatVer) out.chat = chatFor(user);
     if (killed.length) out.kills = killed;
     const lk = sec.lockedUntil(user); if (lk) out.lock = lk;   // salvamento suspenso: o cliente deve avisar o jogador
@@ -828,6 +863,7 @@ setInterval(() => { const n = Date.now(); for (const k of Object.keys(syncBucket
 app.post('/api/sync', auth, (req, res) => { if (!syncAllowed(req.user, SEC_IP(req))) return res.status(429).json({ error: 'Muitas ações seguidas. Aguarde um instante.', code: 'RATE' }); res.json(doSync(req.user, req.body, SEC_IP(req))); });
 app.post('/api/social', auth, userLimit('social', 120, 60000), (req, res) => { const r = social.act(req.user, req.body); if (r && !r.error && req.body && typeof req.body.a === 'string' && req.body.a.startsWith('trade_')) persistNow(); res.json(Object.assign({}, r, { social: social.view(req.user) })); });
 
+app.post('/api/drop', auth, userLimit('drop', 120, 60000), (req, res) => { const b = req.body || {}; res.json(b.a === 'take' ? takeDrop(req.user, b.s) : { ok: false }); });
 app.post('/api/house', auth, userLimit('house', 60, 60000), (req, res) => { res.json(extras.house(req.user, req.body)); });
 app.post('/api/market', auth, userLimit('market', 90, 60000), (req, res) => { const r = extras.market(req.user, req.body); if (r && r.ok && req.body && req.body.a !== 'browse' && req.body.a !== 'mail') persistNow(); res.json(r); });
 app.post('/api/rank', auth, userLimit('rank', 30, 60000), (req, res) => { res.json(extras.ranking(req.user, req.body || {})); });
@@ -921,8 +957,13 @@ app.post('/api/daily', auth, userLimit('daily', 20, 60000), (req, res) => { cons
 app.post('/api/engage', auth, userLimit('engage', 90, 60000), (req, res) => { const b = req.body; const r = eng.act(req.user, b, SEC_IP(req)); if (r && r.ok && b && ['daily', 'qclaim', 'qbonus', 'mclaim', 'lclaim', 'rend', 'rclaim'].includes(b.a)) persistNow(); res.json(r); });
 
 /* missões especiais: jogadores listam e resgatam; só o admin cria/edita (specialquests.js) */
-app.get('/api/specialquest/list', auth, userLimit('sqlist', 60, 60000), (req, res) => res.json({ ok: true, quests: sq.list(req.user) }));
-app.post('/api/specialquest/claim', auth, userLimit('sqclaim', 20, 60000), (req, res) => { const r = sq.claim(req.user, req.body, SEC_IP(req)); if (r && r.ok) persistNow(); res.json(r); });
+app.get('/api/specialquest/list', auth, userLimit('sqlist', 60, 60000), (req, res) => res.json({ ok: true, quests: (db.toggles && db.toggles.especiais === false) ? [] : sq.list(req.user) }));
+app.post('/api/specialquest/claim', auth, userLimit('sqclaim', 20, 60000), (req, res) => { if (db.toggles && db.toggles.especiais === false) return res.json({ ok: false, error: 'Evento desativado.' }); const r = sq.claim(req.user, req.body, SEC_IP(req)); if (r && r.ok) persistNow(); res.json(r); });
+app.get('/api/admin/events', auth, adminOnly, userLimit('evadm', 60, 60000), (req, res) => res.json({ ok: true, toggles: db.toggles }));
+app.post('/api/admin/events', auth, adminOnly, userLimit('evadm', 60, 60000), (req, res) => {
+    const b = req.body || {}; if (b.k !== 'fenda' && b.k !== 'especiais') return res.json({ ok: false, error: 'Evento desconhecido.' });
+    db.toggles = db.toggles || { fenda: false, especiais: true }; db.toggles[b.k] = b.on === true; sec.slog('EVENT', req.user, SEC_IP(req), b.k + ' = ' + db.toggles[b.k]); persistNow(); res.json({ ok: true, toggles: db.toggles });
+});
 app.get('/api/admin/specialquest', auth, adminOnly, userLimit('sqadm', 60, 60000), (req, res) => res.json({ ok: true, quests: sq.adminList(req.user) }));
 app.post('/api/admin/specialquest', auth, adminOnly, userLimit('sqadm', 60, 60000), (req, res) => res.json(sq.adminAct(req.user, req.body, SEC_IP(req))));
 

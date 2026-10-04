@@ -88,6 +88,7 @@
     }
     function specialHtml() {
         if (!online()) return '<i>As missões especiais só ficam disponíveis online.</i>';
+        if (window.EventToggles && window.EventToggles.especiais === false) return '<i>O evento de Missões Especiais está encerrado no momento.</i>';
         if (!sqData) return '<i>Carregando...</i>';
         let h = '<div style="font-size:.78rem;opacity:.85;margin-bottom:4px">Missões especiais, com recompensas exclusivas. Cada uma pode ser resgatada <b>uma vez</b> por jogador; o prêmio chega pelo correio.</div>';
         if (!sqData.length) return h + '<i>Nenhuma missão especial ativa agora.</i>';
