@@ -784,6 +784,7 @@
             isSyncing = true;
             try {
                 let payload = { x: player.x, y: player.y, map: (currentMap === 'casa' && window.World2 && World2.houseKey && World2.houseKey()) || currentMap, facing: player.facing, actionAnim: player.actionAnim, combatLogs: pendingCombatLogs, chatVer: lastChatVer, title: player.title || '' }; if (window.Life) { const _em = Life.pendingEmote(); if (_em) payload.emote = _em; }
+                if (window.RemoteFx) { const fxo = RemoteFx.take(); if (fxo.length) payload.fx = fxo; }
                 const eqStr = JSON.stringify(player.equipment); if (eqStr !== lastEqStr) { payload.equipment = player.equipment; lastEqStr = eqStr; }
                 if (player.look) { const lkStr = JSON.stringify(player.look); if (lkStr !== lastLookStr || ++lookTick >= 100) { payload.look = player.look; lastLookStr = lkStr; lookTick = 0; } }
                 const sentLogs = pendingCombatLogs; pendingCombatLogs = [];
@@ -805,6 +806,7 @@
                 try { if (window.Net) Net.onSync(data); } catch (e) { console.error(e); }
 
                 if(data.players) {
+                    try { if (window.RemoteFx) RemoteFx.onSync(data.players); } catch (e) { }
                     Object.keys(data.players).forEach(u => {
                         if (!otherPlayers[u]) {
                             otherPlayers[u] = data.players[u]; otherPlayers[u].displayX = data.players[u].x; otherPlayers[u].displayY = data.players[u].y; netPush(otherPlayers[u], data.players[u].x, data.players[u].y);
@@ -1409,7 +1411,7 @@
                         let hasRunes = true; Object.keys(spell.req).forEach(rk => { if(getInvCount(rk) < spell.req[rk]) hasRunes = false; });
                         if(hasRunes) {
                             if (!(window.Stats && Stats.saves())) Object.keys(spell.req).forEach(rk => removeInvItem(rk, spell.req[rk])); rg = playerRange('magic', wp); d = Balance.rollDmg(rg); sT = 'magic';
-                            projectiles.push({ x: player.x, y: player.y, target: tObj, tx: tObj.x + (tObj.w||30)/2, ty: tObj.y + (tObj.h||30)/2, dmg: d, speed: 6, type: 'magic', color: spell.color });
+                            projectiles.push({ x: player.x, y: player.y, target: tObj, tx: tObj.x + (tObj.w||30)/2, ty: tObj.y + (tObj.h||30)/2, dmg: d, speed: 6, type: 'magic', color: spell.color }); try { Sfx.play('magic'); } catch (e) { } if (window.RemoteFx) RemoteFx.out('magic', spell.color, player.x, player.y, tObj.x + (tObj.w||30)/2, tObj.y + (tObj.h||30)/2);
                             updateUI(); return; 
                         } else { setActionText("Sem runas!", "#e74c3c"); return; }
                     } else { setActionText("Magia indisponível ou nível baixo.", "#e74c3c"); return; }
@@ -1419,7 +1421,7 @@
                     if(ammo && ammo.qty >= 1) {
                         if (!(window.Stats && Stats.saves())) ammo.qty--; if(ammo.qty <= 0) { if(player.equipment) player.equipment.ammo = null; }
                         rg = playerRange('ranged', wp); d = Balance.rollDmg(rg); sT = 'ranged';
-                        projectiles.push({ x: player.x, y: player.y, target: tObj, tx: tObj.x + (tObj.w||30)/2, ty: tObj.y + (tObj.h||30)/2, dmg: d, speed: 8, type: 'ranged' }); 
+                        projectiles.push({ x: player.x, y: player.y, target: tObj, tx: tObj.x + (tObj.w||30)/2, ty: tObj.y + (tObj.h||30)/2, dmg: d, speed: 8, type: 'ranged' }); try { Sfx.play('bow'); } catch (e) { } if (window.RemoteFx) RemoteFx.out('ranged', '#795548', player.x, player.y, tObj.x + (tObj.w||30)/2, tObj.y + (tObj.h||30)/2);
                         updateUI(); return;
                     } else { setActionText("Sem flechas equipadas!", "#e74c3c"); return; }
                 } else { rg = playerRange('melee', wp); d = Balance.rollDmg(rg); }
@@ -1700,6 +1702,7 @@
 
                 if (typeof otherPlayers !== 'undefined') { Object.keys(otherPlayers).forEach(u => { let op = otherPlayers[u]; const sp = netSample(op, op.x, op.y); op.displayX = sp.x; op.displayY = sp.y; }); }
 
+                if (window.RemoteFx) RemoteFx.step();
                 for(let i = projectiles.length - 1; i >= 0; i--) { let p = projectiles[i]; if (p.target && p.target.active) { p.tx = p.target.x + (p.target.w||30) / 2; p.ty = p.target.y + (p.target.h||30) / 2; } let dx = p.tx - p.x; let dy = p.ty - p.y; let dist = Math.hypot(dx, dy); if (window.LOS && !(p._nl) && dist > 0 && !LOS.clear(p.x, p.y, p.x + (dx/dist)*Math.min(dist, p.speed + 4), p.y + (dy/dist)*Math.min(dist, p.speed + 4), cur)) { Art.burst(p.x, p.y, p.type === 'magic' ? (p.color || '#9ad') : '#cbb28a', 6, 0.8); projectiles.splice(i, 1); if (p.type === 'ranged' || p.type === 'magic') { if (!_losMsgT || performance.now() - _losMsgT > 1500) { _losMsgT = performance.now(); setActionText('O tiro bateu na parede.', '#e67e22'); } } continue; } if (dist < p.speed) { if(p.target && p.target.active) applyDamage(p.target, p.dmg, p.type); projectiles.splice(i, 1); } else { p.x += (dx/dist)*p.speed; p.y += (dy/dist)*p.speed; } }
 
                 if (rangedTarget) rangedTick(cur);
@@ -1988,6 +1991,7 @@
                 if (player.isPerformingAction && !(window.Fishing && Fishing.busy())) { const prg = 1 - (player.actionTimer / player.actionDelay); ctx.fillStyle = '#222'; ctx.fillRect(player.x - 15, player.y - 25, 30, 6); ctx.fillStyle = '#3498db'; ctx.fillRect(player.x - 14, player.y - 24, 28 * prg, 4); }
 
                 projectiles.forEach(p => { if (p.type === 'ranged') { ctx.fillStyle = '#795548'; ctx.fillRect(p.x-2, p.y-2, 4, 4); } else { ctx.fillStyle = p.color || '#1abc9c'; ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#ecf0f1'; ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI*2); ctx.fill(); } });
+                if (window.RemoteFx) RemoteFx.draw(ctx);
                 Fx.drawGhosts(ctx, drawMonster);
                 floatingTexts.forEach(ft => {
                     if (ft.dmg) { Fx.drawDmg(ctx, ft); return; }
@@ -2067,6 +2071,8 @@
             try { draw(); } catch(e){ logErr(e); } try { drawMinimap(); } catch(e){ logErr(e); }
         }
     </script>
+    <script src="remotefx.js"></script>
+    <script src="music.js"></script>
     <script src="ui.js"></script>
 </body>
 </html>

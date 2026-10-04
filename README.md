@@ -86,7 +86,9 @@ O cliente (`public/index.html`, `hub.js`, `net.js`) fala exatamente este protoco
 
 ## Conteúdo e sistemas (módulos em `public/`)
 - `env.js`: ciclo de dia e noite (20 min reais por dia), clima e luz por região com transições suaves (chuva, tempestade, neblina, neve, areia, cinzas, calor, névoa sombria; tabela na seção *Clima por região*), luzes de lampiões, tochas e cristais. Interiores (casas, cavernas, catacumbas, torres) nunca têm chuva e ficam escuros, com tochas nas paredes.
-- `sfx.js`: sons e música sintetizados por WebAudio (sem arquivos). Volumes na aba Menu.
+- `sfx.js`: efeitos e ambiente sintetizados por WebAudio (golpes, arco, magia, poção, equipar, passos por terreno). Volumes na aba Menu.
+- `music.js`: trilha RPG composta em código, uma música por bioma (aldeia, floresta, rio, mar, pântano, serra, neve, deserto, oásis, mina, covil, cemitério, vulcão, casa) mais combate e combate sombrio. Só muda ao trocar de bioma ou entrar/sair de combate. Faixas próprias: `audio/music/index.json` (`{"village":"village.mp3"}`) + arquivos na mesma pasta.
+- `remotefx.js`: magias e flechas de outros jogadores (o servidor repassa `fx` no sync); liga/desliga em Menu > Gráficos. Telas grandes desenham menos pixels (`Quality.renderScale`).
 - `quests.js`: missões de NPC com marcador `!`/`?`, entrega segura e integração ao diário. Novas missões: `Quests.add({...})`.
 - `content.js`: carvão e mithril, aço e mithril (fornalha), agricultura (canteiros, sementes do Fazendeiro, crescimento em tempo real), alquimia (caldeirão) e encantamento (mesa). Os itens/peças são colocados uma única vez por mapa (`m.c3`), sem sobrescrever o que o admin editou.
 - `world2.js`: Bestiário (aba Ofícios), Casa do Aventureiro e Catacumbas com o Lich Rei Ossian.

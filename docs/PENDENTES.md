@@ -14,8 +14,10 @@ Leia o README.md antes de começar. Regras de trabalho: testar com Playwright em
 - Casa: novo editor com inventário/estoque, preview que segue o mouse, girar (R) e móveis de treino automáticos com XP fixa editável no Dev (`public/world2.js`).
 - Fendas (`public/fendas.js`, `engagesrv.js`): masmorra de 6 andares, níveis 1-30, modificador semanal, placar semanal, pódio e meta comunitária. Reforja com afixos (`public/reforja.js`).
 - Terreno orgânico em grade (`public/terrain.js`), objetos com altura/base (estante encosta na parede, construções com pés mais rasos), celeiro e placa da taverna corrigidos. Se não gostar do terreno novo, basta remover a linha do script `terrain.js` no `index.html`: o desenho antigo volta sozinho.
+- Casa: poses por rotação, setas de frente na edição, visitante atualiza móveis (poll de 7 s). Magias/flechas visíveis para outros (`remotefx.js`, relé `fx` em `doSync`), música RPG por bioma (`music.js`), SFX novos, limite de pixels em telas grandes.
 
 ## Falta
+- Móveis na casa de outro jogador: causa real não confirmada, testar em produção.
 - Falta o evento Invasão no cliente (spawn dos invasores; precisa de teste multiplayer no servidor real).
 - Teste em produção das Fendas/Reforja/Casa (o ambiente de desenvolvimento não tem `express`; a lógica de servidor foi testada em módulo e o cliente com o servidor simulado).
 - Prestígio: não implementado (a Maestria após o nível 99 já cumpre o papel). Guildas não existem; a meta coletiva vive nas Fendas.

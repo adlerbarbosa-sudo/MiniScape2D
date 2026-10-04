@@ -98,33 +98,40 @@
     function tone(freq, dur, type, vol, opt) {
         opt = opt || {}; const t = ctx.currentTime + (opt.delay || 0); const o = ctx.createOscillator(), g = ctx.createGain(); o.type = type || 'sine'; o.frequency.setValueAtTime(freq, t);
         if (opt.to) o.frequency.exponentialRampToValueAtTime(Math.max(20, opt.to), t + dur);
-        env(g, t, opt.a || 0.004, dur, vol); o.connect(opt.filter || g); if (opt.filter) opt.filter.connect(g); g.connect(opt.bus || sfxBus); o.start(t); o.stop(t + dur + (opt.a || 0.004) + 0.05);
+        env(g, t, opt.a || 0.004, dur, vol * vm); o.connect(opt.filter || g); if (opt.filter) opt.filter.connect(g); g.connect(opt.bus || sfxBus); o.start(t); o.stop(t + dur + (opt.a || 0.004) + 0.05);
     }
     function noise(dur, ftype, freq, q, vol, opt) {
         opt = opt || {}; const t = ctx.currentTime + (opt.delay || 0); const s = ctx.createBufferSource(); s.buffer = noiseBuf; s.loop = true; const f = ctx.createBiquadFilter(); f.type = ftype; f.frequency.setValueAtTime(freq, t); f.Q.value = q || 1;
         if (opt.sweepTo) f.frequency.exponentialRampToValueAtTime(Math.max(40, opt.sweepTo), t + dur);
-        const g = ctx.createGain(); env(g, t, opt.a || 0.003, dur, vol); s.connect(f); f.connect(g); g.connect(opt.bus || sfxBus); s.start(t, Math.random() * 0.5); s.stop(t + dur + (opt.a || 0.003) + 0.05);
+        const g = ctx.createGain(); env(g, t, opt.a || 0.003, dur, vol * vm); s.connect(f); f.connect(g); g.connect(opt.bus || sfxBus); s.start(t, Math.random() * 0.5); s.stop(t + dur + (opt.a || 0.003) + 0.05);
     }
     const R = (a, b) => a + Math.random() * (b - a);
 
     const DEF = {
-        click: () => tone(1500, 0.03, 'square', 0.05),
-        step: () => noise(0.07, 'lowpass', R(300, 520), 1, 0.13),
-        hit: () => { tone(R(150, 190), 0.12, 'triangle', 0.4, { to: 60 }); noise(0.08, 'bandpass', 1400, 1, 0.22); },
-        miss: () => noise(0.12, 'bandpass', 900, 1.5, 0.12, { sweepTo: 2200 }),
-        kill: () => { tone(220, 0.35, 'sawtooth', 0.18, { to: 55 }); noise(0.25, 'lowpass', 900, 1, 0.25, { sweepTo: 200 }); },
-        hurt: () => { tone(200, 0.22, 'sawtooth', 0.28, { to: 90 }); noise(0.1, 'lowpass', 700, 1, 0.2); },
+        click: () => { tone(R(1900, 2200), 0.025, 'triangle', 0.05); tone(1100, 0.03, 'sine', 0.03, { delay: 0.012 }); },
+        step: () => { const sf = surf; const L = (stepAlt ^= 1) ? 1 : 0.9;
+            if (sf === 'wood') { tone(R(120, 150) * L, 0.07, 'triangle', 0.22, { to: 70 }); noise(0.05, 'bandpass', 900, 2, 0.1); }
+            else if (sf === 'stone') { noise(0.05, 'highpass', 2200 * L, 1, 0.12); tone(R(240, 300), 0.05, 'triangle', 0.08, { to: 150 }); }
+            else if (sf === 'snow') { noise(0.11, 'bandpass', 3200, 0.8, 0.1); noise(0.08, 'lowpass', 400, 1, 0.08); }
+            else if (sf === 'sand') { noise(0.12, 'bandpass', 1800, 0.6, 0.07, { sweepTo: 900 }); }
+            else if (sf === 'mud') { noise(0.1, 'lowpass', 260, 2, 0.16, { sweepTo: 140 }); tone(R(300, 420), 0.05, 'sine', 0.03, { to: 180, delay: 0.04 }); }
+            else { noise(0.08, 'lowpass', R(380, 600) * L, 0.9, 0.12); noise(0.04, 'highpass', 4500, 1, 0.025); } },
+        hit: () => { const p = R(0.9, 1.15); tone(R(140, 180) * p, 0.14, 'triangle', 0.42, { to: 55 }); tone(R(600, 800), 0.05, 'square', 0.08, { to: 300 }); noise(0.07, 'bandpass', 1600 * p, 1.2, 0.26); noise(0.18, 'lowpass', 500, 1, 0.14, { delay: 0.01 }); },
+        crit: () => { DEF.hit(); tone(1400, 0.22, 'sine', 0.12, { to: 2200 }); tone(2100, 0.3, 'sine', 0.07, { delay: 0.04 }); noise(0.12, 'highpass', 5000, 1, 0.12); },
+        miss: () => { noise(0.16, 'bandpass', 700, 1.6, 0.13, { sweepTo: 2600, a: 0.04 }); },
+        kill: () => { tone(240, 0.4, 'sawtooth', 0.16, { to: 50 }); tone(120, 0.5, 'triangle', 0.22, { to: 40 }); noise(0.3, 'lowpass', 1000, 1, 0.25, { sweepTo: 180 }); tone(880, 0.2, 'sine', 0.05, { to: 1320, delay: 0.1 }); },
+        hurt: () => { tone(R(180, 230), 0.24, 'sawtooth', 0.26, { to: 80 }); noise(0.12, 'lowpass', 800, 1, 0.22); tone(90, 0.2, 'sine', 0.3, { to: 45 }); },
         death: () => { [392, 330, 262, 196].forEach((f, i) => tone(f, 0.5, 'triangle', 0.22, { delay: i * 0.22 })); },
-        chop: () => { tone(R(170, 210), 0.09, 'square', 0.18, { to: 90 }); noise(0.09, 'bandpass', 700, 1, 0.3); },
-        mine: () => { tone(R(1000, 1200), 0.16, 'square', 0.1, { to: 650 }); tone(2400, 0.08, 'sine', 0.08); noise(0.06, 'highpass', 3000, 1, 0.16); },
+        chop: () => { tone(R(150, 190), 0.1, 'triangle', 0.3, { to: 70 }); noise(0.08, 'bandpass', R(600, 800), 1.4, 0.3); tone(R(380, 460), 0.06, 'square', 0.06, { to: 250, delay: 0.015 }); noise(0.2, 'lowpass', 300, 1, 0.12, { delay: 0.03 }); },
+        mine: () => { const b = R(1000, 1250); tone(b, 0.18, 'square', 0.08, { to: b * 0.6 }); tone(b * 2.4, 0.1, 'sine', 0.09); tone(b * 3.1, 0.06, 'sine', 0.04, { delay: 0.01 }); noise(0.06, 'highpass', 3000, 1, 0.18); tone(110, 0.1, 'triangle', 0.22, { to: 60 }); },
         fish: () => { noise(0.35, 'lowpass', 2200, 1, 0.22, { sweepTo: 300 }); tone(500, 0.12, 'sine', 0.08, { to: 900, delay: 0.05 }); },
         smelt: () => { noise(0.4, 'bandpass', 500, 2, 0.16, { sweepTo: 250 }); tone(110, 0.4, 'sawtooth', 0.08, { to: 80 }); },
         cook: () => noise(0.5, 'highpass', 4200, 0.7, 0.13),
         fire: () => { noise(0.25, 'bandpass', 600, 1, 0.2, { sweepTo: 1600 }); },
         pickup: () => { tone(660, 0.09, 'sine', 0.18); tone(990, 0.12, 'sine', 0.18, { delay: 0.07 }); },
-        coin: () => { tone(1320, 0.1, 'square', 0.08); tone(1760, 0.18, 'square', 0.08, { delay: 0.06 }); },
+        coin: () => { tone(1568, 0.1, 'square', 0.06); tone(2093, 0.22, 'square', 0.06, { delay: 0.06 }); tone(3136, 0.3, 'sine', 0.05, { delay: 0.07 }); noise(0.04, 'highpass', 6000, 1, 0.05); },
         craft: () => { tone(1250, 0.35, 'sine', 0.18); tone(1870, 0.28, 'sine', 0.1); noise(0.05, 'highpass', 2500, 1, 0.3); tone(1250, 0.3, 'sine', 0.12, { delay: 0.18 }); },
-        levelup: () => { [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.28, 'triangle', 0.22, { delay: i * 0.09 })); tone(1568, 0.5, 'sine', 0.12, { delay: 0.4 }); },
+        levelup: () => { [[523, 659, 784], [587, 740, 880], [659, 784, 988], [784, 988, 1175]].forEach((c, i) => c.forEach(f => tone(f, 0.34, 'triangle', 0.13, { delay: i * 0.1 }))); [1568, 2093].forEach((f, i) => tone(f, 0.7, 'sine', 0.1, { delay: 0.46 + i * 0.05 })); noise(0.5, 'highpass', 6000, 1, 0.05, { delay: 0.45 }); },
         quest: () => { [392, 523, 659, 784].forEach((f, i) => { tone(f, 0.4, 'triangle', 0.2, { delay: i * 0.13 }); tone(f * 2, 0.4, 'sine', 0.06, { delay: i * 0.13 }); }); },
         accept: () => { tone(440, 0.12, 'triangle', 0.18); tone(660, 0.2, 'triangle', 0.18, { delay: 0.1 }); },
         error: () => { tone(160, 0.18, 'square', 0.12); tone(130, 0.2, 'square', 0.12, { delay: 0.12 }); },
@@ -135,14 +142,24 @@
         harvest: () => { noise(0.1, 'bandpass', 2000, 1, 0.2); tone(700, 0.1, 'sine', 0.12, { delay: 0.05 }); },
         brew: () => { for (let i = 0; i < 4; i++) tone(R(300, 700), 0.09, 'sine', 0.12, { delay: i * 0.07, to: R(700, 1200) }); },
         enchant: () => { [880, 1175, 1568, 2093].forEach((f, i) => tone(f, 0.5, 'sine', 0.1, { delay: i * 0.06 })); noise(0.5, 'highpass', 5000, 1, 0.06); },
+        bow: () => { tone(R(200, 240), 0.1, 'triangle', 0.2, { to: 110 }); noise(0.2, 'bandpass', 1800, 1.5, 0.12, { sweepTo: 4200, a: 0.02, delay: 0.03 }); tone(900, 0.06, 'sine', 0.05, { delay: 0.02 }); },
+        magic: () => { noise(0.4, 'bandpass', 900, 3, 0.1, { sweepTo: 4200, a: 0.05 }); [660, 990, 1320].forEach((f, i) => tone(f, 0.35, 'sine', 0.08, { to: f * 1.5, delay: i * 0.05 })); tone(180, 0.3, 'sawtooth', 0.07, { to: 360 }); },
+        magichit: () => { noise(0.25, 'bandpass', 2400, 2, 0.12, { sweepTo: 600 }); tone(520, 0.2, 'sine', 0.12, { to: 180 }); tone(1560, 0.15, 'sine', 0.06, { to: 700 }); },
+        potion: () => { for (let i = 0; i < 3; i++) { tone(R(260, 360), 0.08, 'sine', 0.14, { to: R(160, 220), delay: i * 0.11 }); noise(0.05, 'bandpass', 700, 2, 0.06, { delay: i * 0.11 }); } tone(900, 0.2, 'sine', 0.05, { delay: 0.4 }); },
+        eat: () => { for (let i = 0; i < 3; i++) { noise(0.06, 'bandpass', R(1400, 2200), 1.2, 0.16, { delay: i * 0.12 }); tone(R(140, 190), 0.05, 'triangle', 0.08, { delay: i * 0.12 }); } },
+        equip: () => { noise(0.05, 'highpass', 3500, 1, 0.14); tone(R(1700, 2000), 0.12, 'triangle', 0.08, { to: 1300 }); tone(220, 0.1, 'triangle', 0.14, { to: 130, delay: 0.03 }); noise(0.12, 'lowpass', 500, 1, 0.1, { delay: 0.03 }); },
+        unequip: () => { tone(R(900, 1100), 0.08, 'triangle', 0.07, { to: 650 }); noise(0.07, 'lowpass', 700, 1, 0.1); },
+        chest: () => { tone(110, 0.16, 'sawtooth', 0.1, { to: 150 }); noise(0.2, 'bandpass', 500, 4, 0.12, { sweepTo: 1200 }); [1320, 1760, 2349].forEach((f, i) => tone(f, 0.25, 'sine', 0.06, { delay: 0.14 + i * 0.07 })); },
+        splash: () => { noise(0.3, 'bandpass', 1400, 0.8, 0.2, { sweepTo: 400, a: 0.01 }); tone(420, 0.12, 'sine', 0.08, { to: 220 }); },
         build: () => { tone(180, 0.08, 'square', 0.16, { to: 120 }); noise(0.06, 'bandpass', 900, 1, 0.16); }
     };
+    let vm = 1, surf = 'grass', stepAlt = 0;
     const last = {}; let poly = 0;
     function play(name, vol) {
         if (!ctx || S.muted || ctx.state !== 'running') return; const f = DEF[name]; if (!f) return;
         const now = performance.now(); const gap = name === 'step' ? 120 : 45; if (last[name] && now - last[name] < gap) return; last[name] = now;
         if (poly > 14) return; poly++; setTimeout(() => { poly--; }, 260);
-        try { f(vol || 1); } catch (e) {}
+        vm = vol || 1; try { f(vm); } catch (e) {} vm = 1;
     }
 
     /* ---------- música procedural por mapa, hora e clima ---------- */
@@ -168,9 +185,9 @@
     setInterval(() => {
         if (!ctx || ctx.state !== 'running' || S.muted) return; const now = ctx.currentTime;
         const sc = SCALES[mood.key] || SCALES.village, root = ROOT[mood.key] || 261.63;
-        if (now >= chordT) { chordT = now + 14 + R(0, 6); curChord = (curChord + 1) % sc.length; setPad(freqOf(root, sc[curChord]), sc); }
+        if (!window.Music && now >= chordT) { chordT = now + 14 + R(0, 6); curChord = (curChord + 1) % sc.length; setPad(freqOf(root, sc[curChord]), sc); }
         const slow = mood.night ? 1.6 : 1;
-        if (now >= nextNote) {
+        if (!window.Music && now >= nextNote) {
             nextNote = now + (mood.key === 'lair' ? R(3.5, 6) : R(1.6, 3.4)) * slow;
             walk = Math.max(0, Math.min(sc.length * 2 - 1, walk + Math.round(R(-2, 2)))); const deg = sc[walk % sc.length] + 12 * Math.floor(walk / sc.length);
             pluck(freqOf(root, deg), (mood.night ? 0.11 : 0.15) * (1 - mood.rain * 0.3));
@@ -211,6 +228,9 @@
         wrap('applyDamage', (a) => { if (a[1] > 0) play('hit'); else play('miss'); if (a[0] && a[0].hp <= 0) play('kill'); });
         wrap('addFloatingText', (a) => { const t = String(a[2]); if (t === 'Pegou') play('pickup'); else if (t === 'Pescado') play('fish'); else if (t === 'Cozinhou!') play('cook'); else if (t === 'Level Up!') play('levelup'); else if (t === 'Vazio') play('depleted'); });
         wrap('setActionText', (a) => { const t = String(a[0]); if (/^Criou /.test(t)) play('craft'); else if (/Faltam|cheio|inválida|Requer|Sem minér|não pode/i.test(t)) play('error'); else if (/^Acendeu/.test(t)) play('fire'); else if (/^Viajou/.test(t)) play('portal'); });
+        wrap('applyDamage', (a) => { if (a[0] && a[0].type === 'enemy' && a[1] > 0 && a[2] === 'magic') setTimeout(() => play('magichit'), 150); });
+        const _use = window.useItem; if (typeof _use === 'function') window.useItem = function (i) { const it = window.player && player.inventory && player.inventory[i]; const r = _use.apply(this, arguments); try { if (it) { if (it.type === 'equipment') play('equip'); else if (it.type === 'consumable') play(/potion|poção|elixir|brew|dose/i.test(it.name || '') ? 'potion' : 'eat'); } } catch (e) { } return r; };
+        wrap('unequip', () => play('unequip'));
         wrap('respawnAtVillage', () => play('death'));
         document.addEventListener('click', (e) => { if (e.target.closest && e.target.closest('.tab-btn,.item-slot,.osrs-menu-item,button,.rc-item,.book-tab,.equip-slot-box')) play('click'); }, true);
         // passos, golpes de coleta, dano recebido, clima e humor da música
@@ -224,10 +244,11 @@
                 if (player.stats) { if (lastHp != null && player.stats.hp < lastHp) play('hurt'); lastHp = player.stats.hp; }
                 if (player.isPerformingAction && player.actionAnim === 10 && lastAnim !== 10) { const t = player.actionType; if (t === 'chop') play('chop'); else if (t === 'mine') play('mine'); else if (t === 'smelt_brz' || t === 'smelt_iron') play('smelt'); }
                 lastAnim = player.actionAnim;
-                const m = gameMaps[currentMap]; if (m && window.Env) setMood({ mapId: currentMap, name: m.name, night: Env.isNight(), rain: Env.rainLevel ? Env.rainLevel() : (/Chuva/.test(Env.weatherLabel()) ? 1 : 0) });
+                const m = gameMaps[currentMap]; if (m && window.Env) { try { const rg = Env.regionOf(m), mk = Env.mapKind(m); surf = mk === 'home' ? 'wood' : (mk === 'dark' || mk === 'dim') ? 'stone' : rg === 'gelo' ? 'snow' : /deserto|oasis|areias|litoral/.test(rg) ? 'sand' : /pantano|rio/.test(rg) ? 'mud' : 'grass'; } catch (e) { } }
+                if (m && window.Env) setMood({ mapId: currentMap, name: m.name, night: Env.isNight(), rain: Env.rainLevel ? Env.rainLevel() : (/Chuva/.test(Env.weatherLabel()) ? 1 : 0) });
             } catch (e) {}
         }, 60);
     }
     window.addEventListener('load', wire);
-    window.Sfx = { def: DEF, tone, noise, _master: () => master, _ctx: () => ctx, _amb: () => A, _mood: () => mood, play, init, setMood, settings: S, ready: () => !!ctx, state: () => ctx && ctx.state };
+    window.Sfx = { _bus: () => ({ ctx, musBus, reverbIn, noiseBuf, S }), setSurf(v) { surf = v; }, def: DEF, tone, noise, _master: () => master, _ctx: () => ctx, _amb: () => A, _mood: () => mood, play, init, setMood, settings: S, ready: () => !!ctx, state: () => ctx && ctx.state };
 })();

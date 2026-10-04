@@ -745,6 +745,18 @@ function doSync(user, b, ip) {
         look: (b.look !== undefined && cleanLook(b.look)) || (prev ? prev.look : null) || savedLook(user),
         pet: b.pet !== undefined ? extras.cleanPetSync(b.pet) : (prev ? prev.pet : null), mount: b.mount !== undefined ? extras.cleanMountId(b.mount) : (prev ? prev.mount : null), ms: b.ms !== undefined ? extras.cleanMountStage(b.ms) : (prev ? prev.ms : 0) };
     if (typeof b.emote === 'string' && /^[a-z]{2,10}$/.test(b.emote) && (!prev || !prev.emote || now - prev.emote.t > 1500)) activePlayers[user].emote = { k: b.emote, t: now };
+    try {   // magias/flechas: eventos curtos só para os outros jogadores desenharem (sem efeito no jogo)
+        let fx = (prev && Array.isArray(prev.fx)) ? prev.fx.filter(f => now - f.t < 2500) : [];
+        if (Array.isArray(b.fx) && (!prev || !prev.fxAt || now - prev.fxAt > 120)) {
+            for (const f of b.fx.slice(0, 4)) {
+                if (!f || (f.k !== 'magic' && f.k !== 'ranged')) continue;
+                const col = (typeof f.c === 'string' && /^#[0-9a-fA-F]{6}$/.test(f.c)) ? f.c : '#1abc9c';
+                fx.push({ k: f.k, c: col, x: coord(f.x, px), y: coord(f.y, py), tx: coord(f.tx, px), ty: coord(f.ty, py), t: now + fx.length });
+            }
+            activePlayers[user].fxAt = now;
+        } else if (prev) activePlayers[user].fxAt = prev.fxAt;
+        activePlayers[user].fx = fx.slice(-8);
+    } catch (e) { }
     try { if (!/^casa_/.test(map)) { sq.onVisit(user, map); eng.onVisit(user, map); } } catch (e) { }
     try { if (eng.isLegend(user) && !activePlayers[user].title) activePlayers[user].title = 'Lenda da Semana'; } catch (e) { }
     const host = electHost(map); const isHost = host === user;
